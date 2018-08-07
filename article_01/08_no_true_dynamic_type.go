@@ -17,4 +17,3 @@ func main() {
 	c = nil
 	fmt.Println(c)
 }
-

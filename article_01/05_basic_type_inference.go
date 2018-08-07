@@ -10,4 +10,3 @@ func main() {
 	c := true
 	fmt.Println(c)
 }
-

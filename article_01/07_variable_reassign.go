@@ -17,4 +17,3 @@ func main() {
 	c = false
 	fmt.Println(c)
 }
-
