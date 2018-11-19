@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 12:
+//    Použití pojmenovaného návratového parametru
+
 package main
 
 import "fmt"
