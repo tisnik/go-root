@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 13:
+//    Funkce se dvěma parametry
+
 package main
 
 import "fmt"
