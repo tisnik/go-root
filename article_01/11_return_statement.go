@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 11:
+//    Deklarace uživatelské funkce s návratovou hodnotou
+
 package main
 
 import "fmt"
