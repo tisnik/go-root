@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 8:
+//    Špatný typ hodnoty přiřazený do proměnných
+
 package main
 
 import "fmt"
