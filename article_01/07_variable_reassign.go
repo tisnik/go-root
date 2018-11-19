@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 7:
+//    Změna hodnoty již existující proměnné
+
 package main
 
 import "fmt"
