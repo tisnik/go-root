@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 16:
+//    Chybný pokus o deklaraci proměnné za příkazem return
+
 package main
 
 import "fmt"
