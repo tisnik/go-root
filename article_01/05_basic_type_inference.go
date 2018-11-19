@@ -1,3 +1,8 @@
+// Seriál "Programovací jazyk Go"
+//
+// Demonstrační příklad číslo 5:
+//    Deklarace proměnné s její inicializací
+
 package main
 
 import "fmt"
