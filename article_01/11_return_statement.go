@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+// První část
+//
 // Demonstrační příklad číslo 11:
 //    Deklarace uživatelské funkce s návratovou hodnotou
 

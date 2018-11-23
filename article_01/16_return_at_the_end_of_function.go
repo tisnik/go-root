@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+// První část
+//
 // Demonstrační příklad číslo 16:
 //    Chybný pokus o deklaraci proměnné za příkazem return
 

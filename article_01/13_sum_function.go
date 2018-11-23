@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+// První část
+//
 // Demonstrační příklad číslo 13:
 //    Funkce se dvěma parametry
 

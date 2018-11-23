@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+// První část
+//
 // Demonstrační příklad číslo 8:
 //    Špatný typ hodnoty přiřazený do proměnných
 
