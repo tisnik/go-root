@@ -2,7 +2,7 @@
 //
 // Druhá část
 //
-// Demonstrační příklad číslo 8:
+// Demonstrační příklad číslo 10:
 //    Základní formátování celočíselných hodnot na výstupu
 
 package main
@@ -15,11 +15,40 @@ func main() {
 	var c int32 = -10000
 	var d int32 = -1000000
 
+        var r1 rune = 'a'
+        var r2 rune = '\x40'
+        var r3 rune = '\n'
+        var r4 rune = '\u03BB'
+
         fmt.Println("%d")
 	fmt.Printf("%d\n", a)
 	fmt.Printf("%d\n", b)
 	fmt.Printf("%d\n", c)
 	fmt.Printf("%d\n", d)
+
+        fmt.Println("\n%5d")
+	fmt.Printf("%5d\n", a)
+	fmt.Printf("%5d\n", b)
+	fmt.Printf("%5d\n", c)
+	fmt.Printf("%5d\n", d)
+
+        fmt.Println("\n%05d")
+	fmt.Printf("%05d\n", a)
+	fmt.Printf("%05d\n", b)
+	fmt.Printf("%05d\n", c)
+	fmt.Printf("%05d\n", d)
+
+        fmt.Println("\n%-5d")
+	fmt.Printf("%-5d\n", a)
+	fmt.Printf("%-5d\n", b)
+	fmt.Printf("%-5d\n", c)
+	fmt.Printf("%-5d\n", d)
+
+        fmt.Println("\n%+5d")
+	fmt.Printf("%+5d\n", a)
+	fmt.Printf("%+5d\n", b)
+	fmt.Printf("%+5d\n", c)
+	fmt.Printf("%+5d\n", d)
 
         fmt.Println("\n%x")
 	fmt.Printf("%x\n", a)
@@ -38,4 +67,10 @@ func main() {
 	fmt.Printf("%b\n", b)
 	fmt.Printf("%b\n", c)
 	fmt.Printf("%b\n", d)
+
+        fmt.Println("%c")
+	fmt.Printf("%c\n", r1)
+	fmt.Printf("%c\n", r2)
+	fmt.Printf("%c\n", r3)
+	fmt.Printf("%c\n", r4)
 }

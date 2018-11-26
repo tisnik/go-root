@@ -2,7 +2,7 @@
 //
 // Druhá část
 //
-// Demonstrační příklad číslo 7:
+// Demonstrační příklad číslo 9:
 //    Základní formátování celočíselných hodnot na výstupu
 
 package main
@@ -10,16 +10,40 @@ package main
 import "fmt"
 
 func main() {
-	var a uint8 = 10
-	var b uint16 = 1000
-	var c uint32 = 10000
-	var d uint32 = 1000000
+	var a uint8 = 20
+	var b uint16 = 2000
+	var c uint32 = 20000
+	var d uint32 = 2000000
 
         fmt.Println("%d")
 	fmt.Printf("%d\n", a)
 	fmt.Printf("%d\n", b)
 	fmt.Printf("%d\n", c)
 	fmt.Printf("%d\n", d)
+
+        fmt.Println("\n%5d")
+	fmt.Printf("%5d\n", a)
+	fmt.Printf("%5d\n", b)
+	fmt.Printf("%5d\n", c)
+	fmt.Printf("%5d\n", d)
+
+        fmt.Println("\n%05d")
+	fmt.Printf("%05d\n", a)
+	fmt.Printf("%05d\n", b)
+	fmt.Printf("%05d\n", c)
+	fmt.Printf("%05d\n", d)
+
+        fmt.Println("\n%-5d")
+	fmt.Printf("%-5d\n", a)
+	fmt.Printf("%-5d\n", b)
+	fmt.Printf("%-5d\n", c)
+	fmt.Printf("%-5d\n", d)
+
+        fmt.Println("\n%+5d")
+	fmt.Printf("%+5d\n", a)
+	fmt.Printf("%+5d\n", b)
+	fmt.Printf("%+5d\n", c)
+	fmt.Printf("%+5d\n", d)
 
         fmt.Println("\n%x")
 	fmt.Printf("%x\n", a)
