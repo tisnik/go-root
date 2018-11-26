@@ -2,7 +2,7 @@
 //
 // Druhá část
 //
-// Demonstrační příklad číslo 10:
+// Demonstrační příklad číslo 9:
 //    Základní formátování celočíselných hodnot na výstupu
 
 package main
@@ -10,15 +10,10 @@ package main
 import "fmt"
 
 func main() {
-	var a int8 = -10
-	var b int16 = -1000
-	var c int32 = -10000
-	var d int32 = -1000000
-
-        var r1 rune = 'a'
-        var r2 rune = '\x40'
-        var r3 rune = '\n'
-        var r4 rune = '\u03BB'
+	var a uint8 = 20
+	var b uint16 = 2000
+	var c uint32 = 20000
+	var d uint32 = 2000000
 
         fmt.Println("%d")
 	fmt.Printf("%d\n", a)
@@ -67,10 +62,4 @@ func main() {
 	fmt.Printf("%b\n", b)
 	fmt.Printf("%b\n", c)
 	fmt.Printf("%b\n", d)
-
-        fmt.Println("%c")
-	fmt.Printf("%c\n", r1)
-	fmt.Printf("%c\n", r2)
-	fmt.Printf("%c\n", r3)
-	fmt.Printf("%c\n", r4)
 }
