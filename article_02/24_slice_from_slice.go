@@ -10,8 +10,8 @@ package main
 import "fmt"
 
 func main() {
-	var a[10]int
-        
+	var a [10]int
+
 	slice1 := a[4:9]
 	slice2 := slice1[3:]
 

@@ -3,7 +3,7 @@
 // Druhá část
 //
 // Demonstrační příklad číslo 19
-//    Lokální proměnné 
+//    Lokální proměnné
 
 package main
 

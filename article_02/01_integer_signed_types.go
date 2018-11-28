@@ -15,10 +15,10 @@ func main() {
 	var c int32 = -10000
 	var d int32 = -1000000
 
-        var r1 rune = 'a'
-        var r2 rune = '\x40'
-        var r3 rune = '\n'
-        var r4 rune = '\u03BB'
+	var r1 rune = 'a'
+	var r2 rune = '\x40'
+	var r3 rune = '\n'
+	var r4 rune = '\u03BB'
 
 	fmt.Println(a)
 	fmt.Println(b)
