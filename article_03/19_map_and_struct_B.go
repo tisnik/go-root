@@ -2,8 +2,8 @@
 //
 // Třetí část
 //
-// Demonstrační příklad číslo 17:
-//    Mapa s inicializací.
+// Demonstrační příklad číslo 19:
+//    Mapa struktur.
 
 package main
 
