@@ -32,7 +32,7 @@ func main() {
 	}
 	fmt.Println(users)
 
-	var users2 = []User{
+	var users2 = [...]User{
 		User{
 			id:      1,
 			name:    "Pepek",
