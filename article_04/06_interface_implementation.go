@@ -26,10 +26,10 @@ func length(shape OpenShape) float64 {
 }
 
 func main() {
-	l1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+	line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
 
-	fmt.Println(l1)
+	fmt.Println(line1)
 
-	line_length := length(l1)
+	line_length := length(line1)
 	fmt.Println(line_length)
 }
