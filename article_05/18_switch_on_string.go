@@ -12,6 +12,7 @@ func command(x string) string {
 	case "":
 		return "missing command"
 	case "help":
+		fallthrough
 	case "info":
 		return "help"
 	case "bye":
