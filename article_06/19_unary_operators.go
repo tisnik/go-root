@@ -40,5 +40,5 @@ func main() {
 	// unární operátor <-
 	channel := make(chan int)
 	go message(channel)
-	channel <- 1
+	<-channel
 }
