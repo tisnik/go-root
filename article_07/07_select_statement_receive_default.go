@@ -16,7 +16,7 @@ func worker(channel chan int, worker int) {
 	fmt.Printf("Worker %d spuštěn\n", worker)
 	time.Sleep(2 * time.Second)
 	channel <- 1
-	fmt.Printf("Worker %d ukonnčen\n", worker)
+	fmt.Printf("Worker %d ukončen\n", worker)
 }
 
 func main() {
