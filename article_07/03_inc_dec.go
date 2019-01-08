@@ -27,4 +27,14 @@ func main() {
 
 	*px--
 	fmt.Printf("x = %d\n", *px)
+
+	y := 3.14
+	fmt.Printf("y = %f\n", y)
+	y++
+	fmt.Printf("y = %f\n", y)
+
+	z := 1 + 2i
+	fmt.Printf("z = %f\n", z)
+	z++
+	fmt.Printf("z = %f\n", z)
 }
