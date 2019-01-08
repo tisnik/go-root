@@ -25,7 +25,7 @@ func worker(channel chan int, worker int) {
 }
 
 func main() {
-	ch1 := make(chan int)
+	ch1 := make(chan int, 20)
 
 	go worker(ch1, 1)
 	go worker(ch1, 2)
