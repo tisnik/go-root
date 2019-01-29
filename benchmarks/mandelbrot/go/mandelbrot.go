@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-func calc_mandelbrot(width uint, height uint, maxiter uint, palette [][3]byte) {
+func calcMandelbrot(width uint, height uint, maxiter uint, palette [][3]byte) {
 	fmt.Println("P3")
 	fmt.Printf("%d %d\n", width, height)
 	fmt.Println("255")
@@ -64,5 +64,5 @@ func main() {
 		fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
 		os.Exit(1)
 	}
-	calc_mandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:])
+	calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:])
 }

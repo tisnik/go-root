@@ -39,7 +39,6 @@ void calc_mandelbrot(unsigned int width, unsigned int height, unsigned int maxit
     }
 }
 
-
 int main(int argc, char **argv)
 {
     if (argc < 4) {
