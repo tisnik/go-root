@@ -1,5 +1,5 @@
 # Parametry prekladace.
-CFLAGS=-Wall -ansi -O9 -funroll-loops -march=native -ffast-math
+CFLAGS=-Wall -ansi -O9 -funroll-loops -march=native
 
 PROGNAME=mandelbrot
 
