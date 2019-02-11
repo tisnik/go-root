@@ -15,6 +15,7 @@ func main() {
 	defer l.Close()
 	for {
 		conn, err := l.Accept()
+		println("connection accepted")
 		time.Sleep(2 * time.Second)
 		defer conn.Close()
 		if err != nil {
@@ -24,5 +25,6 @@ func main() {
 			cnt++
 			conn.Write(b)
 		}
+		println("connection closed")
 	}
 }
