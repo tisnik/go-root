@@ -1,0 +1,2383 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Konstrukce pro řízení běhu programu v jazyce Go (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Konstrukce pro řízení běhu programu v jazyce Go (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Po popisu řídicích struktur používaných pro klasické strukturované programování (podmínky a smyčky) si dnes představíme dva příkazy pro "nestrukturované" ovlivnění běhu programu. Jedná se o příkazy goto a defer. V závěru článku se budeme zabývat specifickými vlastnostmi operátorů v Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Konstrukce pro řízení běhu programu v jazyce Go (dokončení)</a></p>
+<p><a href="#k02">2. Další možnosti použití příkazu <strong>goto</strong>: výskok z&nbsp;vnořených smyček a výskok ze struktury <strong>switch</strong></a></p>
+<p><a href="#k03">3. Příklady nekorektního použití příkazu <strong>goto</strong></a></p>
+<p><a href="#k04">4. Jak často se <strong>goto</strong> používá v&nbsp;reálných programech?</a></p>
+<p><a href="#k05">5. Výsledky analýz zdrojových kódů</a></p>
+<p><a href="#k06">6. Příkaz <strong>defer</strong></a></p>
+<p><a href="#k07">7. Volání funkce s&nbsp;parametry v&nbsp;bloku <strong>defer</strong></a></p>
+<p><a href="#k08">8. Pořadí volání funkcí zaregistrovaných s&nbsp;využitím příkazu <strong>defer</strong></a></p>
+<p><a href="#k09">9. Vyhodnocení parametrů funkcí zaregistrovaných příkazem <strong>defer</strong></a></p>
+<p><a href="#k10">10. Defer a příkaz <strong>return</strong></a></p>
+<p><a href="#k11">11. Praktické použití příkazu <strong>defer</strong></a></p>
+<p><a href="#k12">12. Ovlivnění návratové hodnoty funkce v&nbsp;bloku <strong>defer</strong></a></p>
+<p><a href="#k13">13. Funkce <strong>panic</strong></a></p>
+<p><a href="#k14">14. Funkce <strong>recover</strong></a></p>
+<p><a href="#k15">15. Výrazy a operátory v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k16">16. Unární operátory</a></p>
+<p><a href="#k17">17. Relační operátory</a></p>
+<p><a href="#k18">18. Dělení, zbytek po dělení a bitové posuny</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Konstrukce pro řízení běhu programu v jazyce Go (dokončení)</h2>
+
+<p>V&nbsp;pořadí již šestý článek o programovacím jazyce Go je rozdělen do tří
+částí. V&nbsp;úvodní části se seznámíme s&nbsp;příkazem <strong>goto</strong> a
+zejména se situacemi, v&nbsp;nichž se tento příkaz <i>nemá</i> používat,
+protože Go v&nbsp;mnoha případech programátorům nabízí lepší výrazové
+prostředky. Uvidíme také, že použití příkazu <strong>goto</strong>
+v&nbsp;reálných zdrojových kódech je ve skutečnosti <a href="#k05">dosti
+nízké</a>. <a href="#k06">Ve druhé části článku</a> se budeme věnovat důležité
+problematice a tou je řešení potenciálních chybových stavů v&nbsp;aplikacích.
+V&nbsp;programovacím jazyce Go se chyby musí testovat explicitně, ovšem pro
+případné uvolnění prostředků a zotavení se používá zvláštní konstrukce nazvaná
+<strong>defer</strong> (nalezneme ji ovšem například i v&nbsp;jazyce Swift
+atd.) společně s&nbsp;funkcemi <strong>panic()</strong> a
+<strong>recover()</strong>. <a href="#k15">Závěrečná část článku</a> je
+věnována problematice použití operátorů v&nbsp;programovacím jazyce Go.</p>
+
+<p>Podívejme se nejdříve na příkaz <strong>goto</strong>. S&nbsp;tímto příkazem
+se můžeme velmi často setkat v&nbsp;těch programovacích jazycích, které
+<strong>goto</strong> využívají namísto skutečných strukturovaných příkazů.
+Mezi tyto jazyky patří především starší dialekty BASICu; viz též články,
+v&nbsp;nichž jsme se těmito dnes již vlastně prehistorickými jazyky zabývali
+[<a
+href="https://www.root.cz/clanky/programovaci-jazyk-basic-na-osmibitovych-mikropocitacich/">1</a>]
+[<a
+href="https://www.root.cz/clanky/programovaci-jazyk-basic-na-osmibitovych-mikropocitacich-2/">2</a>]
+[<a
+href="https://www.root.cz/clanky/programovaci-jazyk-basic-na-osmibitovych-mikropocitacich-3/">3</a>]
+[<a
+href="https://www.root.cz/clanky/programovaci-jazyk-basic-na-osmibitovych-mikropocitacich-dokonceni/">4</a>].
+V&nbsp;dalších programovacích jazycích, které strukturované konstrukce
+obsahují, se <strong>goto</strong> (pokud vůbec existuje) používá méně často,
+například při výskoku z&nbsp;vnořených smyček, při obsluze chybových stavů, při
+implementaci programových smyček s&nbsp;testem uprostřed či při implementaci
+konečného automatu.</p>
+
+<p><div class="rs-tip-major">Poznámka: příkaz <strong>goto</strong> je možné
+doimplementovat například i do Pythonu, pro nějž dokonce vznikla i podpůrná
+knihovna <a
+href="https://github.com/snoack/python-goto/">https://github.com/snoack/python-goto/</a>.
+Příkaz <strong>goto</strong> se <a
+href="http://lua-users.org/wiki/GotoStatement">objevuje i v&nbsp;programovacím
+jazyku Lua</a>.</div></p>
+
+<p>Příkaz <strong>goto</strong> se ve své nejjednodušší (a nutno říci, že i
+nejzbytečnější variantě) může napsat následujícím způsobem:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        i := 10
+<strong>Next_i:</strong>
+        fmt.Printf("%2d\n", i)
+        i--
+        if i &gt;= 0 {
+                <strong>goto Next_i</strong>
+        }
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/01_goto.go">V&nbsp;tomto
+příkladu</a> je ukázána realizace počítané programové smyčky stylem, jaký možná
+pamatujete z&nbsp;osmibitových BASICů:</p>
+
+<pre>
+10
+ 9
+ 8
+ 7
+ 6
+ 5
+ 4
+ 3
+ 2
+ 1
+ 0
+</pre>
+
+<p>Povšimněte si, že se v&nbsp;Go používají pojmenovaná návěští (<i>label</i>),
+na rozdíl od již zmíněných starších BASICů či <a
+href="http://www.tutorialspoint.com/pascal/pascal_goto_statement.htm">Pascalu</a>,
+kde byla návěští jen celočíselná (což ještě více znepříjemňuje praktické
+použití <strong>goto</strong>).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Další možnosti použití příkazu <strong>goto</strong>: výskok z&nbsp;vnořených smyček a výskok ze struktury <strong>switch</strong></h2>
+
+<p>V&nbsp;programovacím jazyce Go je možné příkaz <strong>goto</strong> použít
+pro výskok z&nbsp;vnořených smyček popř.&nbsp;(s&nbsp;čímž se setkáme častěji)
+pro výskok z&nbsp;konstrukce <strong>switch</strong>. S&nbsp;prvním zmíněným
+použitím se můžeme setkat s&nbsp;mnohem menší frekvencí, než je tomu v&nbsp;C,
+protože Go podporuje (<a
+href="https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/#k17">jak
+již víme</a>) příkaz <strong>break návěští</strong>. Pokud budete chtít přesto
+<strong>goto</strong> pro tento účel, což není obecně doporučováno, bude celá
+struktura <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/02_goto_from_inner_loop.go">vypadat
+následovně</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        for i := 1; i &lt;= 10; i++ {
+                for j := 1; j &lt;= 10; j++ {
+                        fmt.Printf("%3d ", i*j)
+                        if i*j == 42 {
+                                fmt.Println("\nodpověď nalezena!\n")
+                                <strong>goto Exit</strong>
+                        }
+                }
+                fmt.Println()
+        }
+<strong>Exit:</strong>
+}
+</pre>
+
+<p>Výsledek by měl po spuštění tohoto příkladu vypadat takto:</p>
+
+<pre>
+  1   2   3   4   5   6   7   8   9  10 
+  2   4   6   8  10  12  14  16  18  20 
+  3   6   9  12  15  18  21  24  27  30 
+  4   8  12  16  20  24  28  32  36  40 
+  5  10  15  20  25  30  35  40  45  50 
+  6  12  18  24  30  36  42 
+odpověď nalezena!
+</pre>
+
+<p>Výskok (dokonce několikanásobný) z&nbsp;konstrukce <strong>switch</strong>
+lze příkazem <strong>goto</strong> realizovat <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/03_goto_from_switch.go">následujícím
+způsobem</a>:</p>
+
+<pre>
+package main
+&nbsp;
+func classify(x int) string {
+        switch x {
+        case 0:
+                return "nula"
+        case 2, 4, 6, 8:
+                <strong>goto SudeCislo</strong>
+        case 1, 3, 5, 7, 9:
+                <strong>goto LicheCislo</strong>
+        default:
+                <strong>goto JineCislo</strong>
+        }
+<strong>JineCislo:</strong>
+        return "?"
+<strong>SudeCislo:</strong>
+        return "sudé číslo"
+<strong>LicheCislo:</strong>
+        return "liché číslo"
+}
+&nbsp;
+func main() {
+        for x := 0; x &lt;= 10; x++ {
+                println(x, classify(x))
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se na terminálu měly objevit následující
+řádky:</p>
+
+<pre>
+0 nula
+1 liché číslo
+2 sudé číslo
+3 liché číslo
+4 sudé číslo
+5 liché číslo
+6 sudé číslo
+7 liché číslo
+8 sudé číslo
+9 liché číslo
+10 ?
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Příklady nekorektního použití příkazu <strong>goto</strong></h2>
+
+<p>V&nbsp;této kapitole si ukážeme příklady, v&nbsp;nichž se naopak příkaz
+<strong>goto</strong> nesmí použít, protože by případný skok přeskočil některou
+důležitou část programu.</p>
+
+<p>Příkazem <strong>goto</strong> se nesmí přeskočit deklarace proměnné, kterou
+následně použijeme. <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/04_goto_bad_usage_A.go">Následující
+demonstrační příklad</a> tedy nepůjde přeložit:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        <strong>goto Next</strong>
+        i := 10
+<strong>Next:</strong>
+        fmt.Printf("%2d\n", i)
+}
+</pre>
+
+<p>Při pokusu o překlad dostaneme toto chybové hlášení:</p>
+
+<pre>
+./04_goto_bad_usage_A.go:13:7: goto Next jumps over declaration of i at ./04_goto_bad_usage_A.go:14:4
+</pre>
+
+<p>Taktéž není možné skočit do programové smyčky popř.&nbsp;do větve
+strukturovaných příkazů <strong>if</strong> a <strong>switch</strong>.
+Z&nbsp;tohoto důvodu nebude možné přeložit <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/05_goto_bad_usage_B.go">ani
+další program</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        i := 10
+        <strong>goto IntoIf</strong>
+        if i &gt; 0 {
+        <strong>IntoIf:</strong>
+                fmt.Printf("%2d\n", i)
+        }
+}
+</pre>
+
+<p>Překlad opět skončí s&nbsp;chybou:</p>
+
+<pre>
+./05_goto_bad_usage_B.go:14:7: goto IntoIf jumps into block starting at ./05_goto_bad_usage_B.go:15:11
+</pre>
+
+<p>A ani <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/06_goto_bad_usage_C.go">třetí
+program</a>, který se snaží o skok do programové smyčky, není korektní. Namísto
+bezproblémového překladu se totiž objeví stejné chybové hlášení, jako
+v&nbsp;příkladu předchozím:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        <strong>goto IntoLoop</strong>
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+        <strong>IntoLoop:</strong>
+                fmt.Printf("%2d\n", i)
+        }
+}
+</pre>
+
+<p>Chybové hlášení překladače:</p>
+
+<pre>
+./06_goto_bad_usage_C.go:13:7: goto IntoLoop jumps into block starting at ./06_goto_bad_usage_C.go:15:26
+</pre>
+
+<p>Už vůbec není dovoleno skočit do jiné funkce:</p>
+
+<pre>
+package main
+&nbsp;
+func a() {
+        <strong>goto FuncB</strong>
+}
+&nbsp;
+func b() {
+<strong>FuncB:</strong>
+}
+&nbsp;
+func main() {
+}
+package main
+&nbsp;
+func a() {
+        goto FuncB
+}
+&nbsp;
+func b() {
+FuncB:
+}
+&nbsp;
+func main() {
+}
+</pre>
+
+<p>Chybové hlášení překladače dokonce ukazuje na dvě chyby (nepoužité a
+neexistující návěští &ndash; ta jsou totiž &bdquo;izolována&ldquo; v&nbsp;rámci
+jedné funkce):</p>
+
+<pre>
+./06_goto_bad_usage_D.go:11:7: label FuncB not defined
+./06_goto_bad_usage_D.go:15:1: label FuncB defined and not used
+</pre>
+
+<p>Příklad izolace návěští v&nbsp;rámci jednotlivých funkcí:</p>
+
+<pre>
+package main
+&nbsp;
+func a() {
+        <strong>goto Label</strong>
+<strong>Label:</strong>
+}
+&nbsp;
+func b() {
+        <strong>goto Label</strong>
+<strong>Label:</strong>
+}
+&nbsp;
+func main() {
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Jak často se <strong>goto</strong> používá v&nbsp;reálných programech?</h2>
+
+<p>V&nbsp;mnoha studijních materiálech se můžeme dočíst, že použití příkazu
+<strong>goto</strong> je známkou špatného programátorského stylu. Tento názor,
+který je reprezentován známým a velmi často citovaným článkem <a
+href="http://www.u.arizona.edu/~rubinson/copyright_violations/Go_To_Considered_Harmful.html">Go
+To Statement Considered Harmful</a> vznikl v&nbsp;dobách, kdy mnohé
+programovací jazyky (a nejedná se zdaleka pouze o zmíněný BASIC) neobsahovaly
+všechny konstrukce nutné pro strukturované programování. Na druhou stranu se
+ovšem nezmiňují ty případy, kdy má použití <strong>goto</strong> smysl,
+tj.&nbsp;zejména řešení algoritmů typu implementace konečného automatu, řešení
+některých podmínek diskutovaných například <a
+href="https://koblents.com/Ches/Links/Month-Mar-2013/20-Using-Goto-in-Linux-Kernel-Code/">v&nbsp;kódu
+kernelu</a> apod.</p>
+
+<p>Příkaz <strong>goto</strong> má dnes význam pouze tam, kde již nedostačují
+další konstrukce jazyka &ndash; což je ovšem v&nbsp;Go relativně malé množství
+případů, určitě menší než například v&nbsp;programovacím jazyku C (vzhledem
+k&nbsp;chybějící konstrukci pro výskok z&nbsp;více smyček a taktéž kvůli
+chybějícímu <strong>defer</strong>).</p>
+
+<p>Ostatně si toto tvrzení můžeme relativně snadno ověřit, a to konkrétně na
+zdrojových kódech, které jsou součástí samotné instalace <strong>Go</strong>.
+Tyto kódy nalezneme v&nbsp;podadresáři <strong>go</strong>. <a
+href="https://github.com/tisnik/go-root/blob/master/tools/keywords_frequency.sh">Následující
+skript</a> je sice poměrně primitivní a ne zcela korektní (nerozlišuje
+víceřádkové poznámky), ovšem dokáže velmi rychle zjistit frekvenci použití
+jednotlivých klíčových slov programovacího jazyka Go ve všech zdrojových
+kódech:</p>
+
+<pre>
+#!/bin/bash
+&nbsp;
+KEYWORDS="
+break        default      func         interface    select
+case         defer        go           map          struct
+chan         else         goto         package      switch
+const        fallthrough  if           range        type
+continue     for          import       return       var"
+&nbsp;
+for keyword in $KEYWORDS
+do
+    grep -h -v "//" `find . -name *.go` | grep "\b$keyword\b" | wc -l | tr '\n' ' '
+    echo $keyword
+done | sort -n
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že ze zdrojových kódu
+odstraňujeme pouze jednořádkové komentáře (a to ještě špatně ve chvíli, kdy
+budou součástí řetězce). Ovšem skript je skutečně dostatečně rychlý a jak
+uvidíme v&nbsp;další kapitole, nedává zcela špatné výsledky.</div></p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/tools/keywords_frequency.py">Druhý
+skript</a>, tentokrát naprogramovaný v&nbsp;Pythonu, je korektní, protože
+využívá tokenizaci podporovanou knihovnou Pygments (viz též příslušné články na
+Rootu: [<a
+href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">1</a>]
+[<a
+href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">2</a>].
+Ovšem právě kvůli tokenizaci je běh tohoto skriptu mnohem pomalejší:</p>
+
+<pre>
+import os
+from glob import iglob
+from collections import defaultdict
+&nbsp;
+from pygments.lexer import *
+from pygments.token import *
+from pygments.lexers import get_lexer_by_name
+&nbsp;
+&nbsp;
+# slovnik s citacem frekvenci vsech klicovych slov
+keywords_freq = defaultdict(lambda: 0)
+&nbsp;
+# lexer pro programovaci jazyk Go
+lexer = get_lexer_by_name('go')
+&nbsp;
+&nbsp;
+def all_sources(path, pattern):
+    """Ziskani seznamu souboru na PATH a v rekurzivne i v podadresarich."""
+    path = os.path.join(path, "**/", pattern)
+    sources = [filename for filename in iglob(path, recursive=True)]
+    return sources
+&nbsp;
+&nbsp;
+def keywords_for_file(filename):
+    """Ziskani seznamu klicovych slov nalezenych ve specifikovanem souboru."""
+    with open(filename) as fin:
+        source = fin.read()
+        tokens = lexer.get_tokens(source)
+&nbsp;
+    keywords = []
+    for token in tokens:
+        t_type = token[0]
+        if t_type is Token.Keyword or t_type in Token.Keyword.Namespace or t_type in Token.Keyword.Declaration:
+            keywords.append(token[1])
+    return keywords
+&nbsp;
+&nbsp;
+def print_frequency_table(keywords_freq):
+    """Tisk tabulky s frekvenci klicovych slov."""
+    # sort tridi n-tice nejprve podle prvniho prvku,
+    # takze musime slovnik prevest na sekvenci n-tic (frekvence, klicove_slovo)
+    swapped = [(v, k) for k, v in keywords_freq.items()]
+    swapped.sort()  # reverse=True pro opacne trideni
+&nbsp;
+    for counter, keyword in swapped:
+        print(counter, keyword)
+&nbsp;
+&nbsp;
+for source in all_sources("src/", "*.go"):
+    print(source)
+    for keyword in keywords_for_file(source):
+        keywords_freq[keyword] += 1
+&nbsp;
+print("\n\n")
+&nbsp;
+print_frequency_table(keywords_freq)
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Výsledky analýz zdrojových kódů</h2>
+
+<p>Podívejme se nyní na výsledky analýz všech zdrojových kódů nalezených
+v&nbsp;podadresáři <strong>src</strong>. V&nbsp;první tabulce jsou uvedeny
+výsledky získané prvním skriptem, které jsou vzestupně setříděné podle
+frekvence jednotlivých klíčových slov:</p>
+
+<table>
+<tr><th>Počet použití</th><th>Klíčové slovo</th></tr>
+<tr><td>189</td><td>fallthrough</td></tr>
+<tr><td>550</td><td><strong>goto</strong></td></tr>
+<tr><td>605</td><td>select</td></tr>
+<tr><td>1711</td><td>chan</td></tr>
+<tr><td>2346</td><td>interface</td></tr>
+<tr><td>2412</td><td>default</td></tr>
+<tr><td>3128</td><td>map</td></tr>
+<tr><td>3443</td><td>continue</td></tr>
+<tr><td>3831</td><td>import</td></tr>
+<tr><td>3946</td><td>defer</td></tr>
+<tr><td>4433</td><td>switch</td></tr>
+<tr><td>4709</td><td>go</td></tr>
+<tr><td>4929</td><td>const</td></tr>
+<tr><td>5308</td><td>package</td></tr>
+<tr><td>7125</td><td>else</td></tr>
+<tr><td>9418</td><td>range</td></tr>
+<tr><td>9885</td><td>struct</td></tr>
+<tr><td>12313</td><td>type</td></tr>
+<tr><td>19094</td><td>var</td></tr>
+<tr><td>22073</td><td>case</td></tr>
+<tr><td>29449</td><td>break</td></tr>
+<tr><td>29736</td><td>for</td></tr>
+<tr><td>57261</td><td>func</td></tr>
+<tr><td>77351</td><td>return</td></tr>
+<tr><td>111163</td><td>if</td></tr>
+</table>
+
+<p>Můžeme vidět, že nejméně používané je klíčové slovo
+<strong>fallthrough</strong>, které je v&nbsp;jazyce Go používáno ve chvíli,
+kdy mají být spojeny dvě větve <strong>case</strong> v&nbsp;příkazu
+<strong>switch</strong>. To mimochodem dokazuje, že tvůrci Go udělali dobře,
+když změnili sémantiku konstrukce <strong>switch</strong> (těla větví na sebe
+ve výchozím stavu nenavazují, na rozdíl od C/C++/Javy atd.).</p>
+
+<p>Klíčové slovo <strong>goto</strong> se zde umístilo na pěkném předposledním
+místě.</p>
+
+<p><div class="rs-tip-major">Poznámka: mimochodem je zajímavé, že se ve vybrané
+skupině zdrojových kódů příliš nepoužívá klíčové slovo <strong>go</strong>, i
+když se jedná o jeden z&nbsp;nejužitečnějších prvků tohoto programovacího
+jazyka. Ovšem nic nám nebrání použít stejné skripty pro získání statistik
+zdrojových kódů serverů a dalších aplikací, v&nbsp;nichž se gorutiny používají
+častěji.</div></p>
+
+<p>Druhý skript (tentokrát psaný v&nbsp;Pythonu) získal nepatrně odlišné
+hodnoty, ovšem <strong>goto</strong> stále patří mezi nejméně používaná klíčová
+slova:</p>
+
+<table>
+<tr><th>Počet použití</th><th>Klíčové slovo</th></tr>
+<tr><td>186</td><td>fallthrough</td></tr>
+<tr><td>480</td><td>select</td></tr>
+<tr><td>547</td><td><strong>goto</strong></td></tr>
+<tr><td>1268</td><td>go</td></tr>
+<tr><td>1617</td><td>chan</td></tr>
+<tr><td>2162</td><td>interface</td></tr>
+<tr><td>2184</td><td>default</td></tr>
+<tr><td>3018</td><td>map</td></tr>
+<tr><td>3105</td><td>import</td></tr>
+<tr><td>3456</td><td>continue</td></tr>
+<tr><td>3937</td><td>package</td></tr>
+<tr><td>3942</td><td>defer</td></tr>
+<tr><td>4343</td><td>switch</td></tr>
+<tr><td>4781</td><td>const</td></tr>
+<tr><td>6899</td><td>else</td></tr>
+<tr><td>8887</td><td>range</td></tr>
+<tr><td>9406</td><td>struct</td></tr>
+<tr><td>10419</td><td>type</td></tr>
+<tr><td>18208</td><td>var</td></tr>
+<tr><td>22310</td><td>case</td></tr>
+<tr><td>27455</td><td>for</td></tr>
+<tr><td>29444</td><td>break</td></tr>
+<tr><td>57573</td><td>func</td></tr>
+<tr><td>76955</td><td>return</td></tr>
+<tr><td>110707</td><td>if</td></tr>
+</table>
+
+<p>Můžeme vidět, že se příkaz <strong>goto</strong> použije průměrně pouze
+jedenkrát na každých cca 200 příkazů <strong>if</strong> (a to se navíc jedná o
+nízkoúrovňové zdrojové kódy, v&nbsp;nichž se mnohdy dává přednost optimálnímu
+kódu před kódem čitelným a udržovatelným).</p>
+
+<a href="https://www.root.cz/obrazek/349093/"><img src="https://i.iinfo.cz/images/289/go-keywords-frequency-1-prev.png" class="image-349093" alt="&#160;" width="336" height="270" /></a>
+<p><i>Grafické znázornění frekvence výskytu jednotlivých klíčových slov ve
+zdrojových kódech Go.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;první tabulce je frekvence
+jednotlivých klíčových slov nepatrně vyšší právě z&nbsp;toho důvodu, že jsou
+slova hledána i ve víceřádkových komentářích a v&nbsp;řetězcích.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Příkaz <strong>defer</strong></h2>
+
+<p>Dalším příkazem, který slouží k&nbsp;ovlivnění toku programu (<i>control
+flow</i>) je příkaz reprezentovaný klíčovým slovem <strong>defer</strong>.
+Tímto příkazem je možné vložit požadavek na volání nějaké funkce do seznamu,
+jehož obsah se vykoná při odchodu z&nbsp;té funkce, v&nbsp;níž je příkaz
+<strong>defer</strong> použit. Předchozí věta sice může vypadat poměrně
+složitě, zvláště pokud jste se s&nbsp;tímto konceptem nesetkali, ale samotné
+použití <strong>defer</strong> je poměrně přímočaré. Podívejme se nejdříve na
+zdrojový kód následujícího demonstračního příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func on_finish() {
+        fmt.Println("Finished")
+}
+&nbsp;
+func main() {
+        <strong>defer on_finish()</strong>
+&nbsp;
+        for i := 10; i &gt;= 0; i-- {
+                fmt.Printf("%2d\n", i)
+        }
+        fmt.Println("Finishing main() function")
+}
+</pre>
+
+<p>Vidíme, že ve funkci <strong>main</strong> je použit příkaz
+<strong>defer</strong>, kterým požadujeme, aby se při ukončování funkce
+<strong>main</strong> zavolala jiná funkce, konkrétně funkce
+<strong>on_finish</strong>.</p>
+
+<p>Po spuštění aplikace se nejdříve desetkrát vypíše obsah počitadla
+<strong>i</strong> a následně se vykoná poslední příkaz funkce
+<strong>main</strong>:</p>
+
+<pre>
+        fmt.Println("Finishing main() function")
+</pre>
+
+<p>Až do této chvíle tedy neměl příkaz <strong>defer</strong> na běh programu
+žádný vliv, ovšem poté, co se vykoná poslední explicitně zapsaný příkaz
+v&nbsp;<strong>main</strong>, se zavolá funkce <strong>on_finish</strong>:</p>
+
+<pre>
+10
+ 9
+ 8
+ 7
+ 6
+ 5
+ 4
+ 3
+ 2
+ 1
+ 0
+Finishing main() function
+Finished
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že se v&nbsp;praxi setkáme s&nbsp;poměrně krátkým
+kódem, který se má na konci nějaké funkce zavolat, se často používá příkaz
+<strong>defer</strong> spojený s&nbsp;deklarací funkce:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        <strong>defer (func() { fmt.Println("Finished") })()</strong>
+&nbsp;
+        for i := 10; i &gt;= 0; i-- {
+                fmt.Printf("%2d\n", i)
+        }
+        fmt.Println("Finishing main() function")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: kulaté závorky na konci jsou nutné,
+protože v&nbsp;<strong>defer</strong> přímo zapisujeme <i>volání</i> funkce,
+nikoli pouze její deklaraci.</div></p>
+
+<p>Běh tohoto programu je naprosto stejný, jako v&nbsp;předchozím případě:</p>
+
+<pre>
+10
+ 9
+ 8
+ 7
+ 6
+ 5
+ 4
+ 3
+ 2
+ 1
+ 0
+Finishing main() function
+Finished
+</pre>
+
+<p>Nyní tedy víme (alespoň ve stručnosti), jak se příkaz <strong>defer</strong>
+používá, ale musíme si samozřejmě říct i proč vůbec v&nbsp;jazyku Go existuje.
+V&nbsp;mnoha programech je nutné nějakým způsobem a za jakýchkoli okolností
+uzavírat nějaké prostředky (připojení k&nbsp;databázi, otevřené připojení ke
+klientovi, otevřený soubor atd.), a právě toto uzavírání lze realizovat
+v&nbsp;bloku či v&nbsp;blocích <strong>defer</strong>. Jedná se vlastně o
+zobecnění bloku <strong>finally</strong> používaného v&nbsp;programové
+konstrukci <strong>try-catch-finally</strong>, kterou jazyk Go (alespoň
+v&nbsp;současné stabilní verzi) nepoužívá.</p>
+
+<p><div class="rs-tip-major">Poznámka: <strong>defer</strong> s&nbsp;funkcí pro
+uzavření nějakého prostředku (souboru, ...) do zdrojového kódu zapište na
+nejbližší logické místo, například ihned po příkazu, který soubor otevírá. Tak
+dáte případným čtenářům najevo, jakým způsobem ošetřujete chyby &ndash; toto
+s&nbsp;klasickými bloky <strong>try-catch-finally</strong> obecně nelze
+provést.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Volání funkce s&nbsp;parametry v&nbsp;bloku <strong>defer</strong></h2>
+
+<p>Při specifikaci volání funkce, která se spustit v&nbsp;rámci bloku
+<strong>defer</strong>, je samozřejmě možné této funkci předat nějaké
+parametry. V&nbsp;dalším <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/09_defer_with_parameters.go">demonstračním
+příkladu</a> je ukázáno, jak se změní zápis:</p>
+
+<pre>
+defer on_finish("Finished")
+</pre>
+
+<p>Vidíme, že ze syntaktického hlediska se před běžné volání funkce pouze přidá
+klíčové slovo <strong>defer</strong>. Je to podobně jednoduché, jako zavolání
+funkce v&nbsp;rámci nově vytvořené gorutiny s&nbsp;využitím klíčového slova
+<strong>go</strong>.</p>
+
+<p>Úplný zdrojový kód příkladu bude vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func on_finish(message string) {
+        fmt.Println(message)
+}
+&nbsp;
+func main() {
+        <strong>defer on_finish("Finished")</strong>
+&nbsp;
+        for i := 10; i &gt;= 0; i-- {
+                fmt.Printf("%2d\n", i)
+        }
+        fmt.Println("Finishing main() function")
+}
+</pre>
+
+<p>Po spuštění se nejdříve vypíše obsah počitadla smyčky <strong>for</strong>,
+následně se vykoná poslední příkaz ve funkci <strong>main</strong> a poté se
+zavolá funkce <strong>on_finish</strong>:</p>
+
+<pre>
+10
+ 9
+ 8
+ 7
+ 6
+ 5
+ 4
+ 3
+ 2
+ 1
+ 0
+Finishing main() function
+Finished
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Pořadí volání funkcí zaregistrovaných s&nbsp;využitím příkazu <strong>defer</strong></h2>
+
+<p>Nic nám nebrání použít v&nbsp;rámci jedné funkce hned několik příkazů
+<strong>defer</strong>. Zajímavé bude ovšem zjistit, jak se bude tato funkce
+chovat při spuštění programu, tj.&nbsp;v&nbsp;<i>runtime</i>. Můžeme si to
+snadno otestovat, protože již víme, že v&nbsp;bloku <strong>defer</strong> je
+možné funkci (či obecně kódu zde zapsaném) předat parametry. To
+mj.&nbsp;znamená, že můžeme <strong>defer</strong> použít například
+v&nbsp;programové smyčce. Viz zdrojový kód <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/10_more_defers.go">dnešního
+dalšího demonstračního příkladu</a> s&nbsp;deseti deklaracemi
+<strong>defer</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func on_finish(i int) {
+        fmt.Printf("Defer #%2d\n", i)
+}
+&nbsp;
+func main() {
+        for i := 0; i &lt;= 10; i++ {
+                <strong>defer on_finish(i)</strong>
+        }
+        fmt.Println("Finishing main() function")
+}
+</pre>
+
+<p>Po ukončení posledního příkazu zapsaného do funkce <strong>main</strong> se
+desetkrát zavolá funkce <strong>on_finish</strong>, ovšem <i>v&nbsp;opačném
+pořadí</i> (nejprve s&nbsp;parametrem 10, poté s&nbsp;parametrem 9 atd.). Je
+tomu tak z&nbsp;toho důvodu, že se příkazy specifikované
+v&nbsp;<strong>defer</strong> ukládají do pomyslného zásobníku:</p>
+
+<pre>
+Finishing main() function
+Defer #10
+Defer # 9
+Defer # 8
+Defer # 7
+Defer # 6
+Defer # 5
+Defer # 4
+Defer # 3
+Defer # 2
+Defer # 1
+Defer # 0
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: toto chování není samoúčelné, ale má
+svůj smysl v&nbsp;případě, že v&nbsp;rámci <strong>defer</strong> budeme chtít
+uzavírat soubory, připojení k&nbsp;databázi, vytvoření session v&nbsp;databázi
+atd., a to v&nbsp;opačném pořadí, než jak došlo k&nbsp;jejich
+otevření.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vyhodnocení parametrů funkcí zaregistrovaných příkazem <strong>defer</strong></h2>
+
+<p>Nyní již víme, že v&nbsp;bloku <strong>defer</strong> lze funkcím předávat
+parametry a že se kód zapsaný ve více deklaracích <strong>defer</strong>
+nakonec zavolá v&nbsp;opačném pořadí. Je tedy namístě se zamyslet nad tím,
+<i>v&nbsp;jakém okamžiku</i> se vlastně vyhodnocují parametry použité
+v&nbsp;<strong>defer</strong>. Chování jazyka Go si opět můžeme ověřit na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/12_defer_arguments_evaluation.go">jednoduchém
+příkladu</a>, v&nbsp;němž je příkaz <strong>defer</strong> použit dvakrát
+&ndash; pokaždé se v&nbsp;něm volá stejná funkce a pokaždé se této funkci
+předává hodnota lokální proměnné <strong>x</strong>. Zajímat nás bude, jaká
+hodnota <strong>x</strong> se vlastně použije. Nejprve si ukažme chování pro
+proměnnou typu <strong>int</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func function(i int) {
+        fmt.Printf("Defer %2d\n", i)
+}
+&nbsp;
+func main() {
+        x := 0
+&nbsp;
+        fmt.Printf("Current x value = %2d\n", x)
+        <strong>defer function(x)</strong>
+&nbsp;
+        x++
+&nbsp;
+        fmt.Printf("Current x value = %2d\n", x)
+        <strong>defer function(x)</strong>
+&nbsp;
+        x++
+        fmt.Printf("Current x value = %2d\n", x)
+}
+</pre>
+
+<p>Po spuštění programu dostaneme tyto výsledky:</p>
+
+<pre>
+Current x value =  0
+Current x value =  1
+Current x value =  2
+Defer  1
+Defer  0
+</pre>
+
+<p>Mohlo by se tedy zdát, že se vždy použije <i>aktuální</i> hodnota proměnné
+<strong>x</strong> ve chvíli, kdy je příkaz <strong>defer</strong> zavolán. Ve
+skutečnosti to ovšem není vždy tak jednoduché, protože musíme počítat
+s&nbsp;tím, že se v&nbsp;programovacím jazyce Go používají i reference
+(odkazy). V&nbsp;nepatrně <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/13_defer_on_all_returns.go">upraveném
+příkladu</a> použijeme řez polem (interně řez obsahuje referenci na bázové
+pole):</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func function(a []int) {
+        fmt.Printf("Defer %v\n", a)
+}
+&nbsp;
+func main() {
+        var x = []int{1, 2, 3}
+&nbsp;
+        fmt.Printf("Current x value = %v\n", x)
+        <strong>defer function(x)</strong>
+&nbsp;
+        x[0] = 0
+&nbsp;
+        fmt.Printf("Current x value = %v\n", x)
+        <strong>defer function(x)</strong>
+&nbsp;
+        x[1] = 0
+&nbsp;
+        fmt.Printf("Current x value = %v\n", x)
+        <strong>defer function(x)</strong>
+&nbsp;
+        x[2] = 0
+&nbsp;
+        fmt.Printf("Current x value = %v\n", x)
+}
+</pre>
+
+<p>Po spuštění zjistíme, že funkce volané v&nbsp;rámci bloku
+<strong>defer</strong> vidí až výsledný obsah pole. To je sice pochopitelné
+chování, ale v&nbsp;praxi si na něj musíme dát pozor:</p>
+
+<pre>
+Current x value = [1 2 3]
+Current x value = [0 2 3]
+Current x value = [0 0 3]
+Current x value = [0 0 0]
+Defer [0 0 0]
+Defer [0 0 0]
+Defer [0 0 0]
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Defer a příkaz <strong>return</strong></h2>
+
+<p>Funkce volaná v&nbsp;rámci bloku <strong>defer</strong> se pochopitelně
+zavolá i tehdy, pokud použijeme výskok z&nbsp;funkce příkazem
+<strong>return</strong>; nezávisle na tom, kolik výskoků funkce ve skutečnosti
+obsahuje. Příklad, s&nbsp;nímž jsme se seznámili v&nbsp;předchozím článku, je
+možné nepatrně upravit přidáním příkazu <strong>defer</strong> do funkce
+<strong>classify</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func function(x int) {
+        fmt.Printf("Defer %d\n", x)
+}
+&nbsp;
+func classify(x int) string {
+        <strong>defer function(x)</strong>
+        switch x {
+        case 0:
+                <strong>return "nula"</strong>
+        case 2, 4, 6, 8:
+                <strong>return "sudé číslo"</strong>
+        case 1, 3, 5, 7, 9:
+                <strong>return "liché číslo"</strong>
+        default:
+                <strong>return "?"</strong>
+        }
+}
+&nbsp;
+func main() {
+        for x := 0; x &lt;= 10; x++ {
+                println(x, classify(x))
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu je patrné, že se blok <strong>defer</strong>
+skutečně použil ve všech možných případech:</p>
+
+<pre>
+Defer 0
+0 nula
+Defer 1
+1 liché číslo
+Defer 2
+2 sudé číslo
+Defer 3
+3 liché číslo
+Defer 4
+4 sudé číslo
+Defer 5
+5 liché číslo
+Defer 6
+6 sudé číslo
+Defer 7
+7 liché číslo
+Defer 8
+8 sudé číslo
+Defer 9
+9 liché číslo
+Defer 10
+10 ?
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Praktické použití příkazu <strong>defer</strong></h2>
+
+<p>Nyní si ukažme typický příklad použití příkazu <strong>defer</strong>, který
+naleznete i v&nbsp;dalších tutoriálech (není divu &ndash; používají se
+v&nbsp;něm obecně známé koncepty). V&nbsp;příkladu je deklarována funkce
+nazvaná <strong>copyFile</strong>, která slouží ke kopii obsahu jednoho souboru
+do souboru druhého. Navíc tato funkce vrátí dvojici hodnot: počet zkopírovaných
+(zapsaných) bajtů (nikoli znaků) a taktéž případnou chybu, která může nastat.
+Pokud žádná chyba nenastane, bude druhá vrácená hodnota obsahovat
+<strong>nil</strong>. Příklad je napsán takovým způsobem, aby vypisoval všechny
+informace o prováděných operacích; v&nbsp;praxi by byl kratší:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os"
+)
+&nbsp;
+func closeFile(file *os.File) {
+        fmt.Printf("Closing file '%s'\n", file.Name())
+        file.Close()
+}
+&nbsp;
+func copyFile(srcName, dstName string) (written int64, err error) {
+        src, err := os.Open(srcName)
+        if err != nil {
+                fmt.Printf("Cannot open file '%s' for reading\n", srcName)
+                return
+        } else {
+                fmt.Printf("File '%s' opened for reading\n", srcName)
+        }
+        defer closeFile(src)
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                fmt.Printf("Cannot create destination file '%s'\n", dstName)
+                return
+        } else {
+                fmt.Printf("File '%s' opened for writing\n", dstName)
+        }
+        defer closeFile(dst)
+&nbsp;
+        return io.Copy(dst, src)
+}
+&nbsp;
+func testCopyFile(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+&nbsp;
+func main() {
+        testCopyFile("14_defer_practical_usage.go", "new.go")
+        testCopyFile("tento_soubor_neexistuje", "new.go")
+        testCopyFile("14_defer_practical_usage.go", "")
+        testCopyFile("14_defer_practical_usage.go", "/dev/full")
+        testCopyFile("/dev/null", "new2.go")
+}
+</pre>
+
+<p>Za povšimnutí stojí zejména tyto &bdquo;triky&ldquo;:</p>
+
+<ol>
+
+<li>Využíváme toho, že <strong>written</strong> má i bez přiřazení známou
+implicitní hodnotu.</li>
+
+<li>Použití samotného <strong>return</strong> s&nbsp;tím, že návratová hodnota
+<strong>err</strong> je explicitně nastavena předchozím příkazem.</li>
+
+<li>Zdrojový a cílový soubor se snažíme zavřít i v&nbsp;případě chyby. Pokus o
+uzavření nastane v&nbsp;každém případě, a to i při výskoku z&nbsp;funkce
+příkazem <strong>return</strong>.</li>
+
+</ol>
+
+<p>Zkusme si tento příkaz spustit:</p>
+
+<pre>
+File '14_defer_practical_usage.go' opened for reading
+File 'new.go' opened for writing
+Closing file 'new.go'
+Closing file '14_defer_practical_usage.go'
+Copied 1319 bytes
+&nbsp;
+Cannot open file 'tento_soubor_neexistuje' for reading
+copyFile('tento_soubor_neexistuje', 'new.go') failed!!!
+&nbsp;
+File '14_defer_practical_usage.go' opened for reading
+Cannot create destination file ''
+Closing file '14_defer_practical_usage.go'
+copyFile('14_defer_practical_usage.go', '') failed!!!
+&nbsp;
+File '14_defer_practical_usage.go' opened for reading
+File '/dev/full' opened for writing
+Closing file '/dev/full'
+Closing file '14_defer_practical_usage.go'
+copyFile('14_defer_practical_usage.go', '/dev/full') failed!!!
+&nbsp;
+File '/dev/null' opened for reading
+File 'new2.go' opened for writing
+Closing file 'new2.go'
+Closing file '/dev/null'
+Copied 0 bytes
+</pre>
+
+<p>Můžeme vidět, že se aplikace vyrovnala jak s&nbsp;neexistujícími soubory,
+tak i se soubory, které nelze vytvořit popř.&nbsp;do nich nelze provést zápis
+(<strong>/dev/full</strong>).</p>
+
+<p>V&nbsp;praxi by byla celá funkce pro kopii obsahu souboru kratší a nevolala
+by se v&nbsp;ní další uživatelská funkce <strong>closeFile</strong>. Namísto ní
+by se v&nbsp;<strong>defer</strong> přímo zapsalo:</p>
+
+<pre>
+defer src.Close()
+defer dst.Close()
+</pre>
+
+<p>Příklad by tedy mohl vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os"
+)
+&nbsp;
+func copyFile(srcName, dstName string) (written int64, err error) {
+        src, err := os.Open(srcName)
+        if err != nil {
+                return
+        }
+        defer src.Close()
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                return
+        }
+        defer dst.Close()
+&nbsp;
+        return io.Copy(dst, src)
+}
+&nbsp;
+func testCopyFile(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+&nbsp;
+func main() {
+        testCopyFile("14_defer_practical_usage.go", "new.go")
+        testCopyFile("tento_soubor_neexistuje", "new.go")
+        testCopyFile("14_defer_practical_usage.go", "")
+        testCopyFile("14_defer_practical_usage.go", "/dev/full")
+        testCopyFile("/dev/null", "new2.go")
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Ovlivnění návratové hodnoty funkce v&nbsp;bloku <strong>defer</strong></h2>
+
+<p>Nyní si ukážeme, jakým způsobem je možné propojit dvě vlastnosti
+programovacího jazyka Go, konkrétně příkaz <strong>defer</strong> a změnu
+návratové hodnoty funkce prostým přiřazením do pojmenované proměnné
+představující jednu z&nbsp;návratových hodnot. Připomeňme si, že následující
+zápis je v&nbsp;Go zcela legální a představuje funkci s&nbsp;návratovou
+hodnotou typu <strong>int</strong>, která je pojmenována
+<strong>i</strong>:</p>
+
+<pre>
+func funkce1() (i int) {
+        i = 1
+        return
+}
+</pre>
+
+<p>S&nbsp;touto návratovou hodnotou lze manipulovat i v&nbsp;bloku
+<strong>defer</strong> a <i>ovlivnit tím</i>, jaká hodnota se z&nbsp;funkce
+skutečně vrátí! To může být velmi užitečné při zpracování výjimečných stavů
+v&nbsp;aplikaci:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func funkce1() (i int) {
+        i = 1
+        return
+}
+&nbsp;
+func funkce2() (i int) {
+        <strong>defer func() { i = 2 }()</strong>
+        return 1
+}
+&nbsp;
+func funkce3() (i int) {
+        <strong>defer func() { i += 2 }()</strong>
+        return 1
+}
+&nbsp;
+func main() {
+        fmt.Printf("Návratová hodnota funkce1: %d\n", funkce1())
+        fmt.Printf("Návratová hodnota funkce2: %d\n", funkce2())
+        fmt.Printf("Návratová hodnota funkce3: %d\n", funkce3())
+}
+</pre>
+
+<p>Z&nbsp;vypsaných výsledků je pravděpodobně nejzajímavější poslední řádek,
+který ukazuje, že v&nbsp;<strong>defer</strong> se původní hodnota vrácená
+příkazem <strong>return</strong> ještě upravila (modifikovala):</p>
+
+<pre>
+Návratová hodnota funkce1: 1
+Návratová hodnota funkce2: 2
+Návratová hodnota funkce3: 3
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Funkce <strong>panic</strong></h2>
+
+<p>V&nbsp;souvislosti se zpracováním potenciálně chybových stavů aplikace se
+často setkáme s&nbsp;funkcí <strong>panic</strong>. Tato funkce je přímo
+součástí základní knihovny jazyka Go, takže ji (resp.&nbsp;její balíček)
+nemusíme žádným způsobem importovat. Pokud je funkce <strong>panic</strong>
+zavolána, je aktuálně prováděná funkce ihned ukončena a jsou samozřejmě
+provedena případná volání funkcí specifikovaných v&nbsp;příkazech
+<strong>defer</strong>. Poté se řízení toku programu vrátí do volajícího kódu,
+který se bude chovat stejným způsobem, jakoby se funkce <strong>panic</strong>
+volala v&nbsp;něm &ndash; v&nbsp;praxi tedy bude docházet k&nbsp;postupnému
+&bdquo;probublávání&ldquo; až do té chvíle, kdy je dosaženo první funkce
+v&nbsp;aktuálně spuštěné gorutině (v&nbsp;hlavní gorutině jde o funkci
+<strong>main</strong>). V&nbsp;této chvíli celý program zhavaruje. Můžeme si to
+vyzkoušet, například přidáním následujícího kódu zavolaného po otevření
+souboru:</p>
+
+<pre>
+if err != nil {
+        <strong>panic(err)</strong>
+}
+</pre>
+
+<p>Celý příklad pro kopii souboru, který jsme si již popsali, je tedy možné
+přepsat například následujícím způsobem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os"
+)
+&nbsp;
+func closeFile(file *os.File) {
+        fmt.Printf("Closing file '%s'\n", file.Name())
+        file.Close()
+}
+&nbsp;
+func copyFile(srcName, dstName string) (written int64, err error) {
+        src, err := os.Open(srcName)
+        if err != nil {
+                <strong>panic(err)</strong>
+        }
+        defer closeFile(src)
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                <strong>panic(err)</strong>
+        }
+        defer closeFile(dst)
+&nbsp;
+        return io.Copy(dst, src)
+}
+&nbsp;
+func testCopyFile(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+&nbsp;
+func main() {
+        testCopyFile("14_defer_practical_usage.go", "new.go")
+        // testCopyFile("tento_soubor_neexistuje", "new.go")
+        testCopyFile("new.go", "")
+        testCopyFile("14_defer_practical_usage.go", "/dev/full")
+        testCopyFile("/dev/null", "new2.go")
+}
+</pre>
+
+<p>Chování po spuštění:</p>
+
+<pre>
+Closing file 'new.go'
+Closing file '14_defer_practical_usage.go'
+Copied 1319 bytes
+&nbsp;
+Closing file 'new.go'
+panic: open : no such file or directory
+&nbsp;
+goroutine 1 [running]:
+main.copyFile(0x4b87d6, 0x6, 0x0, 0x0, 0x0, 0x4cc760, 0xc000060150)
+        /home/tester/temp/out/go-root/article_06/17_panic.go:30 +0x1ad
+main.testCopyFile(0x4b87d6, 0x6, 0x0, 0x0)
+        /home/tester/temp/out/go-root/article_06/17_panic.go:38 +0x67
+main.main()
+        /home/tester/temp/out/go-root/article_06/17_panic.go:50 +0x70
+exit status 2
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zavolání <strong>panic</strong> má tedy
+podobný efekt, jako vyhození výjimky příkazem <strong>throw</strong>
+v&nbsp;těch jazycích, které s&nbsp;výjimkami přímo pracují (což opět není
+případ jazyka Go, alespoň ne v&nbsp;jeho stabilní verzi).</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Funkce <strong>recover</strong></h2>
+
+<p>Ve chvíli, kdy funkce <strong>panic</strong> probublává zásobníkovými rámci
+aktuální gorutiny, ji můžeme zachytit funkcí <strong>recover</strong>. Otázkou
+ovšem zůstává, kam vlastně volání funkce <strong>recover</strong> umístit.
+Typicky se setkáme s&nbsp;tím, že se <strong>recover</strong> použije
+v&nbsp;bloku <strong>defer</strong>, takže je zaručeno, že se funkce
+<strong>recover</strong> zavolá vždy a za jasně daných podmínek:</p>
+
+<pre>
+defer func() {
+        if rec := recover(); rec != nil {
+                fmt.Println("Recovered in copyFile", rec)
+        }
+}()
+</pre>
+
+<p>Tímto způsobem jsme vlastně implementovali zobecněnou podobu bloku
+<strong>catch/expect</strong>. Ukažme si to opět na praktickém příkladu &ndash;
+nám již známé kopii souboru:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os"
+)
+&nbsp;
+func closeFile(file *os.File) {
+        fmt.Printf("Closing file '%s'\n", file.Name())
+        file.Close()
+}
+&nbsp;
+func copyFile(srcName, dstName string) (written int64, err error) {
+        <strong>defer func()</strong> {
+                if rec := recover(); rec != nil {
+                        fmt.Println("Recovered in copyFile", rec)
+                }
+        }()
+        src, err := os.Open(srcName)
+        if err != nil {
+                panic(err)
+        }
+        defer closeFile(src)
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                panic(err)
+        }
+        defer closeFile(dst)
+&nbsp;
+        return io.Copy(dst, src)
+}
+&nbsp;
+func testCopyFile(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+&nbsp;
+func main() {
+        testCopyFile("14_defer_practical_usage.go", "new.go")
+        // testCopyFile("tento_soubor_neexistuje", "new.go")
+        testCopyFile("new.go", "")
+        testCopyFile("14_defer_practical_usage.go", "/dev/full")
+        testCopyFile("/dev/null", "new2.go")
+}
+</pre>
+
+<p>Můžeme vidět, že se <strong>recover</strong> zavolá vždy a navíc se zavolá
+až za všemi dalšími bloky <strong>defer</strong>, tj.&nbsp;jako poslední příkaz
+v&nbsp;rámci ukončované funkce <strong>copyFile</strong>.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Výrazy a operátory v&nbsp;programovacím jazyce Go</h2>
+
+<p>Ve třetí části článku se budeme zabývat problematikou operátorů. Pro čtenáře
+tohoto seriálu pravděpodobně nebude žádnou novinkou, že operátory určené pro
+manipulaci s&nbsp;číselnými, pravdivostními, řetězcovými aj.&nbsp;hodnotami
+tvoří podstatnou část syntaxe v&nbsp;prakticky všech mainstreamových jazycích
+(výjimkou jsou lispovské jazyky či <a
+href="https://www.root.cz/serialy/programovaci-jazyk-forth/">Forth</a>, které
+ovšem nepatří mezi mainstream). V&nbsp;programovacím jazyku Go nalezneme celkem
+26 základních operátorů, k&nbsp;nimž navíc ještě musíme připočíst operátory
+spojené s&nbsp;přiřazením:</p>
+
+<table>
+<tr><td>aritmetické</td><td>+</td><td>-</td><td>*</td><td>/</td><td>%</td><td>&nbsp;</td></tr>
+<tr><td>aritmetické s&nbsp;přiřazením</td><td>+=</td><td>-=</td><td>*=</td><td>/=</td><td>%=</td><td>&nbsp;</td></tr>
+<tr><td>logické</td><td>&amp;&amp;</td><td>||</td><td>!</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>posuny a bitové operace</td><td>&lt;&lt;</td><td>&gt;&gt;</td><td>&amp;</td><td>|</td><td>^</td><td>&amp;^</td></tr>
+<tr><td>posuny a bitové operace s přiřazením</td><td>&lt;&lt;=</td><td>&gt;&gt;=</td><td>&amp;=</td><td>|=</td><td>^=</td><td>&amp;^=</td></tr>
+<tr><td>relační</td><td>==</td><td>!=</td><td>&lt;</td><td>&lt;=</td><td>&gt;</td><td>&gt;=</td></tr>
+<tr><td>operace s adresami</td><td>*</td><td>&amp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>unární operátory</td><td>+</td><td>-</td><td>^</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>další operátory</td><td>&lt;-</td><td>:=</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti má operátor + ještě další
+význam; slouží totiž pro spojení (konkatenaci) řetězců, nikoli pouze pro
+realizaci aritmetických operací.</div></p>
+
+<p>Zajímavá je tabulka s&nbsp;prioritami operátorů. Ta je totiž poměrně
+jednoduchá, zejména v&nbsp;porovnání s&nbsp;tabulkami, které mnozí čtenáři
+pravděpodobně znají z&nbsp;jazyků C, C++ či Javy. Nejvyšší prioritu mají unární
+operátory (s&nbsp;jediným operandem) a následně existuje pouze pět priorit,
+které si můžete zapamatovat s&nbsp;využitím <a
+href="https://yourbasic.org/golang/operator-priority/">mnemotechnické pomůcky
+MACAO</a>:</p>
+
+<table>
+<tr><th>Úroveň</th><th>Operátory</th><th>Mnemotechnická pomůcka</th></tr>
+<tr><td>1</td><td></td><td><strong>M</strong>ultiplicative</td></tr>
+<tr><td>2</td><td></td><td><strong>A</strong>dditive</td></tr>
+<tr><td>3</td><td></td><td><strong>C</strong>omparison</td></tr>
+<tr><td>4</td><td></td><td><strong>A</strong>nd</td></tr>
+<tr><td>5</td><td></td><td><strong>O</strong>r</td></tr>
+</table>
+
+<p>V&nbsp;navazujících kapitolách a taktéž v&nbsp;další části článku si
+jednotlivé operátory postupně popíšeme.</p>
+
+<p><div class="rs-tip-major">Poznámka: pravděpodobně jste si všimli, že
+v&nbsp;předchozích tabulkách nebyly uvedeny operátory ++ a --, protože ty
+v&nbsp;programovacím jazyku Go spadají do zvláštní kategorie operátorů
+tvořících příkazy. Jaký to má dopad na způsob použití těchto operátorů si
+ukážeme v&nbsp;demonstračních příkladech.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Unární operátory</h2>
+
+<p>Nejprve se podívejme na použití unárních operátorů. Ty mají, jak již víme,
+nejvyšší prioritu a proto se téměř nikdy nesetkáme s&nbsp;nutností uzavírat
+tyto operátory do kulatých závorek, které (jako v&nbsp;jiných jazycích i
+v&nbsp;matematice) slouží ke změně priority. V&nbsp;Go najdeme tyto unární
+operátory:</p>
+
+<table>
+<tr><th>Operátor</th><th>Význam</th></tr>
+<tr><td>+</td><td>nemění znaménko výsledku (opak dalšího operátoru)</td></tr>
+<tr><td>-</td><td>mění znaménko výsledku</td></tr>
+<tr><td>!</td><td>logická negace</td></tr>
+<tr><td>^</td><td>negace bit po bitu (podobně jako ~ v&nbsp;C)</td></tr>
+<tr><td>*</td><td>přístup na adresu přes ukazatel (referenci)</td></tr>
+<tr><td>&amp;</td><td>získání adresy operandu</td></tr>
+<tr><td>&lt;-</td><td>přečtení hodnoty z&nbsp;kanálu</td></tr>
+</table>
+
+<p>Ukažme si nyní, jak se jednotlivé unární operátory používají. Povšimněte si,
+že se všechny zmíněné operátory vždy zapisují před operand:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func message(channel chan int) {
+        code, status := &lt;-channel
+&nbsp;
+        fmt.Printf("received code: %d and status: %t\n", code, status)
+}
+&nbsp;
+func main() {
+        <i>// unární operátory + a -</i>
+        i := 42
+        fmt.Println(<strong>+i</strong>)
+        fmt.Println(<strong>-i</strong>)
+&nbsp;
+        <i>// unární operátor ^</i>
+        i = 0
+        fmt.Println(<strong>^i</strong>)
+        i++
+        fmt.Println(<strong>^i</strong>)
+&nbsp;
+        <i>// unární operátor !</i>
+        b := false
+        fmt.Println(<strong>!b</strong>)
+&nbsp;
+        <i>// unární operátory &amp; a *</i>
+        fmt.Println(<strong>&amp;i</strong>)
+&nbsp;
+        p_i := &amp;i
+        fmt.Println(<strong>*p_i</strong>)
+&nbsp;
+        <i>// unární operátor &lt;-</i>
+        channel := make(chan int)
+        go message(channel)
+        <strong>&lt;channel </strong>
+}
+</pre>
+
+<p>Tento příklad je jen ilustrační, protože skončí s&nbsp;chybou při pokusu o
+čtení hodnoty z&nbsp;kanálu <strong>channel</strong> s&nbsp;čekáním:</p>
+
+<pre>
+42
+-42
+-1
+-2
+true
+0xc0000140e0
+1
+fatal error: all goroutines are asleep - deadlock!
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Relační operátory</h2>
+
+<p>Nabídka relačních operátorů v&nbsp;programovacím jazyce Go by nás neměla
+ničím nepřekvapit: k&nbsp;dispozici je všech šest základních operátorů pro test
+na rovnost, nerovnost, větší než, menší než a kombinací větší nebo rovno a
+menší nebo rovno. Těchto šest operátorů lze použít pro všechny celočíselné
+datové typy i pro datové typy s&nbsp;plovoucí řádovou čárkou. Kromě toho ovšem
+můžeme porovnávat i řetězce.</p>
+
+<p>U komplexních čísel, tj.&nbsp;u datových typů <strong>complex64</strong> a
+<strong>complex128</strong> je ovšem situace odlišná, protože tyto hodnoty
+můžeme porovnávat jen na rovnost a nerovnost (tvůrci programovacího jazyka Go
+se tak vyhnuli problémům, jak vlastně definovat relaci mezi dvojicí komplexních
+čísel).</p>
+
+<p>Zajímavé je, že hodnoty typu <i>boolean</i>, tj.&nbsp;hodnoty
+<strong>true</strong> a <strong>false</strong> je možné v&nbsp;programovacím
+jazyce Go porovnávat pouze na rovnost a nerovnost. Zbylé čtyři relační
+operátory nelze použít, tj.&nbsp;v&nbsp;jazyce Go nelze rozhodnout, zda je
+<strong>true</strong> větší či menší než <strong>false</strong> (naproti tomu
+například v&nbsp;Pascalu je <strong>false</strong> &lt;
+<strong>true</strong>).</p>
+
+<p>Opět si ukažme příklad použití všech relačních operátorů pro různé datové
+typy:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        x := 42
+        y := 0
+&nbsp;
+        fmt.Println(<strong>x &lt; y</strong>)
+        fmt.Println(<strong>x &lt;= y</strong>)
+        fmt.Println(<strong>x == y</strong>)
+        fmt.Println(<strong>x &gt;= y</strong>)
+        fmt.Println(<strong>x &gt; y</strong>)
+        fmt.Println(<strong>x != y</strong>)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        fx := 1e10
+        fy := -2.3e56
+&nbsp;
+        fmt.Println(<strong>fx &lt; fy</strong>)
+        fmt.Println(<strong>fx &lt;= fy</strong>)
+        fmt.Println(<strong>fx == fy</strong>)
+        fmt.Println(<strong>fx &gt;= fy</strong>)
+        fmt.Println(<strong>fx &gt; fy</strong>)
+        fmt.Println(<strong>fx != fy</strong>)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        bx := true
+        by := false
+&nbsp;
+        fmt.Println(<strong>bx == by</strong>)
+        fmt.Println(<strong>bx != by</strong>)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        cx := 1 + 1i
+        cy := 0 + 0i
+&nbsp;
+        fmt.Println(<strong>cx == cy</strong>)
+        fmt.Println(<strong>cx != cy</strong>)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        sx := "Hello"
+        sy := "World"
+&nbsp;
+        fmt.Println(<strong>sx &lt; sy</strong>)
+        fmt.Println(<strong>sx &lt;= sy</strong>)
+        fmt.Println(<strong>sx == sy</strong>)
+        fmt.Println(<strong>sx &gt;= sy</strong>)
+        fmt.Println(<strong>sx &gt; sy</strong>)
+        fmt.Println(<strong>sx != sy</strong>)
+&nbsp;
+        fmt.Println()
+}
+</pre>
+
+<p>Po překladu a spuštění <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_06/20_relational_operators.go">předchozího
+demonstračního příkladu</a> získáme tyto (očekávatelné) výsledky:</p>
+
+<pre>
+false
+false
+false
+true
+true
+true
+&nbsp;
+false
+false
+false
+true
+true
+true
+&nbsp;
+false
+true
+&nbsp;
+false
+true
+&nbsp;
+true
+true
+false
+false
+false
+true
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Dělení, zbytek po dělení a bitové posuny</h2>
+
+<p>V&nbsp;programovacím jazyce Go se pro zápis podílu používá operátor / a pro
+výpočet zbytku po dělení operátor %, ostatně podobně je tomu i ve všech
+jazycích více či méně odvozených od jazyka C. Vyzkoušejme si nyní, jak vlastně
+dělení a výpočet zbytku probíhá pro kladné i záporné dělence a dělitele. Pomůže
+nám tento demonstrační příklad:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func compute_div_mod(x, y int) {
+        fmt.Printf("%3d / %2d = %3d   %3d %% %2d = %3d\n", x, y, x/y, x, y, x%y)
+}
+&nbsp;
+func main() {
+        compute_div_mod(10, 3)
+        compute_div_mod(-10, 3)
+        compute_div_mod(10, -3)
+        compute_div_mod(-10, -3)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                compute_div_mod(100, i)
+        }
+}
+</pre>
+
+<p>V&nbsp;jazyku Go je znaménko zbytku odvozeno od <i>znaménka dělence</i>.
+Toto chování je zachováno na všech platformách (zatímco v&nbsp;C a C++ je
+implementačně závislé):</p>
+
+<pre>
+ 10 /  3 =   3    10 %  3 =   1
+-10 /  3 =  -3   -10 %  3 =  -1
+ 10 / -3 =  -3    10 % -3 =   1
+-10 / -3 =   3   -10 % -3 =  -1
+</pre>
+
+<p>Z&nbsp;toho vyplývají i další vlastnosti, například to, že se při
+celočíselném dělení kladných čísel zaokrouhluje výsledek směrem dolů (protože
+zbytek musí být buď nulový nebo kladný):</p>
+
+<pre>
+100 /  1 = 100   100 %  1 =   0
+100 /  2 =  50   100 %  2 =   0
+100 /  3 =  33   100 %  3 =   1
+100 /  4 =  25   100 %  4 =   0
+100 /  5 =  20   100 %  5 =   0
+100 /  6 =  16   100 %  6 =   4
+100 /  7 =  14   100 %  7 =   2
+100 /  8 =  12   100 %  8 =   4
+100 /  9 =  11   100 %  9 =   1
+100 / 10 =  10   100 % 10 =   0
+</pre>
+
+<p>Při dělení nulou se interně zavolá <strong>panic()</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func compute_div_mod(x, y int) {
+        fmt.Printf("%3d / %2d = %3d   %3d %% %2d = %3d\n", x, y, x/y, x, y, x%y)
+}
+&nbsp;
+func main() {
+        compute_div_mod(10, 0)
+}
+</pre>
+
+<p>Z&nbsp;chybového hlášení a výpisu volaných funkcí snadno zjistíme, na kterém
+místě v&nbsp;programu chyba nastala:</p>
+
+<pre>
+panic: runtime error: integer divide by zero
+&nbsp;
+goroutine 1 [running]:
+main.compute_div_mod(0xa, 0x0)
+        /home/tester/temp/out/go-root/article_06/22_div_by_zero.go:13 +0x1fd
+main.main()
+        /home/tester/temp/out/go-root/article_06/22_div_by_zero.go:17 +0x33
+</pre>
+
+<p>Dále si ukažme použití bitových posunů. U těchto operátorů je nutné dodržet
+jedno pravidlo &ndash; samotný posun musí být reprezentován kladným číslem
+(konstantou) popř.&nbsp;proměnnou typu celé kladné číslo. Z&nbsp;tohoto důvodu
+nebude možné přeložit následující kód, protože proměnná <strong>i</strong> je
+typu <strong>int</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        x := 1
+&nbsp;
+        for i := 0; i &lt;= 10; i++ {
+                fmt.Printf("%d &lt;&lt; %2d == %4d\n", x, i, x&lt;&lt;i)
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        x = 10000000
+&nbsp;
+        for i := 0; i &lt;= 10; i++ {
+                fmt.Printf("%d &gt;&gt; %2d == %4d\n", x, i, x&gt;&gt;i)
+        }
+&nbsp;
+}
+</pre>
+
+<p>Chybové hlášení:</p>
+
+<pre>
+./23_bit_shift_negative_shift.go:16:43: invalid operation: x &lt;&lt; i (shift count type int, must be unsigned integer)
+./23_bit_shift_negative_shift.go:24:43: invalid operation: x &gt;&gt; i (shift count type int, must be unsigned integer)
+</pre>
+
+<p>Úprava programu je snadná &ndash; použijeme přetypování s&nbsp;využitím
+funkce <strong>uint()</strong>, čímž změníme hodnotu proměnné
+<strong>i</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        x := 1
+&nbsp;
+        for i := uint(0); i &lt;= 10; i++ {
+                fmt.Printf("%d &lt;&lt; %2d == %4d\n", x, i, x&lt;&lt;i)
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        x = 10000000
+&nbsp;
+        for i := uint(0); i &lt;= 10; i++ {
+                fmt.Printf("%d &gt;&gt; %2d == %4d\n", x, i, x&gt;&gt;i)
+        }
+&nbsp;
+}
+</pre>
+
+<p>Nyní již bude možné výsledek spočítat:</p>
+
+<pre>
+1 &lt;&lt;  0 ==    1
+1 &lt;&lt;  1 ==    2
+1 &lt;&lt;  2 ==    4
+1 &lt;&lt;  3 ==    8
+1 &lt;&lt;  4 ==   16
+1 &lt;&lt;  5 ==   32
+1 &lt;&lt;  6 ==   64
+1 &lt;&lt;  7 ==  128
+1 &lt;&lt;  8 ==  256
+1 &lt;&lt;  9 ==  512
+1 &lt;&lt; 10 == 1024
+&nbsp;
+10000000 &gt;&gt;  0 == 10000000
+10000000 &gt;&gt;  1 == 5000000
+10000000 &gt;&gt;  2 == 2500000
+10000000 &gt;&gt;  3 == 1250000
+10000000 &gt;&gt;  4 == 625000
+10000000 &gt;&gt;  5 == 312500
+10000000 &gt;&gt;  6 == 156250
+10000000 &gt;&gt;  7 == 78125
+10000000 &gt;&gt;  8 == 39062
+10000000 &gt;&gt;  9 == 19531
+10000000 &gt;&gt; 10 == 9765
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+doslova několik kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_goto.go</td><td>základní použití příkazu <strong>goto</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/01_goto.go">https://github.com/tisnik/go-fedora/blob/master/article_06/01_goto.go</a></td></tr>
+<tr><td> 2</td><td>02_goto_from_inner_loop.go</td><td>výskok z&nbsp;vnořených smyček</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/02_goto_from_inner_loop.go">https://github.com/tisnik/go-fedora/blob/master/article_06/02_goto_from_inner_loop.go</a></td></tr>
+<tr><td> 3</td><td>03_goto_from_switch.go</td><td>výskok z&nbsp;konstrukce <strong>switch</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/03_goto_from_switch.go">https://github.com/tisnik/go-fedora/blob/master/article_06/03_goto_from_switch.go</a></td></tr>
+<tr><td> 4</td><td>04_goto_bad_usage_A.go</td><td>nekorektní použití <strong>goto</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/04_goto_bad_usage_A.go">https://github.com/tisnik/go-fedora/blob/master/article_06/04_goto_bad_usage_A.go</a></td></tr>
+<tr><td> 5</td><td>05_goto_bad_usage_B.go</td><td>další nekorektní použití <strong>goto</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/05_goto_bad_usage_B.go">https://github.com/tisnik/go-fedora/blob/master/article_06/05_goto_bad_usage_B.go</a></td></tr>
+<tr><td> 6</td><td>06_goto_bad_usage_C.go</td><td>další nekorektní použití <strong>goto</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/06_goto_bad_usage_C.go">https://github.com/tisnik/go-fedora/blob/master/article_06/06_goto_bad_usage_C.go</a></td></tr>
+<tr><td> 7</td><td>07_defer.go</td><td>příkaz <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/07_defer.go">https://github.com/tisnik/go-fedora/blob/master/article_06/07_defer.go</a></td></tr>
+<tr><td> 8</td><td>08_defer_func.go</td><td>funkce v&nbsp;příkazu <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/08_defer_func.go">https://github.com/tisnik/go-fedora/blob/master/article_06/08_defer_func.go</a></td></tr>
+<tr><td> 9</td><td>09_defer_with_parameters.go</td><td>parametry předané do <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/09_defer_with_parameters.go">https://github.com/tisnik/go-fedora/blob/master/article_06/09_defer_with_parameters.go</a></td></tr>
+<tr><td>10</td><td>10_more_defers.go</td><td>použití více příkazů <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/10_more_defers.go">https://github.com/tisnik/go-fedora/blob/master/article_06/10_more_defers.go</a></td></tr>
+<tr><td>11</td><td>11_defer_arguments_evaluation.go</td><td>čas vyhodnocování argumentů v&nbsp;<strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/11_defer_arguments_evaluation.go">https://github.com/tisnik/go-fedora/blob/master/article_06/11_defer_arguments_evaluation.go</a></td></tr>
+<tr><td>12</td><td>12_defer_arguments_evaluation.go</td><td>čas vyhodnocování argumentů v&nbsp;<strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/12_defer_arguments_evaluation.go">https://github.com/tisnik/go-fedora/blob/master/article_06/12_defer_arguments_evaluation.go</a></td></tr>
+<tr><td>13</td><td>13_defer_on_all_returns.go</td><td><strong>defer</strong> a příkaz <strong>return</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/13_defer_on_all_returns.go">https://github.com/tisnik/go-fedora/blob/master/article_06/13_defer_on_all_returns.go</a></td></tr>
+<tr><td>14</td><td>14_defer_practical_usage.go</td><td>praktické použití příkazu <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/14_defer_practical_usage.go">https://github.com/tisnik/go-fedora/blob/master/article_06/14_defer_practical_usage.go</a></td></tr>
+<tr><td>15</td><td>15_defer_practical_usage.go</td><td>praktické použití příkazu <strong>defer</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/15_defer_practical_usage.go">https://github.com/tisnik/go-fedora/blob/master/article_06/15_defer_practical_usage.go</a></td></tr>
+<tr><td>16</td><td>16_defer_return_values.go</td><td>modifikace návratové hodnoty funkce</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/16_defer_return_values.go">https://github.com/tisnik/go-fedora/blob/master/article_06/16_defer_return_values.go</a></td></tr>
+<tr><td>17</td><td>17_panic.go</td><td>funkce <strong>panic</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/17_panic.go">https://github.com/tisnik/go-fedora/blob/master/article_06/17_panic.go</a></td></tr>
+<tr><td>18</td><td>18_panic_recover.go</td><td>kooperace <strong>panic</strong>+<strong>recover</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/18_panic_recover.go">https://github.com/tisnik/go-fedora/blob/master/article_06/18_panic_recover.go</a></td></tr>
+<tr><td>19</td><td>19_unary_operators.go</td><td>použití unárních operátorů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/19_unary_operators.go">https://github.com/tisnik/go-fedora/blob/master/article_06/19_unary_operators.go</a></td></tr>
+<tr><td>20</td><td>20_relational_operators.go</td><td>všechny relační operátory</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/20_relational_operators.go">https://github.com/tisnik/go-fedora/blob/master/article_06/20_relational_operators.go</a></td></tr>
+<tr><td>21</td><td>21_div_mod.go</td><td>dělení a zbytek po dělení</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/21_div_mod.go">https://github.com/tisnik/go-fedora/blob/master/article_06/21_div_mod.go</a></td></tr>
+<tr><td>22</td><td>22_div_by_zero.go</td><td>dělení nulou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/22_div_by_zero.go">https://github.com/tisnik/go-fedora/blob/master/article_06/22_div_by_zero.go</a></td></tr>
+<tr><td>23</td><td>23_bit_shift_negative_shift.go</td><td>bitové posuny</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/23_bit_shift_negative_shift.go">https://github.com/tisnik/go-fedora/blob/master/article_06/23_bit_shift_negative_shift.go</a></td></tr>
+<tr><td>24</td><td>24_bit_shifts.go</td><td>bitové posuny</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/24_bit_shifts.go">https://github.com/tisnik/go-fedora/blob/master/article_06/24_bit_shifts.go</a></td></tr>
+<tr><td>25</td><td>25_bit_shift_assignment.go</td><td>bitové posuny s&nbsp;přiřazením</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/25_bit_shift_assignment.go">https://github.com/tisnik/go-fedora/blob/master/article_06/25_bit_shift_assignment.go</a></td></tr>
+<tr><td>26</td><td>26_bit_operators.go</td><td>bitové operátory</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_06/26_bit_operators.go">https://github.com/tisnik/go-fedora/blob/master/article_06/26_bit_operators.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go <br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2018</small></p>
+</body>
+</html>
+
