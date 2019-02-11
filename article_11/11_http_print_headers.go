@@ -1,0 +1,25 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+)
+
+func main() {
+	response, err := http.Get("http://httpbin.org/uuid")
+	if err != nil {
+		println("Connection refused")
+	}
+	defer response.Body.Close()
+
+	fmt.Printf("Status: %s\n", response.Status)
+	fmt.Printf("Content length: %d\n", response.ContentLength)
+
+	for name, headers := range response.Header {
+		name = strings.ToLower(name)
+		for _, h := range headers {
+			fmt.Printf("%v: %v\n", name, h)
+		}
+	}
+}
