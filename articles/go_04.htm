@@ -1,0 +1,2427 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Rozhraní, metody, gorutiny a kanály v programovacím jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Rozhraní, metody, gorutiny a kanály v programovacím jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Mezi užitečné technologie, které nalezneme v programovacím jazyku Go, patří podpora datového typu rozhraní (interface) a především pak takzvané gorutiny a kanály. Právě s těmito třemi důležitými technologiemi se dnes podrobněji seznámíme.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Rozhraní, metody, gorutiny a kanály v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Metody</a></p>
+<p><a href="#k03">3. Metody s&nbsp;parametry</a></p>
+<p><a href="#k04">4. Předání ukazatele na strukturu (objekt) do volané metody</a></p>
+<p><a href="#k05">5. Rozhraní (interface)</a></p>
+<p><a href="#k06">6. Rozhraní jako datový typ při volání funkcí</a></p>
+<p><a href="#k07">7. Metody a rozhraní (struktura vyhovující rozhraní)</a></p>
+<p><a href="#k08">8. Vícenásobná implementace stejného rozhraní</a></p>
+<p><a href="#k09">9. Řez se strukturami implementujícími společné rozhraní</a></p>
+<p><a href="#k10">10. Řezy rozhraní jako parametry funkce</a></p>
+<p><a href="#k11">11. Datový typ implementující větší množství rozhraní</a></p>
+<p><a href="#k12">12. Skládání rozhraní</a></p>
+<p><a href="#k13">13. Gorutiny</a></p>
+<p><a href="#k14">14. Spuštění gorutiny</a></p>
+<p><a href="#k15">15. Spuštění většího množství gorutin na pozadí</a></p>
+<p><a href="#k16">16. Kanály &ndash; technologie pro komunikaci mezi gorutinami</a></p>
+<p><a href="#k17">17. Implementace workerů s&nbsp;využitím gorutin a kanálů</a></p>
+<p><a href="#k18">18. Deadlock a jeho detekce v&nbsp;runtime</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Rozhraní, metody, gorutiny a kanály v&nbsp;programovacím jazyku Go</h2>
+
+<p>Většina vlastností programovacího jazyka Go, s&nbsp;nimiž jsme se alespoň
+prozatím seznámili, ve skutečnosti nebyla nijak revoluční &ndash; kromě
+automatické správy paměti (GC) a plnohodnotné podpory Unicode se vlastně
+jednalo o typový systém převzatý z&nbsp;céčkovských jazyků a vylepšený o mnohem
+silnější typovou kontrolu, řezy, pole s&nbsp;kontrolou mezí, řetězce (ty jsou
+zde plnohodnotným datovým typem) a samozřejmě o nové datové typy (zejména o
+mapy). Mezi další vylepšení, s&nbsp;nímž jsme se již seznámili, patří možnost
+vrátit větší množství hodnot z&nbsp;funkcí, což využijeme i v&nbsp;dnešních
+příkladech.</p>
+
+<p>Jazyk Go se ovšem stal populární i z&nbsp;jiných důvodů. Především se
+v&nbsp;jeho typovém systému mohou používat rozhraní (<i>interface</i>) a kromě
+toho Go podporuje tvorbu takzvaných <i>gorutin</i>, což jsou funkce běžící
+asynchronně k&nbsp;hlavnímu vláknu (někdy se setkáme s&nbsp;označením
+<i>light-weight process</i>). Mezi jednotlivými gorutinami je možné realizovat
+komunikaci s&nbsp;využitím další technologie &ndash; takzvaných kanálů
+(<i>channel</i>). Kanály lze využít jak k&nbsp;běžné synchronizaci, tak i
+k&nbsp;realizaci front se zprávami (<i>message queue</i>). Užitečný a
+v&nbsp;kontextu mainstreamových jazyků i přelomový je však fakt, že gorutiny i
+kanály lze v&nbsp;programech použít velmi snadno; stačí pouze pochopit základní
+koncept, klíčové slovo <strong>go</strong> a operátor &lt;-.</p>
+
+<p><div class="rs-tip-major">Poznámka: koncept kanálů byl převzat i do dalších
+jazyků. Na stránkách Rootu jsme se již seznámili s&nbsp;knihovnou
+<strong>core.async</strong> implementovanou v&nbsp;programovacím jazyku Clojure
+[<a
+href="https://www.root.cz/clanky/asynchronni-programovani-v-clojure-s-vyuzitim-knihovny-core-async/">1</a>]
+[<a
+href="https://www.root.cz/clanky/asynchronni-programovani-v-clojure-s-vyuzitim-knihovny-core-async-pokracovani/">2</a>]
+[<a
+href="https://www.root.cz/clanky/asynchronni-programovani-v-clojure-s-vyuzitim-knihovny-core-async-dokonceni/">3</a>].</div></p>
+
+<p>Právě popisu rozhraní, gorutin a kanálů bude věnován dnešní článek, i když
+složitější příklady budou vysvětleny až příště.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Metody</h2>
+
+<p>Nejdříve se seznámíme s&nbsp;konceptem <i>metod</i>, jež slouží pro
+implementaci funkcionality svázané s&nbsp;nějakým typem záznamu (struktury).
+S&nbsp;metodami se setkáme v&nbsp;dnes již klasických programovacích jazycích
+podporujících objektově orientované programování &ndash; v&nbsp;takovém případě
+jsou metody svázány s&nbsp;nějakou třídou popř.&nbsp;se jejich hlavičky mohou
+objevit v&nbsp;rozhraních. Ovšem v&nbsp;programovacím jazyku Go se
+s&nbsp;třídami nesetkáme (s&nbsp;rozhraními ovšem ano). Metody zde jsou
+implementovány jako funkce u kterých je kromě jména, parametrů a typů
+návratových hodnot specifikován i takzvaný <i>receiver</i> (příjemce), což je
+v&nbsp;praxi právě datový typ záznam (resp.&nbsp;struktura) popř.&nbsp;se
+alternativně může jednat o ukazatel na typ záznam.</p>
+
+<p>Příjemce je &ndash; což je specifické právě pro Go &ndash; zapisován ještě
+před jméno metody. Podívejme se na několik příkladů. Nejdříve si uvedeme běžnou
+funkci bez parametrů vracející hodnotu typu <strong>float64</strong>:</p>
+
+<pre>
+func length() float64 {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Metoda s&nbsp;příjemcem typu <strong>Line</strong> bude vypadat odlišně,
+protože se před jméno metody musí zapsat právě specifikace příjemce (dvojice
+identifikátor + typ umístěná do kulatých závorek):</p>
+
+<pre>
+func (<strong>line Line</strong>) length() float64 {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Pokud nyní vytvoříme typ záznam pojmenovaný <strong>Line</strong>:</p>
+
+<pre>
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+</pre>
+
+<p>...můžeme metodu <strong>length</strong> zavolat s&nbsp;využitím běžné
+tečkové notace, která se mj.&nbsp;používá i v&nbsp;běžných objektově
+orientovaných jazycích:</p>
+
+<pre>
+line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+line_length := <strong>line1.length()</strong>
+</pre>
+
+<p>Povšimněte si, že se v&nbsp;těle metody pracuje s&nbsp;příjemcem
+<strong>line</strong> stejně jako s&nbsp;běžným parametrem &ndash; interně se
+totiž o parametr skutečně jedná (v&nbsp;podstatě jde o obdobu
+<strong>this</strong> v&nbsp;Javě či <strong>self</strong> v&nbsp;Pythonu):</p>
+
+<pre>
+func (<strong>line Line</strong>) length() float64 {
+        return math.Hypot(<strong>line.x1</strong>-<strong>line.x2</strong>, <strong>line.y1</strong>-<strong>line.y2</strong>)
+}
+</pre>
+
+<p>Podívejme se nyní na úplný zdrojový kód dnešního <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/01_methods.go">prvního
+demonstračního příkladu</a>, v&nbsp;němž je deklarována struktura/záznam
+nazvaná <strong>Line</strong> a taktéž metoda <strong>length</strong> svázaná
+s&nbsp;touto strukturou:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := line1.length()
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu by se měla nejdříve zobrazit
+výchozí hodnota záznamu typu <strong>Line</strong> tak, jak byla inicializovaná
+a na druhém řádku vypočtená délka úsečky:</p>
+
+<pre>
+{0 0 100 100}
+141.4213562373095
+</pre>
+
+<p>Metody se od funkcí liší ještě v&nbsp;jednom směru &ndash; jejich jméno
+nemusí být v&nbsp;daném modulu unikátní, protože specifikace příjemce stačí
+sama od sebe na odlišení metody pro různé typy i na odlišení metody od funkce.
+<a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/01_B_unique_names.go">Následující
+příklad</a> je tedy zcela korektní:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type Point struct {
+        x1, y1 float64
+}
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func <strong>length()</strong> float64 {
+        return 0
+}
+&nbsp;
+func (point Point) <strong>length()</strong> float64 {
+        return 0
+}
+&nbsp;
+func (line Line) <strong>length()</strong> float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := line1.length()
+        fmt.Println(line_length)
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Metody s&nbsp;parametry</h2>
+
+<p>Vyzkoušejme si nyní vytvořit metodu s&nbsp;parametry, aby byl ještě více
+zřejmý jak zápis, jakým se metoda deklaruje ve zdrojovém kódu, tak i technika
+jejího volání v&nbsp;čase běhu programu (<i>runtime</i>). Parametry metody se
+zapisují do kulatých závorek za jménem metody, tedy stejně, jako u běžných
+funkcí. Následující metodě se při jejím volání předá jak vlastní příjemce typu
+<strong>Line</strong>, tak i dvojice parametrů <strong>dx</strong> a
+<strong>dy</strong>, které jsou typu <strong>float16</strong>:</p>
+
+<pre>
+func (<strong>line Line</strong>) translate(<strong>dx, dy float64</strong>) {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že příjemcem je běžná datová struktura (neboli
+záznam), mohlo by se zdát, že implementace metody pro posun úsečky v&nbsp;rámci
+souřadného systému je triviální &ndash; ostatně přístup k&nbsp;položkám
+struktury máme a víme, že jsou měnitelné (<i>mutable</i>):</p>
+
+<pre>
+func (line Line) translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", line, dx, dy)
+        line.x1 += dx
+        line.y1 += dy
+        line.x2 += dx
+        line.y2 += dy
+}
+</pre>
+
+<p>Ve skutečnosti je to však nepatrně složitější, a to z&nbsp;toho důvodu, že
+v&nbsp;programovacím jazyce Go se při volání funkcí i metod parametry předávají
+<i>hodnotou</i> a nikoli <i>odkazem</i>. To znamená, že příjemce, který je
+interně metodě předán jako skrytý parametr, je naklonovanou kopií původní
+struktury a navenek se tedy změna souřadnic nijak neprojeví (pouze uvnitř
+metody uvidíme nové hodnoty souřadnic).</p>
+
+<p>Můžeme se o tom snadno přesvědčit po překladu a spuštění <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/02_methods_with_parameters.go">tohoto
+demonstračního příkladu</a>, který sice neskončí s&nbsp;chybou, ovšem po
+návratu z&nbsp;metody <strong>translate</strong> budou souřadnice
+v&nbsp;záznamu <strong>line</strong> nezměněny:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func (line Line) translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", line, dx, dy)
+        line.x1 += dx
+        line.y1 += dy
+        line.x2 += dx
+        line.y2 += dy
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+        line1.translate(5, 5)
+        fmt.Println(line1)
+&nbsp;
+        line_length := line1.length()
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Výsledek, který získáme po spuštění tohoto příkladu ukazuje, že se položky
+struktury vně metody skutečně nezměnily (viz první a třetí řádek):</p>
+
+<pre>
+<strong>{0 0 100 100}</strong>
+Translating line {0 0 100 100} by 5.000000 5.000000
+<strong>{0 0 100 100}</strong>
+141.4213562373095
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: toto chování jazyka Go nám sice může
+připadat poněkud zvláštní, ovšem na druhou stranu je dobré vědět, že je jazyk
+(alespoň co se týče práce s&nbsp;hodnotami a voláním funkcí i metod) zcela
+konzistentní a pracuje se všemi hodnotami stejným způsobem. Naproti tomu
+například v&nbsp;Javě se chování liší podle toho, zda pracujeme
+s&nbsp;takzvanými primitivními datovými typy (ty se předávají hodnotou) či
+s&nbsp;objektovými typy (ty se předávají odkazem &ndash; referencí).</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Předání ukazatele na strukturu (objekt) do volané metody</h2>
+
+<p>Jakým způsobem se tedy musí postupovat, když budeme chtít ve svém programu
+implementovat metodu, která mění stav záznamu, pro který byla vytvořena? Řešení
+je ve skutečnosti velmi jednoduché &ndash; namísto předání struktury
+<i>hodnotou</i>, tedy tak, jak jsme to udělali v&nbsp;předchozím příkladu:</p>
+
+<pre>
+func <strong>(line Line)</strong> translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", line, dx, dy)
+        line.x1 += dx
+        line.y1 += dy
+        line.x2 += dx
+        line.y2 += dy
+}
+&nbsp;
+line1.translate(5, 5)
+</pre>
+
+<p>...předáme do metody ukazatel na strukturu. To znamená nutnost změny samotné
+metody (odlišný typ příjemce a odlišný přístup k&nbsp;prvkům záznamu), ovšem
+samotné její volání bude stejné (!) jako v&nbsp;předchozím příkladu (nemusíme
+zjišťovat adresu struktury pomocí unárního operátoru &amp;):</p>
+
+<pre>
+func <strong>(line *Line)</strong> translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", *line, dx, dy)
+        <strong>(*line).</strong>x1 += dx
+        <strong>(*line).</strong>y1 += dy
+        <strong>(*line).</strong>x2 += dx
+        <strong>(*line).</strong>y2 += dy
+}
+&nbsp;
+line1.translate(5, 5)
+</pre>
+
+<p>Takto <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/03_methods_ptr.go">upravený
+demonstrační příklad</a> již bude provádět všechny operace takovým způsobem,
+jak jsme si přáli:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (<strong>line Line</strong>) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func (<strong>line *Line</strong>) translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", *line, dx, dy)
+        (*line).x1 += dx
+        (*line).y1 += dy
+        (*line).x2 += dx
+        (*line).y2 += dy
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+        <strong>line1.translate(5, 5)</strong>
+        fmt.Println(line1)
+&nbsp;
+        line_length := line1.length()
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Na třetím řádku je patrné, že úsečka byla skutečně v&nbsp;rovině posunuta o
+pět jednotek doprava a nahoru:</p>
+
+<pre>
+<strong>{0 0 100 100}</strong>
+Translating line {0 0 100 100} by 5.000000 5.000000
+<strong>{5 5 105 105}</strong>
+141.4213562373095
+</pre>
+
+<p>Ve skutečnosti je však v&nbsp;programovacím jazyce Go možné napsat metodu
+ještě jednodušeji &ndash; pouhou změnou typu <i>příjemce</i> (na ukazatel),
+nikoli změnou samotného těla metody:</p>
+
+<pre>
+func <strong>(line *Line)</strong> translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", *line, dx, dy)
+        line.x1 += dx
+        line.y1 += dy
+        line.x2 += dx
+        line.y2 += dy
+}
+</pre>
+
+<p>Výše uvedený zápis je zajímavý, protože sice předáváme záznam typu
+<strong>Line</strong> přes ukazatel, ovšem v&nbsp;těle metody přistupujeme
+k&nbsp;položkám struktury pouze s&nbsp;použitím tečkové notace a nikoli přes
+<strong>(*line).položka</strong>. Důvod pro toto nepochybně praktické chování
+(které není například v&nbsp;C či C++ možné) jsme si již vysvětlili <a
+href="https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/#k12">ve
+dvanácté kapitole předchozí části</a> <a href="">tohoto seriálu</a>.</p>
+
+<p>Podívejme se nyní na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/04_methods_ptr_better_solution.go">upravený
+příklad</a>, který vznikl zjednodušením příkladu předchozího:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func (<strong>line *Line</strong>) translate(dx, dy float64) {
+        fmt.Printf("Translating line %v by %f %f\n", *line, dx, dy)
+        line.x1 += dx
+        line.y1 += dy
+        line.x2 += dx
+        line.y2 += dy
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+        <strong>line1.translate(5, 5)</strong>
+        fmt.Println(line1)
+&nbsp;
+        line_length := line1.length()
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Výsledkem budou stejné zprávy, jako v&nbsp;předchozím příkladu:</p>
+
+<pre>
+<strong>{0 0 100 100}</strong>
+Translating line {0 0 100 100} by 5.000000 5.000000
+<strong>{5 5 105 105}</strong>
+141.4213562373095
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;Go je tedy velmi snadné rozlišit
+mezi metodami, které nikdy nemění stav příjemce a mezi metodami, které ho mění.
+Taktéž se můžeme sami rozhodnout, že pokud je struktura s&nbsp;příjemcem
+rozsáhlá (stovky bajtů), nemá smysl provádět kopii při každém volání metody a
+<i>změnou jediného znaku</i> použít volání odkazem/referencí.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Rozhraní (interface)</h2>
+
+<p>Ve druhé části článku se seznámíme s&nbsp;konceptem takzvaných
+<i>rozhraní</i> (<i>interface</i>). Jedná se o předposlední datový typ,
+s&nbsp;nímž se setkáme (posledním typem je kanál zmíněný v&nbsp;závěru článku).
+Rozhraní v&nbsp;jazyku Go byla inspirována protokoly, s&nbsp;nimiž jsme se
+mohli setkat například v&nbsp;programovacím jazyku Smalltalk: ve stručnosti jde
+o specifikaci metod (jmen, parametrů, návratových typů), které jsou společné
+pro entity s&nbsp;nějakou sdílenou vlastností nebo vlastnostmi.
+V&nbsp;rozhraní se však nijak nespecifikuje vlastní chování, tj.&nbsp;těla
+metod. V&nbsp;Go navíc není nutné explicitně určovat, které záznamy
+implementují dané rozhraní &ndash; tuto informaci si dokáže automaticky odvodit
+překladač (poněkud nepřesně se toto chování nazývá <i>duck typing</i>).</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;jazyce Java se taktéž
+s&nbsp;rozhraními pracuje, ovšem zde je nutné explicitně určit, které třídy
+rozhraní implementují. V&nbsp;Go se tento princip neuplatňuje, už jen
+z&nbsp;toho důvodu, že se zde vůbec s&nbsp;pojmem <i>třída</i>
+nepracuje.</div></p>
+
+<p>Při deklaraci nového rozhraní (tj.&nbsp;při vytváření nového datového typu)
+je nutné specifikovat jak jméno rozhraní, tak i seznam hlaviček metod, které
+jsou součástí rozhraní (tento seznam ovšem může být prázdný, nicméně je nutné
+ho zapsat pomocí prázdného bloku {}). Příkladem rozhraní s&nbsp;jedinou metodou
+může být datový typ pojmenovaný <strong>OpenShape</strong>, v&nbsp;němž je
+předepsána jediná metoda <strong>length</strong> bez parametrů a
+s&nbsp;návratovou hodnotou <strong>float64</strong> (u metody předepsané
+v&nbsp;rozhraní se ovšem neuvádí příjemce &ndash; ten si Go odvodí automaticky
+na základě dalšího kódu):</p>
+
+<pre>
+type OpenShape interface {
+        length() float64
+}
+</pre>
+
+<p>V&nbsp;rozhraní může být předepsáno větší množství metod:</p>
+
+<pre>
+type ClosedShape interface {
+        area() float64
+        perimeter() float64
+}
+</pre>
+
+<p>Nebo naopak nemusí být předepsána žádná metoda:</p>
+
+<pre>
+type Shape interface {
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;seriálu o programovacím jazyku
+Rust jsme se setkali s&nbsp;termínem <i>trait</i> (rys). Traity lze
+(zjednodušeně řečeno) pokládat za rozšířená rozhraní, která kromě hlaviček
+funkcí a metod obsahují (resp.&nbsp;mohou obsahovat) i jejich těla, ale už
+nikoli stavové informace. Právě tím, že se v&nbsp;traitu mohou objevit
+implementace metod, se tento koncept odlišuje od běžných rozhraní (je jejich
+zobecněním).</div></p>
+
+<p>Následuje <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/05_interface.go">příklad</a>,
+v&nbsp;němž je pouze deklarována trojice rozhraní:</p>
+
+<pre>
+package main
+&nbsp;
+type Shape interface {
+}
+&nbsp;
+type OpenShape interface {
+        length() float64
+}
+&nbsp;
+type ClosedShape interface {
+        area() float64
+        perimeter() float64
+}
+&nbsp;
+func main() {
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Rozhraní jako datový typ při volání funkcí</h2>
+
+<p>Rozhraní jakožto plnohodnotný datový typ je možné použít pro specifikaci
+typu parametru (parametrů) ve funkcích. Opět si to vyzkoušejme na našem
+příkladu s&nbsp;rozhraním nazvaným <strong>OpenShape</strong>, v&nbsp;němž je
+předepsána jediná metoda <strong>length()</strong>:</p>
+
+<pre>
+type OpenShape interface {
+        length() float64
+}
+</pre>
+
+<p>Nyní můžeme napsat funkci (běžnou funkci), které se předá libovolná
+struktura implementující rozhraní <strong>OpenShape</strong> a tato funkce
+vrátí hodnotu získanou zavoláním metody
+<strong>OpenShape.length()</strong>:</p>
+
+<pre>
+func length(shape OpenShape) float64 {
+        return shape.length()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nenechte se zmást tím, že můžeme mít
+funkci <strong>length</strong> a metodu (či více metod)
+<strong>length</strong>. Víme již, že se jedná o odlišné prvky programu, takže
+funkci <strong>length</strong> klidně můžeme přejmenovat:</div></p>
+
+<pre>
+func compute_open_shape_length(shape OpenShape) float64 {
+        return shape.length()
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/06_interface_implementation.go">V&nbsp;šestém
+demonstračním příkladu</a> se pokusíme funkci <strong>length()</strong> zavolat
+a předat jí strukturu/záznam <strong>Line</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type OpenShape interface {
+        length() float64
+}
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func length(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Ovšem vzhledem k&nbsp;tomu, že struktura <strong>Line</strong> prozatím
+rozhraní <strong>OpenShape</strong> neimplementuje (v&nbsp;Go se mluví o tom,
+že struktura <i>nevyhovuje</i> rozhraní), nebude možné program spustit:</p>
+
+<pre>
+./06_interface_implementation.go:12:2: imported and not used: "math"
+./06_interface_implementation.go:33:23: cannot use line1 (type Line) as type OpenShape in argument to length:
+        Line does not implement OpenShape (missing length method)
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Metody a rozhraní (struktura vyhovující rozhraní)</h2>
+
+<p>Co přesně tedy musíme udělat pro to, aby struktura <strong>Line</strong>
+vyhovovala (<i>satisfy</i>) rozhraní <strong>OpenShape</strong> a v&nbsp;něm
+předepsané metodě <strong>length()</strong>? Je toho překvapivě málo, protože
+jediné, co musíme udělat, je implementace metody <strong>length()</strong>
+s&nbsp;příjemcem <strong>Line</strong>. Tato implementace bude jednoduchá,
+protože metoda bude vracet délku úsečky, tj.&nbsp;vzdálenost mezi body [x1, y1]
+a [x2, y2]:</p>
+
+<pre>
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+</pre>
+
+<p>Již vytvořením této metody jsme dosáhli toho, že <strong>Line</strong> bude
+vyhovovat rozhraní <strong>OpenShape</strong>! Tuto skutečnost si jazyk Go
+ověří jak při překladu, tak i po spuštění aplikace.</p>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že skutečně nemusíme
+explicitně specifikovat (například klíčovým slovem <strong>implements</strong>
+apod.), že je rozhraní implementováno. To je poměrně velký sémantický rozdíl
+oproti programovacímu jazyku Java.</div></p>
+
+<p>Korektní chování si otestujeme na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/08_more_implementations.go">tomto
+demonstračním příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type OpenShape interface {
+        length() float64
+}
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func length(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+
+        fmt.Println(line1)
+
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu dostaneme žádoucí výsledek:</p>
+
+<pre>
+{0 0 100 100}
+141.4213562373095
+</pre>
+
+<p>Metody předepsané v&nbsp;rozhraní musí být implementovány zcela přesně, a to
+včetně návratového typu. Pokud typ nepatrně změníme (<strong>float32</strong>
+&rarr; <strong>float64</strong>), nebude <strong>Line</strong> rozhraní
+<strong>OpenShape</strong> vyhovovat:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type OpenShape interface {
+        length() float32
+}
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func length(shape OpenShape) float32 {
+        return shape.length()
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+
+        fmt.Println(line1)
+
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Pokus o překlad nyní skončí s&nbsp;chybou:</p>
+
+<pre>
+./07_B_wrong_return_type.go:37:23: cannot use line1 (type Line) as type OpenShape in argument to length:
+        Line does not implement OpenShape (wrong type for length method)
+                have length() float64
+                want length() float32
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Vícenásobná implementace stejného rozhraní</h2>
+
+<p>Nyní si ukážeme poněkud složitější příklad, který je odvozen od klasického
+&bdquo;školního&ldquo; příkladu s&nbsp;hierarchií geometrických tvarů. Budeme
+mít deklarována dvě rozhraní, jedno pro otevřené křivky (nebo chcete-li tvary)
+a druhé pro křivky uzavřené:</p>
+
+<pre>
+type OpenShape interface {
+        length() float64
+}
+&nbsp;
+type ClosedShape interface {
+        area() float64
+}
+</pre>
+
+<p>Dále vytvoříme dvě funkce, které budou akceptovat jakoukoli strukturu/záznam
+implementující dané rozhraní:</p>
+
+<pre>
+func length(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func area(shape ClosedShape) float64 {
+        return shape.area()
+}
+</pre>
+
+<p>Následně již můžeme bez problémů první rozhraní implementovat konkrétní
+strukturou představující úsečku. Následující řádky plně dostačují, aby
+struktura <strong>Line</strong> vyhovovala prvnímu rozhraní
+<strong>OpenShape</strong>:</p>
+
+<pre>
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+</pre>
+
+<p>Dále vytvoříme tři struktury, které vyhovují druhému rozhraní
+<strong>ClosedShape</strong>:</p>
+
+<pre>
+type Circle struct {
+        x, y   float64
+        radius float64
+}
+&nbsp;
+type Ellipse struct {
+        x, y float64
+        a, b float64
+}
+&nbsp;
+type Rectangle struct {
+        x, y          float64
+        width, height float64
+}
+&nbsp;
+func (rect Rectangle) area() float64 {
+        return rect.width * rect.height
+}
+&nbsp;
+func (circle Circle) area() float64 {
+        return math.Pi * circle.radius * circle.radius
+}
+&nbsp;
+func (ellipse Ellipse) area() float64 {
+        return math.Pi * ellipse.a * ellipse.b
+}
+</pre>
+
+<p>Vše si samozřejmě opět otestujeme:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type OpenShape interface {
+        length() float64
+}
+&nbsp;
+type ClosedShape interface {
+        area() float64
+}
+&nbsp;
+func length(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func area(shape ClosedShape) float64 {
+        return shape.area()
+}
+&nbsp;
+type Line struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+type Circle struct {
+        x, y   float64
+        radius float64
+}
+&nbsp;
+type Ellipse struct {
+        x, y float64
+        a, b float64
+}
+&nbsp;
+type Rectangle struct {
+        x, y          float64
+        width, height float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func (rect Rectangle) area() float64 {
+        return rect.width * rect.height
+}
+&nbsp;
+func (circle Circle) area() float64 {
+        return math.Pi * circle.radius * circle.radius
+}
+&nbsp;
+func (ellipse Ellipse) area() float64 {
+        return math.Pi * ellipse.a * ellipse.b
+}
+&nbsp;
+func main() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+        fmt.Println("Line")
+        fmt.Println(line1)
+        fmt.Println(length(line1))
+        fmt.Println(line1.length())
+        fmt.Println()
+&nbsp;
+        fmt.Println("Rectangle")
+        r := Rectangle{x: 0, y: 0, width: 100, height: 100}
+        fmt.Println(r)
+        fmt.Println(area(r))
+        fmt.Println(r.area())
+        fmt.Println()
+&nbsp;
+        fmt.Println("Circle")
+        c := Circle{x: 0, y: 0, radius: 100}
+        fmt.Println(c)
+        fmt.Println(area(c))
+        fmt.Println(c.area())
+        fmt.Println()
+&nbsp;
+        fmt.Println("Ellipse")
+        e := Ellipse{x: 0, y: 0, a: 100, b: 50}
+        fmt.Println(e)
+        fmt.Println(area(e))
+        fmt.Println(e.area())
+        fmt.Println()
+}
+</pre>
+
+<p>Povšimněte si, že můžeme volat jak funkci <strong>length</strong> a
+<strong>area</strong>, tak i přímo metody <strong>Line.length()</strong>,
+<strong>Circle.area()</strong> atd.:</p>
+
+<pre>
+Line
+{0 0 100 100}
+141.4213562373095
+141.4213562373095
+&nbsp;
+Rectangle
+{0 0 100 100}
+10000
+10000
+&nbsp;
+Circle
+{0 0 100}
+31415.926535897932
+31415.926535897932
+&nbsp;
+Ellipse
+{0 0 100 50}
+15707.963267948966
+15707.963267948966
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Řez se strukturami implementujícími společné rozhraní</h2>
+
+<p>Vzhledem k&nbsp;tomu, že se s&nbsp;využitím rozhraní může
+v&nbsp;programovacím jazyce Go realizovat polymorfní chování, asi nás
+nepřekvapí, že je povoleno vytvářet pole popř.&nbsp;řezy (rozdílných) struktur
+implementujících stejné rozhraní. Následující zápis je tak zcela korektní,
+protože všechny tři typy struktur (<strong>Rectangle</strong>,
+<strong>Circle</strong> i <strong>Ellipse</strong>) implementují rozhraní
+<strong>ClosedShape</strong>, což je překladačem samozřejmě kontrolováno:</p>
+
+<pre>
+shapes := []ClosedShape{
+        Rectangle{x: 0, y: 0, width: 100, height: 100},
+        Circle{x: 0, y: 0, radius: 100},
+        Ellipse{x: 0, y: 0, a: 100, b: 50}}
+</pre>
+
+<p>V&nbsp;předchozím úryvku byl vytvořen řez se třemi strukturami, ovšem můžeme
+snadno vytvořit i pole:</p>
+
+<pre>
+shapes := [...]ClosedShape{
+        Rectangle{x: 0, y: 0, width: 100, height: 100},
+        Circle{x: 0, y: 0, radius: 100},
+        Ellipse{x: 0, y: 0, a: 100, b: 50}}
+</pre>
+
+<p>Následně je možné iterovat přes všechny prvky pole či řezu a volat buď přímo
+implementované metody nebo funkce akceptující jako svůj parametr jakýkoli typ
+vyhovující rozhraní <strong>ClosedShape</strong>:</p>
+
+<pre>
+for _, shape := range shapes {
+        fmt.Println(shape)
+        fmt.Println(<strong>area(shape)</strong>)
+        fmt.Println(<strong>shape.area()</strong>)
+        fmt.Println()
+}
+</pre>
+
+<p>Podívejme se nyní na konkrétní realizaci výše popsaného polymorfního
+chování:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type ClosedShape interface {
+        area() float64
+}
+&nbsp;
+func area(shape ClosedShape) float64 {
+        return shape.area()
+}
+&nbsp;
+type Circle struct {
+        x, y   float64
+        radius float64
+}
+&nbsp;
+type Ellipse struct {
+        x, y float64
+        a, b float64
+}
+&nbsp;
+type Rectangle struct {
+        x, y          float64
+        width, height float64
+}
+&nbsp;
+func (rect Rectangle) area() float64 {
+        return rect.width * rect.height
+}
+&nbsp;
+func (circle Circle) area() float64 {
+        return math.Pi * circle.radius * circle.radius
+}
+&nbsp;
+func (ellipse Ellipse) area() float64 {
+        return math.Pi * ellipse.a * ellipse.b
+}
+&nbsp;
+func main() {
+        shapes := []ClosedShape{
+                Rectangle{x: 0, y: 0, width: 100, height: 100},
+                Circle{x: 0, y: 0, radius: 100},
+                Ellipse{x: 0, y: 0, a: 100, b: 50}}
+&nbsp;
+        for _, shape := range shapes {
+                fmt.Println(shape)
+                fmt.Println(area(shape))
+                fmt.Println(shape.area())
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Po spuštění příkladu se vypíšou informace o třech strukturách &ndash;
+souřadnice, plocha a znovu plocha (pokaždé se ovšem volá jiná funkce
+resp.&nbsp;metoda):</p>
+
+<pre>
+{0 0 100 100}
+10000
+10000
+&nbsp;
+{0 0 100}
+31415.926535897932
+31415.926535897932
+&nbsp;
+{0 0 100 50}
+15707.963267948966
+15707.963267948966
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Řezy rozhraní jako parametry funkce</h2>
+
+<p>Dynamické chování programovacího jazyka Go (alespoň v&nbsp;oblasti,
+v&nbsp;níž se používají rozhraní) jde samozřejmě ještě dále, protože můžeme
+deklarovat funkci akceptující řez rozhraním, tj.&nbsp;v&nbsp;praxi řez
+obsahující struktury vyhovující specifikovanému rozhraní. Taková funkce může
+vypadat například následovně:</p>
+
+<pre>
+func print_areas(shapes []ClosedShape) {
+        for _, shape := range shapes {
+                fmt.Println(shape)
+                fmt.Println(area(shape))
+                fmt.Println(shape.area())
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Tuto funkci lze zavolat a přitom jí předat následující řez:</p>
+
+<pre>
+shapes := []ClosedShape{
+        Rectangle{x: 0, y: 0, width: 100, height: 100},
+        Circle{x: 0, y: 0, radius: 100},
+        Ellipse{x: 0, y: 0, a: 100, b: 50}}
+&nbsp;
+print_areas(shapes)
+</pre>
+
+<p>Opět se podívejme na ucelený demonstrační příklad, v&nbsp;němž se výše
+zmíněná funkce používá:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type ClosedShape interface {
+        area() float64
+}
+&nbsp;
+func area(shape ClosedShape) float64 {
+        return shape.area()
+}
+&nbsp;
+type Circle struct {
+        x, y   float64
+        radius float64
+}
+&nbsp;
+type Ellipse struct {
+        x, y float64
+        a, b float64
+}
+&nbsp;
+type Rectangle struct {
+        x, y          float64
+        width, height float64
+}
+&nbsp;
+func (rect Rectangle) area() float64 {
+        return rect.width * rect.height
+}
+&nbsp;
+func (circle Circle) area() float64 {
+        return math.Pi * circle.radius * circle.radius
+}
+&nbsp;
+func (ellipse Ellipse) area() float64 {
+        return math.Pi * ellipse.a * ellipse.b
+}
+&nbsp;
+func print_areas(shapes []ClosedShape) {
+        for _, shape := range shapes {
+                fmt.Println(shape)
+                fmt.Println(area(shape))
+                fmt.Println(shape.area())
+                fmt.Println()
+        }
+}
+&nbsp;
+func main() {
+        shapes := []ClosedShape{
+                Rectangle{x: 0, y: 0, width: 100, height: 100},
+                Circle{x: 0, y: 0, radius: 100},
+                Ellipse{x: 0, y: 0, a: 100, b: 50}}
+
+        print_areas(shapes)
+}
+</pre>
+
+<p>Výsledek po spuštění tohoto příkladu bude shodný s&nbsp;výsledkem příkladu
+předchozího:</p>
+
+<pre>
+{0 0 100 100}
+10000
+10000
+&nbsp;
+{0 0 100}
+31415.926535897932
+31415.926535897932
+&nbsp;
+{0 0 100 50}
+15707.963267948966
+15707.963267948966
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Datový typ implementující větší množství rozhraní</h2>
+
+<p>Datová struktura (záznam) samozřejmě může vyhovovat většímu množství
+rozhraní, což si můžeme snadno ukázat na struktuře pojmenované dosti obecně
+<strong>Type</strong>, která sice neobsahuje žádné položky, což však vůbec
+nevadí:</p>
+
+<pre>
+type Type struct{}
+</pre>
+
+<p>V&nbsp;programu je dále deklarována dvojice rozhraní:</p>
+
+<pre>
+type Interface1 interface {
+        method1()
+}
+&nbsp;
+type Interface2 interface {
+        method2()
+}
+</pre>
+
+<p>Nyní postačuje implementovat obě metody, aby <strong>Type</strong>
+vyhovovala oběma rozhraním:</p>
+
+<pre>
+func (Type) method1() {
+        fmt.Println("Type.method1")
+}
+&nbsp;
+func (Type) method2() {
+        fmt.Println("Type.method2")
+}
+</pre>
+
+<p>Podívejme se nyní na příklad, v&nbsp;němž jsou tato rozhraní deklarována a
+použita:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+type Interface1 interface {
+        method1()
+}
+&nbsp;
+type Interface2 interface {
+        method2()
+}
+&nbsp;
+type Type struct{}
+&nbsp;
+func (Type) method1() {
+        fmt.Println("Type.method1")
+}
+&nbsp;
+func (Type) method2() {
+        fmt.Println("Type.method2")
+}
+&nbsp;
+func f1(i Interface1) {
+        fmt.Println("Interface1.f1")
+        i.method1()
+}
+&nbsp;
+func f2(i Interface2) {
+        fmt.Println("Interface2.f2")
+        i.method2()
+}
+&nbsp;
+func main() {
+        t := Type{}
+&nbsp;
+        t.method1()
+        t.method2()
+        fmt.Println()
+&nbsp;
+        f1(t)
+        fmt.Println()
+&nbsp;
+        f2(t)
+        fmt.Println()
+}
+</pre>
+
+<p>Povšimněte si, že můžeme bez problémů volat i funkce <strong>f1</strong> a
+<strong>f2</strong> a přitom jim předat strukturu typu <strong>t</strong>:</p>
+
+<pre>
+Type.method1
+Type.method2
+&nbsp;
+Interface1.f1
+Type.method1
+&nbsp;
+Interface2.f2
+Type.method2
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Skládání rozhraní</h2>
+
+<p>Další užitečnou vlastností typového systému programovacího jazyka Go je
+možnost při deklaraci nového rozhraní použít již existující rozhraní (této
+operaci se říká kompozice nebo též embedding, vložení). Díky tomu, že se
+v&nbsp;rozhraní nachází pouze deklarace hlaviček metod a nikoli jejich těla,
+nedojde při skládání k&nbsp;žádným nežádoucím a potenciálně nejednoznačným
+stavům (na rozdíl od vícenásobné dědičnosti). Podívejme se, jak lze rozhraní
+pojmenované <strong>Interface2</strong> vytvořit a použít přitom již existující
+rozhraní se jménem <strong>Interface1</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+type Interface1 interface {
+        method1()
+}
+&nbsp;
+type Interface2 interface {
+        Interface1
+        method2()
+}
+&nbsp;
+type Type struct{}
+&nbsp;
+func (Type) method1() {
+        fmt.Println("Type.method1")
+}
+&nbsp;
+func (Type) method2() {
+        fmt.Println("Type.method2")
+}
+&nbsp;
+func f1(i Interface1) {
+        fmt.Println("Interface1.f1")
+        i.method1()
+}
+&nbsp;
+func f2(i Interface2) {
+        fmt.Println("Interface2.f2")
+        i.method2()
+}
+&nbsp;
+func main() {
+        t := Type{}
+&nbsp;
+        t.method1()
+        t.method2()
+        fmt.Println()
+&nbsp;
+        f1(t)
+        fmt.Println()
+&nbsp;
+        f2(t)
+        fmt.Println()
+}
+</pre>
+
+<p>Chování příkladu po jeho spuštění:</p>
+
+<pre>
+Type.method1
+Type.method2
+&nbsp;
+Interface1.f1
+Type.method1
+&nbsp;
+Interface2.f2
+Type.method2
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Gorutiny</h2>
+
+<p>Ve třetí části článku si ukážeme způsob vytvoření a zavolání takzvaných
+gorutin, o nichž jsme se zmínili v&nbsp;úvodní kapitole. Vytvoření gorutiny je
+ve skutečnosti velmi snadné. Ve chvíli, kdy například máme deklarovanou funkci
+<strong>message()</strong>:</p>
+
+<pre>
+func message(id int) {
+        fmt.Printf("gorutina %d\n", id)
+}
+</pre>
+
+<p>Můžeme tuto funkci spustit přímo (synchronně):</p>
+
+<pre>
+message(1)
+</pre>
+
+<p>nebo nepřímo (asynchronně):</p>
+
+<pre>
+<strong>go</strong> message(1)
+</pre>
+
+<p>Jediným rozdílem je použití klíčového slova <strong>go</strong>.</p>
+
+<p>V&nbsp;některých případech se setkáme s&nbsp;tím, že je implementace
+gorutiny uvedena přímo za klíčovým slovem <strong>go</strong>, což je
+samozřejmě možné, protože funkce jsou plnohodnotným datovým typem:</p>
+
+<pre>
+<strong>go</strong> func(msg string) {
+    fmt.Println(msg)
+}("Hello world")
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Spuštění gorutiny</h2>
+
+<p>Gorutinu samozřejmě můžeme spustit přímo z&nbsp;hlavního vlákna
+aplikace:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func message(id int) {
+        fmt.Printf("gorutina %d\n", id)
+}
+&nbsp;
+func main() {
+        fmt.Println("main begin")
+        <strong>go</strong> message(1)
+        <strong>go</strong> message(2)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu však s&nbsp;velkou pravděpodobností vůbec
+neuvidíme hlášení vypsané oběma gorutinami. Je tomu tak z&nbsp;toho důvodu, že
+hlavní vlákno s&nbsp;funkcí <strong>main</strong> skončí ještě předtím, než
+dojde k&nbsp;inicializaci a spuštění gorutin.</p>
+
+<p>Jedno z&nbsp;řešení (ne příliš dobré!) spočívá v&nbsp;tom, že v&nbsp;hlavním
+vláknu počkáme na dokončení gorutin. Naše gorutiny jsou tak krátké a doslova
+primitivní, že plně postačuje počkat &bdquo;pouze&ldquo; dvě sekundy:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func message(id int) {
+        fmt.Printf("gorutina %d\n", id)
+}
+&nbsp;
+func main() {
+        fmt.Println("main begin")
+        go message(1)
+        go message(2)
+        time.Sleep(2 * time.Second)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Výsledek po spuštění:</p>
+
+<pre>
+main begin
+gorutina 1
+gorutina 2
+main end
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Spuštění většího množství gorutin na pozadí</h2>
+
+<p>Můžeme si samozřejmě vyzkoušet složitější příklady, například trojici
+gorutin, které zapisují řetězec na jediný řádek s&nbsp;různým zpožděním:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func print_chars() {
+        for ch := 'a'; ch &lt;= 'z'; ch++ {
+                fmt.Printf("%c", ch)
+                time.Sleep(200 * time.Millisecond)
+        }
+}
+&nbsp;
+func print_dots() {
+        for i := 0; i &lt; 30; i++ {
+                fmt.Print(".")
+                time.Sleep(200 * time.Millisecond)
+        }
+}
+&nbsp;
+func print_spaces() {
+        for i := 0; i &lt; 60; i++ {
+                fmt.Print(" ")
+                time.Sleep(110 * time.Millisecond)
+        }
+}
+&nbsp;
+func main() {
+        fmt.Println("main begin")
+        <strong>go</strong> print_chars()
+        <strong>go</strong> print_spaces()
+        <strong>go</strong> print_dots()
+        time.Sleep(6 * time.Second)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Výsledek může (ale nemusí) vypadat následovně:</p>
+
+<pre>
+main begin
+a.  b.  .c  .d  e.  .f g.  .h  i.  j.  .k l.  .m  n.  o.  p.  .q .r  .s  t.  u.  .v .w  .x  .y  z.  .  . .  .  main end
+</pre>
+
+<p>Gorutiny lze volat z&nbsp;jiných gorutin:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func print_chars() {
+        for ch := 'a'; ch &lt;= 'z'; ch++ {
+                fmt.Printf("%c", ch)
+                time.Sleep(200 * time.Millisecond)
+        }
+}
+&nbsp;
+func print_dots() {
+        for i := 0; i &lt; 30; i++ {
+                fmt.Print(".")
+                time.Sleep(200 * time.Millisecond)
+        }
+}
+&nbsp;
+func print_spaces() {
+        <strong>go</strong> print_chars()
+        <strong>go</strong> print_dots()
+        for i := 0; i &lt; 60; i++ {
+                fmt.Print(" ")
+                time.Sleep(110 * time.Millisecond)
+        }
+}
+&nbsp;
+func main() {
+        fmt.Println("main begin")
+        <strong>go</strong> print_spaces()
+        time.Sleep(6 * time.Second)
+        fmt.Println("main end")
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Kanály &ndash; technologie pro komunikaci mezi gorutinami</h2>
+
+<p>Knihovny či nové jazykové konstrukce umožňující používání kanálů (či front)
+pro asynchronní komunikaci mezi různými částmi vyvíjených aplikací, se
+v&nbsp;posledních několika letech těší poměrně velké popularitě. Ta je
+způsobena dvěma faktory. První důvod spočívá ve snaze o zjednodušení návrhu (či
+porozumění) vyvíjené aplikace, zejména ve chvíli, kdy se v&nbsp;rámci jednoho
+programu předávají data (resp.&nbsp;objekty) mezi částmi, jejichž funkce může
+být dobře izolována od částí ostatních.</p>
+
+<p>Druhý důvod je poněkud prozaičtější &ndash; v&nbsp;některých situacích je
+nutné dosáhnout zvýšení efektivity aplikace (například zvýšit počet odpovědí,
+které může server vygenerovat za určitou časovou jednotku) a přitom není možné
+či vhodné využívat řešení založené na použití většího množství vláken
+spravovaných přímo operačním systémem. Naprosto typickým příkladem jsou
+virtuální stroje JavaScriptu, které povětšinou umožňují běh aplikace
+v&nbsp;jediném vláknu (což je ovšem s&nbsp;ohledem na &bdquo;kvalitu&ldquo;
+některých programových kódů spíše výhodou...).</p>
+
+<p>Některé programovací jazyky, zejména pak <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;tomto
+seriálu</a> popisovaný jazyk <i>Go</i>, obsahují prostředky sloužící pro
+zajištění asynchronní komunikace přímo v&nbsp;syntaxi (a samozřejmě též
+v&nbsp;sémantice) jazyka. Konkrétně v&nbsp;případě jazyka <i>Go</i> se jedná o
+gorutiny představené v&nbsp;předchozích kapitolách, které jsou doplněny o
+specializované operace sloužící pro zápis či čtení dat z&nbsp;kanálů. Tyto
+specializované operace jsou představovány operátorem <strong>&lt;-</strong>
+(ten má dva významy v&nbsp;závislosti na tom, zda je před operátorem uveden
+identifikátor představující kanál či nikoli).</p>
+
+<p>Typickým příkladem, v&nbsp;němž se použije kanál, je komunikace mezi
+producentem a konzumentem:</p>
+
+<pre>
++-----------+                            +-----------+
+| producent |          +-----+           | konzument |
+|           |... &gt; ... |kanál} ... &gt; ... |           |
+| go block  |          +-----+           | go block  |
++-----------+                            +-----------+
+</pre>
+
+<p>Kanál může být v&nbsp;případě potřeby využíván více producenty (i
+konzumenty), takže se původní schéma komunikace může změnit:</p>
+
+<pre>
++-----------+ 
+| producent |
+|     #1    |... &gt;.........
+| go block  |             :
++-----------+             :
+                          :
++-----------+             :              +-----------+
+| producent |          +-----+           | konzument |
+|     #2    |... &gt; ... |kanál} ... &lt; ... |           |
+| go block  |          +-----+           | go block  |
++-----------+             :              +-----------+
+                          :
++-----------+             :
+| producent |             :
+|     #3    |... &gt;........:
+| go block  |
++-----------+
+</pre>
+
+<p>Ukažme si nyní velmi jednoduchý příklad použití kanálu při čekání na
+dokončení gorutiny. Jedná se o mnohem čistší řešení problému, s&nbsp;nímž jsme
+se setkali v&nbsp;předchozích kapitolách. Nyní je gorutině předán kanál
+(s&nbsp;kapacitou jediného čísla typu <strong>int</strong>) a kód ve funkci
+<strong>main</strong> nejprve gorutinu zavolá a posléze čeká na hodnotu
+zapsanou do kanálu. Toto čekání je blokující &ndash; hlavní blok tedy skutečně
+bude v&nbsp;daném místě čekat na operaci zápisu do kanálu. Kromě vlastní
+hodnoty se při čtení z&nbsp;kanálu získá i jeho stav, tj.&nbsp;zda je kanál
+stále otevřen a připraven pro komunikaci:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func message(id int, channel chan int) {
+        fmt.Printf("gorutina %d\n", id)
+&nbsp;
+        <i>// zápis libovolné hodnoty do kanálu</i>
+        <strong>channel &lt;- 1</strong>
+}
+&nbsp;
+func main() {
+        channel := make(chan int)
+&nbsp;
+        fmt.Println("main begin")
+        go message(1, channel)
+&nbsp;
+        fmt.Println("waiting...")
+&nbsp;
+        <i>// blokující čtení z&nbsp;kanálu</i>
+        <strong>code, status := &lt;-channel</strong>
+&nbsp;
+        fmt.Printf("received code: %d and status: %t\n", code, status)
+        fmt.Println("main end")
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Implementace workerů s&nbsp;využitím gorutin a kanálů</h2>
+
+<p>Prozatím bez podrobnějšího popisu si ukažme, jak lze implementovat
+jednoduchý systém s&nbsp;<i>workery</i> s&nbsp;využitím gorutin a kanálů.
+Workerům se úlohy předávají přes kanál <strong>task_channel</strong>, druhý
+kanál slouží pro jejich ukončení:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func worker(task_channel chan int, worker_done chan bool) {
+        fmt.Println("worker started")
+        for {
+                value, more := &lt;-task_channel
+                if more {
+                        fmt.Printf("worker received task with parameter %d\n", value)
+                } else {
+                        fmt.Println("finishing worker")
+                        worker_done &lt;- true
+                        fmt.Println("worker finished")
+                        return
+                }
+        }
+}
+&nbsp;
+func main() {
+        task_channel := make(chan int)
+        worker_done := make(chan bool)
+&nbsp;
+        fmt.Println("main begin")
+&nbsp;
+        go worker(task_channel, worker_done)
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                fmt.Printf("sending task with parameter %d\n", i)
+                task_channel &lt;- i
+        }
+        //close(task_channel)
+&nbsp;
+        fmt.Println("waiting for workers...")
+&nbsp;
+        code, status := &lt;-worker_done
+&nbsp;
+        fmt.Printf("received code: %t and status: %t\n", code, status)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Práce jednoho workera:</p>
+
+<pre>
+main begin
+sending task with parameter 1
+worker started
+worker received task with parameter 1
+sending task with parameter 2
+sending task with parameter 3
+worker received task with parameter 2
+worker received task with parameter 3
+sending task with parameter 4
+sending task with parameter 5
+worker received task with parameter 4
+worker received task with parameter 5
+sending task with parameter 6
+sending task with parameter 7
+worker received task with parameter 6
+worker received task with parameter 7
+sending task with parameter 8
+sending task with parameter 9
+worker received task with parameter 8
+worker received task with parameter 9
+sending task with parameter 10
+waiting for workers...
+worker received task with parameter 10
+finishing worker
+worker finished
+received code: true and status: true
+main end
+</pre>
+
+<p>Workerů můžeme spustit více, zde konkrétně tři:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func worker(id int, task_channel chan int, worker_done chan bool) {
+        fmt.Printf("worker %d started\n", id)
+        for {
+                value, more := &lt;-task_channel
+                if more {
+                        fmt.Printf("worker %d received task with parameter %d\n", id, value)
+                        time.Sleep(2 * time.Second)
+                } else {
+                        fmt.Printf("finishing worker %d\n", id)
+                        worker_done &lt;- true
+                        fmt.Printf("worker %d finished\n", id)
+                        return
+                }
+        }
+}
+&nbsp;
+func main() {
+        task_channel := make(chan int)
+        worker_done := make(chan bool)
+&nbsp;
+        fmt.Println("main begin")
+&nbsp;
+        for i := 1; i &lt;= 3; i++ {
+                go worker(i, task_channel, worker_done)
+        }
+        time.Sleep(2 * time.Second)
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                fmt.Printf("sending task with parameter %d\n", i)
+                task_channel &lt;- i
+        }
+        close(task_channel)
+&nbsp;
+        fmt.Println("waiting for workers...")
+&nbsp;
+        code, status := &lt;-worker_done
+&nbsp;
+        fmt.Printf("received code: %t and status: %t\n", code, status)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Nyní se workeři o práci poměrně spravedlivě dělí:</p>
+
+<pre>
+main begin
+worker 1 started
+worker 2 started
+worker 3 started
+sending task with parameter 1
+sending task with parameter 2
+sending task with parameter 3
+sending task with parameter 4
+worker 2 received task with parameter 2
+worker 1 received task with parameter 1
+worker 3 received task with parameter 3
+worker 3 received task with parameter 4
+sending task with parameter 5
+sending task with parameter 6
+sending task with parameter 7
+worker 2 received task with parameter 5
+worker 1 received task with parameter 6
+worker 3 received task with parameter 7
+sending task with parameter 8
+worker 1 received task with parameter 8
+sending task with parameter 9
+sending task with parameter 10
+worker 2 received task with parameter 9
+worker 3 received task with parameter 10
+waiting for workers...
+finishing worker 1
+worker 1 finished
+received code: true and status: true
+main end
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Deadlock a jeho detekce v&nbsp;runtime</h2>
+
+<p>Kanály, které jsme až doposud pro komunikaci mezi gorutinami používali,
+mohly obsahovat pouze jediný prvek, takže se jejich chování dá shrnout
+přibližně takto:</p>
+
+<ul>
+
+<li>Zápis do prázdného kanálu je neblokující operace (kanál se zápisem zaplní,
+další zápis již tedy bude blokující, pokud mezitím nedojde ke čtení).</li>
+
+<li>Zápis do neprázdného kanálu je blokující operace.</li>
+
+<li>Čtení z&nbsp;prázdného kanálu je blokující operace (počká se na další
+zápis).</li>
+
+<li>Čtení z&nbsp;neprázdného kanálu je neblokující operace (kanál se
+vyprázdní).</li>
+
+</ul>
+
+<p>V&nbsp;praxi však může dojít i k&nbsp;problémové situaci, a to ve chvíli,
+kdy použijeme větší množství kanálů, přičemž dvě gorutiny budou navzájem čekat
+na zápis provedený do různých kanálů. V&nbsp;takovém případě dojde
+k&nbsp;takzvanému <i>deadlocku</i>, což si můžeme relativně snadno
+otestovat:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func worker(task_channel chan int, worker_done chan bool) {
+        fmt.Println("worker started")
+        for {
+                value, more := &lt;-task_channel
+                if more {
+                        fmt.Printf("worker received task with parameter %d\n", value)
+                } else {
+                        fmt.Println("finishing worker")
+                        worker_done &lt;- true
+                        fmt.Println("worker finished")
+                        return
+                }
+        }
+}
+&nbsp;
+func main() {
+        task_channel := make(chan int)
+        worker_done := make(chan bool)
+&nbsp;
+        fmt.Println("main begin")
+&nbsp;
+        go worker(task_channel, worker_done)
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                fmt.Printf("sending task with parameter %d\n", i)
+                task_channel &lt;- i
+        }
+        // !!!
+        // close(task_channel)
+        // !!!
+&nbsp;
+        fmt.Println("waiting for workers...")
+&nbsp;
+        code, status := &lt;-worker_done
+&nbsp;
+        fmt.Printf("received code: %t and status: %t\n", code, status)
+        fmt.Println("main end")
+}
+</pre>
+
+<p>Kanál <strong>task_channel</strong> není uzavřen, tudíž workeři nikdy
+neskončí a budou čekat na data, která nedostanou:</p>
+
+<pre>
+main begin
+sending task with parameter 1
+worker started
+worker received task with parameter 1
+sending task with parameter 2
+sending task with parameter 3
+worker received task with parameter 2
+worker received task with parameter 3
+sending task with parameter 4
+sending task with parameter 5
+worker received task with parameter 4
+worker received task with parameter 5
+sending task with parameter 6
+sending task with parameter 7
+worker received task with parameter 6
+worker received task with parameter 7
+sending task with parameter 8
+sending task with parameter 9
+worker received task with parameter 8
+worker received task with parameter 9
+sending task with parameter 10
+waiting for workers...
+worker received task with parameter 10
+<strong>fatal error: all goroutines are asleep - deadlock!</strong>
+&nbsp;
+goroutine 1 [chan receive]:
+main.main()
+        /home/tester/temp/out/go-root/article_04/20_workers_deadlock.go:45 +0x1f1
+&nbsp;
+goroutine 5 [chan receive]:
+main.worker(0xc00005e060, 0xc00005e0c0)
+        /home/tester/temp/out/go-root/article_04/20_workers_deadlock.go:15 +0xf2
+created by main.main
+        /home/tester/temp/out/go-root/article_04/20_workers_deadlock.go:33 +0xed
+exit status 2
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že deadlock byl
+v&nbsp;runtime detekován, což je velmi užitečné.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+doslova několik kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_methods.go</td><td>deklarace metody pro záznam/strukturu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/01_methods.go">https://github.com/tisnik/go-fedora/blob/master/article_04/01_methods.go</a></td></tr>
+<tr><td> 2</td><td>02_methods_with_parameters.go</td><td>deklarace metody s&nbsp;parametry</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/02_methods_with_parameters.go">https://github.com/tisnik/go-fedora/blob/master/article_04/02_methods_with_parameters.go</a></td></tr>
+<tr><td> 3</td><td>03_methods_ptr.go</td><td>předání ukazatele na strukturu do metody</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/03_methods_ptr.go">https://github.com/tisnik/go-fedora/blob/master/article_04/03_methods_ptr.go</a></td></tr>
+<tr><td> 4</td><td>04_methods_ptr_better_solution.go</td><td>vylepšení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/04_methods_ptr_better_solution.go">https://github.com/tisnik/go-fedora/blob/master/article_04/04_methods_ptr_better_solution.go</a></td></tr>
+<tr><td> 5</td><td>05_interface.go</td><td>deklarace trojice rozhraní</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/05_interface.go">https://github.com/tisnik/go-fedora/blob/master/article_04/05_interface.go</a></td></tr>
+<tr><td> 6</td><td>06_interface_implementation.go</td><td>rozhraní, které má být implementováno</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/06_interface_implementation.go">https://github.com/tisnik/go-fedora/blob/master/article_04/06_interface_implementation.go</a></td></tr>
+<tr><td> 7</td><td>07_interface_implementation_with_method.go</td><td>implementace rozhraní</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/07_interface_implementation_with_method.go">https://github.com/tisnik/go-fedora/blob/master/article_04/07_interface_implementation_with_method.go</a></td></tr>
+<tr><td> 8</td><td>08_more_implementations.go</td><td>více rozhraní</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/08_more_implementations.go">https://github.com/tisnik/go-fedora/blob/master/article_04/08_more_implementations.go</a></td></tr>
+<tr><td> 9</td><td>09_slice_of_interfaces.go</td><td>řez s&nbsp;rozhraními</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/09_slice_of_interfaces.go">https://github.com/tisnik/go-fedora/blob/master/article_04/09_slice_of_interfaces.go</a></td></tr>
+<tr><td>10</td><td>10_slice_of_interfaces_as_param.go</td><td>řez s&nbsp;rozhraními</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/10_slice_of_interfaces_as_param.go">https://github.com/tisnik/go-fedora/blob/master/article_04/10_slice_of_interfaces_as_param.go</a></td></tr>
+<tr><td>11</td><td>11_multiple_interfaces.go</td><td>implementace více rozhraní</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/11_multiple_interfaces.go">https://github.com/tisnik/go-fedora/blob/master/article_04/11_multiple_interfaces.go</a></td></tr>
+<tr><td>12</td><td>12_embedded_interface.go</td><td>vložená rozhraní</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/12_embedded_interface.go">https://github.com/tisnik/go-fedora/blob/master/article_04/12_embedded_interface.go</a></td></tr>
+<tr><td>13</td><td>13_simple_goroutine.go</td><td>jednoduchá gorutina</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/13_simple_goroutine.go">https://github.com/tisnik/go-fedora/blob/master/article_04/13_simple_goroutine.go</a></td></tr>
+<tr><td>14</td><td>14_wait_for_goroutine.go</td><td>čekání na dokončení gorutiny</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/14_wait_for_goroutine.go">https://github.com/tisnik/go-fedora/blob/master/article_04/14_wait_for_goroutine.go</a></td></tr>
+<tr><td>15</td><td>15_multiple_goroutines.go</td><td>spuštění většího množství gorutin</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/15_multiple_goroutines.go">https://github.com/tisnik/go-fedora/blob/master/article_04/15_multiple_goroutines.go</a></td></tr>
+<tr><td>16</td><td>16_goroutine_from_goroutine.go</td><td>volání gorutiny z&nbsp;jiné gorutiny</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/16_goroutine_from_goroutine.go">https://github.com/tisnik/go-fedora/blob/master/article_04/16_goroutine_from_goroutine.go</a></td></tr>
+<tr><td>17</td><td>17_channel.go</td><td>vytvoření a použití kanálu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/17_channel.go">https://github.com/tisnik/go-fedora/blob/master/article_04/17_channel.go</a></td></tr>
+<tr><td>18</td><td>18_worker.go</td><td>implementace workera</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/18_worker.go">https://github.com/tisnik/go-fedora/blob/master/article_04/18_worker.go</a></td></tr>
+<tr><td>19</td><td>19_more_workers.go</td><td>větší množství workerů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/19_more_workers.go">https://github.com/tisnik/go-fedora/blob/master/article_04/19_more_workers.go</a></td></tr>
+<tr><td>20</td><td>20_workers_deadlock.go</td><td>vznik deadlocku</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_04/20_workers_deadlock.go">https://github.com/tisnik/go-fedora/blob/master/article_04/20_workers_deadlock.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go <br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2018</small></p>
+</body>
+</html>
