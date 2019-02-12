@@ -1,0 +1,2558 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V první části dnešního článku o programovacím jazyku Go si popíšeme další užitečné funkce a metody ze standardních balíčků. Ve druhé části porovnáme kvalitu překladače Go v porovnání s ANSI C (překladač GCC) a vliv paralelizace kódu pomocí gorutin.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem</a></p>
+<p><a href="#k02">2. Zpracování argumentů předaných na příkazové řádce</a></p>
+<p><a href="#k03">3. Standardní balíček <strong>flag</strong></a></p>
+<p><a href="#k04">4. Celá čísla s&nbsp;neomezeným rozsahem</a></p>
+<p><a href="#k05">5. Výpočet faktoriálu pro téměř libovolné <i>n</i></a></p>
+<p><a href="#k06">6. Čísla s&nbsp;plovoucí řádovou čárkou s&nbsp;neomezeným rozsahem a přesností</a></p>
+<p><a href="#k07">7. Spuštění externích utilit</a></p>
+<p><a href="#k08">8. Předání dat na standardní vstup externích utilit</a></p>
+<p><a href="#k09">9. Čtení a vyhledávání proměnných prostředí</a></p>
+<p><a href="#k10">10. Získání základních informací o běžícím procesu a jeho prostředí</a></p>
+<p><a href="#k11">11. Kvalita překladače jazyka Go při optimalizacích</a></p>
+<p><a href="#k12">12. Vzorový benchmark naprogramovaný v&nbsp;ANSI C</a></p>
+<p><a href="#k13">13. První varianta benchmarku přímo přepsaná do Go</a></p>
+<p><a href="#k14">14. Vliv bufferu na rychlost dokončení benchmarku</a></p>
+<p><a href="#k15">15. Druhá verze benchmarku: použití bufferovaného výstupu</a></p>
+<p><a href="#k16">16. Třetí verze benchmarku: výpočet po jednotlivých obrazových řádcích</a></p>
+<p><a href="#k17">17. Finální verze benchmarku: využití kanálů a gorutin pro paralelní výpočty</a></p>
+<p><a href="#k18">18. Porovnání výsledků všech benchmarků</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem</h2>
+
+<p>Dnešní díl <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> je rozdělen na dvě části. <a
+href="#k02">V&nbsp;první polovině</a> se budeme převážně věnovat dalším
+balíčkům, které se vývojářům mohou hodit v&nbsp;každodenní praxi. <a
+href="#k12">Ve druhé části</a> si ukážeme jeden benchmark zaměřený jak na
+optimalizaci počítaných programových smyček a výpočtů s&nbsp;hodnotami typu
+<i>float64</i>, tak i na základní vstupně-výstupní operace. Porovnáme si dvě
+varianty benchmarku naprogramovaných v&nbsp;ANSI C s&nbsp;několika
+implementacemi vytvořenými přímo v&nbsp;programovacím jazyku Go. Na závěr si
+ukážeme, jakým způsobem lze benchmark vytvořený v&nbsp;Go relativně snadno
+přepsat do paralelní podoby s&nbsp;využitím nám již známých <i>gorutin</i> a
+<i>kanálů</i> (což samozřejmě není příliš férové v&nbsp;porovnání
+s&nbsp;jednovláknovou céčkovskou implementací, ovšem &bdquo;paralelizace&ldquo;
+v&nbsp;Go je &ndash; na rozdíl od programovacího jazyka C &ndash; velmi snadná
+a, což je neméně důležité, i poměrně přímočará).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Zpracování argumentů předaných na příkazové řádce</h2>
+
+<p>Programovací jazyk Go se mj.&nbsp;používá i pro tvorbu různých nástrojů
+spouštěných z&nbsp;příkazového řádku. Typicky se těmto nástrojům musí předávat
+nějaké argumenty, takže si dnes ukážeme, jakým způsobem se tyto argumenty
+přečtou a zpracují. Jen pro připomenutí si nejprve ukažme, jak se
+s&nbsp;argumenty předávanými na příkazovém řádku pracuje v&nbsp;programovacím
+jazyku C. Předpokládejme, že se aplikaci mají předat tři celočíselné
+argumenty:</p>
+
+<pre>
+int <strong>main</strong>(int argc, char **argv)
+{
+    if (argc &lt; 4) {
+        puts("usage: ./mandelbrot width height maxiter");
+        return 1;
+    }
+    int width = atoi(argv[1]);
+    int height = atoi(argv[2]);
+    int maxiter = atoi(argv[3]);
+    ...
+    ...
+    ...
+</pre>
+
+<p>Z&nbsp;předchozího příkladu je patrné, že v&nbsp;programovacím jazyku C se
+informace o případných argumentech zapsaných na příkazovém řádku předávají
+přímo do funkce <strong>main</strong>, která je vstupním bodem aplikace (je
+automaticky zavolána runtime systémem). V&nbsp;prvním parametru nazvaném
+<strong>argc</strong> je uložen celkový počet argumentů a druhý parametr
+pojmenovaný <strong>argv</strong> obsahuje ukazatel na pole řetězců
+s&nbsp;argumenty (řetězce jsou v&nbsp;poli taktéž představovány ukazateli typu
+<strong>char*</strong>, což je v&nbsp;céčku <a
+href="https://www.root.cz/clanky/interni-reprezentace-retezcu-v-ruznych-jazycich-od-pocitacoveho-praveku-po-soucasnost/#k06">obvyklý
+způsob reprezentace řetězců</a>). Důležité je, že v&nbsp;poli
+<strong>argv</strong> se v&nbsp;prvním prvku (s&nbsp;indexem 0) nachází název
+spuštěného programu. Díky tomu je možné &bdquo;simulovat&ldquo; větší množství
+programů s&nbsp;různým chováním, které jsou ovšem uloženy ve stejném binárním
+souboru &ndash; postačuje spustit symbolický ukazatel na tento soubor, protože
+řetězec <strong>argv[0]</strong> bude obsahovat právě jméno symlinku (takto se
+například rozlišují příkazy <strong>vi</strong>, <strong>vim</strong> a
+<strong>vimdiff</strong> reprezentované jediným binárním souborem a dvěma
+symlinky).</p>
+
+<p>V&nbsp;programovacím jazyku Go se s&nbsp;argumenty zapsanými na příkazový
+řádek aplikace pracuje poněkud odlišným způsobem. Všechny argumenty (včetně
+jména spuštěného programu) jsou uloženy do pole <strong>os.Args</strong>, což
+mj.&nbsp;znamená, že nejdříve musíme importovat balíček <strong>os</strong>.
+Pole <strong>os.Args</strong> je typu:</p>
+
+<pre>
+var Args []string
+</pre>
+
+<p>což z&nbsp;pohledu vývojáře značí, že s&nbsp;jeho prvky můžeme pracovat jako
+s&nbsp;běžnými řetězci. To je ostatně ukázáno i v&nbsp;dnešním prvním
+demonstračním příkladu, jehož zdrojový kód naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_10/01_cmdline_params.go">https://github.com/tisnik/go-fedora/blob/master/article_10/01_cmdline_params.go</a>.
+Po spuštění tohoto příkladu se nejdříve vypíše celkový počet argumentů a
+posléze i jejich hodnoty:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "os"
+)
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Printf("Arguments: %d\n", <strong>len(os.Args)</strong>)
+&nbsp;
+        for index, element := <strong>range os.Args</strong> {
+                fmt.Printf("Argument #%d = %s\n", index, element)
+        }
+}
+</pre>
+
+<p>Samozřejmě si ukážeme použití tohoto jednoduchého příkladu v&nbsp;praxi.</p>
+
+<p>Spuštění bez argumentů:</p>
+
+<pre>
+$ <strong>go run 01_cmdline_params.go</strong>
+&nbsp;
+Arguments: 1
+Argument #0 = /tmp/go-build447690084/b001/exe/01_cmdline_params
+</pre>
+
+<p>Spuštění s&nbsp;předáním tří argumentů:</p>
+
+<pre>
+$ <strong>go run 01_cmdline_params.go foo bar baz</strong>
+&nbsp;
+Arguments: 4
+Argument #0 = /tmp/go-build652687078/b001/exe/01_cmdline_params
+Argument #1 = foo
+Argument #2 = bar
+Argument #3 = baz
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě je v&nbsp;prvním
+prvku pole <strong>os.Args</strong> uloženo jméno dočasně vytvořeného
+spustitelného souboru, protože jsme použili příkaz <strong>go run</strong> a
+nikoli <strong>go build</strong>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Standardní balíček <strong>flag</strong></h2>
+
+<p>Přímá práce s&nbsp;výše popsaným polem <strong>os.Args</strong> je
+v&nbsp;praxi vhodná jen ve chvíli, kdy aplikace akceptuje pouze několik
+argumentů, které jsou navíc umístěny na pevné pozici (například může první
+argument obsahovat jméno vstupního souboru a druhý argument jméno souboru
+výstupního). Pokud však má aplikace podporovat různé přepínače, pojmenované
+argumenty, argumenty s&nbsp;krátkou a dlouhou variantou zápisu (-h, --help)
+apod., tak je lepší namísto ručního procházení polem <strong>os.Args</strong>
+využít možností poskytovaných standardním balíčkem nazvaným
+<strong>flag</strong>. S&nbsp;tímto balíčkem se pracuje následujícím
+způsobem:</p>
+
+<ol>
+
+<li>Nejdříve se s&nbsp;využitím funkcí <strong>flag.InvVar</strong>,
+<strong>flag.UintVar</strong>, <strong>flag.BoolVar</strong>,
+<strong>flag.Float64Var</strong> atd. zaregistrují jména argumentů očekávaných
+na příkazové řádce, jejich typy (řetězec, celé číslo, logický přepínač, ...),
+výchozí hodnoty a taktéž ukazatele na proměnné, které se mají naplnit skutečně
+zapsanými hodnotami argumentů.</li>
+
+<li>Posléze se zavolá funkce <strong>flag.Parse</strong>, která argumenty
+zadané na příkazové řádce zpracuje a naplní příslušné proměnné (z&nbsp;tohoto
+důvodu se registrují ukazatele na proměnné).</li>
+
+</ol>
+
+<p>Ukažme si nyní jednoduché základní použití balíčku <strong>flag</strong> i
+s&nbsp;příslušným komentářem:</p>
+
+<pre>
+<i>// deklarace běžné proměnné typu int</i>
+var width int
+&nbsp;
+<i>// specifikace, že na příkazovém řádku očekáváme argument se jménem width</i>
+<i>// hodnotou tohoto argumentu má být celé číslo s výchozí hodnotou 0</i>
+<i>// po zpracování a převodu na celé číslo se má výsledek uložit do proměnné width</i>
+flag.IntVar(&amp;width, "width", 0, "image width")
+&nbsp;
+<i>// vlastní zpracování argumentů předaných na příkazové řádce</i>
+flag.Parse()
+&nbsp;
+<i>// výpis výsledku</i>
+fmt.Printf("width: %d\n", width)
+</pre>
+
+<p>Následuje poněkud obsáhlejší <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_10/02_flags.go">demonstrační
+příklad</a>, v&nbsp;němž jsou specifikovány čtyři argumenty, z&nbsp;toho dva
+celočíselné, jeden je typu boolean (buď je použit či nikoli) a poslední
+argument může obsahovat libovolný řetězec:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "flag"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var width int
+        var height int
+        var aa bool
+        var output string
+&nbsp;
+        flag.IntVar(&amp;width, "width", 0, "image width")
+        flag.IntVar(&amp;height, "height", 0, "image height")
+        flag.BoolVar(&amp;aa, "aa", false, "enable antialiasing")
+        flag.StringVar(&amp;output, "output", "", "output file name")
+&nbsp;
+        flag.Parse()
+&nbsp;
+        fmt.Printf("width: %d\n", width)
+        fmt.Printf("height: %d\n", height)
+        fmt.Printf("antialiasing: %t\n", aa)
+        fmt.Printf("output file name: %s\n", output)
+}
+</pre>
+
+<p>Spuštění tohoto příkladu bez argumentů:</p>
+
+<pre>
+$ <strong>go run 02_flags.go </strong>
+&nbsp;
+width: 0
+height: 0
+antialiasing: false
+output file name: 
+</pre>
+
+<p>Spuštění příkladu s&nbsp;argumenty:</p>
+
+<pre>
+$ <strong>go run 02_flags.go -width=320 -height=200 -aa -output=xyzzy</strong>
+&nbsp;
+width: 320
+height: 200
+antialiasing: true
+output file name: xyzzy
+</pre>
+
+<p>Balíček <strong>flag</strong> dokonce dokáže automaticky vygenerovat
+nápovědu na základě zaregistrovaných argumentů:</p>
+
+<pre>
+$ <strong>go run 02_flags.go -h</strong>
+&nbsp;
+Usage of /tmp/go-build202978013/b001/exe/02_flags:
+  -aa
+        enable antialiasing
+  -height int
+        image height
+  -output string
+        output file name
+  -width int
+        image width
+exit status 2
+</pre>
+
+<p>Popř.&nbsp;můžeme použít dlouhou variantu <strong>--help</strong>:</p>
+
+<pre>
+$ <strong>go run 02_flags.go --help</strong>
+&nbsp;
+Usage of /tmp/go-build109677334/b001/exe/02_flags:
+  -aa
+        enable antialiasing
+  -height int
+        image height
+  -output string
+        output file name
+  -width int
+        image width
+exit status 2
+</pre>
+
+<p>Samozřejmě nám nic nebrání ve specifikaci argumentů s&nbsp;krátkým a
+současně i dlouhým jménem &ndash; prostě u obou argumentů uvedeme stejnou
+proměnnou, což je ukázáno v&nbsp;dnešním <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_10/03_flag_shorthands.go">třetím
+demonstračním příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "flag"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var width int
+        var height int
+        var aa bool
+        var output string
+&nbsp;
+        flag.IntVar(&amp;width, "w", 0, "image width (shorthand)")
+        flag.IntVar(&amp;width, "width", 0, "image width")
+&nbsp;
+        flag.IntVar(&amp;height, "h", 0, "image height (shorthand)")
+        flag.IntVar(&amp;height, "height", 0, "image height")
+&nbsp;
+        flag.BoolVar(&amp;aa, "a", false, "enable antialiasing (shorthand)")
+        flag.BoolVar(&amp;aa, "antialias", false, "enable antialiasing")
+&nbsp;
+        flag.StringVar(&amp;output, "o", "", "output file name (shorthand)")
+        flag.StringVar(&amp;output, "output", "", "output file name")
+&nbsp;
+        flag.Parse()
+&nbsp;
+        fmt.Printf("width: %d\n", width)
+        fmt.Printf("height: %d\n", height)
+        fmt.Printf("antialiasing: %t\n", aa)
+        fmt.Printf("output file name: %s\n", output)
+}
+</pre>
+
+<p>Krátké otestování možností:</p>
+
+<pre>
+$ <strong>go run 03_flag_shorthands.go </strong>
+&nbsp;
+width: 0
+height: 0
+antialiasing: false
+output file name: 
+</pre>
+
+<p>Vygenerovaná nápověda:</p>
+
+<pre>
+$ <strong>go run 03_flag_shorthands.go --help</strong>
+&nbsp;
+Usage of /tmp/go-build543408348/b001/exe/03_flag_shorthands:
+  -a    enable antialiasing (shorthand)
+  -antialias
+        enable antialiasing
+  -h int
+        image height (shorthand)
+  -height int
+        image height
+  -o string
+        output file name (shorthand)
+  -output string
+        output file name
+  -w int
+        image width (shorthand)
+  -width int
+        image width
+exit status 2
+</pre>
+
+<p>Specifikace zkrácených parametrů:</p>
+
+<pre>
+$ <strong>go run 03_flag_shorthands.go -w=320 -h=240 -o=xyzzy -a</strong>
+&nbsp;
+width: 320
+height: 240
+antialiasing: true
+output file name: xyzzy
+</pre>
+
+<p>Alternativní způsob volání:</p>
+
+<pre>
+$ <strong>go run 03_flag_shorthands.go -w 320 -h 240 -o xyzzy -a</strong>
+&nbsp;
+width: 320
+height: 240
+antialiasing: true
+output file name: xyzzy
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Celá čísla s&nbsp;neomezeným rozsahem</h2>
+
+<p>Připomeňme si, že v&nbsp;programovacím jazyku Go mají vývojáři
+k&nbsp;dispozici několik základních datových typů určených pro práci
+s&nbsp;celými čísly, ať již se znaménkem, nebo bez znaménka. Jedná se o tyto
+typy, přičemž <strong>int</strong> a <strong>uint</strong> jsou systémově
+závislé aliasy:</p>
+
+<table>
+<tr><th>Identifikátor</th><th>Typ</th><th>Stručný popis</th></tr>
+<tr><td>int</td><td>datový typ</td><td>odpovídá buď typu int32 nebo int64</td></tr> 
+<tr><td>int8</td><td>datový typ</td><td>osmibitové celé číslo se znaménkem</td></tr> 
+<tr><td>int16</td><td>datový typ</td><td>šestnáctibitové celé číslo se znaménkem</td></tr> 
+<tr><td>int32</td><td>datový typ</td><td>32bitové celé číslo se znaménkem</td></tr> 
+<tr><td>int64</td><td>datový typ</td><td>64bitové celé číslo se znaménkem</td></tr> 
+<tr><td>uint</td><td>datový typ</td><td>odpovídá buď typu uint32 nebo uint64</td></tr> 
+<tr><td>uint8</td><td>datový typ</td><td>osmibitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint16</td><td>datový typ</td><td>16bitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint32</td><td>datový typ</td><td>32bitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint64</td><td>datový typ</td><td>64bitové celé číslo bez znaménka</td></tr> 
+</table>
+
+<p>Práce s&nbsp;hodnotami těchto typů je většinou velmi rychlá, a to
+z&nbsp;toho důvodu, že současné mikroprocesory operaci s&nbsp;celými čísly
+typicky provedou přímo v&nbsp;aritmeticko-logické jednotce v&nbsp;několika
+strojových cyklech (které se navíc překrývají s&nbsp;dalšími instrukcemi díky
+instrukční pipeline). Ovšem mohou nastat situace, kdy nám ani rozsah typu
+<strong>int64</strong> nebo <strong>uint64</strong> nebude dostačovat.
+V&nbsp;tomto případě je možné využít možnosti poskytované standardním balíčkem
+<strong>math/big</strong>, v&nbsp;němž se mj.&nbsp;nachází i specifikace nového
+typu <strong>Int</strong>. Podívejme se nyní, jakým způsobem se budou počítat
+druhé mocniny dvojky, a to v&nbsp;libovolném rozsahu (ve skutečnosti jsme
+omezeni pamětí přiřazenou procesu popř.&nbsp;maximální velikosti zásobníku
+gorutiny, ovšem z&nbsp;praktického hlediska se o žádné reálné omezení nejedná).
+Povšimněte si, že namísto běžných operací <strong>=</strong> a
+<strong>*</strong> je nutné použít metody <strong>SetInt64</strong> a
+<strong>Mul</strong>, protože současná verze programovacího jazyka Go
+neumožňuje přetížení operátorů:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        . "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x Int
+        var y Int
+        x.SetInt64(1)
+        y.SetInt64(2)
+&nbsp;
+        for i := 1; i &lt; 200; i++ {
+                fmt.Println(x.Text(10))
+                x.Mul(&amp;x, &amp;y)
+        }
+}
+</pre>
+
+<p>Výsledek po spuštění bude vypadat následovně:</p>
+
+<pre>
+1
+2
+4
+8
+16
+32
+64
+128
+256
+512
+1024
+2048
+4096
+8192
+16384
+32768
+65536
+131072
+262144
+524288
+1048576
+...
+...
+...
+6277101735386680763835789423207666416102355444464034512896
+12554203470773361527671578846415332832204710888928069025792
+25108406941546723055343157692830665664409421777856138051584
+50216813883093446110686315385661331328818843555712276103168
+100433627766186892221372630771322662657637687111424552206336
+200867255532373784442745261542645325315275374222849104412672
+401734511064747568885490523085290650630550748445698208825344
+</pre>
+
+<p>Z&nbsp;těchto výsledků můžeme vidět, že skutečně nejsme omezeni
+&bdquo;pouze&ldquo; rozsahem 64bitových slov.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Výpočet faktoriálu pro téměř libovolné <i>n</i></h2>
+
+<p>S&nbsp;celými čísly o prakticky neomezeném rozsahu můžeme provádět všechny
+základní aritmetické operace; pouze nesmíme zapomenout na to, že se nezapisují
+s&nbsp;využitím operátorů +, -, *, / a %, ale příslušnými metodami popsanými na
+stránce <a
+href="https://golang.org/pkg/math/big/#Int">https://golang.org/pkg/math/big/#Int</a>.
+Taktéž porovnání dvou hodnot se neprovádí standardní šesticí relačních
+operátorů, ale metodou <strong>Int.Cmp</strong> Pro úplnost si ukažme, jakým
+způsobem je možné implementovat funkci pro výpočet faktoriálu pro libovolné
+kladné <i>n</i>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        . "math/big"
+)
+&nbsp;
+func <strong>factorial</strong>(n *Int) *Int {
+        one := NewInt(1)
+        if n.Cmp(NewInt(0)) &lt;= 0 {
+                return one
+        } else {
+                return one.Mul(n, factorial(one.Sub(n, one)))
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        for n := int64(1); n &lt; 80; n++ {
+                f := factorial(NewInt(n))
+                fmt.Printf("%3d! = %s\n", n, f.Text(10))
+        }
+}
+</pre>
+
+<p>Podívejme se nyní na faktoriály od 1! do 79! (samozřejmě můžeme spočítat i
+faktoriál pro vyšší <i>n</i>, výstup je však již příliš dlouhý a nevleze se do
+šířky vyhrazené textu článku):</p>
+
+<pre>
+  1! = 1
+  2! = 2
+  3! = 6
+  4! = 24
+  5! = 120
+  6! = 720
+  7! = 5040
+  8! = 40320
+  9! = 362880
+ 10! = 3628800
+ 11! = 39916800
+ 12! = 479001600
+ 13! = 6227020800
+ 14! = 87178291200
+ 15! = 1307674368000
+ 16! = 20922789888000
+ 17! = 355687428096000
+ 18! = 6402373705728000
+ 19! = 121645100408832000
+ 20! = 2432902008176640000
+ 21! = 51090942171709440000
+ 22! = 1124000727777607680000
+ 23! = 25852016738884976640000
+ 24! = 620448401733239439360000
+ 25! = 15511210043330985984000000
+ 26! = 403291461126605635584000000
+ 27! = 10888869450418352160768000000
+ 28! = 304888344611713860501504000000
+ 29! = 8841761993739701954543616000000
+ 30! = 265252859812191058636308480000000
+ 31! = 8222838654177922817725562880000000
+ 32! = 263130836933693530167218012160000000
+ 33! = 8683317618811886495518194401280000000
+ 34! = 295232799039604140847618609643520000000
+ 35! = 10333147966386144929666651337523200000000
+ 36! = 371993326789901217467999448150835200000000
+ 37! = 13763753091226345046315979581580902400000000
+ 38! = 523022617466601111760007224100074291200000000
+ 39! = 20397882081197443358640281739902897356800000000
+ 40! = 815915283247897734345611269596115894272000000000
+ 41! = 33452526613163807108170062053440751665152000000000
+ 42! = 1405006117752879898543142606244511569936384000000000
+ 43! = 60415263063373835637355132068513997507264512000000000
+ 44! = 2658271574788448768043625811014615890319638528000000000
+ 45! = 119622220865480194561963161495657715064383733760000000000
+ 46! = 5502622159812088949850305428800254892961651752960000000000
+ 47! = 258623241511168180642964355153611979969197632389120000000000
+ 48! = 12413915592536072670862289047373375038521486354677760000000000
+ 49! = 608281864034267560872252163321295376887552831379210240000000000
+ 50! = 30414093201713378043612608166064768844377641568960512000000000000
+ 51! = 1551118753287382280224243016469303211063259720016986112000000000000
+ 52! = 80658175170943878571660636856403766975289505440883277824000000000000
+ 53! = 4274883284060025564298013753389399649690343788366813724672000000000000
+ 54! = 230843697339241380472092742683027581083278564571807941132288000000000000
+ 55! = 12696403353658275925965100847566516959580321051449436762275840000000000000
+ 56! = 710998587804863451854045647463724949736497978881168458687447040000000000000
+ 57! = 40526919504877216755680601905432322134980384796226602145184481280000000000000
+ 58! = 2350561331282878571829474910515074683828862318181142924420699914240000000000000
+ 59! = 138683118545689835737939019720389406345902876772687432540821294940160000000000000
+ 60! = 8320987112741390144276341183223364380754172606361245952449277696409600000000000000
+ 61! = 507580213877224798800856812176625227226004528988036003099405939480985600000000000000
+ 62! = 31469973260387937525653122354950764088012280797258232192163168247821107200000000000000
+ 63! = 1982608315404440064116146708361898137544773690227268628106279599612729753600000000000000
+ 64! = 126886932185884164103433389335161480802865516174545192198801894375214704230400000000000000
+ 65! = 8247650592082470666723170306785496252186258551345437492922123134388955774976000000000000000
+ 66! = 544344939077443064003729240247842752644293064388798874532860126869671081148416000000000000000
+ 67! = 36471110918188685288249859096605464427167635314049524593701628500267962436943872000000000000000
+ 68! = 2480035542436830599600990418569171581047399201355367672371710738018221445712183296000000000000000
+ 69! = 171122452428141311372468338881272839092270544893520369393648040923257279754140647424000000000000000
+ 70! = 11978571669969891796072783721689098736458938142546425857555362864628009582789845319680000000000000000
+ 71! = 850478588567862317521167644239926010288584608120796235886430763388588680378079017697280000000000000000
+ 72! = 61234458376886086861524070385274672740778091784697328983823014963978384987221689274204160000000000000000
+ 73! = 4470115461512684340891257138125051110076800700282905015819080092370422104067183317016903680000000000000000
+ 74! = 330788544151938641225953028221253782145683251820934971170611926835411235700971565459250872320000000000000000
+ 75! = 24809140811395398091946477116594033660926243886570122837795894512655842677572867409443815424000000000000000000
+ 76! = 1885494701666050254987932260861146558230394535379329335672487982961844043495537923117729972224000000000000000000
+ 77! = 145183092028285869634070784086308284983740379224208358846781574688061991349156420080065207861248000000000000000000
+ 78! = 11324281178206297831457521158732046228731749579488251990048962825668835325234200766245086213177344000000000000000000
+ 79! = 894618213078297528685144171539831652069808216779571907213868063227837990693501860533361810841010176000000000000000000
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Čísla s&nbsp;plovoucí řádovou čárkou s&nbsp;neomezeným rozsahem a přesností</h2>
+
+<p>Opět si připomeňme, že v&nbsp;programovacím jazyku Go existují dva základní
+datové typy určené pro reprezentaci hodnot s&nbsp;plovoucí řádovou čárkou. Tyto
+typy se jmenují <strong>float32</strong> a <strong>float64</strong>, což
+odpovídá céčkovským typům <strong>float</strong> a <strong>double</strong>.
+Typy <strong>float32</strong> i <strong>float64</strong> svými vlastnostmi
+odpovídají normě <i>IEEE 754</i>, z&nbsp;níž si uvedeme jen krátký výňatek:</p>
+
+<p>Čísla s&nbsp;plovoucí řádovou čárkou jsou reprezentována třemi bitovými poli
+určenými pro uložení znaménka, exponentu a mantisy.</p>
+
+<p>Podle bitové šířky čísel <strong>exp</strong>, <strong>bias</strong> a
+<strong>m</strong> se rozlišují základní (<i>basic</i>) a rozšířené
+(<i>extended</i>) formáty FP čísel; norma <i>IEEE 754</i> (její původní verze)
+přitom explicitně zmiňuje dva základní formáty: jednoduchá přesnost
+(<i>single</i>, v&nbsp;Go pak <i>float32</i>) a dvojitá přesnost
+(<i>double</i>, v&nbsp;Go <i>float64</i>). Druhá verze normy IEEE 754-2008 již
+obsahuje specifikaci většího množství formátů; navíc došlo k&nbsp;přejmenování
+typů <i>single</i> a <i>double</i> na <i>binary32</i> a <i>binary64</i>:</p>
+
+<table>
+<tr><th>Oficiální jméno</th><th>Základní</th><th>Známo též jako</th><th>Znaménko</th><th>Exponent</th><th>Mantisa</th><th>Celkem</th><th>Decimálních číslic</th></tr>
+<tr><td>binary16</td><td>&times;</td><td>half precision</td><td>1b</td><td> 5b</td><td>10b</td><td>16b</td><td>cca 3,3</td></tr>
+<tr><td>binary32</td><td>&#x2713;</td><td>single precision/float/float32</td><td>1b</td><td> 8b</td><td>23b</td><td>32b</td><td>cca 7,2</td></tr>
+<tr><td>binary64</td><td>&#x2713;</td><td>double precision/float64</td><td>1b</td><td>11b</td><td>52b</td><td>64b</td><td>cca 15,9</td></tr>
+<tr><td>binary128</td><td>&#x2713;</td><td>quadruple precision</td><td>1b</td><td>15b</td><td>112b</td><td>128b</td><td>cca 34,0</td></tr>
+<tr><td>binary256</td><td>&times;</td><td>octuple precision</td><td>1b</td><td>19b</td><td>236b</td><td>256b</td><td>cca 71,3</td></tr>
+</table>
+
+<p>Zajímat nás nyní bude typ označený v&nbsp;Go jménem
+<strong>float32</strong>. Jeho 32 bitů je rozděleno takto:</p>
+
+<ol>
+<li>1 bit pro znaménko</li>
+<li>8 bitů pro exponent</li>
+<li>23 bitů pro mantisu</li>
+</ol>
+
+<p>Exponent je přitom posunutý o hodnotu <strong>bias</strong>, která je
+nastavena na 127, protože je použit vztah:</p>
+
+<p><i>bias=2<sup>eb-1</sup>-1</i></p>
+
+<p>a po dosazení <i>eb=8 (bitů)</i> dostaneme:</p>
+
+<p><i>bias=2<sup>8-1</sup>-1=2<sup>7</sup>-1=128-1=</i><strong>127</strong></p>
+
+<p>Vzorec pro vyjádření reálné hodnoty vypadá následovně:</p>
+
+<p><i>X<sub>single</sub>=(-1)<sup>s</sup>&nbsp;&times;&nbsp;2<sup>exp-127</sup>&nbsp;&times;&nbsp;m</i></p>
+
+<p>Naproti tomu u typu <strong>float64</strong> je každá hodnota reprezentována
+šedesáti čtyřmi bity rozdělenými následujícím způsobem:</p>
+
+<ol>
+<li>1 bit pro znaménko</li>
+<li>11 bitů pro exponent</li>
+<li>52 bitů pro mantisu</li>
+</ol>
+
+<p>Bitově vypadá rozdělení následovně:</p>
+
+<table>
+<tr><th>bit</th><td>63</td><td>62 ... 52</td><td>51 ... 0</td></tr>
+<tr><th>význam</th><td>s</td><td>exponent (11 bitů)</td><td>mantisa (52 bitů)</td></tr>
+</table>
+
+<p>Exponent je v&nbsp;tomto případě posunutý o hodnotu
+<strong>bias=2047</strong> a vzorec pro výpočet reálné hodnoty vypadá
+takto:</p>
+
+<p><i>X<sub>double</sub>=(-1)<sup>s</sup>&nbsp;&times;&nbsp;2<sup>exp-2047</sup>&nbsp;&times;&nbsp;m</i></p>
+
+<p>Přičemž hodnotu mantisy je možné pro normalizované hodnoty získat pomocí
+vztahu:</p>
+
+<p><i>m=1+m<sub>51</sub><sup>-1</sup>+m<sub>50</sub><sup>-2</sup>+m<sub>49</sub><sup>-3</sup>+...+m<sub>0</sub><sup>-52</sup></i></p>
+
+<p>(<i>m<sub>x</sub></i> představuje <i>x</i>-tý bit mantisy)</p>
+
+<p>Rozsah hodnot ukládaných ve dvojité přesnosti je
+-1,7&times;10<sup>308</sup>..1,7&times;10<sup>308</sup>, nejmenší možná
+nenulová hodnota je rovna 2,2&times;10<sup>-308</sup>.</p>
+
+<p>V&nbsp;případě, že nám nebude rozsah hodnot (tj.&nbsp;v&nbsp;podstatě počet
+bitů exponentu) či přesnost (de facto počet bitů mantisy) dostačovat, můžeme
+namísto toho použít datový typ <strong>Float</strong> z&nbsp;balíčku
+<strong>math/big</strong>. Způsob jeho použití je velmi podobný nám již známému
+typu <strong>Int</strong>, takže si ukažme způsob postupného výpočtu prvků řady
+2<sup>-n</sup>. Povšimněte si, jakým způsobem se převádí hodnota
+<strong>Float</strong> na řetězec s&nbsp;využitím metody <strong>Text</strong>,
+které se předává jak požadovaný formát, tak i šířka výpisu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        . "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := NewFloat(1.0)
+        y := NewFloat(0.5)
+
+        for i := 1; i &lt; 82; i++ {
+                fmt.Println(x.Text('f', 80))
+                x.Mul(x, y)
+        }
+}
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, že nedochází k&nbsp;žádným zaokrouhlovacím ani
+jiným chybám (stačí odseknout část před desetinnou tečkou a spočítat výsledky
+s&nbsp;typem <strong>Int</strong> pro kontrolu):</p>
+
+<pre>
+1.00000000000000000000000000000000000000000000000000000000000000000000000000000000
+0.50000000000000000000000000000000000000000000000000000000000000000000000000000000
+0.25000000000000000000000000000000000000000000000000000000000000000000000000000000
+0.12500000000000000000000000000000000000000000000000000000000000000000000000000000
+0.06250000000000000000000000000000000000000000000000000000000000000000000000000000
+0.03125000000000000000000000000000000000000000000000000000000000000000000000000000
+0.01562500000000000000000000000000000000000000000000000000000000000000000000000000
+0.00781250000000000000000000000000000000000000000000000000000000000000000000000000
+...
+...
+...
+0.00000000000000000000010587911840678754238354031258495524525642395019531250000000
+0.00000000000000000000005293955920339377119177015629247762262821197509765625000000
+0.00000000000000000000002646977960169688559588507814623881131410598754882812500000
+0.00000000000000000000001323488980084844279794253907311940565705299377441406250000
+0.00000000000000000000000661744490042422139897126953655970282852649688720703125000
+0.00000000000000000000000330872245021211069948563476827985141426324844360351562500
+0.00000000000000000000000165436122510605534974281738413992570713162422180175781250
+0.00000000000000000000000082718061255302767487140869206996285356581211090087890625
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Spuštění externích utilit</h2>
+
+<p>Poměrně často se setkáme s&nbsp;požadavkem na to, aby se s&nbsp;aplikace
+naprogramované v&nbsp;jazyku Go spustila nějaká externí utilita. K&nbsp;tomuto
+účelu je možné použít funkci <strong>Command</strong>, kterou nalezneme
+v&nbsp;balíčku <strong>os/exec</strong>. Této funkci lze předat proměnný počet
+parametrů, přičemž prvním parametrem je jméno spouštěné utility a
+v&nbsp;dalších parametrech pak argumenty předávané na příkazovém řádku.
+V&nbsp;dalším příkladu je ukázáno, jakým způsobem je možné spustit známou
+utilitku <strong>date</strong> a získat její výstup; a to s&nbsp;kontrolou, zda
+případně nedošlo k&nbsp;nějaké chybě při spouštění či při běhu utility:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "os/exec"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cmd := exec.Command("date", "--date=next Mon")
+        out, err := cmd.Output()
+        if err != nil {
+                fmt.Println(err)
+        } else {
+                fmt.Printf("Next Monday: %s\n", out)
+        }
+}
+</pre>
+
+<pre>
+$ <strong>go run 07_exec.go</strong>
+&nbsp;
+Next Monday: Po úno  4 00:00:00 CET 2019
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Předání dat na standardní vstup externích utilit</h2>
+
+<p>Poněkud složitější je situace ve chvíli, kdy potřebujeme externí utilitě
+předat nějaké informace přes standardní vstup. Příkladem může být požadavek na
+spuštění nástroje <strong>sort</strong>, který dokáže seřadit řádky ze
+standardního vstupu. Pro spuštění utility <strong>sort</strong> nyní použijeme
+příkaz <strong>StdinPipe</strong>, který by měl vrátit handle nově otevřeného
+standardního vstupu utility (určeného pro zápis z&nbsp;pohledu programu
+v&nbsp;Go) a případný kód chyby. Do otevřeného standardního vstupu se zapisují
+data přes funkci <strong>io.WriteString</strong> a nesmíme zapomenout na jeho
+uzavření. Následně již výstup z&nbsp;utility zpracujeme nám již známým
+způsobem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os/exec"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cmd := exec.Command("sort")
+&nbsp;
+        stdin, err := cmd.StdinPipe()
+        if err != nil {
+                fmt.Println(err)
+        }
+&nbsp;
+        io.WriteString(stdin, "zzz\n")
+        io.WriteString(stdin, "xyz\n")
+        io.WriteString(stdin, "aaa\n")
+        stdin.Close()
+&nbsp;
+        out, err := cmd.Output()
+        if err != nil {
+                fmt.Println(err)
+        } else {
+                fmt.Printf("sorted input:\n%s\n", out)
+        }
+}
+</pre>
+
+<p>Příklad výstupu programu:</p>
+
+<pre>
+$ <strong>go run 08_exec_stdin.go </strong>
+&nbsp;
+sorted input:
+aaa
+xyz
+zzz
+</pre>
+
+<p>V&nbsp;případě, že se volá externí utilita zpracovávající rozsáhlejší data,
+je korektnější použít jiný způsob zápisu, v&nbsp;němž se data utilitě předávají
+v&nbsp;paralelně běžící <i>gorutině</i> a současně se čte výstup produkovaný
+utilitou. Tímto způsobem lze utilitě předat prakticky libovolné množství dat.
+Jedno z&nbsp;nejjednodušších řešení tohoto problému je ukázáno
+v&nbsp;následujícím demonstračním příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os/exec"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cmd := exec.Command("sort")
+&nbsp;
+        stdin, err := cmd.StdinPipe()
+        if err != nil {
+                fmt.Println(err)
+        }
+&nbsp;
+        go func() {
+                defer stdin.Close()
+                io.WriteString(stdin, "zzz\n")
+                io.WriteString(stdin, "xyz\n")
+                io.WriteString(stdin, "aaa\n")
+        }()
+&nbsp;
+        out, err := cmd.Output()
+        if err != nil {
+                fmt.Println(err)
+        } else {
+                fmt.Printf("sorted input:\n%s\n", out)
+        }
+}
+</pre>
+
+<p>Výstup, který získáme z&nbsp;předchozího příkladu, bude vypadat
+následovně:</p>
+
+<pre>
+$ <strong>go run 09_exec_stdin.go </strong>
+&nbsp;
+sorted input:
+aaa
+xyz
+zzz
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Čtení a vyhledávání proměnných prostředí</h2>
+
+<p>Dalším často prováděnou operací je čtení a popř.&nbsp;i modifikace
+proměnných prostředí (<i>environment variables</i>). Pro přečtení nějaké
+proměnné použijte funkci <strong>os.LookupEnv</strong>, která vrací hodnotu
+proměnné a příznak, zda byla proměnná nalezena. Pokud budete potřebovat vypsat
+všechny proměnné prostředí, použijte funkci <strong>os.Environ</strong> &ndash;
+výslednou sekvencí lze iterovat s&nbsp;využitím konstrukce
+<strong>for-range</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "os"
+)
+&nbsp;
+func <strong>main</strong>() {
+        env_vars := os.Environ()
+&nbsp;
+        for i, env_var := range env_vars {
+                fmt.Printf("%02d\t%s\n", i, env_var)
+        }
+&nbsp;
+        term, found := os.LookupEnv("TERM")
+        if found {
+                fmt.Printf("\n\n\nSelected TERM = %s", term)
+        } else {
+                fmt.Printf("\n\n\nThe TERM environment variable is not set")
+        }
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Získání základních informací o běžícím procesu a jeho prostředí</h2>
+
+<p>V&nbsp;závěru první části článku si ještě ukažme několik funkcí
+z&nbsp;balíčku <strong>os</strong>, které slouží pro získání základních
+informací o běžícím procesu (PID) a o jeho prostředí (PID rodičovského procesu,
+adresář pro uložení dočasných souborů, aktuální adresář):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "os"
+)
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Printf("PID = %d\n", os.Getpid())
+        fmt.Printf("Parent PID = %d\n", os.Getppid())
+        fmt.Printf("Temp. directory = %s\n", os.TempDir())
+        cwd, err := os.Getwd()
+        if err == nil {
+                fmt.Printf("CWD = %s\n", cwd)
+        } else {
+                fmt.Printf("can not get CWD")
+        }
+}
+</pre>
+
+<p>Výstup může vypadat následovně:</p>
+
+<pre>
+PID = 8841
+Parent PID = 8782
+Temp. directory = /tmp
+CWD = /home/tester/article_10
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Kvalita překladače jazyka Go při optimalizacích</h2>
+
+<p>Ve druhé části článku se pokusíme porovnat kvalitu překladače programovacího
+jazyka Go (jeho standardní verze) s&nbsp;překladačem ANSI C. Jak sami uvidíte,
+je nutné při psaní benchmarků brát v&nbsp;úvahu i vlastnosti standardních
+knihoven obou jazyků, které mohou mít dosti odlišné chování.</p>
+
+<p>Dnešní benchmark bude provádět výpočty s&nbsp;výpisem výsledku výpočtů na
+standardní výstup. Ten bude přesměrován do souboru, protože výsledkem výpočtů
+budou bitmapy v&nbsp;jednoduchém a současně i přenositelném formátu <i>Portable
+Pixel Map</i> (viz [<a
+href="https://www.root.cz/clanky/graficke-formaty-ve-znameni-unixu/#k06">1</a>]).
+Samozřejmě je nutné si uvědomit, že i výpis hodnot na standardní výstup znamená
+nutnost volání knihovních funkcí a bude ovlivňovat čas výpočtu (jak uvidíme
+dále, tak mnohdy dosti význačně). Celý benchmark spočívá ve výpočtu barev
+pixelů <a
+href="https://www.root.cz/clanky/fraktaly-v-pocitacove-grafice-xii/">Mandelbrotovy
+množiny</a>, přičemž rozlišení výsledného rastrového obrázku i maximální počet
+iterací bude možné zvolit z&nbsp;příkazového řádku.</p>
+
+<img src="https://i.iinfo.cz/images/464/golang-10-3.png" class="image-351957" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 1: Výsledek benchmarku pro fraktál s&nbsp;rozlišením
+512&times;512 pixelů.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Vzorový benchmark naprogramovaný v&nbsp;ANSI C</h2>
+
+<p>První <a
+href="https://github.com/tisnik/go-root/tree/master/benchmarks/mandelbrot/c">varianta
+příkladu naprogramovaného v&nbsp;jazyku C</a> vypadá následovně:</p>
+
+<pre>
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+&nbsp;
+#include "palette_mandmap.h"
+&nbsp;
+void <strong>calc_mandelbrot</strong>(unsigned int width, unsigned int height, unsigned int maxiter, unsigned char palette[][3])
+{
+    puts("P3");
+    printf("%d %d\n", width, height);
+    puts("255");
+&nbsp;
+    double cy = -1.5;
+    int y;
+    for (y=0; y&lt;height; y++) {
+        double cx = -2.0;
+        int x;
+        for (x=0; x&lt;width; x++) {
+            double zx = 0.0;
+            double zy = 0.0;
+            unsigned int i = 0;
+            while (i &lt; maxiter) {
+                double zx2 = zx * zx;
+                double zy2 = zy * zy;
+                if (zx2 + zy2 &gt; 4.0) {
+                    break;
+                }
+                zy = 2.0 * zx * zy + cy;
+                zx = zx2 - zy2 + cx;
+                i++;
+            }
+            unsigned char *color = palette[i];
+            unsigned char r = *color++;
+            unsigned char g = *color++;
+            unsigned char b = *color;
+            printf("%d %d %d\n", r, g, b);
+            cx += 3.0/width;
+        }
+        cy += 3.0/height;
+    }
+}
+&nbsp;
+&nbsp;
+int <strong>main</strong>(int argc, char **argv)
+{
+    if (argc &lt; 4) {
+        puts("usage: ./mandelbrot width height maxiter");
+        return 1;
+    }
+    int width = atoi(argv[1]);
+    int height = atoi(argv[2]);
+    int maxiter = atoi(argv[3]);
+    calc_mandelbrot(width, height, maxiter, palette);
+    return 0;
+}
+</pre>
+
+<p>Překlad provedeme takto pomocí <strong>Makefile</strong>:</p>
+
+<pre>
+# Parametry prekladace.
+CFLAGS=-Wall -ansi -O9 -funroll-loops -march=native
+&nbsp;
+PROGNAME=mandelbrot
+&nbsp;
+all:    $(PROGNAME)
+&nbsp;
+clean:
+        rm *.o
+        rm $(PROGNAME)
+&nbsp;
+# Pravidlo pro slinkovani vsech objektovych souboru a vytvoreni
+# vysledne spustitelne aplikace.
+$(PROGNAME):    $(PROGNAME).o
+        $(CC) -o $@ $(LDFLAGS) $&lt;
+&nbsp;
+# Pravidlo pro preklad kazdeho zdrojoveho souboru do prislusneho
+# objektoveho souboru.
+%.o:    %.c
+        $(CC) $(CFLAGS) -c $&lt; -o $@
+</pre>
+
+<p>Benchmark spustíme několikrát a budeme přitom měnit požadované rozlišení
+výsledné bitmapy s&nbsp;fraktálem:</p>
+
+<pre>
+sizes="16 24 32 48 64 96 128 192 256 384 512 768 1024 1536 2048 3072 4096"
+&nbsp;
+OUTFILE="c.times"
+PREFIX="mandelbrot"
+&nbsp;
+rm $OUTFILE
+&nbsp;
+for size in $sizes
+do
+    echo $size
+    echo -n "$size " &gt;&gt; $OUTFILE
+    /usr/bin/time --output $OUTFILE --append --format "%e %M" ./mandelbrot $size $size 255 &gt; "${PREFIX}_${size}_${size}.ppm"
+done
+</pre>
+
+<p>Výsledky po spuštění na stroji s&nbsp;procesorem i5 se čtyřmi jádry:</p>
+
+<table>
+<tr><th> #</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.03</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.06</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.11</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.25</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.44</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>1.01</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.78</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>4.03</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>7.11</td></tr>
+</table>
+
+<p>Výsledky po spuštění na stroji s&nbsp;procesorem i7 se šesti jádry:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.02</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.04</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.07</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.17</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.30</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0.67</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.20</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>2.70</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>4.83</td></tr>
+</table>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. První varianta benchmarku přímo přepsaná do Go</h2>
+
+<p>Předchozí benchmark si nejdříve přepíšeme do jazyka Go, a to bez jakýchkoli
+zásadnějších úprav. Výsledek by mohl vypadat <a
+href="https://github.com/tisnik/go-root/tree/master/benchmarks/mandelbrot/go">například
+takto</a>:</p>
+
+<pre>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte) {
+        fmt.Println("P3")
+        fmt.Printf("%d %d\n", width, height)
+        fmt.Println("255")
+&nbsp;
+        var cy float64 = -1.5
+&nbsp;
+        for y := uint(0); y &lt; height; y++ {
+                var cx float64 = -2.0
+                for x := uint(0); x &lt; width; x++ {
+                        var zx float64 = 0.0
+                        var zy float64 = 0.0
+                        var i uint = 0
+                        for i &lt; maxiter {
+                                zx2 := zx * zx
+                                zy2 := zy * zy
+                                if zx2+zy2 &gt; 4.0 {
+                                        break
+                                }
+                                zy = 2.0*zx*zy + cy
+                                zx = zx2 - zy2 + cx
+                                i++
+                        }
+                        color := palette[i]
+                        r := color[0]
+                        g := color[1]
+                        b := color[2]
+                        fmt.Printf("%d %d %d\n", r, g, b)
+                        cx += 3.0 / float64(width)
+                }
+                cy += 3.0 / float64(height)
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+        calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:])
+}
+</pre>
+
+<p>Časy běhu na počítači s&nbsp;procesorem i5 jsou znatelně horší, než
+v&nbsp;případě céčkové varianty:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.01</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.02</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.04</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.09</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.16</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.36</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.64</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>1.41</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>2.54</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>5.66</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>10.08</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>23.61</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>40.53</td></tr>
+</table>
+
+<p>Totéž zhoršení uvidíme i u počítače s&nbsp;procesorem i7:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.01</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.02</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.05</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.08</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.19</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.34</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.77</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>1.36</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>3.08</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>5.55</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>12.41</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>21.95</td></tr>
+</table>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Vliv bufferu na rychlost dokončení benchmarku</h2>
+
+<p>Při porovnání výsledků benchmarku naprogramovaného v&nbsp;céčku a
+přeloženého s&nbsp;povolením optimalizací překladače s&nbsp;benchmarkem
+vytvořeným v&nbsp;Go by se mohlo zdát, že překladač Go nedokáže provádět příliš
+dobré optimalizace. To sice může být pravda (přesvědčíme se o tom
+v&nbsp;dalších kapitolách), ovšem benchmark ve skutečnosti provádí i export
+vypočteného obrázku na standardní výstup a ukazuje se, že právě tato část je
+dosti kritická operace, protože v&nbsp;případě Go se používá jiná metoda
+bufferování, než je tomu v&nbsp;céčku.</p>
+
+<p>V&nbsp;jazyku C se při použití standardního výstupu používá buffer, který
+ovšem můžeme s&nbsp;využitím funkce <strong>setvbuf</strong> přenastavit a
+dokonce i zakázat. Ukažme si vypnutí bufferingu. Nejprve vytvoříme buffer
+s&nbsp;nulovou kapacitou (což je nyní ve skutečnosti zbytečné, ovšem později si
+můžete sami vyzkoušet změnit konstantu <strong>BUFFER_SIZE</strong>):</p>
+
+<pre>
+#define BUFFER_SIZE 0
+char buffer[BUFFER_SIZE];
+</pre>
+
+<p>A posléze funkcí <strong>setvbuf</strong> řekneme, že se má buffer zcela
+vypnout (<strong>_IONBF</strong>), a to konkrétně pro soubor
+<strong>stdout</strong> (protože z&nbsp;pohledu céčka je standardní výstup
+běžným souborem, který je automaticky otevřený již při vstupu do funkce
+<strong>main</strong>):</p>
+
+<pre>
+setvbuf(stdout, buffer, _IONBF, BUFFER_SIZE);
+</pre>
+
+<p>Po této nepatrné úpravě se časy běhu céčkovského programu
+zcela změní. Výsledky běhu benchmarku ve chvíli, kdy je
+buffer vypnutý a má navíc nulovou délku:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.01</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.02</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.03</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.08</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.13</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.29</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.52</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>1.18</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>2.14</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>4.91</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>8.52</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>19.66</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>34.40</td></tr>
+</table>
+
+<p>Nic nám samozřejmě nebrání provést i opačné nastavení &ndash; deklarovat
+obrovský buffer o kapacitě jednoho megabajtu a nastavit takzvané plné
+bufferování, bez závislosti na tom, zda se na výstup posílají znaky pro konce
+řádků či nikoli (tento typ bufferování by nám vadil při sledování standardního
+výstupu aplikace, my ovšem provádíme přesměrování do souboru):</p>
+
+<pre>
+#define BUFFER_SIZE 1*1024*1024
+char buffer[BUFFER_SIZE];
+</pre>
+
+<p>Pro plné bufferování se použije konstanta <strong>_IOFBF</strong>:</p>
+
+<pre>
+setvbuf(stdout, buffer, _IOFBF, BUFFER_SIZE);
+</pre>
+
+<p>Nyní již budou výsledky benchmarku markantně odlišné od výsledků
+předchozích, což je ostatně patrné i z&nbsp;následující tabulky:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.01</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.01</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.03</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.06</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.11</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.25</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.44</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>1.00</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.75</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>3.99</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>7.10</td></tr>
+</table>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Druhá verze benchmarku: použití bufferovaného výstupu</h2>
+
+<p>V&nbsp;programovacím jazyku Go se režim bufferování při zápisu do souborů
+řídí jiným způsobem, než je tomu v&nbsp;programovacím jazyku C. Musíme použít
+standardní balíček pojmenovaný <strong>bufio</strong> a v&nbsp;něm vytvořit
+novou instanci tzv.&nbsp;writeru, kterému se předá reference na otevřený
+soubor, u něhož chceme bufferování použít. Tímto souborem bude v&nbsp;našem
+případě <strong>os.Stdout</strong>. Nesmíme zapomenout na to, aby se na konci
+zápisu provedla operace <strong>Writer.Flush()</strong>, která zapíše celý
+zbytek bufferu na konec souboru:</p>
+
+<pre>
+w := bufio.NewWriter(os.Stdout)
+<strong>defer</strong> w.Flush()
+</pre>
+
+<p>Zápisy nyní nebudou prováděny přímo na <strong>os.Stdout</strong> funkcemi
+<strong>fmt.Println</strong> či <strong>fmt.Printf</strong>, ale budeme muset
+explicitně specifikovat soubor, do něhož se zápis má provést pomocí
+<strong>fmt.Fprintln</strong> a <strong>fmt.Fprintf</strong>:</p>
+
+<pre>
+fmt.Fprintln(w, "P3")
+fmt.Fprintf(w, "%d %d\n", width, height)
+fmt.Fprintln(w, "255")
+...
+...
+...
+r := color[0]
+g := color[1]
+b := color[2]
+fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+</pre>
+
+<p>Druhá varianta zdrojového kódu benchmarku bude vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte) {
+        w := bufio.NewWriter(os.Stdout)
+        defer w.Flush()
+&nbsp;
+        fmt.Fprintln(w, "P3")
+        fmt.Fprintf(w, "%d %d\n", width, height)
+        fmt.Fprintln(w, "255")
+&nbsp;
+        var cy float64 = -1.5
+&nbsp;
+        for y := uint(0); y &lt; height; y++ {
+                var cx float64 = -2.0
+                for x := uint(0); x &lt; width; x++ {
+                        var zx float64 = 0.0
+                        var zy float64 = 0.0
+                        var i uint = 0
+                        for i &lt; maxiter {
+                                zx2 := zx * zx
+                                zy2 := zy * zy
+                                if zx2+zy2 &gt; 4.0 {
+                                        break
+                                }
+                                zy = 2.0*zx*zy + cy
+                                zx = zx2 - zy2 + cx
+                                i++
+                        }
+                        color := palette[i]
+                        r := color[0]
+                        g := color[1]
+                        b := color[2]
+                        fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+                        cx += 3.0 / float64(width)
+                }
+                cy += 3.0 / float64(height)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+        calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:])
+}
+</pre>
+
+<p>Při pohledu na následující tabulku je zřejmé, že se nám podařilo přiblížení
+k&nbsp;výsledkům, které jsme získali z&nbsp;céčkovského kódu.</p>
+
+<p>Průběh na počítači s&nbsp;procesorem i5:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.01</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.02</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.03</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.07</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.13</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.29</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.50</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>1.14</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>2.03</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>4.56</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>8.07</td></tr>
+</table>
+
+<p>Průběh na počítači s&nbsp;procesorem i7:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.02</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.05</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.09</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.20</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.35</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0.80</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.42</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>3.21</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>5.78</td></tr>
+</table>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Třetí verze benchmarku: výpočet po jednotlivých obrazových řádcích</h2>
+
+<p>Předchozí benchmark si ještě dále upravíme, a to takovým způsobem, že dojde
+k&nbsp;oddělení kódu určeného pro zápis výsledného obrázku na standardní výstup
+od kódu pro výpočet. To ovšem není všechno, protože funkci pro výpočet
+Mandelbrotovy množiny změníme takovým způsobem, že se vypočte pouze jediný
+obrazový řádek (důvod pro tuto na první pohled možná podivnou změnu je
+vysvětlen <a href="#k17">v&nbsp;navazující kapitole</a>). Změny budou vypadat
+takto:</p>
+
+<p>Zápis (či lépe řečeno export) výsledné bitmapy je realizován
+v&nbsp;samostatné funkci pojmenované <strong>writeImage</strong>, které se
+předají rozměry bitmapy a hodnoty jednotlivých pixelů v&nbsp;poli typu
+<strong>[]byte</strong>:</p>
+
+<pre>
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+}
+</pre>
+
+<p>Funkce pro výpočet jediného řádku obrázku Mandelbrotovy množiny bude mít
+hlavičku:</p>
+
+<pre>
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64) {
+}
+</pre>
+
+<p>Povšimněte si, že v&nbsp;posledním parametru předáváme hodnotu <strong>cy</strong>, která určuje imaginární složku komplexního čísla <strong>C</strong>, které vstupuje do iterativního výpočtu Mandelbrotovy množiny (viz odkazovaný článek s&nbsp;podrobnějším vysvětlením).</p>
+
+<p>Volání této funkce a postupné skládání bitmapy tedy může vypadat například takto:</p>
+
+<pre>
+image := make([]byte, width*height*3)
+offset := 0
+delta := width * 3
+&nbsp;
+var cy float64 = -1.5
+for y := 0; y &lt; height; y++ {
+        calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy)
+        offset += delta
+        cy += 3.0 / float64(height)
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/tree/master/benchmarks/mandelbrot/go-linewise">Úplný
+zdrojový kód benchmarku</a> se tedy modifikuje následujícím způsobem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+        w := bufio.NewWriter(os.Stdout)
+        defer w.Flush()
+&nbsp;
+        fmt.Fprintln(w, "P3")
+        fmt.Fprintf(w, "%d %d\n", width, height)
+        fmt.Fprintln(w, "255")
+&nbsp;
+        for i := 0; i &lt; len(image); {
+                r := image[i]
+                i++
+                g := image[i]
+                i++
+                b := image[i]
+                i++
+                fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+        }
+}
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64) {
+        var cx float64 = -2.0
+        for x := uint(0); x &lt; width; x++ {
+                var zx float64 = 0.0
+                var zy float64 = 0.0
+                var i uint = 0
+                for i &lt; maxiter {
+                        zx2 := zx * zx
+                        zy2 := zy * zy
+                        if zx2+zy2 &gt; 4.0 {
+                                break
+                        }
+                        zy = 2.0*zx*zy + cy
+                        zx = zx2 - zy2 + cx
+                        i++
+                }
+                color := palette[i]
+                image[3*x] = color[0]
+                image[3*x+1] = color[1]
+                image[3*x+2] = color[2]
+                cx += 3.0 / float64(width)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        image := make([]byte, width*height*3)
+        offset := 0
+        delta := width * 3
+&nbsp;
+        var cy float64 = -1.5
+        for y := 0; y &lt; height; y++ {
+                calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy)
+                offset += delta
+                cy += 3.0 / float64(height)
+        }
+        writeImage(uint(width), uint(height), image)
+}
+</pre>
+
+<p>Povšimněte si, že se tyto úpravy &ndash; které zvyšují složitost programu
+&ndash; vlastně nijak zásadně neprojevily na výsledcích benchmarku:</p>
+
+<p>Průběh na počítači s&nbsp;procesorem i5:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.01</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.02</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.04</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.07</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.13</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.29</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.50</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>1.19</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>2.09</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>4.73</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>8.44</td></tr>
+</table>
+
+<p>Průběh na počítači s&nbsp;procesorem i7:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.02</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.05</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.09</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.20</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.35</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0.82</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.49</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>3.25</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>5.74</td></tr>
+</table>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Finální verze benchmarku: využití kanálů a gorutin pro paralelní výpočty</h2>
+
+<p>Nyní konečně nastal čas, abychom si vysvětlili, proč jsme vlastně upravili
+předchozí variantu benchmarku takovým způsobem, že je možné počítat jednotlivé
+obrazové řádky explicitním zavoláním funkce <strong>calcMandelbrot</strong>.
+Celý výpočet nyní budeme paralelizovat &ndash; každý obrazový řádek bude
+vypočten v&nbsp;samostatné gorutině. Vzhledem k&nbsp;tomu, že gorutiny jsou
+interně reprezentovány úsporným způsobem, je možné tuto optimalizaci bez
+problémů provést a vytvořit jich tak i několik tisíc (v&nbsp;závislosti na
+rozlišení bitmapy).</p>
+
+<p>O to, aby se počkalo na dokončení všech gorutin, se postará kanál
+pojmenovaný <strong>done</strong>, jehož kapacita přesně odpovídá počtu
+gorutin. Nejprve se kanál vytvoří, následně se všechny gorutiny spustí a na
+konci čtením z&nbsp;kanálu počkáme na dokončení všech <strong>height</strong>
+gorutin:</p>
+
+<pre>
+done := make(chan bool, height)
+&nbsp;
+// na tomto místě bude umístěn vlastní výpočet
+&nbsp;
+for i := 0; i &lt; height; i++ {
+        &lt;-done
+}
+</pre>
+
+<p>Jedinou další úpravou bude modifikace funkce
+<strong>calcMandelbrot</strong>, které se musí předat reference na kanál a do
+kterého se na konci výpočtu zapíše hodnota <strong>true</strong> (důležitý je
+zápis, nikoli vlastní hodnota):</p>
+
+<pre>
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64, <strong>done chan bool</strong>) {
+        ...
+        ...
+        ...
+        <strong>done &lt;- true</strong>
+}
+</pre>
+
+<p>Poslední &bdquo;paralelizovaná&ldquo; varianta benchmarku bude vypadat
+takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+        w := bufio.NewWriter(os.Stdout)
+        defer w.Flush()
+&nbsp;
+        fmt.Fprintln(w, "P3")
+        fmt.Fprintf(w, "%d %d\n", width, height)
+        fmt.Fprintln(w, "255")
+&nbsp;
+        for i := 0; i &lt; len(image); {
+                r := image[i]
+                i++
+                g := image[i]
+                i++
+                b := image[i]
+                i++
+                fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+        }
+}
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64, done chan bool) {
+        var cx float64 = -2.0
+        for x := uint(0); x &lt; width; x++ {
+                var zx float64 = 0.0
+                var zy float64 = 0.0
+                var i uint = 0
+                for i &lt; maxiter {
+                        zx2 := zx * zx
+                        zy2 := zy * zy
+                        if zx2+zy2 &gt; 4.0 {
+                                break
+                        }
+                        zy = 2.0*zx*zy + cy
+                        zx = zx2 - zy2 + cx
+                        i++
+                }
+                color := palette[i]
+                image[3*x] = color[0]
+                image[3*x+1] = color[1]
+                image[3*x+2] = color[2]
+                cx += 3.0 / float64(width)
+        }
+        done &lt;- true
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        done := make(chan bool, height)
+&nbsp;
+        image := make([]byte, width*height*3)
+        offset := 0
+        delta := width * 3
+&nbsp;
+        var cy float64 = -1.5
+        for y := 0; y &lt; height; y++ {
+                go calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy, done)
+                offset += delta
+                cy += 3.0 / float64(height)
+        }
+        for i := 0; i &lt; height; i++ {
+                &lt;-done
+        }
+        writeImage(uint(width), uint(height), image)
+}
+</pre>
+
+<p>Výsledky benchmarku budou podle očekávání mnohem lepší, a to z&nbsp;toho
+důvodu, že plně využijeme možnosti vícejádrových mikroprocesorů.</p>
+
+<p>Průběh na počítači s&nbsp;procesorem i5:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.01</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.02</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.05</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.08</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.19</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.34</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0.76</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1.33</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>2.98</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>5.31</td></tr>
+</table>
+
+<p>Průběh na počítači s&nbsp;procesorem i7:</p>
+
+<table>
+<tr><th>#</th><th>Rozlišení</th><th>Čas (s)</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0.00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0.00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0.00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0.00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0.00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0.00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0.00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0.00</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0.01</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0.03</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0.04</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0.10</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0.19</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0.42</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>0.73</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>1.66</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>2.94</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Opět připomínám, že se v&nbsp;posledním případě
+nejedná o férové porovnání, ovšem paralelizace programu v&nbsp;Go je mnohem
+snadnější, než by tomu bylo v&nbsp;céčku s&nbsp;využitím vláken.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Porovnání výsledků všech benchmarků</h2>
+
+<p>Na závěr si výsledky jednotlivých benchmarků porovnáme. Povšimněte si,
+v&nbsp;případě kódu běžícího v&nbsp;jednom vláknu je lepší překladač jazyka C
+(s&nbsp;optimalizacemi!), ovšem &ndash; což asi očekáváte &ndash; varianta
+s&nbsp;gorutinami je rychlejší, než nejlepší céčková varianta.</p>
+
+<p>Počítač s&nbsp;procesorem i5 (čtyři jádra):</p>
+
+<table>
+<tr><th> #</th><th>Rozlišení</th><th>C std.</th><th>C bez bufferu</th><th>C s bufferem</th><th>Go std.</th><th>Go s bufferem</th><th>Go po řádcích</th><th>Go s gorutinami</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0,00</td><td> 0,01</td><td>0,00</td><td> 0,01</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0,00</td><td> 0,02</td><td>0,01</td><td> 0,02</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0,00</td><td> 0,03</td><td>0,01</td><td> 0,04</td><td>0,01</td><td>0,01</td><td>0,01</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0,01</td><td> 0,08</td><td>0,01</td><td> 0,09</td><td>0,02</td><td>0,02</td><td>0,01</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0,03</td><td> 0,13</td><td>0,03</td><td> 0,16</td><td>0,03</td><td>0,04</td><td>0,02</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0,06</td><td> 0,29</td><td>0,06</td><td> 0,36</td><td>0,07</td><td>0,07</td><td>0,05</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0,11</td><td> 0,52</td><td>0,11</td><td> 0,64</td><td>0,13</td><td>0,13</td><td>0,08</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0,25</td><td> 1,18</td><td>0,25</td><td> 1,41</td><td>0,29</td><td>0,29</td><td>0,19</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0,44</td><td> 2,14</td><td>0,44</td><td> 2,54</td><td>0,50</td><td>0,50</td><td>0,34</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>1,01</td><td> 4,91</td><td>1,00</td><td> 5,66</td><td>1,14</td><td>1,19</td><td>0,76</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1,78</td><td> 8,52</td><td>1,75</td><td>10,08</td><td>2,03</td><td>2,09</td><td>1,33</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>4,03</td><td>19,66</td><td>3,99</td><td>23,61</td><td>4,56</td><td>4,73</td><td>2,98</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>7,11</td><td>34,40</td><td>7,10</td><td>40,53</td><td>8,07</td><td>8,44</td><td>5,31</td></tr>
+</table>
+
+<a href="https://www.root.cz/obrazek/351956/"><img src="https://i.iinfo.cz/images/464/golang-10-2-prev.png" class="image-351956" alt="&#160;" width="370" height="188" /></a>
+
+<p>Počítač s&nbsp;procesorem i7 (šest jader):</p>
+
+<table>
+<tr><th> #</th><th>Rozlišení</th><th>C std.</th><th>C bez bufferu</th><th>C s bufferem</th><th>Go std.</th><th>Go s bufferem</th><th>Go po řádcích</th><th>Go s gorutinami</th></tr>
+<tr><td> 1</td><td>    16&times;16</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 2</td><td>    24&times;24</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 3</td><td>    32&times;32</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 4</td><td>    48&times;48</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 5</td><td>    64&times;64</td><td>0,00</td><td> 0,00</td><td>0,00</td><td> 0,00</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 6</td><td>    96&times;96</td><td>0,00</td><td> 0,01</td><td>0,00</td><td> 0,01</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 7</td><td>  128&times;128</td><td>0,00</td><td> 0,02</td><td>0,00</td><td> 0,02</td><td>0,00</td><td>0,00</td><td>0,00</td></tr>
+<tr><td> 8</td><td>  192&times;192</td><td>0,01</td><td> 0,04</td><td>0,01</td><td> 0,05</td><td>0,01</td><td>0,01</td><td>0,00</td></tr>
+<tr><td> 9</td><td>  256&times;256</td><td>0,02</td><td> 0,07</td><td>0,02</td><td> 0,08</td><td>0,02</td><td>0,02</td><td>0,01</td></tr>
+<tr><td>10</td><td>  384&times;384</td><td>0,04</td><td> 0,16</td><td>0,04</td><td> 0,19</td><td>0,05</td><td>0,05</td><td>0,03</td></tr>
+<tr><td>11</td><td>  512&times;512</td><td>0,07</td><td> 0,29</td><td>0,07</td><td> 0,34</td><td>0,09</td><td>0,09</td><td>0,04</td></tr>
+<tr><td>12</td><td>  768&times;768</td><td>0,17</td><td> 0,65</td><td>0,17</td><td> 0,77</td><td>0,20</td><td>0,20</td><td>0,10</td></tr>
+<tr><td>13</td><td>1024&times;1024</td><td>0,30</td><td> 1,20</td><td>0,30</td><td> 1,36</td><td>0,35</td><td>0,35</td><td>0,19</td></tr>
+<tr><td>14</td><td>1536&times;1536</td><td>0,67</td><td> 2,64</td><td>0,67</td><td> 3,08</td><td>0,80</td><td>0,82</td><td>0,42</td></tr>
+<tr><td>15</td><td>2048&times;2048</td><td>1,20</td><td> 4,67</td><td>1,19</td><td> 5,55</td><td>1,42</td><td>1,49</td><td>0,73</td></tr>
+<tr><td>16</td><td>3072&times;3072</td><td>2,70</td><td>10,67</td><td>2,68</td><td>12,41</td><td>3,21</td><td>3,25</td><td>1,66</td></tr>
+<tr><td>17</td><td>4096&times;4096</td><td>4,83</td><td>18,84</td><td>4,89</td><td>21,95</td><td>5,78</td><td>5,74</td><td>2,94</td></tr>
+</table>
+
+<a href="https://www.root.cz/obrazek/351955/"><img src="https://i.iinfo.cz/images/464/golang-10-1-prev.png" class="image-351955" alt="&#160;" width="370" height="188" /></a>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+doslova několik kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_cmdline_params.go</td><td>práce s&nbsp;argumenty CLI uloženými do pole <strong>os.Args</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/01_cmdline_params.go">https://github.com/tisnik/go-fedora/blob/master/article_10/01_cmdline_params.go</a></td></tr>
+<tr><td> 2</td><td>02_flags.go</td><td>práce s&nbsp;argumenty CLI přes balíček <strong>flag</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/02_flags.go">https://github.com/tisnik/go-fedora/blob/master/article_10/02_flags.go</a></td></tr>
+<tr><td> 3</td><td>03_flag_shorthands.go</td><td>krátká a dlouhá jména argumentů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/03_flag_shorthands.go">https://github.com/tisnik/go-fedora/blob/master/article_10/03_flag_shorthands.go</a></td></tr>
+<tr><td> 4</td><td>04_bigint.go</td><td>práce s&nbsp;celými čísly s&nbsp;neomezeným rozsahem</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/04_bigint.go">https://github.com/tisnik/go-fedora/blob/master/article_10/04_bigint.go</a></td></tr>
+<tr><td> 5</td><td>05_factorial.go</td><td>výpočet faktoriálu prakticky libovolného <i>n</i></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/05_factorial.go">https://github.com/tisnik/go-fedora/blob/master/article_10/05_factorial.go</a></td></tr>
+<tr><td> 6</td><td>06_bigfloat.go</td><td>čísla s&nbsp;plovoucí řádovou čárkou bez omezení rozsahu a přesnosti</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/06_bigfloat.go">https://github.com/tisnik/go-fedora/blob/master/article_10/06_bigfloat.go</a></td></tr>
+<tr><td> 7</td><td>07_exec.go</td><td>spuštění externího procesu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/07_exec.go">https://github.com/tisnik/go-fedora/blob/master/article_10/07_exec.go</a></td></tr>
+<tr><td> 8</td><td>08_exec_stdin.go</td><td>spuštění externího procesu s&nbsp;předáním dat na standardní vstup</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/08_exec_stdin.go">https://github.com/tisnik/go-fedora/blob/master/article_10/08_exec_stdin.go</a></td></tr>
+<tr><td> 9</td><td>09_exec_stdin.go</td><td>spuštění externího procesu s&nbsp;předáním dat na standardní vstup</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/09_exec_stdin.go">https://github.com/tisnik/go-fedora/blob/master/article_10/09_exec_stdin.go</a></td></tr>
+<tr><td>10</td><td>10_env_var.go</td><td>přístup k&nbsp;proměnným prostředí</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/10_env_var.go">https://github.com/tisnik/go-fedora/blob/master/article_10/10_env_var.go</a></td></tr>
+<tr><td>11</td><td>11_process_info.go</td><td>základní informace o spuštěném procesu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/11_process_info.go">https://github.com/tisnik/go-fedora/blob/master/article_10/11_process_info.go</a></td></tr>
+<tr><td>12</td><td>12_file_operations.go</td><td>operace se soubory</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_10/12_file_operations.go">https://github.com/tisnik/go-fedora/blob/master/article_10/12_file_operations.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Mandelbrot set (Rosetta code)<br />
+<a href="https://rosettacode.org/wiki/Mandelbrot_set">https://rosettacode.org/wiki/Mandelbrot_set</a>
+</li>
+
+<li>Computer language Benchmark Game: Mandelbrot set<br />
+<a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/performance/mandelbrot.html">https://benchmarksgame-team.pages.debian.net/benchmarksgame/performance/mandelbrot.html</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
