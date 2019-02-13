@@ -16,8 +16,8 @@ func main() {
 		if err != nil {
 			println("Connection refused!")
 		}
+		defer conn.Close()
 		go func(c net.Conn) {
-			defer c.Close()
 			fmt.Fprintf(c, "Holla\n")
 		}(conn)
 	}
