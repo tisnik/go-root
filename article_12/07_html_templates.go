@@ -1,0 +1,32 @@
+package main
+
+import (
+	"fmt"
+	"html/template"
+	"net/http"
+)
+
+type IndexPageDynContent struct {
+	Title  string
+	Header string
+}
+
+func mainEndpoint(writer http.ResponseWriter, request *http.Request) {
+	t, err := template.ParseFiles("index_template.html")
+	if err != nil {
+		writer.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(writer, "Not found!")
+		return
+	}
+
+	dynData := IndexPageDynContent{Title: "Test", Header: "Welcome!"}
+	err = t.Execute(writer, dynData)
+	if err != nil {
+		println("Error executing template")
+	}
+}
+
+func main() {
+	http.HandleFunc("/", mainEndpoint)
+	http.ListenAndServe(":8000", nil)
+}
