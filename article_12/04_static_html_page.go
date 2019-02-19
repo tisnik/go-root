@@ -27,6 +27,7 @@ func missingEndpoint(writer http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", missingEndpoint)
+	http.HandleFunc("/", mainEndpoint)
+	http.HandleFunc("/missing", missingPageEndpoint)
 	http.ListenAndServe(":8000", nil)
 }
