@@ -24,5 +24,6 @@ func staticPage(filename string) func(writer http.ResponseWriter, request *http.
 
 func main() {
 	http.HandleFunc("/", staticPage("index.html"))
+	http.HandleFunc("/missing", staticPage("missing.html"))
 	http.ListenAndServe(":8000", nil)
 }
