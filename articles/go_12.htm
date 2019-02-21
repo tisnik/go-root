@@ -1,0 +1,2041 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vývoj síťových aplikací v programovacím jazyku Go (pokračování)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vývoj síťových aplikací v programovacím jazyku Go (pokračování)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Síťové aplikace, mj. i HTTP servery, tvoří důležitou oblast, v&nbsp;níž je programovací jazyk Go poměrně často nasazován. Proto se budeme popisem tvorby síťových aplikací a utilit zabývat i dnes, mj. si ukážeme i použití protokolu HTTPS.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vývoj síťových aplikací v&nbsp;programovacím jazyku Go (pokračování)</a></p>
+<p><a href="#k02">2. Jednoduchý HTTP server &ndash; postup při tvorbě odpovědi posílané zpět klientovi</a></p>
+<p><a href="#k03">3. Nastavení hlavičky <strong>Content-Type</strong></a></p>
+<p><a href="#k04">4. Posílání statických a dynamických stránek</a></p>
+<p><a href="#k05">5. Vylepšení předchozího příkladu &ndash; funkce pro načtení a vrácení statické stránky</a></p>
+<p><a href="#k06">6. Další zjednodušení, tentokrát s&nbsp;využitím uzávěrů (closures)</a></p>
+<p><a href="#k07">7. Šablona dynamicky generované HTML stránky</a></p>
+<p><a href="#k08">8. Zpracování šablony</a></p>
+<p><a href="#k09">9. Kostra webové aplikace pro výpočet faktoriálu</a></p>
+<p><a href="#k10">10. Dokončení webové aplikace pro výpočet faktoriálu</a></p>
+<p><a href="#k11">11. Statická šablona</a></p>
+<p><a href="#k12">12. Použití protokolu HTTPS namísto HTTP</a></p>
+<p><a href="#k13">13. Implementace jednoduchého HTTPS serveru</a></p>
+<p><a href="#k14">14. Vygenerování privátního klíče serveru a certifikátu</a></p>
+<p><a href="#k15">15. Přístup k&nbsp;certifikátu z&nbsp;klienta</a></p>
+<p><a href="#k16">16. Připojení klienta s&nbsp;využitím známého certifikátu</a></p>
+<p><a href="#k17">17. Použití certifikátu ve webovém prohlížeči s&nbsp;GUI</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Vývoj síťových aplikací v&nbsp;programovacím jazyku Go (pokračování)</h2>
+
+<p>Dnešní článek naváže na <a
+href="https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/">jedenácté
+pokračování</a> <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a>, v&nbsp;němž jsme si ukázali některé (prozatím
+dosti základní) možnosti nabízené balíčkem <strong>net</strong> a taktéž
+balíčkem <strong>net/http</strong>. Dnes se zaměříme především na tvorbu
+serverů používajících protokoly HTTP a HTTPS. Nejprve si ukážeme, jakým
+způsobem se vlastně používá typ <strong>ResponseWriter</strong>, dále si
+vysvětlíme specifikaci MIME typů v&nbsp;hlavičce HTTP protokolu a následně se
+budeme zabývat různými způsoby posílání statických i dynamických HTML stránek,
+a to samozřejmě včetně použití jednoduchého šablonovacího nástroje
+(<i>templates</i>), který je taktéž součástí základní knihovny programovacího
+jazyka Go (i když je samozřejmě možné použít i jiné šablonovací systémy). Ve
+druhé části článku si popíšeme základy tvorby serveru používajícího protokol
+HTTPS a nikoli &bdquo;pouze&ldquo; HTTP. I tuto možnost nám balíček
+<strong>net/http</strong> nabízí, ovšem budeme muset vykonat i nějakou práci
+navíc (vygenerování klíčů, certifikátů atd.).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Jednoduchý HTTP server &ndash; postup při tvorbě odpovědi posílané zpět klientovi</h2>
+
+<p>S&nbsp;tvorbou jednoduchého HTTP serveru jsme se již seznámili <a
+href="https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/#k12">v&nbsp;předchozím
+článku</a>. Připomeňme si, že základem pro implementaci HTTP serveru je
+v&nbsp;programovacím jazyku Go funkce nazvaná <strong>HandleFunc</strong>
+z&nbsp;balíčku <strong>net/http</strong>, která nám umožňuje zaregistrovat
+obslužnou funkci (<i>handler</i>) v&nbsp;případě, že je server volán
+s&nbsp;určitým URL (endpointem). Můžeme si například zaregistrovat handler pro
+endpoint / (pouhé lomítko):</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+</pre>
+
+<p>Námi implementovaný handler představovaný funkcí
+<strong>mainEndpoint</strong> bude posílat na výstup (který je typu
+<strong>ResponseWriter</strong>) jednoduchý text, jenž bude zaslán klientovi
+v&nbsp;celé a automaticky zkonstruované HTTP odpovědi (s&nbsp;hlavičkami,
+stavovým kódem, délkou atd.  atd.). Je zde pouze jediné omezení &ndash; pro typ
+<strong>ResponseWriter</strong> je předepsána metoda:</p>
+
+<pre>
+Write([]byte) (int, error)
+</pre>
+
+<p>která akceptuje řez bajtů a nikoli řetězec. Jen pro připomenutí &ndash;
+v&nbsp;programovacím jazyku Go je plně podporován Unicode, takže převod
+obecného řetězce na řez bajtů je relativně složitou záležitostí. Samotný převod
+provedeme například přetypováním řetězce na <strong>[]byte</strong>, takže
+implementace handleru může vypadat následovně:</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        response := "Hello world!\n"
+        writer.Write([]byte(response))
+}
+</pre>
+
+<p>Po registraci handlerů pro všechny podporované endpointy nám již stačí
+server spustit na určeném portu:</p>
+
+<pre>
+http.ListenAndServe(":8000", nil)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: číslo portu by mělo být větší než 1023,
+protože porty s&nbsp;nižšími čísly vyžadují administrátorská práva.</div></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/02_simple_http_server_write_bytes.go">Úplný
+zdrojový kód</a> dnešního prvního demonstračního příkladu s&nbsp;implementací
+HTTP serveru vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        response := "Hello world!\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Příklad komunikace klienta se serverem:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+&nbsp;
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 17 Feb 2019 16:19:04 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: přepínač <strong>-v</strong> budeme při
+volání nástroje <strong>curl</strong> používat velmi často, protože nám zobrazí
+jak průběh komunikace, tak i úplnou (zpracovanou) odpověď serveru. Pokud vás
+bude zajímat přesný tvar odpovědi, bude postačovat použít
+<strong>telnet</strong> a příkaz <strong>GET</strong>.</div></p>
+
+<p>Existuje ovšem i jednodušší způsob, jak vytvořit textovou odpověď. Ten
+spočívá v&nbsp;použití funkce nazvané <strong>WriteString</strong> [<a
+href="https://golang.org/pkg/io/#WriteString">1</a>] z&nbsp;balíčku
+<strong>io</strong>. Této funkci předáme hodnotu typu
+<strong>ResponseWriter</strong> popř.&nbsp;hodnotu takového typu, který
+implementuje rozhraní <strong>Writer</strong>. Text specifikovaný programátorem
+bude automaticky převeden na sekvenci bajtů (přesněji řečeno na řez bajtů). <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/01_simple_http_server.go">Příklad</a>
+si tedy můžeme nepatrně zjednodušit:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "io"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Příklad komunikace klienta se serverem bude naprosto stejný:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+&nbsp;
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 17 Feb 2019 16:19:57 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Nastavení hlavičky <strong>Content-Type</strong></h2>
+
+<p>HTTP servery by u všech odpovědí měly specifikovat MIME typ odpovědi,
+protože právě na základě specifikovaného typu se klient rozhodne, jakým
+způsobem bude odpověď zpracovávat (může ji buď nějakým způsobem interpretovat
+sám nebo zavolat externí aplikaci). Tato důležitá informace je při použití
+protokolu HTTP zapsána v&nbsp;hlavičce nazvané <strong>Content-Type</strong>
+[<a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html">2</a>],
+která se v&nbsp;handleru požadavků konfiguruje následujícím způsobem:</p>
+
+<pre>
+writer.Header().Set("Content-Type", "text/html")
+</pre>
+
+<p>U velmi často používaných typů text/html a text/plain je samozřejmě možné
+dodat i doplňkové informace o použité znakové sadě, například:</p>
+
+<pre>
+writer.Header().Set("Content-Type", "text/html; charset=ISO-8859-2")
+</pre>
+
+<p>Podporované a registrované MIME typy naleznete například na stránce <a
+href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a></p>
+
+<p>Podívejme se nyní na demonstrační příklad s&nbsp;implementací HTTP serveru
+se třemi endpointy:</p>
+
+<table>
+<tr><th>Endpoint</th><th>MIME typ odpovědi</th></tr>
+<tr><td>/html</td><td>text/html</td></tr>
+<tr><td>/text</td><td>text/plain</td></tr>
+<tr><td>/asm</td><td>text/x-asm</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: poslední typ nijak nespecifikuje, o jaký
+assembler a o jakou architekturu se jedná.</div></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/03_specify_content_type.go">Úplný
+zdrojový kód</a> tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>endpointHtml</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "text/html")
+        response := "&lt;body&gt;&lt;h1&gt;Hello world!&lt;/h1&gt;&lt;/body&gt;\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>endpointText</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "text/plain")
+        response := "Hello world!\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>endpointAsm</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "text/x-asm")
+        response := "START: brk\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/html", endpointHtml)
+        http.HandleFunc("/text", endpointText)
+        http.HandleFunc("/asm", endpointAsm)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Příklad komunikace klienta se serverem (formát odpovědi je vždy
+zvýrazněn):</p>
+
+<pre>
+$ <strong>curl -v localhost:8000/html</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET /html HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; <strong>Content-Type: text/html</strong>
+&lt; Date: Sun, 17 Feb 2019 16:33:21 GMT
+&lt; Content-Length: 35
+&lt; 
+&lt;body&gt;&lt;h1&gt;Hello world!&lt;/h1&gt;&lt;/body&gt;
+</pre>
+ 
+<p>Získání čistého textu (plain text):</p>
+
+<pre>
+$ <strong>curl -v localhost:8000/text</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET /text HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; <strong>Content-Type: text/plain</strong>
+&lt; Date: Sun, 17 Feb 2019 16:33:52 GMT
+&lt; Content-Length: 13
+&lt; 
+Hello world!
+</pre>
+
+<p>Získání zdrojového kódu s&nbsp;jedinou instrukcí v&nbsp;assembleru:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000/asm</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET /asm HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; <strong>Content-Type: text/x-asm</strong>
+&lt; Date: Sun, 17 Feb 2019 16:34:30 GMT
+&lt; Content-Length: 11
+&lt; 
+START: brk
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Posílání statických a dynamických stránek</h2>
+
+<p>V&nbsp;této kapitole i v&nbsp;navazujících kapitolách si ukážeme některé
+možnosti, které nám standardní balíček <strong>net/http</strong> nabízí při
+posílání statických a dynamických stránek klientům. Nejprve si ukažme triviální
+příklad, a to poslání statické stránky uložené v&nbsp;souboru pojmenovaném
+&bdquo;index.html&ldquo;, který má tento obsah:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Test&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Test&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Při posílání statického obsahu máme dvě možnosti. S&nbsp;první možností jsme
+se seznámili minule: jedná se o registraci endpointu/endpointů s&nbsp;využitím
+funkce <strong>http.FileServer</strong>:</p>
+
+<pre>
+http.Handle("/", http.FileServer(http.Dir("")))
+</pre>
+
+<p>Samozřejmě nám ovšem nic nebrání v&nbsp;tom, abychom statickou stránku
+explicitně načítali a vraceli ji klientovi. Jedna z&nbsp;možných implementací
+handleru může vypadat následovně:</p>
+
+<pre>
+body, err := ioutil.ReadFile("index.html")
+if err == nil {
+        fmt.Fprint(writer, string(body))
+} else {
+        writer.WriteHeader(http.StatusNotFound)
+        fmt.Fprint(writer, "Not found!")
+}
+</pre>
+
+<p>Povšimněte si, že v&nbsp;případě chyby při načítání se klientovi vrátí
+odpověď, v&nbsp;níž je nastaven stavový kód HTTP &bdquo;Not Found&ldquo;.</p>
+
+<p>Samozřejmě si opět ukážeme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/04_serve_static_html_page.go">úplný
+zdrojový příklad se serverem</a>, který sice vrací statické stránky, ovšem
+interně je generuje dynamicky (druhá stránka neexistuje, což je vhodné pro
+zjištění, jak se server chová i v&nbsp;této situaci):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io/ioutil"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        body, err := ioutil.ReadFile("index.html")
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>missingEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        body, err := ioutil.ReadFile("missing.html")
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/missing", missingPageEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Příklad chování serveru při přístupu na existující stránku:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+&nbsp;
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 17 Feb 2019 17:06:53 GMT
+&lt; Content-Length: 225
+&lt; Content-Type: text/html; charset=utf-8
+&lt; 
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Test&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Test&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>V&nbsp;případě, že stránka neexistuje, bude server reagovat odpovědí se
+stavovým kódem &bdquo;404 Not Found&ldquo;:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000/missing</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET /missing HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 404 Not Found
+&lt; Date: Sun, 17 Feb 2019 17:07:17 GMT
+&lt; Content-Length: 10
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Vylepšení předchozího příkladu &ndash; funkce pro načtení a vrácení statické stránky</h2>
+
+<p>V&nbsp;předchozím příkladu byl použit opakující se kód pro poslání HTML
+stránek načtených ze souborů. To samozřejmě není to nejlepší řešení, ovšem
+úprava (přesněji řečeno první varianta úpravy) bude snadná &ndash; společný kód
+přesuneme do obecnější funkce vracející obsah libovolného souboru:</p>
+
+<pre>
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+</pre>
+
+<p>Oba handlery se zjednoduší tak, že budou obsahovat jediný řádek:</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        sendStaticPage(writer, "index.html")
+}
+&nbsp;
+func <strong>missingPageEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        sendStaticPage(writer, "missing.html")
+}
+</pre>
+
+<p>Zbytek příkladu zůstane stejný, takže si jen (bez dalšího testování) ukažme
+<a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/05_static_html_page.go">jeho
+zdrojový kód</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io/ioutil"
+        "net/http"
+)
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        sendStaticPage(writer, "index.html")
+}
+&nbsp;
+func <strong>missingPageEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        sendStaticPage(writer, "missing.html")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/missing", missingPageEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Další zjednodušení, tentokrát s&nbsp;využitím uzávěrů (closures)</h2>
+
+<p>Zdrojový kód je možné ještě dále zjednodušit, a to s&nbsp;využitím
+takzvaných <i>uzávěrů</i> neboli <i>closure(s)</i>. Uzávěrem označujeme funkci
+(může být anonymní i pojmenovaná), která na sebe má navázanou alespoň jednu
+volnou proměnnou, která není deklarována uvnitř funkce. Podpora uzávěrů
+v&nbsp;programovacím jazyce Go umožňuje například tvorbu funkcí sdílejících
+společný kontext (testy, GUI), my ovšem uzávěr použijeme z&nbsp;toho důvodu,
+abychom k&nbsp;funkci <strong>sendStaticPage</strong> navázali jméno souboru
+s&nbsp;požadovanou stránkou. Samotný kód této funkce se nijak nezmění, ovšem
+nyní ji nebudeme volat přímo z&nbsp;pomocných funkcí
+<strong>mainEndpoint</strong> a <strong>missingPageEndpoint</strong>. Namísto
+toho použijeme pomocnou funkci vracející uzávěr:</p>
+
+<pre>
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+</pre>
+
+<p>Tato funkce akceptuje jako svůj jediný parametr jméno souboru se statickou
+stránkou a vrací novou (anonymní funkci), která má stejnou hlavičku, jako
+jakýkoli jiný handler:</p>
+
+<pre>
+func(writer http.ResponseWriter, request *http.Request)
+</pre>
+
+<p>Ve skutečnosti si ovšem vrácená funkce &bdquo;pamatuje&ldquo; i hodnotu
+parametru <strong>filename</strong>, protože se jedná o uzávěr. Můžeme tedy
+psát:</p>
+
+<pre>
+http.HandleFunc("/", staticPage("index.html"))
+http.HandleFunc("/missing", staticPage("missing.html"))
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/06_serve_static_html_page_closure.go">Zdrojový
+kód</a> se nám sice nepatrně zvětšil, ovšem přidání další stránky bude
+v&nbsp;této chvíli triviální (dokonce je možné mapování mezi endpointem a
+stránkou uložit například do tabulky atd.):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io/ioutil"
+        "net/http"
+)
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", staticPage("index.html"))
+        http.HandleFunc("/missing", staticPage("missing.html"))
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Šablona dynamicky generované HTML stránky</h2>
+
+<p>V&nbsp;dalším příkladu již použijeme šablonu HTML stránky, která bude
+obsahovat modifikovatelné části. Tato šablona bude vypadat následovně:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;<strong>{{.Title}}</strong>&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;<strong>{{.Header}}</strong>&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Povšimněte si zvýrazněných textů &ndash; právě tyto části budou nahrazeny
+jiným (dynamicky generovaným) obsahem.</p>
+
+<p><div class="rs-tip-major">Poznámka: zápis {{Placeholder}} je vyžadován
+šablonovacím systémem.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Zpracování šablony</h2>
+
+<p>Pro zpracování šablony použijeme funkce nabízené balíčkem
+<strong>html/template</strong>. Jedná se o funkce odvozené od
+<strong>text/template</strong>, ovšem upravené takovým způsobem, aby správně
+konvertovaly znaky, které mají v&nbsp;HTML speciální význam: &lt;, &gt; a
+&amp;. Samotná šablona (viz <a href="#k07">předchozí kapitolu</a>) je uložena
+v&nbsp;souboru nazvaném &bdquo;index_template.html&ldquo; a zpracujeme ji
+takto:</p>
+
+<pre>
+t, err := template.ParseFiles("index_template.html")
+</pre>
+
+<p>V&nbsp;případě, že se zpracování šablony podaří, musíme zajistit, aby se
+místo <strong>{{.Title}}</strong> a <strong>{{.Header}}</strong> použily
+hodnoty předané programátorem. Šablonovací systém umožňuje zpracování struktur,
+takže si jednu takovou strukturu nadeklarujeme:</p>
+
+<pre>
+type <strong>IndexPageDynContent</strong> struct {
+        Title  string
+        Header string
+}
+</pre>
+
+<p>Povšimněte si zejména toho, že položky struktury odpovídají jménům
+v&nbsp;šabloně a že začínají velkými písmeny (tudíž jsou viditelné).</p>
+
+<p>Přepis zástupných textů v&nbsp;šabloně je snadný &ndash; strukturu vytvoříme
+a zavoláme metodu <strong>šablona.Execute</strong>, které předáme jak instanci
+typu <strong>ResponseWriter</strong>, tak i datovou strukturu:</p>
+
+<pre>
+dynData := IndexPageDynContent{Title: "Test", Header: "Welcome!"}
+t.Execute(writer, dynData)
+</pre>
+
+<p>Pro ladění můžeme namísto <strong>writer</strong> použít přímo
+<strong>os.stdout</strong>.</p>
+
+<p>Nakonec přidáme i kontrolu chybové hodnoty funkce
+<strong>ParseFiles</strong> a metody <strong>Execute</strong>:</p>
+
+<pre>
+t, err := template.ParseFiles("index_template.html")
+if err != nil {
+        writer.WriteHeader(http.StatusNotFound)
+        fmt.Fprint(writer, "Not found!")
+        return
+}
+&nbsp;
+dynData := IndexPageDynContent{Title: "Test", Header: "Welcome!"}
+err = t.Execute(writer, dynData)
+if err != nil {
+        println("Error executing template")
+}
+</pre>
+
+<p>Implementace serveru, v&nbsp;němž se dynamicky generuje HTML stránka ze
+šablony, tedy <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/07_html_templates.go">může
+vypadat následovně</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "net/http"
+)
+&nbsp;
+type <strong>IndexPageDynContent</strong> struct {
+        Title  string
+        Header string
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        t, err := template.ParseFiles("index_template.html")
+        if err != nil {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+                return
+        }
+&nbsp;
+        dynData := IndexPageDynContent{Title: "Test", Header: "Welcome!"}
+        err = t.Execute(writer, dynData)
+        if err != nil {
+                println("Error executing template")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Po spuštění serveru a přístupu z&nbsp;klienta získáme korektní HTML stránku
+se správným titulkem i nadpisem:</p>
+
+<pre>
+$ <strong>curl localhost:8000</strong>
+&nbsp;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Test&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Welcome!&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Kostra webové aplikace pro výpočet faktoriálu</h2>
+
+<p>Nyní si ukážeme, jakým způsobem je možné vytvořit kostru webové aplikace
+určené pro výpočet faktoriálu. Začneme první verzí šablony, která obsahuje
+formulář, do něhož se zapisuje <i>n</i> a současně se v&nbsp;něm zobrazí
+výsledek z&nbsp;předchozího výpočtu:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Factorial calculator&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Factorial calculator&lt;/h1&gt;
+        &lt;form action="/" method="get"&gt;
+            &lt;input type="text" name="n" value="0" size="3" /&gt;! = <strong>{{.Result}}</strong>&lt;br /&gt;
+            &lt;input type="submit" value="compute n!" /&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>První verze serveru prozatím nebude načítat <i>n</i> zadané uživatelem na
+webové stránce, ale pouze připraví šablonu a doplní do něj pevně zadaný
+&bdquo;výsledek&ldquo; 1. Použijeme přitom novou strukturu pojmenovanou
+<strong>FactorialPageDynContent</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "net/http"
+)
+&nbsp;
+type <strong>FactorialPageDynContent</strong> struct {
+        Result int
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        t, err := template.ParseFiles("factorial.html")
+        if err != nil {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+                return
+        }
+&nbsp;
+        dynData := FactorialPageDynContent{1}
+        err = t.Execute(writer, dynData)
+        if err != nil {
+                println("Error executing template")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Dokončení webové aplikace pro výpočet faktoriálu</h2>
+
+<p>Dokončení webové aplikace pro výpočet faktoriálu vyžaduje tři úpravy:</p>
+
+<ol>
+<li>Změnu šablony, aby si webová aplikace pamatovala dříve zadané <i>n</i></li>
+<li>Implementaci vlastního výpočtu faktoriálu</li>
+<li>A konečně získání hodnoty <i>n</i> z&nbsp;formuláře</li>
+</ol>
+
+<p>Úprava šablony je jednoduchá, pouze přidáme atribut <strong>value</strong>
+ke vstupnímu textovému poli:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Factorial calculator&lt;/title&gt;
+        &lt;meta name="Generator" content="Go"&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Factorial calculator&lt;/h1&gt;
+        &lt;form action="/" method="get"&gt;
+            &lt;input type="text" name="n" value="<strong>{{.N}}</strong>" size="3" /&gt;! = <strong>{{.Result}}</strong>&lt;br /&gt;
+            &lt;input type="submit" value="compute n!" /&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Výpočet faktoriálu prozatím provedeme pouze pro rozsah datového typu
+<strong>int64</strong>:</p>
+
+<pre>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+</pre>
+
+<p>Zbývá nám tedy získat hodnotu, která byla uživatelem zapsána do webového
+formuláře. Použijeme přitom metodu <strong>ParseForm</strong> datového typu
+<strong>Request</strong>. Pokud tato metoda neskončí s&nbsp;chybou, je možné
+přes metodu <strong>FormValue(ID)</strong> přistupovat k&nbsp;obsahu
+jednotlivých prvků formuláře (a případně je převádět z&nbsp;řetězcové podoby na
+celá čísla atd. atd.):</p>
+
+<pre>
+err := request.ParseForm()
+if err != nil {
+        writer.WriteHeader(http.StatusBadRequest)
+        return
+}
+&nbsp;
+n, err := strconv.ParseInt(request.FormValue("n"), 10, 64)
+if err != nil {
+        n = 0
+}
+</pre>
+
+<p>Celý příklad s&nbsp;implementací webové aplikace lze přepsat následujícím
+způsobem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "net/http"
+        "strconv"
+)
+&nbsp;
+type <strong>FactorialPageDynContent</strong> struct {
+        N      int64
+        Result int64
+}
+&nbsp;
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        err := request.ParseForm()
+        if err != nil {
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        n, err := strconv.ParseInt(request.FormValue("n"), 10, 64)
+        if err != nil {
+                n = 0
+        }
+&nbsp;
+        t, err := template.ParseFiles("factorial_compute.html")
+        if err != nil {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+                return
+        }
+&nbsp;
+        dynData := FactorialPageDynContent{N: n, Result: Factorial(n)}
+        err = t.Execute(writer, dynData)
+        if err != nil {
+                println("Error executing template")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Statická šablona</h2>
+
+<p>Ještě si ukažme jednu úpravu webové aplikace. Ta spočívá v&nbsp;tom, že se
+šablona bude parsovat pouze jedenkrát, a to při spuštění serveru:</p>
+
+<pre>
+t, err := template.ParseFiles("factorial_compute.html")
+if err != nil {
+        println("Cannot load and parse template")
+        os.Exit(1)
+}
+</pre>
+
+<p>Toto řešení přináší dvě změny v&nbsp;chování serveru:</p>
+
+<ol>
+<li>Server bude odpovídat rychleji, protože nemusí pro každou odpověď znovu načítat a parsovat šablonu z&nbsp;disku</li>
+<li>Na druhou stranu ovšem nebude možné šablonu měnit bez restartu serveru</li>
+</ol>
+
+<p>Podívejme se, jak bude vypadat <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/10_factorial_compute_const_template.go">upravená
+varianta serveru</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "html/template"
+        "net/http"
+        "os"
+        "strconv"
+)
+&nbsp;
+type <strong>FactorialPageDynContent</strong> struct {
+        N      int64
+        Result int64
+}
+&nbsp;
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>getNFromForm</strong>(request *http.Request) (int64, error) {
+        err := request.ParseForm()
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        n, err := strconv.ParseInt(request.FormValue("n"), 10, 64)
+        if err != nil {
+                n = 0
+        }
+        return n, nil
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request, t *template.Template) {
+        n, err := getNFromForm(request)
+        if err != nil {
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        result := Factorial(n)
+        dynData := FactorialPageDynContent{N: n, Result: result}
+&nbsp;
+        err = t.Execute(writer, dynData)
+        if err != nil {
+                println("Error executing template")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        t, err := template.ParseFiles("factorial_compute.html")
+        if err != nil {
+                println("Cannot load and parse template")
+                os.Exit(1)
+        }
+&nbsp;
+        http.HandleFunc("/", func(
+                writer http.ResponseWriter, request *http.Request) {
+                mainEndpoint(writer, request, t)
+        })
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Použití protokolu HTTPS namísto HTTP</h2>
+
+<p>Ve druhé části článku si ukážeme, jakým způsobem je možné s&nbsp;využitím
+programovacího jazyka Go a jeho základních knihoven implementovat HTTPS server.
+Uvidíme, že samotná implementace bude velmi podobná implementaci HTTP serveru,
+ovšem pro správnou funkčnost protokolu HTTPS budeme muset použít externího
+nástroje pro vytvoření privátního klíče serveru a jeho certifikátu. Bližší
+informace o samotném konceptu, na němž je HTTPS postaveno, naleznete například
+na stránce <a
+href="https://en.wikipedia.org/wiki/HTTPS">https://en.wikipedia.org/wiki/HTTPS</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;příkladu budeme používat port
+4443 a nikoli obvyklejší port 443. Je tomu tak z&nbsp;toho důvodu, že pro
+otevření portů s&nbsp;nižšími čísly je nutné mít práva
+administrátora.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Implementace jednoduchého HTTPS serveru</h2>
+
+<p>Samotná implementace jednoduchého HTTPS serveru se ve skutečnosti podobá
+implementaci běžného HTTP serveru. Jediným rozdílem je, že se server bude
+spouštět odlišným způsobem. Namísto:</p>
+
+<pre>
+http.ListenAndServe(":8000", nil)
+</pre>
+
+<p>použijeme:</p>
+
+<pre>
+http.ListenAndServeTLS(":4443", "server.crt", "server.key", nil)
+</pre>
+
+<p>kde &bdquo;server.crt&ldquo; a &bdquo;server.key&ldquo; jsou soubory, které
+si vygenerujeme podle návodu uvedeného v&nbsp;dalších kapitolách.</p>
+
+<p>Korektnější bude provést kontrolu, zda funkce
+<strong>http.ListenAndServeTLS</strong> neskončila s&nbsp;chybou:</p>
+
+<pre>
+err := http.ListenAndServeTLS(":4443", "server.crt", "server.key", nil)
+if err != nil {
+        log.Fatal("ListenAndServe: ", err)
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_12/11_https_server.go">Implementace
+HTTPS serveru</a> bude vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "io"
+        "log"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "text/plain")
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        err := http.ListenAndServeTLS(":4443", "server.crt", "server.key", nil)
+        if err != nil {
+                log.Fatal("ListenAndServe: ", err)
+        }
+}
+</pre>
+
+<p>Prozatím ovšem ještě nemáme připraveny všechny potřebné soubory, a to ani na
+straně serveru, ani na straně klienta. Proto se pokus o zavolání serveru
+nezdaří:</p>
+
+<pre>
+$ <strong>curl -v https://localhost:4443</strong>
+&nbsp;
+* Rebuilt URL to: https://localhost:4443/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 4443 (#0)
+* successfully set certificate verify locations:
+*   CAfile: none
+  CApath: /etc/ssl/certs
+* SSLv3, TLS handshake, Client hello (1):
+* SSLv3, TLS handshake, Server hello (2):
+* SSLv3, TLS handshake, CERT (11):
+* SSLv3, TLS alert, Server hello (2):
+* SSL certificate problem: self signed certificate
+* Closing connection 0
+curl: (60) SSL certificate problem: self signed certificate
+More details here: http://curl.haxx.se/docs/sslcerts.html
+&nbsp;
+curl performs SSL certificate verification by default, using a "bundle"
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn't adequate, you can specify an alternate file
+ using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+ the bundle, the certificate verification probably failed due to a
+ problem with the certificate (it might be expired, or the name might
+ not match the domain name in the URL).
+If you'd like to turn off curl's verification of the certificate, use
+ the -k (or --insecure) option.
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Vygenerování privátního klíče serveru a certifikátu</h2>
+
+<p>Nyní musíme vygenerovat soubory <strong>server.key</strong> a
+<strong>server.crt</strong>, které bude naše implementace HTTPS serveru
+používat.</p>
+
+<p>Privátní klíč používaný serverem vygenerujeme s&nbsp;využitím nástroje
+<strong>openssl</strong>, který již pravděpodobně máte v&nbsp;systému
+nainstalovaný:</p>
+
+<pre>
+$ <strong>openssl genrsa -out server.key 2048</strong>
+</pre>
+
+<p>Výsledkem by měl být soubor <strong>server.key</strong> obsahující klíč pro
+2048bitové RSA:</p>
+
+<pre>
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAyhgV0Gmo0dCkdcEO5X0J//xKD73E+n0pyw7htM/1gPnU9h2X
+JYNqFnq0xz9QsxTAPHYLkueW1SNhWT9gq3Sad/M3Cxb6uomB+i0qSk71Q6PkaqHQ
+KveSsNNa4lw5DBFVjTD/JPnWhVvKS7v0A266snwmTi18+fRpWZ/TaQN5uQRy0bik
+...
+...
+...
+RbBs8QKBgB3dl+NGC+iTPVviPixjFkP5KAcf3Is57Pi0RUgTj4Fmq2q90Scoi6Vv
+OzZoo2XHmqAnqxV75OWqA7NiKdBHwWg2O9BupFa+G3uRXgoP7cpCeT9ZoUbbMKww
+j49BC9GHmOhlcz3fBT4YE3OgoeM5Fga8sVtWew9YkKe/gBAkR0+Y
+-----END RSA PRIVATE KEY-----
+</pre>
+
+<p>Dále, opět nástrojem <strong>openssl</strong>, vytvoříme soubor
+s&nbsp;certifikátem s&nbsp;uvedenou platností:</p>
+
+<pre>
+$ <strong>openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650</strong>
+</pre>
+
+<p>V&nbsp;tomto okamžiku se bude <strong>openssl</strong> interaktivně ptát na
+několik údajů, které jsou v&nbsp;přepisu konverzace vypsány tučně:</p>
+
+<pre>
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:<strong>CZ</strong>
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:<strong>Kocourkov</strong>
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:<strong>Mestska garda</strong>
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:<strong>localhost</strong>
+Email Address []:<strong>nikdo@nikde.cz</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: vyplnit můžete téměř jakékoli údaje,
+pouze u &bdquo;Common Name&ldquo; ponechejte &bdquo;localhost&ldquo;
+popř.&nbsp;pravé doménové jméno (pokud ho váš počítač má přiřazené).</div></p>
+
+<p>Výsledný soubor nazvaný &bdquo;server.crt&ldquo; může vypadat takto:</p>
+
+<pre>
+-----BEGIN CERTIFICATE-----
+MIIDlzCCAn+gAwIBAgIJALw/AUKjIONeMA0GCSqGSIb3DQEBCwUAMGIxCzAJBgNV
+BAYTAkNaMRMwEQYDVQQIDApTb21lLVN0YXRlMRIwEAYDVQQHDAlLb2NvdXJrb3Yx
+FjAUBgNVBAoMDU1lc3Rza2EgZ2FyZGExEjAQBgNVBAMMCWxvY2FsaG9zdDAeFw0x
+...
+...
+...
+rnPxzautFYD++NjhJ/j537I0Lcj9t/DkjvBiECZYkJF8p9dL4+lWZXc27n3RYS6L
+7Dj+85WUXwxkfPqhkggGi8jSrZesUDtWw4XFw7bLGOaKTo2JMGxOfxL3RhrFtiMO
+4j9Rvz9cr2R6a0Y=
+-----END CERTIFICATE-----
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Přístup k&nbsp;certifikátu z&nbsp;klienta</h2>
+
+<p>HTTPS server již máme připravený (a pravděpodobně i úspěšně spuštěný), takže
+ještě musíme provést konfiguraci na straně klienta. Nejprve získáme certifikát
+z&nbsp;běžícího serveru, opět s&nbsp;využitím nástroje
+<strong>openssl</strong>, který zkontaktuje HTTPS server a získá od něj všechny
+potřebné údaje:</p>
+
+<pre>
+$ <strong>openssl s_client -showcerts -connect localhost:4443</strong>
+</pre>
+
+<p>Výsledek může vypadat následovně &ndash; nejprve je zobrazen vlastní
+certifikát a posléze další metadata:</p>
+
+<pre>
+CONNECTED(00000003)
+---
+Certificate chain
+ 0 s:/C=CZ/ST=Some-State/L=Kocourkov/O=Mestska garda/CN=localhost
+   i:/C=CZ/ST=Some-State/L=Kocourkov/O=Mestska garda/CN=localhost
+-----BEGIN CERTIFICATE-----
+MIIDlzCCAn+gAwIBAgIJALw/AUKjIONeMA0GCSqGSIb3DQEBCwUAMGIxCzAJBgNV
+BAYTAkNaMRMwEQYDVQQIDApTb21lLVN0YXRlMRIwEAYDVQQHDAlLb2NvdXJrb3Yx
+FjAUBgNVBAoMDU1lc3Rza2EgZ2FyZGExEjAQBgNVBAMMCWxvY2FsaG9zdDAeFw0x
+OTAyMTYyMDE0MTJaFw0yOTAyMTMyMDE0MTJaMGIxCzAJBgNVBAYTAkNaMRMwEQYD
+VQQIDApTb21lLVN0YXRlMRIwEAYDVQQHDAlLb2NvdXJrb3YxFjAUBgNVBAoMDU1l
+c3Rza2EgZ2FyZGExEjAQBgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEB
+BQADggEPADCCAQoCggEBAMoYFdBpqNHQpHXBDuV9Cf/8Sg+9xPp9KcsO4bTP9YD5
+1PYdlyWDahZ6tMc/ULMUwDx2C5LnltUjYVk/YKt0mnfzNwsW+rqJgfotKkpO9UOj
+5Gqh0Cr3krDTWuJcOQwRVY0w/yT51oVbyku79ANuurJ8Jk4tfPn0aVmf02kDebkE
+ctG4pIsfu6HPfBPyMFgEBXYDiObKfGCEgpnGIeX8Li4n9r8Law45+KEFz4n2Yj3c
+Jq77ZLopjV4w4n+JZYNXkK9JeV9twM5PrsYLqrLEvstXqyo/2ccYFtMvTsXx57SY
+BEKABLYuPsEzYVzNo2lgtXJxxgcXfS+PrCnH6KhS4c0CAwEAAaNQME4wHQYDVR0O
+BBYEFBdmG7K8HXslTnR5OkOLZCGVPD1hMB8GA1UdIwQYMBaAFBdmG7K8HXslTnR5
+OkOLZCGVPD1hMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAKYKeOz4
+u0er6BQmy72Wc4H9ZjWnXjphfVAC0UK2gz7UHXDnyzfrBKR6FkVbeiIUjBzbrWG5
+xUoHcZsfayefOEEpqcAyKpa8CRkbissHF6qtFZArt+cOWwTmmPfYQxfa9KqVP13L
+FcZqcchyvTLdNTGD5ZBtLI9B5Pcm4a7vgEdMqdJb++FpSNhW9H2P0wvfhTK7Mh6/
+rnPxzautFYD++NjhJ/j537I0Lcj9t/DkjvBiECZYkJF8p9dL4+lWZXc27n3RYS6L
+7Dj+85WUXwxkfPqhkggGi8jSrZesUDtWw4XFw7bLGOaKTo2JMGxOfxL3RhrFtiMO
+4j9Rvz9cr2R6a0Y=
+-----END CERTIFICATE-----
+---
+Server certificate
+subject=/C=CZ/ST=Some-State/L=Kocourkov/O=Mestska garda/CN=localhost
+issuer=/C=CZ/ST=Some-State/L=Kocourkov/O=Mestska garda/CN=localhost
+---
+No client certificate CA names sent
+---
+SSL handshake has read 1529 bytes and written 421 bytes
+---
+New, TLSv1/SSLv3, Cipher is ECDHE-RSA-AES128-GCM-SHA256
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : ECDHE-RSA-AES128-GCM-SHA256
+    Session-ID: 1F74CA2806A25B6AE774B7A0D4E470A477D16B73130EAB527C03FE861086B076
+    Session-ID-ctx: 
+    Master-Key: 555000EA285A2EEFE95D5268756ED98CC71711075F8036251EC6B34494C7ED8F6861EDDDA842BC847922F536AC9CF0EA
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket:
+    0000 - 71 d2 38 c8 ec 5d e7 5e-c7 fe a7 f5 d4 33 03 e8   q.8..].^.....3..
+    0010 - e9 ba 8d ff f2 1e e7 9f-8e 66 9b 0e 2b 34 eb db   .........f..+4..
+    0020 - 83 c1 4b 96 f7 a4 67 71-26 3a a5 2d 65 2e 08 ae   ..K...gq&amp;:.-e...
+    0030 - 84 38 3f bf 90 2e 04 0a-62 25 aa 0e 86 ca 31 4a   .8?.....b%....1J
+    0040 - b7 2a 1b 1a b7 b0 b2 d9-d5 3c f4 9e 39 37 a1 69   .*.......&lt;..97.i
+    0050 - 6c ac 2c 8b 83 d0 25 53-da 7c 43 17 4d 55 d6 fc   l.,...%S.|C.MU..
+    0060 - 7a 55 2f 74 bd 6a e2 6f-59 b0 cc 16 d7 e0 a9 14   zU/t.j.oY.......
+    0070 - 71 35 d4 62 27 85 93 f7-                          q5.b'...
+&nbsp;
+    Start Time: 1550348405
+    Timeout   : 300 (sec)
+    Verify return code: 18 (self signed certificate)
+---
+</pre>
+
+<p>Nástroj budeme muset ukončit klávesovou zkratkou Ctrl+C.</p>
+
+<p>Pro klienta je nejjednodušší přesměrovat výstup z&nbsp;předchozího volání
+nástroje <strong>openssl</strong> do souboru, který bývá nazván
+&bdquo;certs.pem&ldquo;:</p>
+
+<pre>
+$ <strong>openssl s_client -showcerts -connect localhost:4443 &gt; certs.pem</strong>
+</pre>
+
+<p>To je ze strany klienta vše &ndash; klient pouze potřebuje pro každé volání
+použít soubor &bdquo;certs.pem&ldquo; s&nbsp;certifikátem serveru, aby ho mohl
+ověřit.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Připojení klienta s&nbsp;využitím známého certifikátu</h2>
+
+<p>Nyní již máme vše připravené pro to, aby se klient mohl připojit
+k&nbsp;serveru s&nbsp;využitím certifikátu uloženého v&nbsp;lokálním souboru
+<strong>certs.pem</strong>. Příkaz volající utilitu <strong>curl</strong> bude
+vypadat následovně:</p>
+
+<pre>
+$ <strong>curl -v --cacert certs.pem  https://localhost:4443</strong>
+</pre>
+
+<p>Po spuštění nástroje <strong>curl</strong> by se měl klient připojit
+k&nbsp;serveru s&nbsp;využitím protokolu HTTPS, ověřit certifikát a následně
+přečíst odpověď serveru (&bdquo;Hello world!&ldquo;):</p>
+
+<pre>
+* Rebuilt URL to: https://localhost:4443/
+* Hostname was NOT found in DNS cache
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 4443 (#0)
+* successfully set certificate verify locations:
+*   CAfile: certs.pem
+  CApath: /etc/ssl/certs
+* SSLv3, TLS handshake, Client hello (1):
+} [data not shown]
+* SSLv3, TLS handshake, Server hello (2):
+{ [data not shown]
+* SSLv3, TLS handshake, CERT (11):
+{ [data not shown]
+* SSLv3, TLS handshake, Server key exchange (12):
+{ [data not shown]
+* SSLv3, TLS handshake, Server finished (14):
+{ [data not shown]
+* SSLv3, TLS handshake, Client key exchange (16):
+} [data not shown]
+* SSLv3, TLS change cipher, Client hello (1):
+} [data not shown]
+* SSLv3, TLS handshake, Finished (20):
+} [data not shown]
+* SSLv3, TLS change cipher, Client hello (1):
+{ [data not shown]
+* SSLv3, TLS handshake, Finished (20):
+{ [data not shown]
+* SSL connection using ECDHE-RSA-AES128-GCM-SHA256
+* Server certificate:
+*        subject: C=CZ; ST=Some-State; L=Kocourkov; O=Mestska garda; CN=localhost
+*        start date: 2019-02-16 20:14:12 GMT
+*        expire date: 2029-02-13 20:14:12 GMT
+*        common name: localhost (matched)
+*        issuer: C=CZ; ST=Some-State; L=Kocourkov; O=Mestska garda; CN=localhost
+*        SSL certificate verify ok.
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:4443
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Content-Type: text/plain
+&lt; Date: Sat, 16 Feb 2019 20:20:29 GMT
+&lt; Content-Length: 13
+&lt; 
+{ [data not shown]
+100    13  100    13    0     0   1106      0 --:--:-- --:--:-- --:--:--  1181
+* Connection #0 to host localhost left intact
+Hello world!
+</pre>
+
+<p>Vidíme, že certifikát byl skutečně použit.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Použití certifikátu ve webovém prohlížeči s&nbsp;GUI</h2>
+
+<p>Pokud se používá webový prohlížeč s&nbsp;GUI, bývá práce s&nbsp;certifikáty
+snazší:</p>
+
+<a href="https://www.root.cz/obrazek/353546/"><img src="https://i.iinfo.cz/images/552/golang-12-1-prev.png" class="image-353546" alt="&#160;" width="272" height="270" /></a>
+<p><i>Obrázek 1: Informace o certifikátu při prvním přístupu k&nbsp;našemu
+serveru. Certifikát jsme si podepsali sami a nebyl potvrzen žádnou certifikační
+autoritou.</i></p>
+
+<a href="https://www.root.cz/obrazek/353547/"><img src="https://i.iinfo.cz/images/552/golang-12-2-prev.png" class="image-353547" alt="&#160;" width="231" height="270" /></a>
+<p><i>Obrázek 2: Zobrazení dalších informací o certifikátu &ndash; tyto
+informace jsme zadali při jeho vytváření.</i></p>
+
+<p>Po potvrzení, že certifikátu důvěřujeme, se již zobrazí kýžená webová
+stránka.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_simple_http_server.go</td><td>jednoduchý HTTP server</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/01_simple_http_server.go">https://github.com/tisnik/go-fedora/blob/master/article_12/01_simple_http_server.go</a></td></tr>
+<tr><td> 2</td><td>02_simple_http_server_write_bytes.go</td><td>alternativní způsob vytvoření sekvence bajtů z&nbsp;řetězce</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/02_simple_http_server_write_bytes.go">https://github.com/tisnik/go-fedora/blob/master/article_12/02_simple_http_server_write_bytes.go</a></td></tr>
+<tr><td> 3</td><td>03_specify_content_type.go</td><td>HTTP server se specifikací MIME typu odpovědí</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/03_specify_content_type.go">https://github.com/tisnik/go-fedora/blob/master/article_12/03_specify_content_type.go</a></td></tr>
+<tr><td> 4</td><td>04_serve_static_html_page.go</td><td>server, který vrací statické HTML stránky načtené ze souborů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/04_serve_static_html_page.go">https://github.com/tisnik/go-fedora/blob/master/article_12/04_serve_static_html_page.go</a></td></tr>
+<tr><td> 5</td><td>05_static_html_page.go</td><td>úprava předchozího příkladu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/05_static_html_page.go">https://github.com/tisnik/go-fedora/blob/master/article_12/05_static_html_page.go</a></td></tr>
+<tr><td> 6</td><td>06_serve_static_html_page_closure.go</td><td>využití uzávěrů pro zápis kratšího kódu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/06_serve_static_html_page_closure.go">https://github.com/tisnik/go-fedora/blob/master/article_12/06_serve_static_html_page_closure.go</a></td></tr>
+<tr><td> 7</td><td>07_html_templates.go</td><td>základní použití šablon</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/07_html_templates.go">https://github.com/tisnik/go-fedora/blob/master/article_12/07_html_templates.go</a></td></tr>
+<tr><td> 8</td><td>08_factorial_prepare.go</td><td>webová aplikace pro výpočet faktoriálu (příprava)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/08_factorial_prepare.go">https://github.com/tisnik/go-fedora/blob/master/article_12/08_factorial_prepare.go</a></td></tr>
+<tr><td> 9</td><td>09_factorial_compute.go</td><td>druhá varianta webové aplikace pro výpočet faktoriálu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/09_factorial_compute.go">https://github.com/tisnik/go-fedora/blob/master/article_12/09_factorial_compute.go</a></td></tr>
+<tr><td>10</td><td>10_factorial_compute_const_template.go</td><td>neměnná šablona stránky</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/10_factorial_compute_const_template.go">https://github.com/tisnik/go-fedora/blob/master/article_12/10_factorial_compute_const_template.go</a></td></tr>
+<tr><td>11</td><td>11_https_server.go</td><td>jednoduchý HTTPS server</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_12/11_https_server.go">https://github.com/tisnik/go-fedora/blob/master/article_12/11_https_server.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
