@@ -1,0 +1,1897 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vývoj síťových aplikací v programovacím jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vývoj síťových aplikací v programovacím jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Jednou z&nbsp;oblastí, v&nbsp;níž je programovací jazyk Go úspěšně používán, jsou síťové aplikace, ať již se jedná o jednoúčelové utility, tak i o mnohdy komplikované servery. V&nbsp;dnešním článku se budeme zabývat právě tímto důležitým tématem.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vývoj síťových aplikací v programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Jednoduchý klient přijímající libovolnou sekvenci bajtů</a></p>
+<p><a href="#k03">3. Server vracející počet realizovaných připojení</a></p>
+<p><a href="#k04">4. Server, který dokáže obsloužit větší množství klientů</a></p>
+<p><a href="#k05">5. Server posílající textové zprávy</a></p>
+<p><a href="#k06">6. Klient pracující v&nbsp;textovém režimu</a></p>
+<p><a href="#k07">7. Získání IP adresy pro specifikované hostname</a></p>
+<p><a href="#k08">8. Další funkce používané v&nbsp;souvislosti s&nbsp;IP adresami</a></p>
+<p><a href="#k09">9. Balíček <strong>http</strong></a></p>
+<p><a href="#k10">10. Poslání HTTP dotazu a základní zpracování odpovědi serveru</a></p>
+<p><a href="#k11">11. Zobrazení hlaviček vrácených v&nbsp;odpovědi HTTP serveru</a></p>
+<p><a href="#k12">12. Vytvoření jednoduchého HTTP serveru</a></p>
+<p><a href="#k13">13. Server s&nbsp;měnitelným stavem a problémy, které to způsobí</a></p>
+<p><a href="#k14">14. Role mutexů v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k15">15. Úprava HTTP serveru takovým způsobem, aby používal mutexy</a></p>
+<p><a href="#k16">16. HTTP server nabízející statický obsah (soubory)</a></p>
+<p><a href="#k17">17. Kombinovaný HTTP server poskytující statický i dynamický obsah</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Vývoj síťových aplikací v programovacím jazyku Go</h2>
+
+<p>Již <a
+href="https://www.root.cz/clanky/go-minimalisticky-a-prekvapive-vykonny-programovaci-jazyk/">v&nbsp;úvodním
+článku</a> <a href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu
+o programovacím jazyku Go</a> jsme si řekli, že po představení stabilní verze
+Go nastala poměrně zajímavá a vlastně i neočekávaná situace &ndash; tvůrci Go
+totiž předvídali spíše přechod programátorů používajících jazyky C a C++ ke Go,
+ovšem programovací jazyk Go a jeho možnosti objevili programátoři, kteří psali
+své síťové a speciálně pak webové aplikace v&nbsp;Pythonu, Ruby či
+Java/TypeScriptu (Node.js). Přepis do jazyka Go mnohdy znamenal řádový a někdy
+i dvouřádový (100&times;) nárůst výkonu těchto aplikací. Do jisté míry je
+nárůst výkonu způsoben překladem do nativního kódu, ovšem nesmíme zapomenout na
+<i>gorutiny</i>, které nejsou (na rozdíl od klasických vláken) příliš náročné
+na paměť, takže se můžeme setkat s&nbsp;aplikacemi, v&nbsp;nichž bez větších
+problémů běží stovky či dokonce tisíce gorutin (ostatně benchmark
+z&nbsp;předchozího článku vytvořil až 4097 gorutin, a to bez jakéhokoli
+viditelného problému).</p>
+
+<p>Dnes se seznámíme se základními balíčky určenými právě pro tvorbu síťových
+aplikací &ndash; jednoduchých a jednorázových utilit, ale například i HTTP
+serverů (což je užitečné téma, kterému se budeme věnovat od <a
+href="#k12">dvanácté kapitoly</a>). Samozřejmě se nebude jednat pouze o popis
+balíčků určených pouze pro práci se síťovými protokoly, protože typické síťové
+aplikace vyžadují i další funkcionalitu &ndash; zpracování formátů JSON a XML
+(čtení i zápis), kódování <a
+href="https://en.wikipedia.org/wiki/Base64">Base64</a>, kryptografické
+algoritmy atd. atd.</p>
+
+<p><div class="rs-tip-major">Poznámka: vzhledem k&nbsp;tomu, že při výchozím
+nastavení překladače Go se vytváří binární soubory obsahující i všechny
+potřebné knihovní funkce, budou výsledky dnešních příkladů objemnější, než jsme
+byli doposud zvyklí. Zatímco program typu &bdquo;Hello world&ldquo; má po
+překladu a slinkování velikost cca 1MB na platformě x86-64, je tomu u dnešních
+příkladů jinak: cca 2,5 MB u jednoduchých klientů a serverů a přes 6 MB u
+plnohodnotného HTTP serveru. Velikost lze samozřejmě snížit, nejjednodušeji
+utilitkou <strong>strip</strong>, dále pak <strong>upx</strong> atd.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Jednoduchý klient přijímající libovolnou sekvenci bajtů</h2>
+
+<p>Síťové aplikace se vytváří na různých úrovních abstrakce &ndash; buď se
+pouze otevřou připojení (například s&nbsp;využitím Unix socketů) a následný
+komunikační protokol je naprogramován přímo vývojářem, nebo se naopak využije
+nějaký již existující protokol na vyšší síťové vrstvě (HTTP atd.). Nejprve si
+ukážeme komunikaci mezi jednoduchým klientem a serverem na nižší úrovni, kdy
+náš komunikační protokol (na aplikační úrovni) bude spočívat v&nbsp;přenosu
+jediného bajtu přes TCP popř.&nbsp;přes UDP.</p>
+
+<p><div class="rs-tip-major">Poznámka: na nižších síťových vrstvách (TCP, IP,
+Ethernet) bude samozřejmě komunikace složitější, od toho ovšem budeme odstíněni
+standardními knihovnami (balíčky) programovacího jazyka Go.</div></p>
+
+<p>Samotná implementace klienta bude poměrně přímočará a bude se skládat
+z&nbsp;těchto kroků:</p>
+
+<ol>
+
+<li>Navázání připojení s&nbsp;využitím konstruktoru <strong>net.Dial(protokol,
+adresa)</strong>, který je popsán na adrese <a
+href="https://golang.org/pkg/net/#Dial">https://golang.org/pkg/net/#Dial</a>.
+Použitý protokol je specifikován řetězcem; konkrétně se může jednat o konstanty
+&bdquo;tcp&ldquo;, &bdquo;tcp4&ldquo;, &bdquo;tcp6&ldquo;, &bdquo;udp&ldquo;,
+&bdquo;udp4&ldquo;, &bdquo;udp6&ldquo;, &bdquo;ip&ldquo;, &bdquo;ip4&ldquo;,
+&bdquo;ip6&ldquo;, &bdquo;unix&ldquo;, &bdquo;unixgram&ldquo;
+popř.&nbsp;&bdquo;unixpacket&ldquo;. V&nbsp;příkladu zvolíme &bdquo;tcp&ldquo;,
+který bude funkční v&nbsp;sítích s&nbsp;IPv4 i IPv6 (nebo pochopitelně
+v&nbsp;kombinovaných sítích).</li>
+
+<li>Přečtení <i>n</i> bajtů metodou <strong>Read(b []byte) (n int, err
+error)</strong> (konkrétní příjemce se liší podle toho, jaké připojení jsme
+deklarovali v&nbsp;konstruktoru, ovšem tato metoda bude vždy podporována).
+Povšimněte si, že této metodě je nutné předat řez (<i>slice</i>) a nikoli pole
+bajtů (to je nekompatibilní datový typ). Z&nbsp;tohoto důvodu v&nbsp;našem
+příkladu použijeme trik <strong>pole[:]</strong>, kterým se vytvoří řez
+ukazující na celé pole (přesněji řez bude ukazovat na první prvek pole a jeho
+délka bude odpovídat délce pole).</li>
+
+<li>Přečtené pole bajtů se následně vytiskne, přičemž server implementovaný
+v&nbsp;rámci další kapitoly je naprogramován takovým způsobem, aby posílal jen
+jediný bajt.</li>
+
+</ol>
+
+<p>Úplný zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/01_simple_client.go">https://github.com/tisnik/go-fedora/blob/master/article_11/01_simple_client.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := net.Dial("tcp", "localhost:1234")
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                var b [1]byte
+                n, err := conn.Read(b[:])
+                if err != nil {
+                        println("No response!")
+                } else {
+                        if n == 1 {
+                                fmt.Printf("Received %d byte: %v\n", n, b)
+                        } else {
+                                fmt.Printf("Received %d bytes: %v\n", n, b)
+                        }
+                }
+        }
+}
+</pre>
+
+<p>O realizovaném připojení si můžeme zjistit i další informace, například
+lokální i vzdálenou adresu s&nbsp;využitím metod
+<strong>Conn.LocalAddr()</strong> a <strong>Conn.RemoteAddr()</strong>. Tyto
+adresy převedeme do tisknutelného tvaru metodou <strong>String()</strong>. <a
+href="https://github.com/tisnik/go-root/blob/master/article_11/01B_simple_client_headers.go">Upravený
+klient</a> může vypadat následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := net.Dial("tcp", "localhost:1234")
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                fmt.Printf("Connection established\n")
+                fmt.Printf("Remote Address: %s \n", conn.RemoteAddr().String())
+                fmt.Printf("Local Address:  %s \n", conn.LocalAddr().String())
+&nbsp;
+                var b [1]byte
+                n, err := conn.Read(b[:])
+                if err != nil {
+                        println("No response!")
+                } else {
+                        if n == 1 {
+                                fmt.Printf("Received %d byte: %v\n", n, b)
+                        } else {
+                                fmt.Printf("Received %d bytes: %v\n", n, b)
+                        }
+                }
+        }
+}
+</pre>
+
+<p>Příklad výsledku po připojení klienta k&nbsp;serveru popsanému <a
+href="#k03">v&nbsp;další kapitole</a>:</p>
+
+<pre>
+Connection established
+Remote Address: 127.0.0.1:1234 
+Local Address:  127.0.0.1:38082 
+Received 1 byte: [0]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že server má pevně zadaný
+port 1234, zatímco port otevřený na straně klienta je zvolen
+systémem.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Server vracející počet realizovaných připojení</h2>
+
+<p>Nyní si ukažme implementaci serveru, na který se budou připojovat výše
+popsaní klienti. Implementace serveru je nepatrně složitější, než implementace
+klienta, a to z&nbsp;toho důvodu, že server musí obsloužit větší množství
+klientů. V&nbsp;tom nejjednodušším případě použijeme
+&bdquo;neforkujícího&ldquo; klienta, který bude implementován následujícím
+způsobem:</p>
+
+<ol>
+
+<li>Použijeme konstruktor <strong>net.Listen()</strong>, v&nbsp;němž opět
+specifikujeme protokol (viz <a href="#k02">předchozí kapitolu</a>) a síťové
+rozhraní s&nbsp;portem 1234.</li>
+
+<li>S&nbsp;využitím příkazu <strong>defer</strong> zajistíme, že se při
+ukončení funkce <strong>main</strong> automaticky uzavře i otevřený port.</li>
+
+<li>Dále v&nbsp;nekonečné smyčce budeme čekat na připojení v&nbsp;metodě
+<strong>Accept</strong>. Jakmile se nějaký klient pokusí o připojení, vrátí
+tato metoda strukturu implementující mj.&nbsp;metody <strong>Read</strong> a
+<strong>Write</strong>. A právě s&nbsp;využitím metody <strong>Write</strong>
+pošleme klientovi jediný bajt obsahující hodnotu počitadla dotazů.</li>
+
+<li>Spojení se automaticky ukončí díky použití příkazu <strong>defer
+l.Close()</strong></li>
+
+</ol>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/02_simple_server.go">Úplný
+zdrojový kód</a> tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                println("Can't open the port!")
+        }
+        defer l.Close()
+        for {
+                conn, err := l.Accept()
+                defer conn.Close()
+                if err != nil {
+                        println("Connection refused!")
+                } else {
+                        var b = []byte{cnt}
+                        cnt++
+                        conn.Write(b)
+                }
+        }
+}
+</pre>
+
+<p>Prakticky je možné při otevírání portu vynechat část se síťovým rozhraním,
+takže se <a
+href="https://github.com/tisnik/go-root/blob/master/article_11/02B_simple_server_no_localhost.go">skript
+nepatrně zjednoduší</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", ":1234")
+        if err != nil {
+                println("Can't open the port!")
+        }
+        defer l.Close()
+        for {
+                conn, err := l.Accept()
+                defer conn.Close()
+                if err != nil {
+                        println("Connection refused!")
+                } else {
+                        var b = []byte{cnt}
+                        cnt++
+                        conn.Write(b)
+                }
+        }
+}
+</pre>
+
+<p>Ještě si vyzkoušejme, jak se bude server chovat ve chvíli, kdy bude vyřízení
+požadavku trvat dlouhou dobu. <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/03_slow_server.go">Upravený
+zdrojový kód serveru</a> bude vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                println("Can't open the port!")
+        }
+        defer l.Close()
+        for {
+                conn, err := l.Accept()
+                println("connection accepted")
+                time.Sleep(2 * time.Second)
+                defer conn.Close()
+                if err != nil {
+                        println("Connection refused!")
+                } else {
+                        var b = []byte{cnt}
+                        cnt++
+                        conn.Write(b)
+                }
+                println("connection closed")
+        }
+}
+</pre>
+
+<p>V&nbsp;tomto případě, nezávisle na počtu spuštěných klientů, bude server
+vždy zpracovávat požadavek od jediného klienta:</p>
+
+<pre>
+connection accepted
+connection closed
+connection accepted
+connection closed
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: sami si vyzkoušejte chování serveru
+v&nbsp;případě, že z&nbsp;několika terminálů spustíte více klientů.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Server, který dokáže obsloužit větší množství klientů</h2>
+
+<p>Kostra předchozího serveru dokázala obsloužit v&nbsp;daný okamžik pouze
+jediného klienta. Je tomu tak z&nbsp;toho důvodu, že metoda
+<strong>l.Accept()</strong> skončila ve chvíli, kdy se k&nbsp;serveru připojí
+jediný klient a následně se musí ukončit celé tělo smyčky, aby se
+<strong>l.Accept()</strong> zavolala znovu:</p>
+
+<pre>
+conn, err := l.Accept()
+defer conn.Close()
+if err != nil {
+        println("Connection refused!")
+} else {
+        var b = []byte{cnt}
+        cnt++
+        conn.Write(b)
+}
+</pre>
+
+<p>Nic nám ovšem nebrání, aby se vlastní obsluha klienta provedla
+v&nbsp;gorutině běžící paralelně s&nbsp;hlavní gorutinou. Na obslužnou gorutinu
+nikde nečekáme, takže se další volání <strong>l.Accept()</strong> provede velmi
+rychle:</p>
+
+<pre>
+conn, err := l.Accept()
+if err != nil {
+        println("Connection refused!")
+} else {
+        println("Connected")
+        <strong>go func</strong>(c net.Conn) {
+                var b = []byte{cnt}
+                cnt++
+                c.Write(b)
+                c.Close()
+        }(conn)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak uvidíme v&nbsp;dalším textu, nebude
+chování serveru zcela korektní, protože zvyšování hodnoty proměnné
+<strong>cnt</strong> není atomické.</div></p>
+
+<p>Podívejme se nyní na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/04_multi_connection_server.go">úplný
+zdrojový kód tohoto příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                println("Can't open the port!")
+        }
+        defer l.Close()
+        for {
+                conn, err := l.Accept()
+                if err != nil {
+                        println("Connection refused!")
+                } else {
+                        println("Connected")
+                        go func(c net.Conn) {
+                                var b = []byte{cnt}
+                                cnt++
+                                c.Write(b)
+                                c.Close()
+                        }(conn)
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět si vyzkoušejte, jak se bude server
+chovat při souběžném připojení většího množství klientů.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Server posílající textové zprávy</h2>
+
+<p>Přenosový protokol implementovaný předchozími verzemi serveru byl skutečně
+velmi primitivní, proto si nyní ukážeme nepatrně složitější implementaci
+serveru, který klientovi pošle textový řádek s&nbsp;ukončujícím znakem \n na
+konci. To je možné zajistit snadno, protože hodnota vrácená funkcí
+<strong>l.Accept()</strong> (<strong>l</strong> je například typ
+<strong>TCPListener</strong>, <strong>UnixListenr</strong> apod., obecným typem
+je <strong>Listener</strong>) reprezentuje handle souboru, do něhož je možné
+zapsat řetězec například funkcí <strong>fmt.Fprintf</strong>:</p>
+
+<pre>
+fmt.Fprintf(c, "Holla\n")
+</pre>
+
+<p>Po poslání řetězce se spojení ihned ukončí:</p>
+
+<pre>
+c.Close()
+</pre>
+
+<p>Celá obsluha klienta je samozřejmě realizována ve vlastní gorutině:</p>
+
+<pre>
+for {
+        conn, err := l.Accept()
+        if err != nil {
+                println("Connection refused!")
+        }
+        go func(c net.Conn) {
+                fmt.Fprintf(c, "Holla\n")
+                c.Close()
+        }(conn)
+}
+</pre>
+
+<p>Alternativně (což je možná korektnější) by bylo zapsat gorutinu
+s&nbsp;využitím příkazu <strong>defer</strong>:</p>
+
+<pre>
+go func(c net.Conn) {
+	defer c.Close()
+	fmt.Fprintf(c, "Holla\n")
+}(conn)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na druhou stranu by však byla
+následující konstrukce nekorektní, protože by k&nbsp;uzavření připojení mohlo
+dojít dřív, než by se provedl zápis:</div></p>
+
+<pre>
+conn, err := l.Accept()
+defer conn.close()
+if err != nil {
+        println("Connection refused!")
+}
+go func(c net.Conn) {
+        fmt.Fprintf(c, "Holla\n")
+}(conn)
+</pre>
+
+<p>Zdrojový kód serveru naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/05_text_client.go">https://github.com/tisnik/go-fedora/blob/master/article_11/05_text_client.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                println("Can't open the port!")
+        }
+        defer l.Close()
+        for {
+                conn, err := l.Accept()
+                if err != nil {
+                        println("Connection refused!")
+                }
+                go func(c net.Conn) {
+                        fmt.Fprintf(c, "Holla\n")
+                        c.Close()
+                }(conn)
+        }
+}
+</pre>
+
+<p>Předností je, že tento server můžeme otestovat s&nbsp;využitím běžného
+Telnetu:</p>
+
+<pre>
+$ <strong>telnet localhost 1234</strong>
+&nbsp;
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+Holla
+Connection closed by foreign host.
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Klient pracující v&nbsp;textovém režimu</h2>
+
+<p>Úprava klienta takovým způsobem, aby akceptoval celý textový řádek
+popř.&nbsp;větší množství řádků, je nepatrně složitější, než tomu bylo u
+serveru, protože je nutné nějakým způsobem &bdquo;rozluštit&ldquo; sekvenci
+bajtů poslaných serverem. Můžeme zde využít například již známý balíček
+<strong>bufio</strong>, s&nbsp;nímž jsme se seznámili v&nbsp;předchozím článku
+v&nbsp;rámci popisu bufferování standardního výstupu. Nyní ovšem použijeme
+metodu <a
+href="https://golang.org/pkg/bufio/#Reader.ReadString">Reader.ReadString()</a>,
+které se předá znak používaný pro ukončení jednotlivých záznamů. A v&nbsp;našem
+případě je záznamem celý textový řádek, takže oddělovačem bude znak \n:</p>
+
+<pre>
+status, err := bufio.NewReader(conn).ReadString('\n')
+</pre>
+
+<p>Tato metoda vrátí příznak chyby v&nbsp;případě, že celá sekvence nekončí
+oddělovacím/ukončovacím znakem.</p>
+
+<p>Podívejme se nyní na úplný zdrojový kód klienta, který naleznete na adrese
+<a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/06_text_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/06_text_server.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := net.Dial("tcp", "localhost:1234")
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                fmt.Fprintf(conn, "Hello")
+                status, err := bufio.NewReader(conn).ReadString('\n')
+                println(status, err)
+                if err != nil {
+                        println("No response!")
+                } else { 
+                        println(status)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Získání IP adresy pro specifikované hostname</h2>
+
+<p>V&nbsp;balíčku <strong>net</strong> nalezneme kromě dalších užitečných věcí
+i definici datového typu pojmenovaného příhodně <strong>IP</strong>. Interně se
+jedná o řez bajtů, který reprezentuje IP adresu, ať již podle standardu IPv4,
+tak i IPv6. IP adresy je možné vytisknout čitelným způsobem díky existenci
+metody <strong>String</strong> definované právě pro typ
+<strong>IP</strong>:</p>
+
+<pre>
+func (ip IP) String() string
+</pre>
+
+<p>Dále se nám může v&nbsp;aplikacích hodit funkce pojmenovaná
+<strong>LookupIP</strong>, které se předá řetězec obsahující například doménové
+jméno a návratovými hodnotami je dvojice: <i>řez s&nbsp;prvky typu IP</i> a
+příznak chyby. Řez se vrací z&nbsp;toho důvodu, že doménovému jménu může
+odpovídat více IP adres &ndash; typicky jedna IPv4 a jedna IPv6.</p>
+
+<p>Opět si ukažme přímočarý způsob použití funkce <strong>LookupIP</strong> <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/07_lookup.go">v&nbsp;následujícím
+příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>performLookup</strong>(address string) {
+        ip, err := net.LookupIP(address)
+        if err != nil {
+                println("Lookup failure")
+        } else {
+                fmt.Printf("%v\n", ip)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        performLookup("localhost")
+        performLookup("root.cz")
+        performLookup("google.com")
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu by se na standardním výstupu měly
+objevit tyto informace:</p>
+
+<pre>
+[127.0.0.1]
+[91.213.160.188 2001:67c:68::76]
+[172.217.19.110 2a00:1450:400d:804::200e]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: vidíme, že se v&nbsp;posledních dvou
+příkladech skutečně vrátila dvojice IP adres, která byla naformátována výše
+zmíněnou metodou <strong>String</strong>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Další funkce používané v&nbsp;souvislosti s&nbsp;IP adresami</h2>
+
+<p>Další užitečnou funkcí z&nbsp;balíčku <strong>net</strong> je funkce nazvaná
+<strong>ParseIP</strong>, které se předá řetězec s&nbsp;různými reprezentacemi
+IP adresy a výsledkem je hodnota typu <strong>IP</strong> (řez bajtů). Tato
+funkce je užitečná především pro IPv6 adresy, které se mnohdy zapisují
+zkráceným způsobem, například
+&bdquo;2041:0000:140F<strong>::</strong>875B:131B&ldquo; namísto
+&bdquo;2041:0000:140F:<strong>0000:0000:0000</strong>:875B:131B&ldquo;
+(v&nbsp;prvním případě je použita &bdquo;čtyřtečka&ldquo;), ve druhém jsou
+explicitně zapsány všechny octety.</p>
+
+<p>Tuto funkci si <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/08_parse_ip.go">vyzkoušíme
+snadno</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>parseIP</strong>(address string) {
+        ip := net.ParseIP(address)
+        if ip == nil {
+                println("ParseIP failure")
+        } else {
+                fmt.Printf("%v\n", ip)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        parseIP("127.0.0.1")
+        parseIP("1000::68")
+        parseIP("fe80::224:d7ff:fe83:1f28")
+        parseIP("fe80:0000:0000:0000:224:d7ff:fe83:1f28")
+        parseIP("fe80:0000:0000:0000:0000:0000:0000:0001")
+}
+</pre>
+
+<p>Výsledky by měly vypadat takto:</p>
+
+<pre>
+127.0.0.1
+1000::68
+fe80::224:d7ff:fe83:1f28
+fe80::224:d7ff:fe83:1f28
+fe80::1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opětovné zkrácení nám opět zajistila
+metoda <strong>String</strong> pro typ <strong>IP</strong>.</div></p>
+
+<p>A <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/09_ipv4_constructor.go">v&nbsp;posledním
+příkladu tohoto typu</a> je ukázáno použití konstruktoru <strong>IPv4</strong>,
+kterému se předá čtveřice bajtů a výsledkem je hodnota typu
+<strong>IP</strong>, tj.&nbsp;plnohodnotná IP adresa:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Printf("%v\n", net.IPv4(127, 0, 0, 1))
+        fmt.Printf("%v\n", net.IPv4(192, 168, 10, 3))
+}
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+127.0.0.1
+192.168.10.3
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento konstruktor tedy vlastně interně
+převádí čtyři samostatně zapsané bajty na pole bajtů.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Balíček <strong>http</strong></h2>
+
+<p>Konečně se dostáváme k&nbsp;popisu balíčku <strong>net/http</strong>. Jak
+již název tohoto balíčku napovídá, obsahuje funkce a nové datové typy určené
+pro práci s&nbsp;protokolem HTTP, a to jak pro klienty, kteří posílají dotazy
+(<i>request</i>) na servery, tak i pro implementaci vlastních serverů
+zpracovávajících dotazy a vytvářejících odpovědi (<i>response</i>). Ostatně
+právě existence tohoto balíčku měla poměrně velký vliv na oblíbenost
+programovacího jazyka Go pro tvorbu síťově orientovaných aplikací.</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Poslání HTTP dotazu a základní zpracování odpovědi serveru</h2>
+
+<p>První příklad použití balíčku <strong>net/http</strong>, s&nbsp;nímž se dnes
+seznámíme, bude volat funkci pojmenovanou <strong>Get</strong>, která posílá na
+zvolený server (a jeho endpoint) dotaz HTTP metodou GET. Použití této funkce je
+velmi snadné &ndash; funkci se pouze předá celá URL a výsledkem je hodnota typu
+<strong>Response</strong> a příznak chyby:</p>
+
+<pre>
+response, err := http.Get("http://httpbin.org/uuid")
+</pre>
+
+<p>Hodnota typu <strong>Response</strong> obsahuje mj.&nbsp;i stavový kód (200,
+301, 400, 404 atd. atd.), stavový kód reprezentovaný řetězcem (&bdquo;200
+OK&ldquo;) a taktéž tělo odpovědi (<i>body</i>). S&nbsp;obsahem těla odpovědi
+můžeme pracovat jako s&nbsp;datovým tokem, takže ho můžeme přečíst funkcí
+<strong>ioutil.ReadAll</strong>, převést výsledek na řetězec a ten
+vytisknout:</p>
+
+<pre>
+raw_body, err := ioutil.ReadAll(response.Body)
+body := string(raw_body)
+println(body)
+</pre>
+
+<p>Příklad použití funkce <strong>Get</strong> je ukázán <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/10_http_get.go">v&nbsp;následujícím
+demonstračním příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io/ioutil"
+        "net/http"
+)
+&nbsp;
+func <strong>main</strong>() {
+        response, err := http.Get("http://httpbin.org/uuid")
+        if err != nil {
+                println("Connection refused")
+        }
+        defer response.Body.Close()
+&nbsp;
+        fmt.Printf("Status: %s\n", response.Status)
+        fmt.Printf("Content length: %d\n", response.ContentLength)
+&nbsp;
+        raw_body, err := ioutil.ReadAll(response.Body)
+        if err != nil {
+                println("Response body can't be read")
+        } else {
+                body := string(raw_body)
+                println(body)
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se na standardním výstupu měly objevit zhruba
+tyto řádky (samotné UUID bude ovšem takřka se stoprocentní jistotou
+odlišné):</p>
+
+<pre>
+Status: 200 OK
+Content length: 53
+{
+  "uuid": "2dc037d0-fec2-4101-9b64-cb93e2e02bf9"
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že jsme získali tělo
+odpovědi, které evidentně obsahuje data ve formátu JSON. Práci s&nbsp;tímto
+formátem si popíšeme v&nbsp;navazující části tohoto seriálu.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Zobrazení hlaviček vrácených v&nbsp;odpovědi HTTP serveru</h2>
+
+<p>Předchozí příklad si můžeme nepatrně vylepšit tak, že vytiskneme i všechny
+hlavičky, které jsou poslány společně s&nbsp;odpovědí serveru:</p>
+
+<pre>
+for name, headers := range response.Header {
+        name = strings.ToLower(name)
+        for _, h := range headers {
+                fmt.Printf("%v: %v\n", name, h)
+        }
+}
+</pre>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/11_http_print_headers.go">zdrojového
+kódu tohoto příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "net/http"
+        "strings"
+)
+&nbsp;
+func <strong>main</strong>() {
+        response, err := http.Get("http://httpbin.org/uuid")
+        if err != nil {
+                println("Connection refused")
+        }
+        defer response.Body.Close()
+&nbsp;
+        fmt.Printf("Status: %s\n", response.Status)
+        fmt.Printf("Content length: %d\n", response.ContentLength)
+&nbsp;
+        for name, headers := range response.Header {
+                name = strings.ToLower(name)
+                for _, h := range headers {
+                        fmt.Printf("%v: %v\n", name, h)
+                }
+        }
+}
+</pre>
+
+<p>Po překladu a spuštění příkladu získáme tento výstup obsahující jak stavový
+kód HTTP (200 OK), tak i délku těla odpovědi a všechny hlavičky:</p>
+
+<pre>
+Status: 200 OK
+Content length: 53
+access-control-allow-credentials: true
+via: 1.1 vegur
+connection: keep-alive
+server: gunicorn/19.9.0
+date: Sun, 10 Feb 2019 20:12:21 GMT
+content-type: application/json
+content-length: 53
+access-control-allow-origin: *
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Vytvoření jednoduchého HTTP serveru</h2>
+
+<p>Nejužitečnější vlastností balíčku <strong>net/http</strong> je jeho podpora
+pro vytvoření skutečného HTTP serveru, a to doslova na několika řádcích
+programového kódu. Základem je funkce <strong>HandleFunc</strong>, která nám
+umožňuje zaregistrovat obslužnou funkci (<i>handler</i>) v&nbsp;případě, že je
+server volán s&nbsp;určitým URL (endpointem). Můžeme si například zaregistrovat
+handler pro endpoint /:</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+</pre>
+
+<p>Hlavička funkce <strong>HandleFunc</strong> vypadá takto:</p>
+
+<pre>
+func <strong>HandleFunc</strong>(pattern string, handler func(ResponseWriter, *Request))
+</pre>
+
+<p>Povšimněte si, že druhým parametrem této funkce je jiná funkce (onen
+handler) s&nbsp;hlavičkou:</p>
+
+<pre>
+func <strong>MujHandler</strong>(ResponseWriter, *Request)
+</pre>
+
+<p>Konkrétně může implementace našeho handleru poslat na výstup (typu
+<strong>ResponseWriter</strong>) jednoduchý text, který bude zaslán klientovi
+v&nbsp;celé HTTP odpovědi (s&nbsp;hlavičkami, stavovým kódem, délkou atd.
+atd.):</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+</pre>
+
+<p>Následně již stačí server spustit na určeném portu:</p>
+
+<pre>
+http.ListenAndServe(":8000", nil)
+</pre>
+
+<p>Úplná <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/12_http_server.go">implementace
+jednoduchého HTTP serveru</a> může vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "io"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>K&nbsp;otestování tohoto příkladu využijeme například utilitku
+<strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl localhost:8000</strong>
+&nbsp;
+Hello world!
+</pre>
+
+<p>Popř.&nbsp;pro podrobnější výstup:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+&nbsp;
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Wed, 13 Feb 2019 19:31:17 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+* Connection #0 to host localhost left intact
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Server s&nbsp;měnitelným stavem a problémy, které to způsobí</h2>
+
+<p>V&nbsp;další implementaci serveru jsou zaregistrovány dva handlery pro
+endpointy / a /counter:</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+http.HandleFunc("/counter", counterEndpoint)
+</pre>
+
+<p>Druhý handler vrátí klientovi obsah počitadla požadavků
+(počitadlo je postupně zvyšováno o jedničku):</p>
+
+<pre>
+var counter int
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+}
+</pre>
+
+<p>Následuje <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/13_http_server_with_state.go">výpis
+zdrojového kódu tohoto příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "net/http"
+)
+&nbsp;
+var counter int
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/counter", counterEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Opět si ukažme příklad odpovědí serveru při posílání požadavků nástrojem
+<strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl localhost:8000</strong>
+Hello world!
+&nbsp;
+$ <strong>curl localhost:8000/counter</strong>
+Counter: 1
+&nbsp;
+$ <strong>curl localhost:8000/counter</strong>
+Counter: 2
+&nbsp;
+$ <strong>curl localhost:8000/counter</strong>
+Counter: 3
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Role mutexů v&nbsp;programovacím jazyce Go</h2>
+
+<p>Ve skutečnosti ovšem není předchozí příklad naprogramován korektně, protože
+jednotlivé dotazy klientů jsou automaticky zpracovávány v&nbsp;samostatných
+gorutinách (tudíž paralelně) a počitadlo je &bdquo;pouze&ldquo; proměnná typu
+<strong>int</strong>. Paralelní přístup k&nbsp;této proměnné by tedy měl být
+synchronizován. K&nbsp;tomu využijeme takzvané <i>mutexy</i> z&nbsp;balíčku
+<strong>sync</strong>.</p>
+
+<p>Vytvoření mutexu:</p>
+
+<pre>
+var mutex = &amp;sync.Mutex{}
+</pre>
+
+<p>V&nbsp;handleru se přístup k&nbsp;proměnné <i>counter</i>, včetně jejího
+zvýšení o jedničku, provede uvnitř mutexu, který zajistí přístup pouze jediné
+gorutiny v&nbsp;daném okamžiku:</p>
+
+<pre>
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        mutex.Lock()
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+        mutex.Unlock()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento přístup by bylo v&nbsp;praxi nutné
+vylepšit, protože v&nbsp;sekci s&nbsp;mutexem se nachází i volání
+<strong>fmt.Fprintf</strong>, tedy potenciálně náročná operace. Můžeme použít
+lokální proměnnou s&nbsp;počitadlem, popř.&nbsp;namísto mutexů využít atomické
+typy definované v&nbsp;balíčku <strong>sync/atomic</strong>.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Úprava HTTP serveru takovým způsobem, aby používal mutexy</h2>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_11/14_http_server_with_state_mutex.go">Korektně
+naprogramovaný server</a> s&nbsp;počitadlem požadavků (tedy se stavem) bude
+vypadat takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "net/http"
+        "sync"
+)
+&nbsp;
+var counter int
+var mutex = &amp;sync.Mutex{}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        mutex.Lock()
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+        mutex.Unlock()
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/counter", counterEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Otestování základní funkcionality:</p>
+
+<pre>
+$ <strong>for i in {1..10};do curl localhost:8000/counter;done</strong>
+&nbsp;
+Counter: 1
+Counter: 2
+Counter: 3
+Counter: 4
+Counter: 5
+Counter: 6
+Counter: 7
+Counter: 8
+Counter: 9
+Counter: 10
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. HTTP server nabízející statický obsah (soubory)</h2>
+
+<p>V&nbsp;případě, že potřebujeme vytvořit HTTP server, který bude klientům
+posílat statický obsah (nějaké soubory), můžeme implementaci napsat doslova na
+několik programových řádků, jak je to ostatně patrné i při pohledu na <a
+href="https://github.com/tisnik/go-root/blob/master/article_11/15_file_server.go">zdrojový
+kód</a> dnešního předposledního demonstračního příkladu. Ve volané funkci
+<strong>http.FileServer(http.Dir())</strong> lze specifikovat adresář se
+statickým obsahem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>main</strong>() {
+        http.Handle("/", http.FileServer(http.Dir("")))
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Po spuštění tohoto serveru:</p>
+
+<pre>
+$ <strong>go run 15_file_server.go</strong>
+</pre>
+
+<p>Lze získat seznam souborů:</p>
+
+<pre>
+$ <strong>curl localhost:8000</strong>
+&nbsp;
+&lt;pre&gt;
+&lt;a href="01B_simple_client_headers.go"&gt;01B_simple_client_headers.go&lt;/a&gt;
+&lt;a href="01_simple_client.go"&gt;01_simple_client.go&lt;/a&gt;
+&lt;a href="02B_simple_server_no_localhost.go"&gt;02B_simple_server_no_localhost.go&lt;/a&gt;
+&lt;a href="02_simple_server.go"&gt;02_simple_server.go&lt;/a&gt;
+&lt;a href="03_slow_server.go"&gt;03_slow_server.go&lt;/a&gt;
+&lt;a href="04_multi_connection_server.go"&gt;04_multi_connection_server.go&lt;/a&gt;
+&lt;a href="05_text_client.go"&gt;05_text_client.go&lt;/a&gt;
+&lt;a href="06_text_server.go"&gt;06_text_server.go&lt;/a&gt;
+&lt;a href="07_lookup.go"&gt;07_lookup.go&lt;/a&gt;
+&lt;a href="08_parse_ip.go"&gt;08_parse_ip.go&lt;/a&gt;
+&lt;a href="09_ipv4_constructor.go"&gt;09_ipv4_constructor.go&lt;/a&gt;
+&lt;a href="10_http_get.go"&gt;10_http_get.go&lt;/a&gt;
+&lt;a href="11_http_print_headers.go"&gt;11_http_print_headers.go&lt;/a&gt;
+&lt;a href="12_http_server.go"&gt;12_http_server.go&lt;/a&gt;
+&lt;a href="13_http_server_with_state.go"&gt;13_http_server_with_state.go&lt;/a&gt;
+&lt;a href="14_http_server_with_state_mutex.go"&gt;14_http_server_with_state_mutex.go&lt;/a&gt;
+&lt;a href="15_file_server.go"&gt;15_file_server.go&lt;/a&gt;
+&lt;a href="16_custom_server.go"&gt;16_custom_server.go&lt;/a&gt;
+&lt;/pre&gt;
+</pre>
+
+<p><div class="rs-tip-major">V&nbsp;tomto případě bude typ obsahu nastaven na
+&bdquo;text/html&ldquo;.</div></p>
+
+<p>Samozřejmě lze získat přímo obsah nějakého souboru, například:</p>
+
+<pre>
+$ <strong>curl localhost:8000/01_simple_client.go</strong>
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := net.Dial("tcp", "localhost:1234")
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                var b [1]byte
+                n, err := conn.Read(b[:])
+                if err != nil {
+                        println("No response!")
+                } else {
+                        if n == 1 {
+                                fmt.Printf("Received %d byte: %v\n", n, b)
+                        } else {
+                                fmt.Printf("Received %d bytes: %v\n", n, b)
+                        }
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">V&nbsp;tomto případě bude typ obsahu nastaven na
+&bdquo;text/plain&ldquo;.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Kombinovaný HTTP server poskytující statický i dynamický obsah</h2>
+
+<p>Dnešní poslední demonstrační příklad vznikl kombinací dvou HTTP serverů,
+které jsme si ukázali v&nbsp;předchozích kapitolách. Nový server nabízí jak
+statický obsah, tak i dva endpointy &ndash; jeden z&nbsp;nich vrací odpověď
+&bdquo;Hello world!&ldquo;, druhý pak textovou zprávu s&nbsp;celkovým počtem
+dotazů, které na tento endpoint přišly. Všechny tři endpointy jsou
+zaregistrovány takto:</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+http.HandleFunc("/counter", counterEndpoint)
+http.HandleFunc("/files/", filesEndpoint)
+</pre>
+
+<p>Úpravou prošla zejména funkce, která vrací statický obsah, protože
+z&nbsp;URL odstraníme prefix &bdquo;/files/&ldquo;:</p>
+
+<pre>
+func <strong>filesEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        url := request.URL.Path[len("/files/"):]
+        println("Serving file from URL: " + url)
+        http.ServeFile(writer, request, url)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde je nutné upozornit na to, že
+manipulace s&nbsp;URL tímto způsobem nemusí být úplně bezpečná, protože se
+případný útočník může pokusit do URL vložit například absolutní cestu,
+relativní cestu s&nbsp;.. atd.</div></p>
+
+<p>Úplný zdrojový kód dnešního posledního demonstračního příkladu naleznete na
+adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_11/16_custom_server.go">https://github.com/tisnik/go-root/blob/master/article_11/16_custom_server.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "net/http"
+        "sync"
+)
+&nbsp;
+var counter int
+var mutex = &amp;sync.Mutex{}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        mutex.Lock()
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+        mutex.Unlock()
+}
+&nbsp;
+func <strong>filesEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        url := request.URL.Path[len("/files/"):]
+        println("Serving file from URL: " + url)
+        http.ServeFile(writer, request, url)
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/counter", counterEndpoint)
+        http.HandleFunc("/files/", filesEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+doslova několik kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_simple_client.go</td><td>klient, který přečte ze serveru sekvenci bajtů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/01_simple_client.go">https://github.com/tisnik/go-fedora/blob/master/article_11/01_simple_client.go</a></td></tr>
+<tr><td> 2</td><td>01B_simple_client_headers.go</td><td>upravený klient, který vytiskne místní i vzdálenou adresu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/01B_simple_client_headers.go">https://github.com/tisnik/go-fedora/blob/master/article_11/01B_simple_client_headers.go</a></td></tr>
+<tr><td> 3</td><td>02_simple_server.go</td><td>jednoduchý server posílající jediný bajt klientovi</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/02_simple_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/02_simple_server.go</a></td></tr>
+<tr><td> 4</td><td>02B_simple_server_no_localhost.go</td><td>úprava adresy v&nbsp;předchozím příkladu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/02B_simple_server_no_localhost.go">https://github.com/tisnik/go-fedora/blob/master/article_11/02B_simple_server_no_localhost.go</a></td></tr>
+<tr><td> 5</td><td>03_slow_server.go</td><td>server odpovídající klientovi opožděně</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/03_slow_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/03_slow_server.go</a></td></tr>
+<tr><td> 6</td><td>04_multi_connection_server.go</td><td>server, který dokáže obsloužit více klientů současně</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/04_multi_connection_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/04_multi_connection_server.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>05_text_client.go</td><td>jednoduchý klient akceptující textový řádek</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/05_text_client.go">https://github.com/tisnik/go-fedora/blob/master/article_11/05_text_client.go</a></td></tr>
+<tr><td> 8</td><td>06_text_server.go</td><td>server posílající klientovi textová data</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/06_text_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/06_text_server.go</a></td></tr>
+<tr><td> 9</td><td>06B_better_text_server.go</td><td>vylepšený server posílající klientovi textová data</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/06B_better_text_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/06B_better_text_server.go</a></td></tr>
+<tr><td>10</td><td>06C_wrong_connection_close.go</td><td>připojení je nutné ukončit v&nbsp;gorutině, ne mimo ni</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/06C_wrong_connection_close.go">https://github.com/tisnik/go-fedora/blob/master/article_11/06C_wrong_connection_close.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>07_lookup.go</td><td>překlad doménového jména na IP adresy</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/07_lookup.go">https://github.com/tisnik/go-fedora/blob/master/article_11/07_lookup.go</a></td></tr>
+<tr><td>12</td><td>08_parse_ip.go</td><td>parsing IP adresy</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/08_parse_ip.go">https://github.com/tisnik/go-fedora/blob/master/article_11/08_parse_ip.go</a></td></tr>
+<tr><td>13</td><td>09_ipv4_constructor.go</td><td>konstruktor typu IPv4</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/09_ipv4_constructor.go">https://github.com/tisnik/go-fedora/blob/master/article_11/09_ipv4_constructor.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>10_http_get.go</td><td>použití HTTP metody GET</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/10_http_get.go">https://github.com/tisnik/go-fedora/blob/master/article_11/10_http_get.go</a></td></tr>
+<tr><td>13</td><td>11_http_print_headers.go</td><td>vytištění hlavičky HTTP odpovědi</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/11_http_print_headers.go">https://github.com/tisnik/go-fedora/blob/master/article_11/11_http_print_headers.go</a></td></tr>
+<tr><td>14</td><td>12_http_server.go</td><td>nejjednodušší HTTP server s&nbsp;jediným endpointem</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/12_http_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/12_http_server.go</a></td></tr>
+<tr><td>15</td><td>13_http_server_with_state.go</td><td>HTTP server se stavovou proměnnou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/13_http_server_with_state.go">https://github.com/tisnik/go-fedora/blob/master/article_11/13_http_server_with_state.go</a></td></tr>
+<tr><td>16</td><td>14_http_server_with_state_mutex.go</td><td>korektní práce se stavovou proměnnou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/14_http_server_with_state_mutex.go">https://github.com/tisnik/go-fedora/blob/master/article_11/14_http_server_with_state_mutex.go</a></td></tr>
+<tr><td>17</td><td>15_file_server.go</td><td>HTTP server vracející statický obsah</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/15_file_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/15_file_server.go</a></td></tr>
+<tr><td>18</td><td>16_custom_server.go</td><td>kombinace předchozích možností</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_11/16_custom_server.go">https://github.com/tisnik/go-fedora/blob/master/article_11/16_custom_server.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
