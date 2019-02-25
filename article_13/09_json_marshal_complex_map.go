@@ -6,8 +6,8 @@ import (
 )
 
 type Identifiers struct {
-	UID     uint32
-	GID     uint32
+	UID uint32
+	GID uint32
 }
 
 type User struct {
@@ -26,7 +26,7 @@ func main() {
 		Name:    "Pepek",
 		Surname: "Vyskoč",
 		Enabled: true,
-		Sign:    []byte{0,0,0,0}}
+		Sign:    []byte{0, 0, 0, 0}}
 
 	mapOfUsers["user-id-2"] = User{
 		Ids:     Identifiers{2, 1},
