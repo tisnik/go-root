@@ -11,6 +11,12 @@ func main() {
 	a3 := [10]int32{1, 10, 2, 9, 3, 8, 4, 7, 5, 6}
 	a4 := []string{"www", "root", "cz"}
 	a5 := []interface{}{1, "root", 3.1415, true, []int{1, 2, 3, 4}}
+	matice := [4][3]float32{
+		{1, 2, 3},
+		{4, 5, 6},
+		{7, 8, 9},
+		{0, -1, 0},
+	}
 
 	a1_json, _ := json.Marshal(a1)
 	fmt.Println(string(a1_json))
@@ -26,4 +32,7 @@ func main() {
 
 	a5_json, _ := json.Marshal(a5)
 	fmt.Println(string(a5_json))
+
+	matice_json, _ := json.Marshal(matice)
+	fmt.Println(string(matice_json))
 }
