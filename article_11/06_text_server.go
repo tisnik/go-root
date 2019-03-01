@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 6:
+//     Server posílající klientovi textová data
+
 package main
 
 import (
