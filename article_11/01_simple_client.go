@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 1:
+//    Klient, který přečte ze serveru sekvenci bajtů
+
 package main
 
 import (

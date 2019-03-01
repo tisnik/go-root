@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 1B:
+//    Upravený klient, který vytiskne místní i vzdálenou adresu
+
 package main
 
 import (
