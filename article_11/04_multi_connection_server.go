@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Server, který dokáže obsloužit více klientů současně
+
 package main
 
 import (
