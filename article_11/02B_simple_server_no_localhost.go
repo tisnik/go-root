@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 2B:
+//     Úprava adresy v předchozím příkladu
+
 package main
 
 import (
