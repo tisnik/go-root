@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 2:
+//     Jednoduchý server posílající jediný bajt klientovi
+
 package main
 
 import (
