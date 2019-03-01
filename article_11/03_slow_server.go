@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 3:
+//     Server odpovídající klientovi opožděně
+
 package main
 
 import (
