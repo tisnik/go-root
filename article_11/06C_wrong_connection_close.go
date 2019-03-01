@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 6C:
+//     Připojení je nutné ukončit v gorutině, ne mimo ni
+
 package main
 
 import (
