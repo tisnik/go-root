@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 5:
+//     	Jednoduchý klient akceptující celý textový řádek
+
 package main
 
 import (
