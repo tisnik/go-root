@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 10:
+//     Použití HTTP metody GET
+
 package main
 
 import (
