@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 8:
+//     Parsing IPv4 a IPv6 adresy
+
 package main
 
 import (
