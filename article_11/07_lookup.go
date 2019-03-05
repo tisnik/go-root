@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 7:
+//     Překlad doménového jména na IP adresy
+
 package main
 
 import (
