@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 14:
+//     Korektní práce se stavovou proměnnou
+
 package main
 
 import (
