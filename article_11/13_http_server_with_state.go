@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 13:
+//     HTTP server se stavovou proměnnou
+
 package main
 
 import (
