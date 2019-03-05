@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 9:
+//     Konstruktor adresy typu IPv4
+
 package main
 
 import (
