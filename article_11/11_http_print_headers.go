@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Jedenáctá část
+//
+// Demonstrační příklad číslo 11:
+//    Vytištění hlavičky HTTP odpovědi
+
 package main
 
 import (
