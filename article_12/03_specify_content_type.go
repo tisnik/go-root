@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 3:
+//     HTTP server se specifikací MIME typu odpovědí
+
 package main
 
 import (
