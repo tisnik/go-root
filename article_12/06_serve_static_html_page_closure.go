@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 6:
+//    Využití uzávěrů pro zápis kratšího kódu
+
 package main
 
 import (
