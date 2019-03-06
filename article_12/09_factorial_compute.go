@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 9:
+//    Druhá varianta webové aplikace pro výpočet faktoriálu
+
 package main
 
 import (
