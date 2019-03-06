@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 10:
+//     Neměnná šablona stránky
+
 package main
 
 import (
