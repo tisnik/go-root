@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 2:
+//    Alternativní způsob vytvoření sekvence bajtů z řetězce
+
 package main
 
 import (
