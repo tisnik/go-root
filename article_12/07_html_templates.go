@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 7:
+//    Základní použití šablon
+
 package main
 
 import (
