@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvanáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Server, který vrací statické HTML stránky načtené ze souborů
+
 package main
 
 import (
