@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 9:
+//     Přímý přístup k jednotlivým pixelům; první varianta
+
 package main
 
 import (
