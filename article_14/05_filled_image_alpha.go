@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 5:
+//     Obrázek, v němž mají pixely různou průhlednost (nekorektní varianta)
+
 package main
 
 import (
