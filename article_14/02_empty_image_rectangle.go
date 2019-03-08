@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 2:
+//     Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku
+
 package main
 
 import (
