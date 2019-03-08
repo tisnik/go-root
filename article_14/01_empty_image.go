@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 1:
+//     Vytvoření rastrového obrázku s výchozími hodnotami pixelů (zcela průhledné černé pixely)
+
 package main
 
 import (
