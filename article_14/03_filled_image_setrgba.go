@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 3:
+//     Rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA
+
 package main
 
 import (
