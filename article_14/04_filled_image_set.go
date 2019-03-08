@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Rastrový obrázek vyplněný konstantní barvou, použití metody Set
+
 package main
 
 import (
