@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 8:
+//     Interní struktura záznamu s informacemi o obrázku
+
 package main
 
 import (
