@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 18:
+//     Implementace Bresenhamova algoritmu pro vykreslení úsečky
+
 package main
 
 import (
