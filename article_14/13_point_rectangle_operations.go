@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 13:
+//     Základní operace s obdélníky a body
+
 package main
 
 import (
