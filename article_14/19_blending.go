@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 19:
+//     Blending v Go (opět rastrové operace)
+
 package main
 
 import (
