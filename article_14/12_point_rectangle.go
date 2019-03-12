@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 12:
+//     Datové struktury Point a Rectangle
+
 package main
 
 import (
