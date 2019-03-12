@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 14:
+//     Základní vlastnosti barvového prostoru RGBA
+
 package main
 
 import (
