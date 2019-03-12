@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 17:
+//     Využití balíčku draw pro vykreslení šachovnice (rastrové operace)
+
 package main
 
 import (
