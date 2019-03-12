@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtrnáctá část
+//
+// Demonstrační příklad číslo 16:
+//     Základní vlastnosti barvového prostoru CMYK
+
 package main
 
 import (
