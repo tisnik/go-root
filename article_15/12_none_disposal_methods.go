@@ -8,8 +8,6 @@ import (
 	"os"
 )
 
-const BoardSize = 8
-
 func CreateImage(width int, height int, imageIndex int) *image.Paletted {
 	var palette = []color.Color{
 		color.RGBA{150, 150, 150, 255},
