@@ -1,0 +1,2398 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V patnácté části seriálu o programovacím jazyku Go se budeme zabývat dvěma důležitými tématy 2D grafiky. Nejdříve si ukážeme tvorbu animací s využitím klasických animovaných GIFů a posléze se zmíníme o užitečné knihovně GG (Go Graphics), která nabízí podobné funkce jako Cairo či OpenVG.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Základní vlastnosti grafického formátu GIF</a></p>
+<p><a href="#k02">2. Logická obrazovka, rámce a barvová paleta</a></p>
+<p><a href="#k03">3. Export rastrových obrázků do formátu GIF</a></p>
+<p><a href="#k04">4. Rozdíl při exportu obrázků s&nbsp;barvovým prostorem RGBA a obrázků s&nbsp;barvovou paletou</a></p>
+<p><a href="#k05">5. Nastavení vlastností výsledného GIFu</a></p>
+<p><a href="#k06">6. Omezení počtu barev ve výsledném GIFu</a></p>
+<p><a href="#k07">7. Animované GIFy</a></p>
+<p><a href="#k08">8. Vytvoření jednoduchého animovaného GIFu &ndash; blikající čtvereček</a></p>
+<p><a href="#k09">9. Složitější animace &ndash; pohybující se šachovnice</a></p>
+<p><a href="#k10">10. Volba metody přechodu mezi jednotlivými snímky animace</a></p>
+<p><a href="#k11">11. Použití nastaveného pozadí GIFu</a></p>
+<p><a href="#k12">12. Přechod na další snímek bez smazání snímku předchozího</a></p>
+<p><a href="#k13">13. Vytvoření GIFu s&nbsp;animovaným progress barem</a></p>
+<p><a href="#k14">14. Tvorba 2D grafiky s&nbsp;využitím knihovny GG</a></p>
+<p><a href="#k15">15. Parametry kreslení zapamatované v&nbsp;kontextu</a></p>
+<p><a href="#k16">16. Kreslení otevřených tvarů (úseček) pomocí příkazu <strong>Stroke</strong></a></p>
+<p><a href="#k17">17. Vyplnění uzavřené křivky příkazem <strong>Fill</strong></a></p>
+<p><a href="#k18">18. Nastavení základních parametrů cest: průhlednost, šířka tahu a styl vykreslení</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Základní vlastnosti grafického formátu GIF</h2>
+
+<p><i>&bdquo;This format has the unique quality that, like the AK47, in a lot
+of circumstances, it just works, unlike the more complex
+alternatives.&ldquo;</i></p>
+
+<p>V&nbsp;úvodní části dnešního článku <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">o programovacím
+jazyku Go</a> si ukážeme práci s&nbsp;rastrovým grafickým formátem GIF. První
+varianta grafického formátu GIF vznikla již v&nbsp;roce 1987 (ostatně proto se
+taky tato verze nazývá <i>GIF87a</i>), takže se jedná o souborový formát, který
+se v&nbsp;oboru IT udržel již neskutečných 32 let. Dnes se ovšem budeme zabývat
+převážně novější verzí GIFu pocházející z&nbsp;roku 1989. Tato varianta se
+jmenuje <i>GIF89a</i> a jedná se o formát, jenž je význačný především tím, že
+podporuje animace a v&nbsp;neposlední řadě i tím, že GIF je prakticky
+univerzálně akceptovaný napříč většinou počítačových architektur a platforem, a
+to i těch (pre)historických. Pokud je tedy zapotřebí vložit na webovou stránku
+nějakou jednoduchou animaci (ideálně v&nbsp;případě, že se jedná o animaci
+s&nbsp;objekty ostrých tvarů a s&nbsp;malým počtem barev), je u GIFu prakticky
+zaručeno, že příjemce bude schopen si animaci prohlédnout, a to bez nutnosti
+instalace kodeků či nějakých pluginů do prohlížečů.</p>
+
+<p>V&nbsp;dalších odstavcích se zmíníme o některých omezeních GIFu. Jedno
+zásadní omezení spočívající v&nbsp;patentovaném algoritmu už sice není
+relevantní, ale technická omezení způsobila, že vzniklo několik alternativ,
+které měly GIF v&nbsp;oblasti jednoduchých animací nahradit. V&nbsp;první řadě
+se jednalo o formát <i>MNG</i> (<i>Multiple-image Network Graphics</i>), jenž
+je založený na populárním PNG. Na rozdíl od PNG (pouze statické obrázky) se
+však MNG příliš nerozšířil a nakonec byla jeho podpora odstraněna i
+z&nbsp;webových prohlížečů, s&nbsp;tím, že by měl být MNG nahrazen jiným
+formátem nazvaným <i>APNG</i> neboli <i>Animated Portable Network Graphics</i>.
+Tento formát je podporován ve většině významných prohlížečů, viz též <a
+href="https://caniuse.com/#feat=apng">Can I use: Animated PNG (APNG)</a>, ovšem
+s&nbsp;tím varováním, že podpora chybí pro IE a Edge: <a
+href="https://developer.microsoft.com/en-us/microsoft-edge/platform/status/apngimageformat/">Edge
+platform status</a>. I přes relativně dobrou podporu jak na straně prohlížečů,
+tak i na straně software pro výrobu animací, však není APNG zdaleka tak
+rozšířen, jako &bdquo;starý dobrý&ldquo; GIF a proto je znalost práce
+s&nbsp;GIFem stále relevantní.</p>
+
+<p><div class="rs-tip-major">Poznámka: dnes nás pochopitelně bude zajímat
+především programová tvorba animovaných GIFů, protože jazyk Go se bude
+v&nbsp;tomto případě používat na straně serveru vytvářejícího a nabízejícího
+(dynamický) obsah.</div></p>
+
+<img src="https://i.iinfo.cz/images/678/golang-15-loopcount-forever-1.gif" class="image-355598" alt="&#160;" width="400" height="300" />
+<p><i>Obrázek 1: Takřka ideální kandidát na použití animovaného GIFu &ndash;
+výsledek jednoduché simulace.</i></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Logická obrazovka, rámce a barvová paleta</h2>
+
+<p>Grafický formát GIF primárně slouží pro záznam a přenos grafických informací
+uložených ve formě bitmapy, tj.&nbsp;obecně vícebarevného rastrového obrázku.
+Většina z&nbsp;dnes používaných grafických formátů, například JPEG, PNG, TGA či
+BMP obsahuje popis rastrového obrázku jako celku, přičemž se (buď přímo nebo
+v&nbsp;komprimované podobě) ukládají barvové hodnoty všech pixelů, ze kterých
+se rastrový obrázek skládá.</p>
+
+<p>V&nbsp;grafickém formátu GIF je však použit odlišný přístup. Celý obrázek,
+který je zde nazývaný logická obrazovka (<i>logical screen</i>), není
+v&nbsp;souboru uložen jako jeden celek, ale skládá se z&nbsp;několika
+takzvaných rámců (<i>frame</i>), což jsou obdélníkové oblasti umístěné uvnitř
+logické obrazovky. Minimálně musí být vždy přítomen jeden rámec, jejich
+maximální množství však není omezeno. Každý rámec je možné chápat jako rastrový
+obrázek, který je celou svou plochou umístěn v&nbsp;logické obrazovce &ndash;
+podle specifikace nesmí žádný pixel z&nbsp;rámce padnout mimo logickou
+obrazovku. Pozice rámce v&nbsp;logické obrazovce je určena souřadnicí jeho
+horního levého rohu a velikostí (šířkou, výškou) zadanou v&nbsp;pixelech. Dále
+může být k&nbsp;rámci přiřazena <i>lokální barvová paleta</i>, pokud však není
+přítomna, použije se <i>globální barvová paleta</i> (viz další text).</p>
+
+<p><div class="rs-tip-major">Poznámka: právě nutnost specifikace velikosti a
+umístění rámce vedla k&nbsp;tomu, že ve standardní knihovně
+<strong>draw</strong> <a
+href="https://www.root.cz/clanky/programovaci-jazyk-go-a-pocitacova-grafika-uvod/">popsané
+minule</a> se při vytváření rastrových obrázků používá datová struktura
+<strong>Rectangle</strong>, i když by v&nbsp;jiném případě postačovalo
+specifikovat šířku a výšku obrázků v&nbsp;pixelech.</div></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-2.gif" class="image-355567" alt="&#160;" width="400" height="300" />
+<p><i>Obrázek 2: Vztah mezi logickou obrazovkou a rámci.</p></i></p>
+
+<p>Na předchozím obrázku je naznačené, jakým způsobem může být logická
+obrazovka popsána pomocí rámců. Vidíme, že není nutné, aby rámce pokryly celou
+logickou obrazovku, rámce se dokonce mohou v&nbsp;případě potřeby navzájem
+překrývat. Jak uvidíme dále, je při překryvu rámců možné použít transparentní
+pixely, takže překryv může být ve skutečnosti mnohem složitější, než pouhé
+přepsání barev pixelů v&nbsp;zadané obdélníkové oblasti.</p>
+
+<p>Rámce nachází v&nbsp;grafickém formátu GIF mnoho uplatnění. Na dalších dvou
+obrázcích je naznačeno, jakým způsobem je možné použít rámce pro redukci
+celkové velikosti obrázku. Prázdné bílé plochy není nutné explicitně ukládat,
+může se zde pouze vykreslit barva pozadí. Algoritmus LZW je, podobně jako
+některé další algoritmy použité pro komprimaci obrázků (kromě primitivního
+RLE), poměrně hloupý a zbytečně by si sekvencemi stejných bytů zaplnil hešovací
+tabulku a tím by byl nucen ji buď rozšířit, nebo uvést do původní podoby (bez
+zapamatovaných sekvencí delších než jeden pixel). Obojí však vede ke zvětšení
+výsledného souboru. Mimochodem, na obrázcích 3 a 4 je ukázána úvodní stránka
+z&nbsp;první kapitoly T<sub>E</sub>Xbooku.</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-3.gif" class="image-355568" alt="&#160;" width="419" height="592" />
+<p><i>Obrázek 3: Obrázek uložený v&nbsp;jednom rámci.</p></i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-4.gif" class="image-355569" alt="&#160;" width="419" height="592" />
+<p><i>Obrázek 4: Obrázek rozdělený na tři rámce s&nbsp;využitím barvy pozadí (ta je pro ilustraci zobrazena šedě).</p></i></p>
+
+<p>Vzhledem k&nbsp;tomu, že každý pixel umístěný v&nbsp;rámci může být popsán
+maximálně osmi bity, znamená to, že jeho barvu je možné vybrat z&nbsp;barvové
+palety obsahující nejvýše 256 barev. Každá barva je v&nbsp;barvové paletě
+popsána trojicí hodnot &ndash; barvových složek označených písmeny R
+(<i>red</i>), G (<i>green</i>) a B (<i>blue</i>), přičemž každá barvová složka
+je uložena v&nbsp;jednom bytu. Minimální velikost barvové palety (se dvěma
+barvami) je proto rovna šesti bytům (2&times;3), maximální velikost barvové
+palety s&nbsp;256 barvami pak 768 bytům (256&times;3). U&nbsp;mnoha obrázků se
+proto může stát, že barvová paleta tvoří nezanedbatelnou část jejich celkové
+velikosti.</p>
+
+<p><div class="rs-tip-major">Poznámka: to znamená, že knihovna
+<strong>draw</strong> musí obrázky převádět do barvového prostoru omezeného
+paletou s&nbsp;maximálně 256 barvami (i když je teoreticky možné
+s&nbsp;využitím rámců dosáhnout efektu většího množství barev).</div></p>
+
+<p>V&nbsp;grafickém formátu GIF rozlišujeme dvě barvové palety: globální a
+lokální. Globální barvová paleta (<i>global color table</i>) může
+v&nbsp;souboru typu GIF existovat maximálně jednou a její velikost
+(tj.&nbsp;počet barev) je zadána v&nbsp;hlavičce popisující logickou obrazovku.
+V&nbsp;některých případech nemusí být globální barvová paleta přítomna vůbec.
+Lokální barvová paleta (<i>local color table</i>) může být přiřazena ke každému
+rámci, opět se však nejedná o povinnou součást rámce. V&nbsp;případě, že není
+přítomna ani globální ani lokální barvová paleta, měl by prohlížecí program
+použít systémovou paletu, v&nbsp;případě webových prohlížečů takzvanou web-safe
+paletu složenou z&nbsp;216 barev rovnoměrně umístěných v&nbsp;jednotkové RGB
+krychli; zbylé barvy tvoří odstíny šedi. Absence obou barvových palet sice může
+zmenšit celkovou velikost souboru, způsob zobrazení se však může v&nbsp;různých
+prohlížečích lišit, proto se většinou (99% případů) alespoň jedna barvová
+paleta používá.</p>
+
+<p>Důležitou součástí popisu logické obrazovky je index jedné barvy
+v&nbsp;globální barvové paletě, která bude použita pro vykreslení pozadí.
+Dodnes sice většina programů při ukládání GIFů každý obrázek uloží do jednoho
+velikého rámce, ale při optimalizaci na velikost je možné (a některé
+sofistikovanější programy to provádí), aby některé pixely logické obrazovky
+nebyly pokryty žádným z&nbsp;rámců. Nepokryté pixely by poté měly být vybarveny
+právě barvou pozadí. Tímto způsobem, jak si ostatně ukážeme v&nbsp;další části,
+je možné vytvořit optimalizované obrázky, či dokonce obrázky o prakticky
+jakékoli velikosti, které však stále budou zabírat malé místo na disku (díky
+tomu, že je uložen například pouze malý rámec uprostřed obrovské volné
+plochy).</p>
+
+<p><div class="rs-tip-major">Poznámka: tuto vlastnost GIFu použijeme
+v&nbsp;některých demonstračních příkladech.</div></p>
+
+<p>Verze GIF89a přinesla oproti původní verzi GIF87a jednu podstatnou novinku
+&ndash; pomocí rozšiřujícího řídicího bloku (<i>graphics control extension</i>)
+je možné v&nbsp;každém rámci specifikovat jeden index do barvové palety, který
+představuje průhledné pixely. Díky tomu je možné, aby optický tvar rámce nebyl
+pouze obdélníkový, ale v&nbsp;podstatě libovolný. Vzhledem k&nbsp;tomu, že je
+možné &bdquo;průhlednými&ldquo; pixely překreslit i původně neprůhlednou barvu
+pozadí, může mít i obrázek jako celek neobdélníkový tvar, což je velmi často
+využíváno zejména při tvorbě různých log na webových stránkách a
+v&nbsp;neposlední řadě i v&nbsp;řadě animací. Na třetím obrázku je ukázka GIFu
+s&nbsp;průhledností.</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-5.gif" class="image-355570" alt="&#160;" width="125" height="60" />
+<p><i>Obrázek 5: GIF s&nbsp;průhlednými pixely.</p></i></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Export rastrových obrázků do formátu GIF</h2>
+
+<p>Nejprve si ukážeme ten nejjednodušší způsob exportu rastrových obrázků do
+formátu GIF. Obrázek je samozřejmě nutné nejdříve vytvořit, například funkcí <a
+href="https://github.com/tisnik/go-root/blob/220929aa0d5b579fc7daaacd20bfaeb914e8675e/article_15/02_gif_export_rgba.go#L13">CreateChessboard</a>,
+kterou jsme si ukázali minule:</p>
+
+<pre>
+img := CreateChessboard(256, 256, BoardSize)
+</pre>
+
+<p>Dále vytvoříme nový soubor pro uložení obrázku:</p>
+
+<pre>
+outfile, err := os.Create("02.gif")
+if err != nil {
+        panic(err)
+}
+defer outfile.Close()
+</pre>
+
+<p>A následně obrázek nechápe zakódovat pomocí funkce <strong>Encode</strong>,
+podobně jako jsme to udělali v&nbsp;případě formátu PNG:</p>
+
+<pre>
+err = gif.Encode(outfile, img, nil)
+if err != nil {
+        panic(err)
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-6.gif" class="image-355571" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 6: Výsledek činnosti prvního demonstračního příkladu.</i></p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/02_gif_export_rgba.go">https://github.com/tisnik/go-fedora/blob/master/article_15/02_gif_export_rgba.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const BoardSize = 8
+&nbsp;
+func <strong>CreateChessboard</strong>(width int, height int, board_size int) *image.RGBA {
+        var palette = []color.Color{
+                color.RGBA{150, 205, 50, 255},
+                color.RGBA{0, 100, 0, 255},
+        }
+&nbsp;
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        index_color := 0
+        hor_block := int(width / board_size)
+        ver_block := int(height / board_size)
+&nbsp;
+        x_from := 0
+        x_to := hor_block
+        for x := 0; x &lt; board_size; x++ {
+                y_from := 0
+                y_to := ver_block
+                for y := 0; y &lt; board_size; y++ {
+                        r := image.Rect(x_from, y_from, x_to, y_to)
+                        draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                        y_from = y_to
+                        y_to += ver_block
+                        index_color = 1 - index_color
+                }
+                x_from = x_to
+                x_to += hor_block
+                index_color = 1 - index_color
+        }
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := CreateChessboard(256, 256, BoardSize)
+&nbsp;
+        outfile, err := os.Create("02.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        err = gif.Encode(outfile, img, nil)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Rozdíl při exportu obrázků s&nbsp;barvovým prostorem RGBA a obrázků s&nbsp;barvovou paletou</h2>
+
+<p>Pokusme se nyní vytvořit jednopixelový obrázek (o rozměrech 1&times;1 pixel)
+v&nbsp;barvovém prostoru RGBA nebo NRGBA:</p>
+
+<pre>
+c := color.RGBA{255, 0, 0, 255}
+img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+img.Set(0, 0, c)
+</pre>
+
+<p>Po exportu do GIFu vznikne tento soubor:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-7.gif" class="image-355572" alt="&#160;" width="1" height="1" />
+<p><i>Obrázek 7: Jednopixelový obrázek, který však obsahuje paletu s&nbsp;256
+barvami.</i></p>
+
+<p>Pokud takový obrázek otevřeme v&nbsp;nějakém grafickém editoru, můžeme se
+přesvědčit o tom, že obsahuje úplnou barvovou paletu s&nbsp;256 barvami:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-8.gif" class="image-355573" alt="&#160;" width="167" height="167" />
+<p><i>Obrázek 8: Zobrazení barvové palety v&nbsp;grafickém editoru.</i></p>
+
+<p>Celková velikost souboru s&nbsp;obrázkem je taktéž až enormně velká
+v&nbsp;poměru k&nbsp;obrazovým informacím, které obsahuje: celých 798
+bajtů!</p>
+
+<p>Úplný výpis zdrojového kódu tohoto demonstračního příkladu je umístěn na
+adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/03_gif_1x1_rgba.go">https://github.com/tisnik/go-fedora/blob/master/article_15/03_gif_1x1_rgba.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int) *image.RGBA {
+        c := color.RGBA{255, 0, 0, 255}
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+        img.Set(0, 0, c)
+&nbsp;
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := CreateImage(1, 1)
+&nbsp;
+        outfile, err := os.Create("03.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        err = gif.Encode(outfile, img, nil)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Tento příklad ovšem můžeme modifikovat, a to konkrétně takovým způsobem, že
+se namísto obrázku s&nbsp;barvovým prostorem RGBA (16 milionů barvových
+odstínů) použije obrázek s&nbsp;paletou. Minimální velikost palety je ve
+formátu GIF rovna dvěma položkám, takže si takovou paletu vytvoříme:</p>
+
+<pre>
+var palette = []color.Color{
+        color.RGBA{255, 128, 128, 255},
+        color.RGBA{255, 255, 255, 255},
+}
+</pre>
+
+<p>Následně je možné vytvořit rastrový obrázek používající tuto paletu a
+nastavit jeho (jediný) pixel na zvolenou barvu vybranou z&nbsp;palety:</p>
+
+<pre>
+c := color.RGBA{255, 128, 128, 255}
+img := image.NewPaletted(image.Rect(0, 0, 1, 1), palette)
+img.Set(0, 0, c)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že druhým parametrem
+konstruktoru <strong>NewPaletted</strong> je právě barvová palety,
+tj.&nbsp;pole s&nbsp;prvky typu <strong>Color</strong>.</div></p>
+
+<p>Po uložení získáme tento soubor:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-9.gif" class="image-355574" alt="&#160;" width="1" height="1" />
+<p><i>Obrázek 9: Jednopixelový obrázek, který obsahuje paletu se dvěma
+barvami.</i></p>
+
+<p>Jeho velikost je nyní pouhých <strong>34 bajtů</strong>, což je současně
+nejmenší možná velikost zcela validního obrázku uloženého ve formátu GIF.</p>
+
+<p>Po otevření vytvořeného obrázku v&nbsp;grafickém editoru je patrné, že
+paleta se rapidně zmenšila na dvě položky:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-10.gif" class="image-355575" alt="&#160;" width="456" height="295" />
+<p><i>Obrázek 10: Zobrazení barvové palety v&nbsp;grafickém editoru.</i></p>
+
+<p>Upravený demonstrační příklad, který vytvoří obrázek s&nbsp;naprosto stejnou
+obrazovou informací jako obrázek předchozí, <a
+href="https://github.com/tisnik/go-root/blob/master/article_15/04_gif_1x1_palette.go">může
+vypadat následovně</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{255, 128, 128, 255},
+                color.RGBA{255, 255, 255, 255},
+        }
+&nbsp;
+        c := color.RGBA{255, 128, 128, 255}
+        img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+        img.Set(0, 0, c)
+&nbsp;
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := CreateImage(1, 1)
+&nbsp;
+        outfile, err := os.Create("04.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        err = gif.Encode(outfile, img, nil)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Nastavení vlastností výsledného GIFu</h2>
+
+<p>Při exportu rastrových obrázků do formátu GIF je možné přes poslední
+parametr <strong>Encode</strong> specifikovat ukazatel na strukturu typu
+<strong>Options</strong>, která obsahuje doplňující informace o vlastnostech
+výsledného GIFu. Můžeme například explicitně nastavit počet barev:</p>
+
+<pre>
+options := gif.Options{NumColors: 255, Quantizer: nil, Drawer: nil}
+</pre>
+
+<p>Ukazatel na nově vytvořenou proměnnou se předá do funkce
+<strong>Encode</strong>:</p>
+
+<pre>
+err = gif.Encode(outfile, img, &amp;options)
+if err != nil {
+        panic(err)
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/05_gif_export_colors.go">Příklad
+použití</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const BoardSize = 8
+&nbsp;
+func <strong>CreateChessboard</strong>(width int, height int, board_size int) *image.RGBA {
+        var palette = []color.Color{
+                color.RGBA{150, 205, 50, 255},
+                color.RGBA{0, 100, 0, 255},
+        }
+&nbsp;
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        index_color := 0
+        hor_block := int(width / board_size)
+        ver_block := int(height / board_size)
+&nbsp;
+        x_from := 0
+        x_to := hor_block
+        for x := 0; x &lt; board_size; x++ {
+                y_from := 0
+                y_to := ver_block
+                for y := 0; y &lt; board_size; y++ {
+                        r := image.Rect(x_from, y_from, x_to, y_to)
+                        draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                        y_from = y_to
+                        y_to += ver_block
+                        index_color = 1 - index_color
+                }
+                x_from = x_to
+                x_to += hor_block
+                index_color = 1 - index_color
+        }
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := CreateChessboard(256, 256, BoardSize)
+&nbsp;
+        outfile, err := os.Create("05.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        options := gif.Options{NumColors: 255, Quantizer: nil, Drawer: nil}
+&nbsp;
+        err = gif.Encode(outfile, img, &amp;options)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Export šachovnice do obrázku typu GIF s&nbsp;dvoubarevnou barvovou
+paletou:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-11.gif" class="image-355576" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 11: Šachovnice, barvová paleta je snížena na dvě barvy, celková
+velikost obrázku je nyní pouze 2667 bajtů.</i></p>
+
+<p>Předchozí obrázek byl vytvořen <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/06_gif_export_palette.go">takto
+upraveným příkladem</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const BoardSize = 8
+&nbsp;
+func <strong>CreateChessboard</strong>(width int, height int, board_size int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{150, 205, 50, 255},
+                color.RGBA{0, 100, 0, 255},
+        }
+&nbsp;
+        img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+        index_color := 0
+        hor_block := int(width / board_size)
+        ver_block := int(height / board_size)
+&nbsp;
+        x_from := 0
+        x_to := hor_block
+        for x := 0; x &lt; board_size; x++ {
+                y_from := 0
+                y_to := ver_block
+                for y := 0; y &lt; board_size; y++ {
+                        r := image.Rect(x_from, y_from, x_to, y_to)
+                        draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                        y_from = y_to
+                        y_to += ver_block
+                        index_color = 1 - index_color
+                }
+                x_from = x_to
+                x_to += hor_block
+                index_color = 1 - index_color
+        }
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := CreateChessboard(256, 256, BoardSize)
+&nbsp;
+        outfile, err := os.Create("06.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        err = gif.Encode(outfile, img, nil)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Omezení počtu barev ve výsledném GIFu</h2>
+
+<p>S&nbsp;barvovými prostory RGBA a NRGBA jsme se již setkali v&nbsp;předchozím
+článku. V&nbsp;obou případech se barva pixelu zadává čtyřmi složkami &ndash;
+červenou, zelenou, modrou a průhledností. Každá z&nbsp;těchto složek je uložena
+v&nbsp;bajtu (jedná se tedy o hodnotu v&nbsp;rozsahu 0 až 255). Celkový počet
+barev ve spektru dosahuje hodnoty 256<sup>3</sup> = 16777216 barev (více než
+šestnáct milionů). Pokud by tento rozsah nedostačoval, například při provádění
+některých editačních operací (vícenásobná filtrace atd.), lze použít prostory
+RGBA64 a NRGBA64. V&nbsp;případě prostoru NRGBA se při ukládání barev
+neprovádí žádné další operace, u RGBA se však nejprve barvové složky přednásobí
+průhledností. Ukažme si, jak se v&nbsp;tomto modelu vytvoří gradientní
+přechody:</p>
+
+<pre>
+img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+for x := 0; x &lt; 256; x++ {
+        for y := 0; y &lt; 256; y++ {
+                c := color.NRGBA{0, byte(x), byte(y), 255}
+                img.SetNRGBA(x, y, c)
+&nbsp;
+                c = color.NRGBA{85, byte(x), byte(y), 255}
+                img.SetNRGBA(x+256, y, c)
+&nbsp;
+                c = color.NRGBA{170, byte(x), byte(y), 255}
+                img.SetNRGBA(x, y+256, c)
+&nbsp;
+                c = color.NRGBA{255, byte(x), byte(y), 255}
+                img.SetNRGBA(x+256, y+256, c)
+        }
+}
+</pre>
+
+<p>Takto vytvořený obrázek uložíme do formátu GIF, ovšem postupně budeme měnit
+počet barev v&nbsp;paletě od 1 do 256 (bude se jednat o mocniny dvou, což
+vyplývá z&nbsp;omezení samotného GIFu):</p>
+
+<pre>
+for colors := 1; colors &lt;= 256; colors &lt;&lt;= 1 {
+        options := gif.Options{NumColors: colors, Quantizer: nil, Drawer: nil}
+&nbsp;
+        gif.Encode(outfile, img, &amp;options)
+}
+</pre>
+
+<p>Výsledky ukazují, jak se s&nbsp;omezením počtu barev dobře či špatně
+vypořádal interní algoritmus využívající <i>dithering</i>:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-12.gif" class="image-355577" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 12: Použití ditheringu při cílovém počtu 256 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-13.gif" class="image-355578" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 13: Použití ditheringu při cílovém počtu 128 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-14.gif" class="image-355579" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 14: Použití ditheringu při cílovém počtu 64 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-15.gif" class="image-355580" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 15: Použití ditheringu při cílovém počtu 32 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-16.gif" class="image-355581" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 16: Použití ditheringu při cílovém počtu 16 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-17.gif" class="image-355582" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 17: Použití ditheringu při cílovém počtu 8 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-18.gif" class="image-355583" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 18: Použití ditheringu při cílovém počtu 4 barev.</i></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-19.gif" class="image-355584" alt="&#160;" width="512" height="512" />
+<p><i>Obrázek 19: Použití ditheringu při cílovém počtu 2 barev.</i></p>
+
+<p>Pochopitelně si opět ukážeme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/07_rgba_to_palette.go">úplné
+znění tohoto demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "image"
+        "image/color"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const width = 512
+const height = 512
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        for x := 0; x &lt; 256; x++ {
+                for y := 0; y &lt; 256; y++ {
+                        c := color.NRGBA{0, byte(x), byte(y), 255}
+                        img.SetNRGBA(x, y, c)
+&nbsp;
+                        c = color.NRGBA{85, byte(x), byte(y), 255}
+                        img.SetNRGBA(x+256, y, c)
+&nbsp;
+                        c = color.NRGBA{170, byte(x), byte(y), 255}
+                        img.SetNRGBA(x, y+256, c)
+&nbsp;
+                        c = color.NRGBA{255, byte(x), byte(y), 255}
+                        img.SetNRGBA(x+256, y+256, c)
+                }
+        }
+&nbsp;
+        for colors := 1; colors &lt;= 256; colors &lt;&lt;= 1 {
+                filename := fmt.Sprintf("07_%03d.gif", colors)
+&nbsp;
+                outfile, err := os.Create(filename)
+                if err != nil {
+                        panic(err)
+                }
+                defer outfile.Close()
+&nbsp;
+                options := gif.Options{NumColors: colors, Quantizer: nil, Drawer: nil}
+&nbsp;
+                gif.Encode(outfile, img, &amp;options)
+        }
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Animované GIFy</h2>
+
+<p>Grafický formát GIF je na Internetu stále oblíbený zejména z&nbsp;toho
+důvodu, že podporuje animace &ndash; a to bez nutnosti instalace pluginů na
+straně prohlížeče nebo použití speciálních technik (JavaScript, streamované
+video apod.). Animace byly na Internetu zavedeny s&nbsp;příchodem Netscape 2 a
+posléze Internet Exploreru 3. Ve skutečnosti nejsou animace nic jiného, než
+sled po sobě jdoucích rámců (které mohou ležet na sobě), mezi jejichž
+zobrazením je vložena krátká či delší časová prodleva. Pokud jsou rámce
+překreslovány rychlostí cca 10 snímků za sekundu, vzniká dojem více či méně
+plynulé animace.</p>
+
+<p>V&nbsp;některých případech, například při požadavcích na prezentaci krátkého
+videa na webových stránkách, musí tvůrce stránek porovnat možnosti grafického
+formátu GIF se souborovými či streamovými formáty určenými pro ukládání videa a
+zjistit, který formát je pro jeho aplikaci výhodnější. GIF není v&nbsp;žádném
+případě vhodný pro ukládání ani přehrávání větších animací, protože osmibitová
+paleta je mnohdy nedostačující a mezisnímková komprimace je obecně
+nedostatečná, zejména při práci s&nbsp;&bdquo;reálným&ldquo;, tj.&nbsp;typicky
+zašuměným videem. GIF také nepodporuje ukládání zvukových stop ani přesné
+časování snímků (o tom jsme se mohli předminule přesvědčit při práci
+s&nbsp;"true color" GIFy).</p>
+
+<p>Pro filmy je použita větší snímková frekvence, typicky 24 či 25 snímků za
+sekundu, musíme si však uvědomit, že filmové políčko má většinou mnohem větší
+rozlišení, než animovaný GIF, takže případné &bdquo;trhání&ldquo; není u GIFu
+tak patrné. Animace byly zavedeny až ve verzi GIF89a.</p>
+
+<p>Pro export/vytvoření animovaných GIFů slouží funkce nazvaná
+<strong>EncodeAll</strong>, kterou pochopitelně nalezneme v&nbsp;balíčku
+<strong>image/gif</strong>. Příklady použití této užitečné funkce naleznete
+v&nbsp;navazujících kapitolách:</p>
+
+<pre>
+func <strong>EncodeAll</strong>(w io.Writer, g *GIF) error
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Vytvoření jednoduchého animovaného GIFu &ndash; blikající čtvereček</h2>
+
+<p>V&nbsp;dalším příkladu je ukázáno, jak snadno je možné s&nbsp;použitím
+základních balíčků programovacího jazyka Go vytvořit jednoduchý animovaný GIF.
+Celá animace bude obsahovat pouhé dva snímky, každý o rozměrech 32&times;32
+pixelů, které budou vyplněny konstantní barvou. Snímky se budou opakovat ve
+smyčce (což je výchozí nastavení řízené jedním bitem hlavičky GIFu) a bude mezi
+nimi prodleva přibližně jedné sekundy.</p>
+
+<p>Obrázky nejdříve musíme uložit do pole ukazatelů na strukturu
+<strong>Paletted</strong> (rastrový obrázek s&nbsp;barvovou paletou):</p>
+
+<pre>
+images := []*image.Paletted{
+        CreateImage(32, 32, 0),
+        CreateImage(32, 32, 1),
+}
+</pre>
+
+<p>Dále je nutné vytvořit pole obsahující prodlevy mezi jednotlivými snímky.
+Prodlevy jsou reprezentovány celými čísly, přičemž základní jednotkou je 10ms
+(setina sekundy):</p>
+
+<pre>
+delays := []int{100, 100}
+</pre>
+
+<p>Pokud počet obrázků odpovídá počtu prodlev, je vytvoření výsledného
+animovaného GIFu již snadné:</p>
+
+<pre>
+gif.EncodeAll(outfile, &amp;gif.GIF{
+        Image: images,
+        Delay: delays,
+})
+</pre>
+
+<p>Velikost výsledného animovaného GIFu s&nbsp;dvojicí snímků je rovna pouhým
+147 bajtům, což je prakticky stejná velikost, jakou zabírá tato věta:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-20.gif" class="image-355585" alt="&#160;" width="32" height="32" />
+<p><i>Obrázek 20: Animovaný GIF se dvěma snímky.</i></p>
+
+<p>Opět si pochopitelně ukážeme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/08_gif_animation_blink.go">úplný
+zdrojový kód tohoto jednoduchého demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const BoardSize = 8
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int, paletteIndex int) *image.Paletted {
+        var palette []color.Color
+&nbsp;
+        if paletteIndex == 0 {
+                palette = []color.Color{
+                        color.RGBA{150, 150, 150, 255},
+                }
+        } else {
+                palette = []color.Color{
+                        color.RGBA{250, 0, 0, 255},
+                }
+        }
+&nbsp;
+        img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+        r := image.Rect(0, 0, width, height)
+        draw.Draw(img, r, &amp;image.Uniform{palette[0]}, image.ZP, draw.Src)
+&nbsp;
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        images := []*image.Paletted{
+                CreateImage(32, 32, 0),
+                CreateImage(32, 32, 1),
+        }
+&nbsp;
+        delays := []int{100, 100}
+&nbsp;
+        outfile, err := os.Create("08.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image: images,
+                Delay: delays,
+        })
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Složitější animace &ndash; pohybující se šachovnice</h2>
+
+<p>Nyní nám již nic nebrání si vyzkoušet vytvořit složitější animace. Můžeme
+například začít se šachovnicí, kterou jsme si ukázali minule. Funkci pro
+vykreslení šachovnice do obrázku je samozřejmě možné modifikovat tak, aby se
+celá šachnovnice pohybovala (scrollovala) v&nbsp;horizontálním i vertikálním
+směru. Postačuje přidat parametry <strong>xoffset</strong>,
+<strong>yoffset</strong> a <strong>step_size</strong> pro specifikaci
+maximálního posunu. Posuny musí být součástí smyček pro vykreslení jednotlivých
+políček šachovnice:</p>
+
+<pre>
+x_from := 0
+x_to := hor_block
+for x := 0; x &lt; board_size+step_size; x++ {
+        y_from := 0
+        y_to := ver_block
+        for y := 0; y &lt; board_size+step_size; y++ {
+                r := image.Rect(x_from+xoffset, y_from+yoffset, x_to+xoffset, y_to+yoffset)
+                draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                y_from = y_to
+                y_to += ver_block
+                index_color = 1 - index_color
+        }
+        x_from = x_to
+        x_to += hor_block
+        index_color = 1 - index_color
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: některé obdélníky (políčka) budou
+kresleny mimo vlastní obrázek, to však nemusí vadit (snad jen z&nbsp;hlediska
+rychlosti vykreslování).</div></p>
+
+<p>Samotnou animaci můžeme vytvořit například takto:</p>
+
+<pre>
+steps := 2 * 256 / BoardSize
+for step := 0; step &lt; steps; step++ {
+        img := CreateChessboard(256, 256, BoardSize, step*2-steps*2, step-steps, steps*2)
+        images = append(images, img)
+        delays = append(delays, 10)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že využíváme faktu, že se
+vzorek se šachovnicí opakuje po 32 pixelech, takže výsledná animace má jen
+velmi malý počet snímků a tudíž i relativně malou velikost (méně než 170
+kB).</div></p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-21.gif" class="image-355586" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 21: Pohybující se šachovnice uložená do formátu GIF.</i></p>
+
+<p>Celý <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/09_gif_animation.go">demonstrační
+příklad</a> nyní vypadá takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+const BoardSize = 8
+&nbsp;
+func <strong>CreateChessboard</strong>(width int, height int, board_size int, xoffset int, yoffset int, step_size int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{150, 205, 50, 255},
+                color.RGBA{0, 100, 0, 255},
+        }
+&nbsp;
+        img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+        index_color := 0
+        hor_block := int(width / board_size)
+        ver_block := int(height / board_size)
+&nbsp;
+        x_from := 0
+        x_to := hor_block
+        for x := 0; x &lt; board_size+step_size; x++ {
+                y_from := 0
+                y_to := ver_block
+                for y := 0; y &lt; board_size+step_size; y++ {
+                        r := image.Rect(x_from+xoffset, y_from+yoffset, x_to+xoffset, y_to+yoffset)
+                        draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                        y_from = y_to
+                        y_to += ver_block
+                        index_color = 1 - index_color
+                }
+                x_from = x_to
+                x_to += hor_block
+                index_color = 1 - index_color
+        }
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        var images []*image.Paletted
+        var delays []int
+&nbsp;
+        steps := 2 * 256 / BoardSize
+        for step := 0; step &lt; steps; step++ {
+                img := CreateChessboard(256, 256, BoardSize, step*2-steps*2, step-steps, steps*2)
+                images = append(images, img)
+                delays = append(delays, 10)
+        }
+&nbsp;
+        outfile, err := os.Create("09.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image: images,
+                Delay: delays,
+        })
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Volba metody přechodu mezi jednotlivými snímky animace</h2>
+
+<p>V&nbsp;grafickém formátu GIF je možné u každého snímku v&nbsp;animaci
+nastavit, jakým způsobem se tento snímek vlastně vykreslí přes snímek
+předchozí. Pro tuto volbu byly rezervovány tři bity; hodnota tohoto bitového
+pole potom určuje provedenou operaci:</p>
+
+<table>
+<tr><th>Hodnota</th><th>Význam</th></tr>
+<tr><td>0</td><td>žádná operace není specifikována, prohlížeč si může vybrat, jak příkaz interpretovat</td></tr>
+<tr><td>1</td><td>použije se původní snímek, nový přes něj bude překreslen</td></tr>
+<tr><td>2</td><td>snímek se vymaže barvou pozadí</td></tr>
+<tr><td>3</td><td>obnoví se původní obsah snímku</td></tr>
+<tr><td>4-7</td><td>prozatím (téměř třicet let) není definováno</td></tr>
+</table>
+
+<p>V&nbsp;dalším příkladu vytvoříme GIF se šesti snímky, přičemž v&nbsp;každém
+snímku se do animace přidá další barevný čtverec:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-22.gif" class="image-355587" alt="&#160;" width="350" height="50" />
+<p><i>Obrázek 22: Výchozí parametr <strong>disposal</strong> a jeho vliv na
+výslednou animaci.</i></p>
+
+<p>Přitom žádným způsobem nenastavujeme metodu přechodu mezi snímky:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int, imageIndex int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{150, 150, 150, 255},
+                color.RGBA{250, 0, 0, 255},
+        }
+&nbsp;
+        img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+        r := image.Rect(0, 0, width, height)
+        draw.Draw(img, r, &amp;image.Uniform{palette[0]}, image.ZP, draw.Src)
+&nbsp;
+        r2 := image.Rect(imageIndex*60, 0, imageIndex*60+50, height)
+        draw.Draw(img, r2, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+        return img
+}
+&nbsp;
+func <strong>main</strong>() {
+        var images []*image.Paletted
+        var delays []int
+&nbsp;
+        for i := 0; i &lt; 6; i++ {
+                img := CreateImage(350, 50, i)
+                images = append(images, img)
+                delays = append(delays, 100)
+        }
+&nbsp;
+        outfile, err := os.Create("10.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image: images,
+                Delay: delays,
+        })
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Použití nastaveného pozadí GIFu</h2>
+
+<p>Příklad ovšem můžeme snadno upravit takovým způsobem, že jednotlivé snímky
+(kromě prvního) budou menší, než snímky předchozí, což je díky koncepci rámců
+zcela legální. Následně zvolíme, že se v&nbsp;průběhu animace má snímek na
+začátku vždy překreslit barvou pozadí:</p>
+
+<pre>
+var disposals []byte
+&nbsp;
+for i := 0; i &lt; 6; i++ {
+        ...
+        ...
+        ...
+        disposals = append(disposals, gif.DisposalBackground)
+}
+</pre>
+
+<p>Způsob vytvoření výsledného GIFu:</p>
+
+<pre>
+gif.EncodeAll(outfile, &amp;gif.GIF{
+        Image:           images,
+        Delay:           delays,
+        Disposal:        disposals,
+        BackgroundIndex: 0,
+})
+</pre>
+
+<p>Výsledná animace:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-23.gif" class="image-355588" alt="&#160;" width="350" height="50" />
+<p><i>Obrázek 23: Parametr <strong>disposal=DisposalBackground</strong> a jeho
+vliv na výslednou animaci.</i></p>
+
+<p>Jaký má tato programová komplikace význam? Výsledný soubor s&nbsp;animací je
+výrazně menší &ndash; proti původním 1908 bajtům jsme dosáhli velikosti pouhých
+734 bajtů.</p>
+
+<p>Samozřejmě nezapomeneme ani na výpis celého zdrojového kódu příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int, imageIndex int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{150, 150, 150, 0},
+                color.RGBA{250, 0, 0, 255},
+        }
+&nbsp;
+        if imageIndex == 0 {
+                img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+                r := image.Rect(0, 0, width, height)
+                draw.Draw(img, r, &amp;image.Uniform{palette[0]}, image.ZP, draw.Src)
+&nbsp;
+                r2 := image.Rect(0, 0, 50, height)
+                draw.Draw(img, r2, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        } else {
+                img := image.NewPaletted(image.Rect(imageIndex*60, 0, imageIndex*60+50, height), palette)
+&nbsp;
+                r2 := image.Rect(imageIndex*60, 0, imageIndex*60+50, height)
+                draw.Draw(img, r2, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>main</strong>() {
+        var images []*image.Paletted
+        var delays []int
+        var disposals []byte
+&nbsp;
+        for i := 0; i &lt; 6; i++ {
+                img := CreateImage(350, 50, i)
+                images = append(images, img)
+                delays = append(delays, 100)
+                disposals = append(disposals, gif.DisposalBackground)
+        }
+&nbsp;
+        outfile, err := os.Create("11.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image:           images,
+                Delay:           delays,
+                Disposal:        disposals,
+                BackgroundIndex: 0,
+        })
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Přechod na další snímek bez smazání snímku předchozího</h2>
+
+<p>A konečně se podívejme, co se stane v&nbsp;případě, kdy se oblast
+s&nbsp;animací nebude mezi snímky nijak měnit. Nový snímek se tedy vykreslí do
+(nesmazané) oblasti. Pokud je nový snímek menší, než celá plocha
+s&nbsp;animací, lze takto prakticky zadarmo dosáhnout zajímavých efektů:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-24.gif" class="image-355589" alt="&#160;" width="350" height="50" />
+<p><i>Obrázek 24: Parametr <strong>disposal=DisposalNone</strong> a jeho vliv
+na výslednou animaci.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: zajímavé je, že soubor s&nbsp;animací má
+naprosto shodnou délku s&nbsp;animací předchozí. Je to vlastně logické, protože
+se soubory odlišují pouze několika bity v&nbsp;bitovém poli <i>disposal
+method</i>.</div></p>
+
+<p>Samozřejmě si opět ukážeme úplný zdrojový kód tohoto příkladu, který nyní
+vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int, imageIndex int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{150, 150, 150, 255},
+                color.RGBA{250, 0, 0, 255},
+        }
+&nbsp;
+        if imageIndex == 0 {
+                img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+                r := image.Rect(0, 0, width, height)
+                draw.Draw(img, r, &amp;image.Uniform{palette[0]}, image.ZP, draw.Src)
+&nbsp;
+                r2 := image.Rect(0, 0, 50, height)
+                draw.Draw(img, r2, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        } else {
+                img := image.NewPaletted(image.Rect(imageIndex*60, 0, imageIndex*60+50, height), palette)
+&nbsp;
+                r2 := image.Rect(imageIndex*60, 0, imageIndex*60+50, height)
+                draw.Draw(img, r2, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>main</strong>() {
+        var images []*image.Paletted
+        var delays []int
+        var disposals []byte
+&nbsp;
+        for i := 0; i &lt; 6; i++ {
+                img := CreateImage(350, 50, i)
+                images = append(images, img)
+                delays = append(delays, 100)
+                disposals = append(disposals, gif.DisposalNone)
+        }
+&nbsp;
+        outfile, err := os.Create("12.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image:    images,
+                Delay:    delays,
+                Disposal: disposals,
+        })
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Vytvoření GIFu s&nbsp;animovaným progress barem</h2>
+
+<p>Se znalostmi, které jsme získali v&nbsp;předchozích kapitolách, si nyní
+můžeme ukázat <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_15/13_progress_bar.go">vytvoření
+GIFu s&nbsp;animovaným progress barem</a>. Celá animace obsahuje celých 200
+snímků a přitom má velikost pouze 6074 bajtů, tedy přibližně pouze 30 bajtů na
+snímek:</p>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-25.gif" class="image-355590" alt="&#160;" width="200" height="10" />
+<p><i>Obrázek 25: Animace progress baru uložená jako obrázek typu GIF.</i></p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>CreateImage</strong>(width int, height int, imageIndex int) *image.Paletted {
+        var palette = []color.Color{
+                color.RGBA{50, 50, 50, 255},
+                color.RGBA{0, 200, 200, 255},
+        }
+&nbsp;
+        if imageIndex == 0 {
+                img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
+&nbsp;
+                r := image.Rect(0, 0, width, height)
+                draw.Draw(img, r, &amp;image.Uniform{palette[0]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        } else {
+                img := image.NewPaletted(image.Rect(imageIndex, 0, imageIndex+1, height), palette)
+&nbsp;
+                r := image.Rect(imageIndex, 0, imageIndex+1, height)
+                draw.Draw(img, r, &amp;image.Uniform{palette[1]}, image.ZP, draw.Src)
+&nbsp;
+                return img
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>main</strong>() {
+        var images []*image.Paletted
+        var delays []int
+        var disposals []byte
+&nbsp;
+        for i := 0; i &lt; 200; i++ {
+                img := CreateImage(200, 10, i)
+                images = append(images, img)
+                delays = append(delays, 2)
+                disposals = append(disposals, gif.DisposalNone)
+        }
+&nbsp;
+        outfile, err := os.Create("13.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image:    images,
+                Delay:    delays,
+                Disposal: disposals,
+        })
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Tvorba 2D grafiky s&nbsp;využitím knihovny GG</h2>
+
+<p>V&nbsp;další části článku se &ndash; prozatím ovšem pouze v&nbsp;rychlosti
+&ndash; seznámíme s&nbsp;některými možnostmi, které nám v&nbsp;oblasti 2D
+grafiky poskytuje knihovna nazvaná GG. Možnosti poskytované touto knihovnou
+připomínají Cairo popř.&nbsp;<a
+href="https://www.root.cz/clanky/pouziti-knihoven-openvg-a-egl-nejenom-na-raspberry-pi/">OpenVG
+a EGL</a>: 2D scéna je vykreslována v&nbsp;<i>immediate</i> (přímém) režimu,
+přičemž se používá koncept takzvaných cest (<i>path</i>).</p>
+
+<p>Samotná instalace knihovny GG je stejná, jako v&nbsp;případě jiných
+externích balíčků, tedy:</p>
+
+<pre>
+$ <strong>go get -u github.com/fogleman/gg</strong>
+</pre>
+
+<p>Po spuštění tohoto příkazu v&nbsp;adresáři, na nějž ukazuje proměnná
+prostředí <strong>GOPATH</strong> by měla vzniknout tato relativně složitá
+adresářová struktura:</p>
+
+<pre>
+├── bin
+├── pkg
+│   └── linux_amd64
+│       └── github.com
+│           └── fogleman
+└── src
+    ├── github.com
+    │   ├── fogleman
+    │   │   └── gg
+    │   │       └── examples
+    │   └── golang
+    │       └── freetype
+    │           ├── cmd
+    │           │   └── print-glyph-points
+    │           ├── example
+    │           │   ├── capjoin
+    │           │   ├── drawer
+    │           │   ├── freetype
+    │           │   ├── gamma
+    │           │   ├── genbasicfont
+    │           │   ├── raster
+    │           │   ├── round
+    │           │   └── truetype
+    │           ├── licenses
+    │           ├── raster
+    │           ├── testdata
+    │           └── truetype
+    ├── golang.org
+    │   └── x
+    │       └── image
+    │           ├── bmp
+    │           ├── cmd
+    │           │   └── webp-manual-test
+    │           ├── colornames
+    │           ├── draw
+    │           ├── example
+    │           │   └── font
+    │           ├── font
+    │           │   ├── basicfont
+    │           │   ├── gofont
+    │           │   │   ├── gobold
+    │           │   │   ├── gobolditalic
+    │           │   │   ├── goitalic
+    │           │   │   ├── gomedium
+    │           │   │   ├── gomediumitalic
+    │           │   │   ├── gomono
+    │           │   │   ├── gomonobold
+    │           │   │   ├── gomonobolditalic
+    │           │   │   ├── gomonoitalic
+    │           │   │   ├── goregular
+    │           │   │   ├── gosmallcaps
+    │           │   │   ├── gosmallcapsitalic
+    │           │   │   └── ttfs
+    │           │   ├── inconsolata
+    │           │   ├── opentype
+    │           │   ├── plan9font
+    │           │   ├── sfnt
+    │           │   └── testdata
+    │           │       └── fixed
+    │           ├── math
+    │           │   ├── f32
+    │           │   ├── f64
+    │           │   └── fixed
+    │           ├── riff
+    │           ├── testdata
+    │           ├── tiff
+    │           │   └── lzw
+    │           ├── vector
+    │           ├── vp8
+    │           ├── vp8l
+    │           └── webp
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Parametry kreslení zapamatované v&nbsp;kontextu</h2>
+
+<p>Podívejme se nejprve na velmi jednoduchý příklad, který po svém spuštění
+vytvoří rastrový obrázek obsahující kružnici o poloměru 100 délkových jednotek.
+Ve výchozím nastavení odpovídá 100 délkových jednotek jednomu stu pixelů:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.SetRGB(0.2, 0.0, 0.8)
+        dc.DrawCircle(width/2, height/2, 100)
+&nbsp;
+        dc.Fill()
+&nbsp;
+        dc.SavePNG("14.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-26.png" class="image-355591" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 26: Kružnice vytvořená předchozím příkladem.</i></p>
+
+<p>Povšimněte si, že parametry vykreslování (zde barva) se stává součástí
+takzvaného kontextu (<i>context</i>). Tyto parametry se použijí až tehdy, kdy
+zavoláme metodu <strong>Stroke</strong> nebo <strong>Fill</strong>. To znamená,
+že nezáleží na tom, zda nejprve vykreslíme kružnici a poté nastavíme její barvu
+či tyto dvě operace prohodíme:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawCircle(width/2, height/2, 100)
+&nbsp;
+        dc.SetRGB(0.2, 0.0, 0.8)
+        dc.Fill()
+&nbsp;
+        dc.SavePNG("15.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-27.png" class="image-355592" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 27: Naprosto stejná kružnice vytvořená předchozím
+příkladem.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Kreslení otevřených tvarů (úseček) pomocí příkazu <strong>Stroke</strong></h2>
+
+<p>V&nbsp;případě, že budeme potřebovat vykreslit dvě úsečky, každou
+s&nbsp;odlišnou barvou, je tedy nutné postupovat následovně: použijeme vždy
+trojici metod <strong>SetRGB</strong>, <strong>DrawLine</strong> a
+<strong>Stroke</strong>. Pokud v&nbsp;prvním případě na <strong>Stroke</strong>
+zapomeneme, bude sice úsečka vykreslena, ale druhou specifikovanou barvou:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.SetRGB(0.2, 0.0, 0.8)
+        dc.DrawLine(10, 10, width-10, height-10)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGB(0.8, 0.0, 0.2)
+        dc.DrawLine(10, height-10, width-10, 10)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("16.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-28.png" class="image-355593" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 28: Dvojice úseček na průhledném pozadí, každá je vykreslena
+odlišnou barvou (jako samostatná cesta).</i></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Vyplnění uzavřené křivky příkazem <strong>Fill</strong></h2>
+
+<p>Velmi často se setkáme s&nbsp;potřebou vykreslit uzavřené tvary.
+K&nbsp;tomuto účelu slouží metoda nazvaná <strong>Fill</strong>. My ji dnes
+konkrétně použijeme pro vyplnění pozadí obrázku konstantní barvou. Pro
+jednoduchost bude použita bílá barva:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.DrawLine(10, 10, width-10, height-10)
+        dc.SetRGB(0.2, 0.0, 0.8)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(10, height-10, width-10, 10)
+        dc.SetRGB(0.8, 0.0, 0.2)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("17.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-29.png" class="image-355594" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 29: Dvojice úseček na bílém pozadí, každá je vykreslena odlišnou
+barvou (jako samostatná cesta).</i></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Nastavení základních parametrů cest: průhlednost, šířka tahu a styl vykreslení</h2>
+
+<p>Nastavit je možné i další parametry vykreslování. Ty si podrobně popíšeme
+příště, takže následující příklady považujte za ukázku některých možností
+nabízených knihovnou <strong>GG</strong>.</p>
+
+<h3>Změna průhlednosti úseček</h3>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 8 {
+                alpha := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, 0.0, alpha)
+&nbsp;
+                x := float64(i + 32)
+                dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("18.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-30.png" class="image-355595" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 30: Postupná změna průhlednosti úseček.</i></p>
+
+<h3>Změna šířky pera při kreslení úseček</h3>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        for i := 0; i &lt; 256; i += 16 {
+                width := float64(i) / 20
+                dc.SetLineWidth(width)
+&nbsp;
+                x := float64(i + 32)
+                dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("19.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-31.png" class="image-355596" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 31: Postupná změna šířky pera při kreslení úseček.</i></p>
+
+<h3>Specifikace vzorku vykreslování</h3>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("20.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/246/golang-15-32.png" class="image-355597" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 32: Úsečky vytvořené s&nbsp;různými vzorky (čárkovaná a
+čerchovaná čára atd.).</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_blending.go</td><td>ukázka blendingu (viz předchozí část seriálu)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/01_blending.go">https://github.com/tisnik/go-fedora/blob/master/article_15/01_blending.go</a></td></tr>
+<tr><td> 2</td><td>02_gif_export_rgba.go</td><td>export obrázku šachovnice do formátu GIF</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/02_gif_export_rgba.go">https://github.com/tisnik/go-fedora/blob/master/article_15/02_gif_export_rgba.go</a></td></tr>
+<tr><td> 3</td><td>03_gif_1x1_rgba.go</td><td>export obrázku o rozlišení 1&times;1 pixel s&nbsp;256 barvovou paletou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/03_gif_1x1_rgba.go">https://github.com/tisnik/go-fedora/blob/master/article_15/03_gif_1x1_rgba.go</a></td></tr>
+<tr><td> 4</td><td>04_gif_1x1_palette.go</td><td>export obrázku o rozlišení 1&times;1 pixel s&nbsp;dvoubarevnou paletou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/04_gif_1x1_palette.go">https://github.com/tisnik/go-fedora/blob/master/article_15/04_gif_1x1_palette.go</a></td></tr>
+<tr><td> 5</td><td>05_gif_export_colors.go</td><td>export se specifikací počtu barev v&nbsp;paletě</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/05_gif_export_colors.go">https://github.com/tisnik/go-fedora/blob/master/article_15/05_gif_export_colors.go</a></td></tr>
+<tr><td> 6</td><td>06_gif_export_palette.go</td><td>šachovnice vykreslená s&nbsp;dvoubarevnou paletou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/06_gif_export_palette.go">https://github.com/tisnik/go-fedora/blob/master/article_15/06_gif_export_palette.go</a></td></tr>
+<tr><td> 7</td><td>07_rgba_to_palette.go</td><td>převod obrázku z&nbsp;prostoru RGBA do prostoru s&nbsp;paletou se snižováním počtu barev</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/07_rgba_to_palette.go">https://github.com/tisnik/go-fedora/blob/master/article_15/07_rgba_to_palette.go</a></td></tr>
+<tr><td> 8</td><td>08_gif_animation_blink.go</td><td>jednoduchá animace se dvěma snímky o velikosti 32&times;32 pixelů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/08_gif_animation_blink.go">https://github.com/tisnik/go-fedora/blob/master/article_15/08_gif_animation_blink.go</a></td></tr>
+<tr><td> 9</td><td>09_gif_animation.go</td><td>složitější animace pohybující se šachovnice</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/09_gif_animation.go">https://github.com/tisnik/go-fedora/blob/master/article_15/09_gif_animation.go</a></td></tr>
+<tr><td>10</td><td>10_default_disposal_methods.go</td><td>výchozí hodnota metody použité při přepínání snímků</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/10_default_disposal_methods.go">https://github.com/tisnik/go-fedora/blob/master/article_15/10_default_disposal_methods.go</a></td></tr>
+<tr><td>11</td><td>11_background_disposal_methods.go</td><td>nastavení metody přepínání snímků: vykreslení pozadí</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/11_background_disposal_methods.go">https://github.com/tisnik/go-fedora/blob/master/article_15/11_background_disposal_methods.go</a></td></tr>
+<tr><td>12</td><td>12_none_disposal_methods.go</td><td>nastavení metody přepínání snímků: žádná modifikace snímku</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/12_none_disposal_methods.go">https://github.com/tisnik/go-fedora/blob/master/article_15/12_none_disposal_methods.go</a></td></tr>
+<tr><td>13</td><td>13_progress_bar.go</td><td>animace progress baru vytvořená jako animovaný GIF</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/13_progress_bar.go">https://github.com/tisnik/go-fedora/blob/master/article_15/13_progress_bar.go</a></td></tr>
+<tr><td>14</td><td>14_gg_basic.go</td><td>základní způsob použití knihovny GG</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/14_gg_basic.go">https://github.com/tisnik/go-fedora/blob/master/article_15/14_gg_basic.go</a></td></tr>
+<tr><td>15</td><td>15_gg_context_properties.go</td><td>použití kontextu a nastavení vlastností kreslení</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/15_gg_context_properties.go">https://github.com/tisnik/go-fedora/blob/master/article_15/15_gg_context_properties.go</a></td></tr>
+<tr><td>16</td><td>16_gg_path_stroke.go</td><td>vykreslení cesty</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/16_gg_path_stroke.go">https://github.com/tisnik/go-fedora/blob/master/article_15/16_gg_path_stroke.go</a></td></tr>
+<tr><td>17</td><td>17_gg_filled_background.go</td><td>vyplnění pozadí konstantní barvou</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/17_gg_filled_background.go">https://github.com/tisnik/go-fedora/blob/master/article_15/17_gg_filled_background.go</a></td></tr>
+<tr><td>18</td><td>18_gg_alpha_rgba.go</td><td>specifikace alfa kanálu (průhlednosti)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/18_gg_alpha_rgba.go">https://github.com/tisnik/go-fedora/blob/master/article_15/18_gg_alpha_rgba.go</a></td></tr>
+<tr><td>19</td><td>19_gg_line_width.go</td><td>specifikace šířky vykreslovaných cest</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/19_gg_line_width.go">https://github.com/tisnik/go-fedora/blob/master/article_15/19_gg_line_width.go</a></td></tr>
+<tr><td>20</td><td>20_gg_set_dash.go</td><td>specifikace stylu vykreslovaných cest</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_15/20_gg_set_dash.go">https://github.com/tisnik/go-fedora/blob/master/article_15/20_gg_set_dash.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
