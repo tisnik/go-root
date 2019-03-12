@@ -1,0 +1,2367 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Programovací jazyk Go a počítačová grafika</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Programovací jazyk Go a počítačová grafika</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Ve čtrnácté části seriálu o programovacím jazyku Go si popíšeme balíčky ze základní knihovny určené pro práci s rastrovou grafikou. V první řadě se samozřejmě jedná o zpracování rastrových obrázků společně s možností jejich exportu a importu, k dispozici jsou ovšem i rastrové operace.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Programovací jazyk Go a počítačová grafika</a></p>
+<p><a href="#k02">2. Základní rozhraní pro rastrovou grafiku: <strong></strong></a></p>
+<p><a href="#k03">3. Inicializace prázdného rastrového obrázku s&nbsp;jeho uložením na disk</a></p>
+<p><a href="#k04">4. Vyplnění všech pixelů rastrového obrázku konstantní barvou</a></p>
+<p><a href="#k05">5. Alfa kanál: rozdíl mezi barvovými prostory RGBA a NRGBA</a></p>
+<p><a href="#k06">6. Interní struktura záznamu s&nbsp;rastrovým obrázkem</a></p>
+<p><a href="#k07">7. Přímý přístup k&nbsp;poli s&nbsp;pixely rastrového obrázku</a></p>
+<p><a href="#k08">8. Třetí varianta využívající řez polem</a></p>
+<p><a href="#k09">9. Struktury <strong>Point</strong> a <strong>Rectangle</strong></a></p>
+<p><a href="#k10">10. Operace, které jsou strukturami <strong>Point</strong> a <strong>Rectangle</strong> podporovány</a></p>
+<p><a href="#k11">11. Barvové prostory RGBA a NRGBA</a></p>
+<p><a href="#k12">12. Barvový prostor CMYK</a></p>
+<p><a href="#k13">13. Význam složky K v&nbsp;barvovém prostoru CMYK</a></p>
+<p><a href="#k14">14. Balíček <strong>image/draw</strong></a></p>
+<p><a href="#k15">15. Trik &ndash; vyplnění obrázku konstantní barvou s&nbsp;využitím obrazových operací</a></p>
+<p><a href="#k16">16. Vykreslení šachovnice</a></p>
+<p><a href="#k17">17. Vykreslení složitějších tvarů do rastrových obrázků</a></p>
+<p><a href="#k18">18. Implementace Bresenhamova algoritmu pro vykreslování úseček</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Programovací jazyk Go a počítačová grafika</h2>
+
+<p>Programovací jazyk Go se sice primárně (minimálně v&nbsp;současnosti)
+používá pro tvorbu síťových aplikací popř.&nbsp;utilit a služeb, v&nbsp;nichž
+je možné využít možností poskytovaných gorutinami a kanály, ovšem můžeme ho
+poměrně elegantně použít i při tvorbě (renderingu) a úpravách rastrových
+obrázků. Jazyk Go již ve své základní knihovně totiž obsahuje balíček nazvaný
+<strong>image</strong>, který je možné pro tyto účely využít. Navíc mají
+vývojáři k&nbsp;dispozici i podbalíčky určené pro kódování a dekódování
+rastrových obrázků z/do formátů GIF (<i>Graphics Interchange Format</i>), PNG
+(<i>Portable Network Graphics</i>) a JPEG (<i>Joint Photographic Experts
+Group</i>, přesněji však JFIF, <i>JPEG File Interchange Format</i>),
+tj.&nbsp;přesně těch formátů, které jsou používány na webu.</p>
+
+<p>Podrobnější informace o rastrových formátech GIF, PNG a JPEG již byly (nutno
+dodat, že v&nbsp;dosti dávné minulosti :-) na Rootu zveřejněny:</p>
+
+<ol>
+
+<li>Případ GIF<br />
+<a href="https://www.root.cz/clanky/pripad-gif/">https://www.root.cz/clanky/pripad-gif/</a>
+</li>
+
+<li>Pravda a mýty o GIFu<br />
+<a href="https://www.root.cz/clanky/pravda-a-myty-o-gifu/">https://www.root.cz/clanky/pravda-a-myty-o-gifu/</a>
+</li>
+
+<li>Anatomie grafického formátu GIF<br />
+<a href="https://www.root.cz/clanky/anatomie-grafickeho-formatu-gif/">https://www.root.cz/clanky/anatomie-grafickeho-formatu-gif/</a>
+</li>
+
+<li>GIF: animace a konkurence<br />
+<a href="https://www.root.cz/clanky/gif-animace-a-konkurence/">https://www.root.cz/clanky/gif-animace-a-konkurence/</a>
+</li>
+
+<li>PNG is Not GIF<br />
+<a href="https://www.root.cz/clanky/png-is-not-gif/">https://www.root.cz/clanky/png-is-not-gif/</a>
+</li>
+
+<li>Anatomie grafického formátu PNG<br />
+<a href="https://www.root.cz/clanky/anatomie-grafickeho-formatu-png/">https://www.root.cz/clanky/anatomie-grafickeho-formatu-png/</a>
+</li>
+
+<li>PNG - bity, byty, chunky<br />
+<a href="https://www.root.cz/clanky/png-bity-byty-chunky/">https://www.root.cz/clanky/png-bity-byty-chunky/</a>
+</li>
+
+<li>Řádkové filtry v PNG<br />
+<a href="https://www.root.cz/clanky/radkove-filtry-v-png/">https://www.root.cz/clanky/radkove-filtry-v-png/</a>
+</li>
+
+<li>Nepovinné chunky v PNG a kontrola pomocí CRC<br />
+<a href="https://www.root.cz/clanky/nepovinne-chunky-v-png-a-kontrola-pomoci-crc/">https://www.root.cz/clanky/nepovinne-chunky-v-png-a-kontrola-pomoci-crc/</a>
+</li>
+
+<li>Finišujeme s PNG - Textové metainformace a kalibrační data<br />
+<a href="https://www.root.cz/clanky/finisujeme-s-png-textove-metainformace-a-kalibracni-data/">https://www.root.cz/clanky/finisujeme-s-png-textove-metainformace-a-kalibracni-data/</a>
+</li>
+
+<li>JPEG - král rastrových grafických formátů?<br />
+<a href="https://www.root.cz/clanky/jpeg-kral-rastrovych-grafickych-formatu/">https://www.root.cz/clanky/jpeg-kral-rastrovych-grafickych-formatu/</a>
+</li>
+
+<li>Ztrátová komprese obrazových dat pomocí JPEG<br />
+<a href="https://www.root.cz/clanky/ztratova-komprese-obrazovych-dat-pomoci-jpeg/">https://www.root.cz/clanky/ztratova-komprese-obrazovych-dat-pomoci-jpeg/</a>
+</li>
+
+<li>Programujeme JPEG: transformace a podvzorkování barev<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-transformace-a-podvzorkovani-barev/">https://www.root.cz/clanky/programujeme-jpeg-transformace-a-podvzorkovani-barev/</a>
+</li>
+
+<li>Programujeme JPEG: diskrétní kosinová transformace (DCT)<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-diskretni-kosinova-transformace-dct/">https://www.root.cz/clanky/programujeme-jpeg-diskretni-kosinova-transformace-dct/</a>
+</li>
+
+<li>Programujeme JPEG: Kvantizace DCT koeficientů<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-kvantizace-dct-koeficientu/">https://www.root.cz/clanky/programujeme-jpeg-kvantizace-dct-koeficientu/</a>
+</li>
+
+<li>Programujeme JPEG: Huffmanovo kódování kvantovaných DCT složek<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-huffmanovo-kodovani-kvantovanych-dct-slozek/">https://www.root.cz/clanky/programujeme-jpeg-huffmanovo-kodovani-kvantovanych-dct-slozek/</a>
+</li>
+
+<li>Programujeme JPEG: Interní struktura souborů typu JFIF/JPEG<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-interni-struktura-souboru-typu-jfifjpeg/">https://www.root.cz/clanky/programujeme-jpeg-interni-struktura-souboru-typu-jfifjpeg/</a>
+</li>
+
+<li>Programujeme JPEG: Načtení informací ze souborů typu JFIF/JPEG<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-nacteni-informaci-ze-souboru-typu-jfifjpeg/">https://www.root.cz/clanky/programujeme-jpeg-nacteni-informaci-ze-souboru-typu-jfifjpeg/</a>
+</li>
+
+<li>Programujeme JPEG: Progresivní JPEG a informace EXIF<br />
+<a href="https://www.root.cz/clanky/programujeme-jpeg-progresivni-jpeg-a-informace-exif/">https://www.root.cz/clanky/programujeme-jpeg-progresivni-jpeg-a-informace-exif/</a>
+</li>
+
+</ol>
+
+<p>Ve druhé části článku si popíšeme i základní možnosti poskytované module
+<strong>draw</strong>, který umožňuje provádění rastrových operací nad dvojicí
+či trojicí obrázků. Ovšem tento modul <i>není</i> určen pro kreslení
+složitějších grafických tvarů &ndash; k&nbsp;tomuto účelu je nutné použít
+nějakou externí knihovnu (o nichž se samozřejmě taktéž zmíníme).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Inicializace prázdného rastrového obrázku s&nbsp;jeho uložením na disk</h2>
+
+<p>V&nbsp;demonstračních příkladech popsaných v&nbsp;navazujících kapitolách
+budeme používat takové reprezentace rastrových obrázků, které jsou plně
+kompatibilní se základní knihovnou (přesněji řečeno s&nbsp;balíčky základní
+knihovny) programovacího jazyka Go. Při použití této knihovny může být samotný
+rastrový obrázek reprezentován různými datovými strukturami, například
+<strong>RGBA</strong>, <strong>NRGBA</strong>, <strong>CMYK</strong>,
+<strong>Gray</strong> atd. &ndash; podle toho, jaký barvový model je použit.
+Ovšem nezávisle na tom, o jakou konkrétní datovou strukturu (a tím pádem o jaký
+barvový model) se jedná, bude vždy implementováno rozhraní nazvané
+<strong>Image</strong>, pro nějž jsou v&nbsp;balíčku <strong>image</strong>
+předepsány pouhé tři metody:</p>
+
+<pre>
+type <strong>Image</strong> interface {
+        ColorModel() color.Model
+        Bounds() Rectangle
+        At(x, y int) color.Color
+}
+</pre>
+
+<p>První z&nbsp;těchto metod vrací barvový model použitý pro reprezentaci barev
+jednotlivých pixelů v&nbsp;obrázku. Druhá metoda vrací obdélník
+(<i>rectangle</i>), kterým se určují okraje (meze) obrázku, přičemž je nutné
+upozornit na to, že levý horní roh obdélníku obecně nemusí začínat na
+souřadnicích [0, 0], což se týká například jednotlivých snímků použitých
+v&nbsp;grafickém formátu GIF ve chvíli, kdy jsou použity animace (jednotlivé
+rozdílové snímky jsou obecně menší, než celý obrázek). A konečně poslední
+metoda vrací barvu pixelu na souřadnicích [x, y]. Tato metoda je pochopitelně
+velmi pomalá, zejména v&nbsp;porovnání s&nbsp;přímým přístupem k&nbsp;polím
+bajtů s&nbsp;obsahem jednotlivých pixelů, ovšem na druhou stranu je tato metoda
+zcela univerzální a programátor se nemusí zabývat tím, jakým způsobem je
+vlastně bitmapa obrázku interně reprezentována.</p>
+
+<p><div class="rs-tip-major">Poznámka: podrobnější informace o tomto rozhraní
+získáte, jak je ostatně v&nbsp;ekosystému programovacího jazyka Go obvyklé,
+příkazem <strong>godoc</strong>. Syntaxe tohoto příkazu je
+následující:</div></p>
+
+<pre>
+$ <strong>godoc image Image</strong>
+</pre>
+
+<p>Dalším důležitým rozhraním, s&nbsp;nímž se velmi často setkáme, je rozhraní
+nazvané <strong>Color</strong>, které je deklarováno v&nbsp;balíčku
+<strong>image/color</strong>. Toto rozhraní předepisuje jedinou metodu
+<strong>RGBA</strong>, která vrací barvu ve formátu čtveřice R (<i>red</i>), G
+(<i>green</i>), B (<i>blue</i>) a A (<i>alpha</i>, průhlednost):</p>
+
+<pre>
+type <strong>Color</strong> interface {
+        RGBA() (r, g, b, a uint32)
+}
+</pre>
+
+<p>Zajímavé je, že všechny tři barvové složky i průhlednost jsou vráceny jako
+hodnoty typu <strong>uint32</strong>, i když se v&nbsp;běžných rastrových
+formátech každá složka ukládá do jediného bajtu. Je tomu tak z&nbsp;toho
+důvodu, že barvové složky jsou vynásobeny hodnotou alfa (průhledností) a jejich
+hodnoty tedy leží v&nbsp;rozsahu 0 až 65025. Pokud se na dva obrázky aplikují
+rastrové operace popsané ve druhé části článku, je zaručeno, že díky rozsahu
+datového typu <strong>uint32</strong> (0 až 2<sup>32</sup>-1) nikdy nedojde
+k&nbsp;přetečení hodnot barvových složek.</p>
+
+<p><div class="rs-tip-major">Poznámka: rozhraní <strong>Color</strong> vždy
+předepisuje metodu <strong>RGBA</strong>, a to nezávisle na tom, jaký barvový
+model je použit pro uložení samotného obrázku. Interně tedy bude docházet
+k&nbsp;přepočtům barev pixelů (což není vždy zcela přesná operace).</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Inicializace prázdného rastrového obrázku s&nbsp;jeho uložením na disk</h2>
+
+<p>V&nbsp;praktické části článku se nejprve podívejme na způsob inicializace
+prázdného rastrového obrázku. Rozlišení obrázku, přesněji řečeno počet
+obrazových řádků a počet pixelů na každém obrazovém řádku, bude pro
+jednoduchost uloženo v&nbsp;konstantách se jmény <strong>width</strong> a
+<strong>height</strong>:</p>
+
+<pre>
+const width = 256
+const height = 256
+</pre>
+
+<p>Dále budeme muset vytvořit a inicializovat datovou strukturu typu
+<strong>Rectangle</strong>, v&nbsp;níž bude uložen obdélník určující rozměry
+obrázku i jeho umístění v&nbsp;rámci roviny. Pro jednoduchost bude levý horní
+roh obdélníku ležet na souřadnicích [<i>0, 0</i>] a pravý dolní roh na
+souřadnicích [<i>width, heigh</i>]. Struktura typu <strong>Rectangle</strong>
+sice obsahuje dva prvky typu <strong>Point</strong>, takže je inicializace
+takové struktury relativně složitá, ovšem namísto toho můžeme použít pomocnou
+funkci <strong>Rect()</strong>, které se předají čtyři celočíselné hodnoty
+&ndash; souřadnice levého horního rohu a souřadnice pravého dolního rohu.
+Inicializace obdélníku tedy bude vypadat takto:</p>
+
+<pre>
+r := image.Rect(0, 0, width, height))
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: datová struktura
+<strong>Rectangle</strong> bude podrobněji popsána <a href="#k09">v&nbsp;deváté
+kapitole</a>.</div></p>
+
+<p>Nyní již máme připraveno vše potřebné pro vytvoření prázdného obrázku,
+resp.&nbsp;přesněji řečeno takového obrázku, v&nbsp;němž budou jednotlivé
+pixely obsahovat barvu (<i>0, 0, 0, 0</i>), protože kromě barvových složek R,
+G, B musíme správně nastavit i průhlednost, neboli alfa kanál. Prázdný obrázek
+vytvoříme jednoduše:</p>
+
+<pre>
+img := image.NewRGBA(r)
+</pre>
+
+<p>Prozatím sice neumíme obrázek přímo zobrazit na displeji, ale dokážeme ho
+velmi snadno uložit například do souboru typu PNG. Nejprve otevřeme soubor
+pojmenovaný &bdquo;01.png&ldquo; pro zápis a poté využijeme možnosti
+poskytované balíčkem <strong>image/png</strong> pro zakódování obrázku do
+formátu PNG::</p>
+
+<pre>
+outfile, err := os.Create("01.png")
+if err != nil {
+        panic(err)
+}
+defer outfile.Close()
+png.Encode(outfile, img)
+</pre>
+
+<p>To je vše &ndash; úplný zdrojový kód dnešního prvního demonstračního
+příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/01_empty_image.go">https://github.com/tisnik/go-fedora/blob/master/article_14/01_empty_image.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("01.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Povšimněte si, že obrázek obsahuje bitmapu o rozměrech 256&times;256 pixelů,
+které jsou průhledné (a mají černou barvu, to však kvůli průhlednosti
+nevidíme). To je výchozí chování datového typu <strong>NewRGBA</strong>.</p>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-1.png" class="image-355042" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 1: Výsledek prvního demonstračního příkladu. Všechny pixely jsou
+ve skutečnosti průhledné &ndash; šachovnice je výsledkem zobrazení bitmapy
+v&nbsp;prohlížeči obrázků.</i></p>
+
+<p>Alternativně samozřejmě můžeme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/02_empty_image_rectangle.go">příklad
+přepsat</a> takovým způsobem, aby se datová struktura
+<strong>Rectangle</strong> vytvořila přímo &bdquo;konstruktorem&ldquo; struktur
+(zápis se složenými závorkami):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        rect := image.Rectangle{image.Point{0, 0},
+                                image.Point{width, height}}
+&nbsp;
+        img := image.NewNRGBA(rect)
+&nbsp;
+        outfile, err := os.Create("02.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+        png.Encode(outfile, img)
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Vyplnění všech pixelů rastrového obrázku konstantní barvou</h2>
+
+<p>První manipulací s&nbsp;obsahem rastrového obrázku, s&nbsp;níž se dnes
+seznámíme, bude vyplnění všech pixelů bitmapy nějakou barvou. Prozatím budeme
+používat barvový model RGBA. Pro tento datový typ existuje metoda určená pro
+změnu barvy pixelu. Tato metoda se jmenuje příznačně <strong>SetRGBA</strong> a
+její hlavička vypadá následovně:</p>
+
+<pre>
+func (p *RGBA) SetRGBA(x, y int, c color.RGBA)
+</pre>
+
+<p>Této metodě se předávají tři parametry:</p>
+
+<ol>
+
+<li>x-ová souřadnice pixelu</li>
+
+<li>y-ová souřadnice pixelu</li>
+
+<li>barva pixelu, což je struktura typu <strong>color.RGBA</strong>
+(<strong>color</strong> je neúplné jméno balíčku <strong>image/color</strong>),
+v&nbsp;němž je každá barvová komponenta reprezentována jediným bajtem (tak, jak
+jsme zvyklí z&nbsp;většiny grafických knihoven)</li>
+
+</ol>
+
+<p>Tato struktura je deklarována následujícím způsobem:</p>
+
+<pre>
+type <strong>RGBA</strong> struct {
+        R, G, B, A uint8
+}
+</pre>
+
+<p>Strukturu <strong>RGBA</strong> naplníme naprosto stejným způsobem, jako
+jakýkoli jiný záznam. Nastavíme přitom čistě zelenou barvu, která bude
+neprůhledná (poslední hodnota 255 určuje neprůhlednost pixelů):</p>
+
+<pre>
+c := color.RGBA{0, 255, 0, 255}
+</pre>
+
+<p>Jakmile máme připravenou barvu pixelů, můžeme jí vyplnit všechny pixely
+tvořící rastrový obrázek:</p>
+
+<pre>
+for x := 0; x &lt; width; x++ {
+        for y := 0; y &lt; height; y++ {
+                img.SetRGBA(x, y, c)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento program bude poměrně pomalý, což
+sice u obrázku s&nbsp;rozlišením 256&times;256 pixelů nebude příliš patrné, ale
+u obrázků s&nbsp;větším rozlišením je většinou lepší použít nízkoúrovňový
+přístup popsaný v&nbsp;dalších kapitolách.</div></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/03_filled_image_setrgba.go">Úplný
+zdrojový kód tohoto příkladu</a> vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("03.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        c := color.RGBA{0, 255, 0, 255}
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        img.SetRGBA(x, y, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-2.png" class="image-355043" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 2: Výsledek běhu demonstračního příkladu, v&nbsp;němž jsou pixely
+vybarveny metodou <strong>SetRGBA</strong>.</i></p>
+
+<p>I tento příklad je možné nepatrně modifikovat, a to takovým způsobem, že se
+namísto metody <strong>SetRGBA</strong>, která je přímo navázána na barvový
+prostor RGBA, použije univerzální metoda <strong>Set</strong>, jíž se opět
+předají souřadnice pixelu a jeho barva. Výsledkem je <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/04_filled_image_set.go">program</a>,
+v&nbsp;němž je změna barvového prostoru přeci jen snazší:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("04.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        c := color.RGBA{0, 255, 0, 255}
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        img.Set(x, y, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Alfa kanál: rozdíl mezi barvovými prostory RGBA a NRGBA</h2>
+
+<p>Nyní si vyzkoušejme zdrojový kód předchozích příkladů nepatrně upravit, a to
+takovým způsobem, že barva všech pixelů sice bude stále čistě zelená, ovšem
+průhlednost se bude měnit v&nbsp;horizontálním směru od 0 (zcela průhledná) do
+255 (zcela neprůhledná). Barva tedy bude vytvářena uvnitř vnější programové
+smyčky:</p>
+
+<pre>
+for x := 0; x &lt; width; x++ {
+        alpha := byte(x)
+        c := color.RGBA{0, 255, 0, alpha}
+        for y := 0; y &lt; height; y++ {
+                img.SetRGBA(x, y, c)
+        }
+}
+</pre>
+
+<p>Opět si samozřejmě ukážeme, jak byla tato změna zakomponována do <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/05_filled_image_alpha.go">úplného
+demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("05.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; width; x++ {
+                alpha := byte(x)
+                c := color.RGBA{0, 255, 0, alpha}
+                for y := 0; y &lt; height; y++ {
+                        img.SetRGBA(x, y, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Pokud se však podíváte na vytvořený rastrový obrázek, je patrné, že
+neodpovídá očekávanému výsledku:</p>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-3.png" class="image-355044" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 3: Výsledek činnosti předchozího příkladu. Povšimněte si, že
+průhlednost &ndash; oproti očekávání &ndash; neroste lineárně od levého okraje
+k&nbsp;okraji pravému.</i></p>
+
+<p>Proč tomu tak je? V&nbsp;barvovém prostoru RGBA (přesněji řečeno ve verzi
+podporované knihovnami jazyka Go) jsou jednotlivé barvové složky (R, G, B)
+přednásobeny hodnotou uloženou do alfa kanálu, což například umožňuje efektivní
+provádění operace <i>blendingu</i> (zjednodušeně řečeno &ndash; násobení se
+provede pouze jednou při změně hodnot pixelů, ovšem nikoli při provádění
+blendingu). Ovšem kvůli přednásobení dvou hodnot v&nbsp;rozsahu 0..255 dochází
+k&nbsp;přetečení přes rozsah typu <strong>byte/uint8</strong>, což je
+v&nbsp;našem případě patrné na hodnotách zelené barvové složky (další dvě
+složky jsou nulové, takže tam při přednásobení k&nbsp;žádnému přetečení
+samozřejmě nedochází).</p>
+
+<p>Řešení tohoto problému je ve skutečnosti velmi snadné &ndash; namísto
+barvového prostoru RGBA použijte barvový prostor NRGBA, což vyžaduje jen
+nepatrné <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/06_filled_image_alpha_correct.go">změny
+ve zdrojovém kódu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("06.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; width; x++ {
+                alpha := byte(x)
+                c := color.NRGBA{0, 255, 0, alpha}
+                for y := 0; y &lt; height; y++ {
+                        img.SetNRGBA(x, y, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Výsledek již bude v&nbsp;tuto chvíli v&nbsp;pořádku, o čemž se můžeme snadno
+přesvědčit:</p>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-4.png" class="image-355045" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 4: Upravený příklad využívající barvový model NRGBA již dává
+korektní výsledky.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti nás bude rozdíl mezi RGBA
+a NRGBA zajímat pouze ve chvíli, kdy se pracuje s&nbsp;poloprůhlednými pixely.
+V&nbsp;případě práce s&nbsp;rastrovými obrázky, v&nbsp;nichž jsou všechny
+pixely neprůhledné, je možné barvový prostor RGBA bez problémů
+použít.</div></p>
+
+<p>Jen pro úplnost si ukažme, jak vypadá stejný příklad, ovšem využívající
+metodu <strong>Set</strong> pro změnu barev pixelů v&nbsp;rastrovém
+obrázku:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("07.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; width; x++ {
+                alpha := byte(x)
+                c := color.NRGBA{0, 255, 0, alpha}
+                for y := 0; y &lt; height; y++ {
+                        img.Set(x, y, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Interní struktura záznamu s&nbsp;rastrovým obrázkem</h2>
+
+<p>Interní struktura záznamu, který nese informace o rastrovém obrázku, nejsou
+ve skutečnosti nijak tajné. Jedná se o běžný záznam s&nbsp;viditelnými prvky
+(jsou pojmenovány s&nbsp;velkým písmenem na začátku). Pro obrázky využívající
+barvový prostor RGBA vypadá záznam následovně:</p>
+
+<pre>
+type <strong>RGBA</strong> struct {
+        Pix []uint8
+        Stride int
+        Rect Rectangle
+}
+</pre>
+
+<p>Kupodivu není žádný rozdíl mezi obrázky s&nbsp;barvovým modelem RGBA a
+jinými barvovými modely. Jen pro představu se podívejme na prvky záznamu
+nesoucího informace o obrázcích s&nbsp;barvovým prostorem NRGBA:</p>
+
+<pre>
+type <strong>NRGBA</strong> struct {
+        Pix []uint8
+        Stride int
+        Rect Rectangle
+</pre>
+
+<p>Či RGBA64, v&nbsp;němž jsou barvové složky reprezentovány 16bitovými
+hodnotami:</p>
+
+<pre>
+type <strong>RGBA64</strong> struct {
+        Pix []uint8
+        Stride int
+        Rect Rectangle
+}
+</pre>
+
+<p>Co to pro nás znamená z&nbsp;praktického hlediska? Implementace některých
+nízkoúrovňových operací může být unifikována a nemusíme se starat o to, jak
+jsou vlastně interpretovány barvy jednotlivých pixelů.</p>
+
+<p>Jednotlivé prvky struktury mají tento význam:</p>
+
+<table>
+<tr><th>Prvek</th><th>Stručný popis</th></tr>
+<tr><td>Pix</td><td>hodnoty jednotlivých pixelů uložené za sebou (řádky shora dolů, pixely zleva doprava)</td></tr>
+<tr><td>Stride</td><td>offset reprezentovaný v&nbsp;bajtech mezi dvěma pixely, které leží pod sebou</td></tr>
+<tr><td>Rect</td><td>obdélník určující pozici a rozměry obrázku v&nbsp;rámci 2D roviny</td></tr>
+</table>
+
+<p>Prvek <strong>Stride</strong> je poměrně důležitý, protože nám umožňuje
+relativně snadnou interpretaci pole bajtů <strong>Pix</strong> tak, aby byl
+umožněn &bdquo;2D přístup&ldquo; k&nbsp;jednotlivým pixelům. Pokud například
+budeme mít obrázek s&nbsp;rozlišením 1024&times;768 pixelů a použijeme barvový
+model RGBA, může být hodnota <strong>Stride</strong> nastavena na
+1024&times;4=4096 popř.&nbsp;na vyšší hodnotu v&nbsp;případě, že mezi
+obrazovými řádky budou umístěny výplňové bajty (což se teoreticky může stát,
+například pro snadnější vykreslování, použití obrázku jako textury atd.
+atd.).</p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/08_image_internals.go">V&nbsp;dalším
+demonstračním příkladu</a> je ukázáno, jak lze přistupovat k&nbsp;jednotlivým
+prvkům struktury typu <strong>NRGBA</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+        println("Stride: ", img.Stride)
+        println("[]byte: ", len(img.Pix))
+        r := img.Rect
+        println("Rectangle:")
+        println("    point 1: ", r.Min.X, r.Min.Y)
+        println("    point 2: ", r.Max.X, r.Max.Y)
+}
+</pre>
+
+<p>Výsledky jsou následující:</p>
+
+<pre>
+Stride:  1024
+[]byte:  262144
+Rectangle:
+    point 1:  0 0
+    point 2:  256 256
+</pre>
+
+<p>Jejich význam je tento:</p>
+
+<ol>
+
+<li><strong>Stride</strong> obsahuje hodnotu 1024, což odpovídá horizontálnímu
+rozlišení 256 pixelů a čtyřem bajtům na pixel.</li>
+
+<li>Celková velikost pole s&nbsp;pixely je také snadno odvoditelná:
+256&times;256&times;4 se skutečně rovná 262144.</li>
+
+<li>U obdélníku s&nbsp;rozměry a umístěním obrázku je patrné, že souřadnice
+pravého dolního rohu již leží mimo vlastní obrázek.</li>
+
+</ol>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Přímý přístup k&nbsp;poli s&nbsp;pixely rastrového obrázku</h2>
+
+<p>Znalost interní struktury záznamů typu <strong>RGBA</strong>,
+<strong>NRGBA</strong> atd. nám umožní přímý přístup k&nbsp;poli
+<strong>Pix</strong>, které obsahuje hodnoty jednotlivých pixelů rastrového
+obrázku. V&nbsp;<a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/09_raw_pixels.go">následujícím
+demonstračním příkladu</a> se obrázek vyplní konstantní barvou, u níž se však
+postupně (ve směru x-ové osy) mění hodnota průhlednosti. Ve vnější programové
+smyčce vypočteme index prvního bajtu na y-ovém obrazovém řádku:</p>
+
+<pre>
+index := img.Stride * y
+</pre>
+
+<p>Ve vnitřní smyčce se postupně vyplní (nastaví) barvy všech pixelů na jednom
+obrazovém řádku &ndash; každý pixel je přitom reprezentován čtyřmi bajty:</p>
+
+<pre>
+for x := 0; x &lt; width; x++ {
+        img.Pix[index] = 0
+        index++
+        img.Pix[index] = 0
+        index++
+        img.Pix[index] = 255
+        index++
+        img.Pix[index] = byte(x)
+        index++
+}
+</pre>
+
+<p>Výsledkem bude tento obrázek:</p>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-5.png" class="image-355046" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 5: Výsledek získaný předchozím demonstračním příkladem.</i></p>
+
+<p>Následuje výpis úplného zdrojového kódu tohoto demonstračního příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("06.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for y := 0; y &lt; height; y++ {
+                index := img.Stride * y
+                for x := 0; x &lt; width; x++ {
+                        img.Pix[index] = 0
+                        index++
+                        img.Pix[index] = 0
+                        index++
+                        img.Pix[index] = 255
+                        index++
+                        img.Pix[index] = byte(x)
+                        index++
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Pokud vám připadá výpočet indexu prvního pixelu na určitém obrazovém řádku
+příliš nízkoúrovňový, je možné řádek:</p>
+
+<pre>
+index := img.Stride * y
+</pre>
+
+<p>nahradit za:</p>
+
+<pre>
+index := img.PixOffset(0, y)
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/10_raw_pixels2.go">Zbytek
+příkladu by mohl zůstat nezměněný</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("07.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for y := 0; y &lt; height; y++ {
+                index := img.PixOffset(0, y)
+                for x := 0; x &lt; width; x++ {
+                        img.Pix[index] = 0
+                        index++
+                        img.Pix[index] = 0
+                        index++
+                        img.Pix[index] = 255
+                        index++
+                        img.Pix[index] = byte(x)
+                        index++
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-7.png" class="image-355048" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 6: Výsledek získaný upraveným demonstračním příkladem.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Třetí varianta využívající řez polem</h2>
+
+<p>Z&nbsp;předchozích článků s&nbsp;popisem vlastností programovacího jazyka Go
+již víme, že nemůžeme použít ukazatelovou aritmetiku, takže například není
+možné získat ukazatel na první pixel na řádku a poté pouze zvyšovat hodnotu
+tohoto ukazatele. Ovšem získat můžeme řez polem, takže se možnostem ukazatelové
+aritmetiky lze alespoň nepatrně přiblížit. V&nbsp;dalším příkladu se pro každý
+obrazový řádek získá řez, který začíná prvním pixelem na tomto řádku:</p>
+
+<pre>
+scanline := img.Pix[img.Stride*y:]
+</pre>
+
+<p>V&nbsp;interní smyčce se pak použije tento řez prakticky stejným způsobem,
+jako by se jednalo o pole:</p>
+
+<pre>
+for x := 0; x &lt; width; x++ {
+        scanline[i] = 0
+        i++
+        scanline[i] = byte(y)
+        i++
+        scanline[i] = 255
+        i++
+        scanline[i] = byte(x)
+        i++
+}
+</pre>
+
+<p>Podívejme se na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/11_raw_pixels3.go">úplný
+zdrojový kód</a> tohoto příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("08.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for y := 0; y &lt; height; y++ {
+                scanline := img.Pix[img.Stride*y:]
+                i := 0
+                for x := 0; x &lt; width; x++ {
+                        scanline[i] = 0
+                        i++
+                        scanline[i] = byte(y)
+                        i++
+                        scanline[i] = 255
+                        i++
+                        scanline[i] = byte(x)
+                        i++
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-6.png" class="image-355047" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 7: Výsledek získaný upraveným demonstračním příkladem.</i></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Struktury <strong>Point</strong> a <strong>Rectangle</strong></h2>
+
+<p>Při používání balíčků <strong>image</strong> a <strong>image/draw</strong>
+se velmi často setkáme se strukturami pojmenovanými <strong>Point</strong> a
+<strong>Rectangle</strong>. Struktura <strong>Point</strong>, jak již ostatně
+její název napovídá, obsahuje informaci o bodu v&nbsp;rovině, přičemž
+souřadnice bodu jsou reprezentovány celými čísly se znaménkem:</p>
+
+<pre>
+type <strong>Point</strong> struct {
+        X, Y int
+}
+</pre>
+
+<p>Naproti tomu struktura <strong>Rectangle</strong> slouží ke specifikaci
+osově orientovaného obdélníka, u něhož je nutné si pamatovat dva protilehlé
+body. Tyto body jsou reprezentovány výše zmíněnými strukturami
+<strong>Point</strong>:</p>
+
+<pre>
+type <strong>Rectangle</strong> struct {
+        Min, Max Point
+}
+</pre>
+
+<p>Tyto struktury samozřejmě můžeme inicializovat přímo, jako jakoukoli jinou
+datovou strukturu v&nbsp;Go (povšimněte si použití složených závorek):</p>
+
+<pre>
+point2 := image.Point{10, 10}
+rectangle2 := image.Rectangle{image.Point{0, 0}, image.Point{320, 240}}
+</pre>
+
+<p>Ovšem můžeme &ndash; a děje se to velmi často &ndash; použít i konstruktory
+<strong>Pt</strong> a <strong>Rect</strong>, které se volají jako běžné
+funkce:</p>
+
+<pre>
+point1 := image.Pt(10, 10)
+rectangle1 := image.Rect(0, 0, 320, 240)
+</pre>
+
+<p>Právě s&nbsp;tímto přístupem při konstrukci struktur <strong>Point</strong>
+a <strong>Rectangle</strong> se setkáme nejčastěji:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+)
+&nbsp;
+func <strong>main</strong>() {
+        point1 := image.Pt(10, 10)
+        point2 := image.Point{10, 10}
+&nbsp;
+        rectangle1 := image.Rect(0, 0, 320, 240)
+        rectangle2 := image.Rectangle{image.Point{0, 0}, image.Point{320, 240}}
+&nbsp;
+        println(point1.String())
+        println(point2.String())
+&nbsp;
+        println(rectangle1.String())
+        println(rectangle2.String())
+}
+</pre>
+
+<p>Výsledek předchozího příkladu ukazuje ekvivalenci mezi přímou inicializací
+struktur a použitím konstruktorů:</p>
+
+<pre>
+(10,10)
+(10,10)
+(0,0)-(320,240)
+(0,0)-(320,240)
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Operace, které jsou strukturami <strong>Point</strong> a <strong>Rectangle</strong> podporovány</h2>
+
+<p>V&nbsp;balíčku <strong>image</strong> taktéž existuje několik metod určených
+pro datové struktury <strong>Point</strong> a <strong>Rectangle</strong>. Jedná
+se zejména o test, zda nějaký bod leží v&nbsp;obdélníku či mimo něj:</p>
+
+<pre>
+point1 := image.Pt(10, 10)
+rectangle1 := image.Rect(0, 0, 200, 200)
+&nbsp;
+println(point1.In(rectangle1))
+</pre>
+
+<p>Dále lze zjistit, zda se dva obdélníky překrývají či nikoli:</p>
+
+<pre>
+rectangle1 := image.Rect(0, 0, 200, 200)
+rectangle2 := image.Rect(100, 100, 300, 300)
+rectangle3 := image.Rect(300, 300, 400, 400)
+&nbsp;
+println(rectangle1.Overlaps(rectangle2))
+println(rectangle1.Overlaps(rectangle3))
+</pre>
+
+<p>A konečně existují operace pro sjednocení dvou obdélníků (vznikne nový
+obdélník obsahující oba zdrojové obdélníky) a pro průnik dvou obdélníků
+(výsledkem je nový obdélník):</p>
+
+<pre>
+rectangle1 := image.Rect(0, 0, 200, 200)
+rectangle2 := image.Rect(100, 100, 300, 300)
+rectangle3 := image.Rect(300, 300, 400, 400)
+&nbsp;
+println(rectangle1.Union(rectangle2).String())
+println(rectangle1.Intersect(rectangle2).String())
+</pre>
+
+<p>Tyto operace jsou ukázány <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/13_point_rectangle_operations.go">ve
+třináctém demonstračním příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+)
+&nbsp;
+func <strong>main</strong>() {
+        point1 := image.Pt(10, 10)
+        point2 := image.Pt(1000, 10)
+&nbsp;
+        rectangle1 := image.Rect(0, 0, 200, 200)
+        rectangle2 := image.Rect(100, 100, 300, 300)
+        rectangle3 := image.Rect(300, 300, 400, 400)
+&nbsp;
+        println(point1.In(rectangle1))
+        println(point2.In(rectangle1))
+&nbsp;
+        println(rectangle1.Union(rectangle2).String())
+        println(rectangle1.Intersect(rectangle2).String())
+&nbsp;
+        println(rectangle1.Overlaps(rectangle2))
+        println(rectangle1.Overlaps(rectangle3))
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+true
+false
+(0,0)-(300,300)
+(100,100)-(200,200)
+true
+false
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Barvové prostory RGBA a NRGBA</h2>
+
+<p>S&nbsp;barvovými prostory RGBA a NRGBA jsme se již setkali
+v&nbsp;předchozích kapitolách. V&nbsp;obou případech se barva pixelu zadává
+čtyřmi složkami &ndash; červenou, zelenou, modrou a průhledností. Každá
+z&nbsp;těchto složek je uložena v&nbsp;bajtu (jedná se tedy o hodnotu
+v&nbsp;rozsahu 0 až 255). Celkový počet barev ve spektru dosahuje hodnoty
+256<sup>3</sup> = 16777216 barev (více než šestnáct milionů). Pokud by tento
+rozsah nedostačoval, například při provádění některých editačních operací
+(vícenásobná filtrace atd.), lze použít prostory RGBA64 a NRGBA64.
+V&nbsp;případě prostoru NRGBA se při ukládání barev neprovádí žádné další
+operace, u RGBA se však nejprve barvové složky přednásobí průhledností. Pro
+úplnost je pod tímto odstavcem vypsán zdrojový kód příkladu, který vytvoří
+obrázek se čtyřmi gradientními přechody:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 512
+const height = 512
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewNRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("10.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; 256; x++ {
+                for y := 0; y &lt; 256; y++ {
+                        c := color.NRGBA{0, byte(x), byte(y), 255}
+                        img.SetNRGBA(x, y, c)
+&nbsp;
+                        c = color.NRGBA{85, byte(x), byte(y), 255}
+                        img.SetNRGBA(x+256, y, c)
+&nbsp;
+                        c = color.NRGBA{170, byte(x), byte(y), 255}
+                        img.SetNRGBA(x, y+256, c)
+&nbsp;
+                        c = color.NRGBA{255, byte(x), byte(y), 255}
+                        img.SetNRGBA(x+256, y+256, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/355049/"><img src="https://i.iinfo.cz/images/410/golang-14-8-prev.png" class="image-355049" alt="&#160;" width="270" height="270" /></a>
+<p><i>Obrázek 8: Čtveřice gradientních přechodů, všechny pixely jsou
+neprůhledné.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Barvový prostor CMYK</h2>
+
+<p>V&nbsp;předchozích demonstračních příkladech jsme používali barvový prostor
+RGBA popř.&nbsp;NRGBA. Tento barvový prostor je v&nbsp;praxi používán velmi
+často, mj.&nbsp;i proto, že jednotlivé barvové složky R, G, B přímo odpovídají
+způsobům zobrazení pixelů na displejích (hodnoty barvových složek se sčítají).
+Ovšem při přípravě barevných obrázků pro tisk je prostor RGBA či NRGBA
+nevýhodný, neboť barevný soutisk je prováděn zcela odlišnou technikou &ndash;
+odečítáním barev od barvy papíru (každá natištěná barva funguje jako filtr
+určité části barvového spektra). Z&nbsp;tohoto důvodu se při přípravě grafiky
+pro tisk používá barvový model CMY (<i>Cyan, Magenta, Yellow</i>) a tiskárny
+(většinou) obsahují tonery či inkousty právě těchto barev. Z&nbsp;praktických
+důvodů jsou tyto tři barvy doplněny ještě o barvu černou &ndash; vede to jak
+k&nbsp;ušetření barev při tisku textů a obrázků v&nbsp;odstínech šedi, tak i
+k&nbsp;možnosti tisku skutečně černou barvou. Výsledkem je barvový model či
+barvový prostor CMYK (<i>Cyan, Magenta, Yellow, blacK</i>).</p>
+
+<p>I s&nbsp;tímto barvovým prostorem je možné v&nbsp;programovacím jazyku Go
+pracovat a to prakticky stejným způsobem, jako tomu bylo u modelů RGBA a NRGBA.
+Obrázek s&nbsp;barvami pixelů reprezentovaných v&nbsp;modelu CMYK je
+představován strukturou/záznamem se jménem <strong>CMYK</strong>:</p>
+
+<pre>
+type <strong>CMYK</strong> struct {
+        Pix []uint8
+        Stride int
+        Rect Rectangle
+}
+</pre>
+
+<p>Pro vytvoření nového obrázku, který odpovídá tomuto barvovému modelu, je
+možné použít konstruktor <strong>NewCMYK()</strong>, který akceptuje stejné
+parametry jako nám již známé konstruktory <strong>NewRGBA()</strong> a
+<strong>NewNRGBA()</strong>:</p>
+
+<pre>
+img := image.NewCMYK(image.Rect(0, 0, width, height))
+</pre>
+
+<p>Barva v&nbsp;barvovém modelu CMYK je reprezentována strukturou
+<strong>color.CMYK</strong>, kterou je možné nastavit zcela běžným
+způsobem:</p>
+
+<pre>
+c := color.CMYK{c, m, y, k}
+</pre>
+
+<p>Další práce s&nbsp;obrázkem, například jeho vyplnění pixely s&nbsp;různou
+barvou, je již prakticky stejné, jako ve všech předchozích příkladech.
+V&nbsp;dalším úryvku kódu vyplníme obrázek o rozlišení 512&times;512 pixelů
+čtyřmi podoblastmi, v&nbsp;nichž každé bude jiný barvový přechod
+(<i>gradient</i>); to vše vypočtené v&nbsp;barvovém prostoru CMYK:</p>
+
+<pre>
+for x := 0; x &lt; 256; x++ {
+        for y := 0; y &lt; 256; y++ {
+                c := color.CMYK{byte(x), 0, 0, 0}
+                img.SetCMYK(x, y, c)
+&nbsp;
+                c = color.CMYK{0, byte(x), 0, 0}
+                img.SetCMYK(x+256, y, c)
+&nbsp;
+                c = color.CMYK{0, 0, byte(x), 0}
+                img.SetCMYK(x, y+256, c)
+&nbsp;
+                c = color.CMYK{0, 0, 0, byte(x)}
+                img.SetCMYK(x+256, y+256, c)
+        }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Význam složky K v&nbsp;barvovém prostoru CMYK</h2>
+
+<p>Poslední složka K (<i>blackK</i>) v&nbsp;barvovém prostoru CMYK určuje podíl
+černé barvy pixelu. Pokud bude tato hodnota nulová, získáme odstíny získané
+rozdílem mezi složkami cyan, magenta a yellow:</p>
+
+<a href="https://www.root.cz/obrazek/355050/"><img src="https://i.iinfo.cz/images/410/golang-14-9-prev.png" class="image-355050" alt="&#160;" width="270" height="270" /></a>
+<p><i>Obrázek 9: Postupná změna intenzity jednotlivých složek CMYK.
+V&nbsp;prvních třech oblastech je hodnota složky K nulová.</i></p>
+
+<p>Výše uvedený obrázek byl získán <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/15_cmyk_images.go">tímto
+demonstračním příkladem</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 512
+const height = 512
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewCMYK(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("11.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; 256; x++ {
+                for y := 0; y &lt; 256; y++ {
+                        c := color.CMYK{byte(x), 0, 0, 0}
+                        img.SetCMYK(x, y, c)
+&nbsp;
+                        c = color.CMYK{0, byte(x), 0, 0}
+                        img.SetCMYK(x+256, y, c)
+&nbsp;
+                        c = color.CMYK{0, 0, byte(x), 0}
+                        img.SetCMYK(x, y+256, c)
+&nbsp;
+                        c = color.CMYK{0, 0, 0, byte(x)}
+                        img.SetCMYK(x+256, y+256, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Hodnotu K však můžeme zvýšit, například na 50%, což odpovídá hodnotě
+127:</p>
+
+<a href="https://www.root.cz/obrazek/355051/"><img src="https://i.iinfo.cz/images/410/golang-14-10-prev.png" class="image-355051" alt="&#160;" width="270" height="270" /></a>
+<p><i>Obrázek 10: Barevné přechody v&nbsp;modelu CMYK, černá složka je
+nastavena na hodnotu 50% (127).</i></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_14/16_cmyk_images.go">Zdrojový
+kód</a> tohoto příkladu se změní jen nepatrně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 512
+const height = 512
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewCMYK(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("12.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        for x := 0; x &lt; 256; x++ {
+                for y := 0; y &lt; 256; y++ {
+                        c := color.CMYK{byte(x), 0, 0, 127}
+                        img.SetCMYK(x, y, c)
+&nbsp;
+                        c = color.CMYK{0, byte(x), 0, 127}
+                        img.SetCMYK(x+256, y, c)
+&nbsp;
+                        c = color.CMYK{0, 0, byte(x), 127}
+                        img.SetCMYK(x, y+256, c)
+&nbsp;
+                        c = color.CMYK{0, byte(y), 0, byte(x)}
+                        img.SetCMYK(x+256, y+256, c)
+                }
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<p>Pokud by se hodnota K nastavila na 100% (255), byl by celý obrázek černý,
+nezávisle na hodnotě dalších tří barevných složek.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Balíček <strong>image/draw</strong></h2>
+
+<p>Dalším balíčkem, s&nbsp;nímž se dnes alespoň ve stručnosti seznámíme, se
+jmenuje <strong>image/draw</strong>. Název tohoto balíčku může být možná
+poněkud matoucí, protože v&nbsp;něm ve skutečnosti <i>nenajdeme</i> funkce pro
+kreslení nějakých geometrických tvarů či textů do rastrových obrázků. Balíček
+<strong>image/draw</strong> totiž obsahuje implementaci operací prováděných
+mezi dvěma obrázky &ndash; tyto operace se někdy nazývají <i>kompozice</i>,
+protože se zdrojový (<i>source</i>) obrázek pixel po pixelu aplikuje na obrázek
+cílový (<i>target</i>).</p>
+
+<p>V&nbsp;tomto balíčku nalezneme především datový typ (strukturu, záznam)
+<strong>Drawer</strong>:</p>
+
+<pre>
+type <strong>Drawer</strong> interface {
+    Draw(dst Image, r image.Rectangle, src image.Image, sp image.Point)
+}
+</pre>
+
+<p>A potom dvojici až překvapivě univerzálních funkcí implementujících rastrové
+operace aplikované na dvojici či trojici obrázků.</p>
+
+<p>Rastrová operace mezi zdrojovým a cílovým obrázkem:</p>
+
+<pre>
+func <strong>Draw</strong>(dst Image, r image.Rectangle, src image.Image, sp image.Point, op Op)
+</pre>
+
+<p>Rastrová operace mezi zdrojovým a cílovým obrázkem s&nbsp;využitím třetího
+obrázku ve funkci masky:</p>
+
+<pre>
+func <strong>DrawMask</strong>(dst Image, r image.Rectangle, src image.Image, sp image.Point, mask image.Image, mp image.Point, op Op)
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Trik &ndash; vyplnění obrázku konstantní barvou s&nbsp;využitím obrazových operací</h2>
+
+<p>Funkce <strong>Draw</strong> a <strong>DrawMask</strong> nám umožňují
+provádět množství zajímavých a užitečných triků. Například s&nbsp;nimi dokážeme
+vyplnit obdélníkovou část obrázku konstantní barvou. Provedeme to tak, že
+vytvoříme obrázek vyplněný konstantní barvou, který má neomezené rozměry.
+K&nbsp;vytvoření takto zvláštního obrázku slouží konstruktor
+<strong>NewUniform</strong>:</p>
+
+<pre>
+func <strong>NewUniform</strong>(c color.Color) *Uniform
+</pre>
+
+<p>popř.&nbsp;můžeme přímo inicializovat strukturu
+<strong>Uniform</strong>:</p>
+
+<pre>
+image.Uniform{nějaká_barva}
+</pre>
+
+<p>Dále použijeme strukturu <strong>image.ZP</strong> reprezentující bod ležící
+na souřadnicích [0, 0]:</p>
+
+<pre>
+image.ZP
+</pre>
+
+<p>a zavoláme funkci <strong>Draw</strong>, kterou překopírujeme obsah obrázku
+vyplněného konstantní barvou do obrázku cílového.  Přitom se provede ořez do
+zvoleného obdélníka <strong>r</strong>:</p>
+
+<pre>
+r := image.Rect(x_from, y_from, x_to, y_to)
+draw.Draw(img, r, &amp;image.Uniform{nějaká_barva}, image.ZP, draw.Src)
+</pre>
+
+<p>Výsledkem bude, že se do obrázku předaného v&nbsp;posledním parametru
+<strong>draw.Src</strong> nakopíruje obdélník s&nbsp;konstantní barvou omezený
+souřadnicemi [x_from, y_from] a [x_to, y_to].</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Vykreslení šachovnice</h2>
+
+<p>Výše uvedeného triku použijeme pro vykreslení šachovnice:</p>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-11.png" class="image-355052" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 11: Šachovnice vykreslená demonstračním příkladem.</i></p>
+
+<p>Budeme postupovat stejně, jak jsme si to ukázali v&nbsp;předchozí kapitole,
+pouze využijeme dva obrázky vyplněné konstantní barvou. Každý obrázek použije
+jednu z&nbsp;barev z&nbsp;této malé palety:</p>
+
+<pre>
+palette := make(map[int]color.RGBA, 2)
+&nbsp;
+palette[0] = color.RGBA{150, 205, 50, 255}
+palette[1] = color.RGBA{0, 100, 0, 255}
+</pre>
+
+<p>Následně ve vnitřní smyčce budeme vykreslovat jednotlivá políčka a
+nezapomeneme přitom přepínat barvu (přesněji index barvy) mezi nulou a
+jedničkou:</p>
+
+<pre>
+r := image.Rect(x_from, y_from, x_to, y_to)
+draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+&nbsp;
+index_color = 1 - index_color
+</pre>
+
+<p>Úplný zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/draw"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewCMYK(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("17.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        palette := make(map[int]color.RGBA, 2)
+&nbsp;
+        palette[0] = color.RGBA{150, 205, 50, 255}
+        palette[1] = color.RGBA{0, 100, 0, 255}
+&nbsp;
+        index_color := 0
+        board_size := 8
+        hor_block := int(width / board_size)
+        ver_block := int(height / board_size)
+&nbsp;
+        x_from := 0
+        x_to := hor_block
+        for x := 0; x &lt; board_size; x++ {
+                y_from := 0
+                y_to := ver_block
+                for y := 0; y &lt; board_size; y++ {
+                        r := image.Rect(x_from, y_from, x_to, y_to)
+                        draw.Draw(img, r, &amp;image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+                        y_from = y_to
+                        y_to += ver_block
+                        index_color = 1 - index_color
+                }
+                x_from = x_to
+                x_to += hor_block
+                index_color = 1 - index_color
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Vykreslení složitějších tvarů do rastrových obrázků</h2>
+
+<p>Další geometrické tvary nejsou balíčkem <strong>image/draw</strong>
+podporovány, i když samozřejmě můžeme použít nějaký externí balíček, typicky <a
+href="https://github.com/llgcode/draw2d">draw2d</a>. Ovšem (re)implementace
+některých základních algoritmů pro 2D tvary do jazyka Go může být minimálně
+poučná.</p>
+
+<p>Pro vykreslení úseček bylo vyvinuto několik algoritmů, ovšem nejrychlejší (a
+v&nbsp;minulosti taktéž nejpoužívanější) je algoritmus navržený Jackem Eltonem
+Bresenhamem už v&nbsp;roce 1962. Tento algoritmus pro vykreslení úsečky, který
+je <a href="https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm">velmi
+podrobně popsán na Wikipedii</a>, využívá pouze celočíselné operace a současně
+jsou v&nbsp;něm eliminovány aritmetické operace pro násobení a dělení, což je i
+dnes poměrně důležité (zejména na výpočetně slabších 32bitových ARMech).
+Všechny výpočty se tak zjednoduší na aritmetický posun, sčítání, odčítání a
+podmíněné skoky. Právě díky těmto vlastnostem se Bresenhamův algoritmus stále
+v&nbsp;některých aplikacích používá, i když v&nbsp;případě požadavků na co
+nejvyšší kvalitu vykreslování se někdy přechází na pomalejší algoritmy
+s&nbsp;antialiasingem.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Implementace Bresenhamova algoritmu pro vykreslování úseček</h2>
+
+<p>Pokud se při vykreslování úseček spokojíme s&nbsp;menší rychlostí celého
+programu, je možné Bresenhamův algoritmus implementovat poměrně přímočarým
+způsobem, což je ostatně patrné z&nbsp;výpisu kódu, který naleznete pod tímto
+odstavcem. Pomocné lokální proměnné <strong>sx</strong> a <strong>sy</strong>
+slouží pro posuny souřadnice vykreslovaného pixelu, čímž bylo možné eliminovat
+rozepsání tohoto algoritmu pro všech osm oktantů (díky existenci
+<strong>sx</strong> a <strong>sy</strong> se jakoby pohybujeme pouze
+v&nbsp;prvním oktantu, i když ve skutečnosti může vykreslování probíhat
+v&nbsp;jiném směru). Pomocné proměnné <strong>dx</strong> a <strong>dy</strong>
+společně s&nbsp;proměnnou <strong>err</strong> se používají k&nbsp;určení směru
+vykreslování. Povšimněte si, že vykreslování vždy začíná v&nbsp;prvním vrcholu
+[x1, y1] a končí přesně ve druhém vrcholu [x2, y2], nezávisle na vzájemné
+pozici těchto vrcholů (může se jednat i o jediný bod). Horizontální a
+vertikální úsečky jsou vykresleny specializovanými (a pravděpodobně i
+rychlejšími) funkcemi:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>DrawHorizontalLine</strong>(img *image.RGBA, color color.Color, x1 int, x2 int, y int) {
+        if x1 &gt; x2 {
+                x1, x2 = x2, x1
+        }
+        for x := x1; x &lt; x2; x++ {
+                img.Set(x, y, color)
+        }
+}
+&nbsp;
+func <strong>DrawVerticalLine</strong>(img *image.RGBA, color color.Color, x int, y1 int, y2 int) {
+        if y1 &gt; y2 {
+                y1, y2 = y2, y1
+        }
+        for y := y1; y &lt; y2; y++ {
+                img.Set(x, y, color)
+        }
+}
+&nbsp;
+func <strong>Abs</strong>(x int) int {
+        if x &lt; 0 {
+                return -x
+        }
+        return x
+}
+&nbsp;
+func <strong>Step</strong>(v1 int, v2 int) int {
+        if v1 &lt; v2 {
+                return 1
+        } else {
+                return -1
+        }
+}
+&nbsp;
+func <strong>DrawLine</strong>(img *image.RGBA, color color.Color, x1 int, y1 int, x2 int, y2 int) {
+        <i>// specialni pripad - svisla usecka</i>
+        if x1 == x2 {
+                DrawVerticalLine(img, color, x1, y1, y2)
+                return
+        }
+&nbsp;
+        <i>// specialni pripad - vodorovna usecka</i>
+        if y1 == y2 {
+                DrawHorizontalLine(img, color, x1, x2, y1)
+                return
+        }
+&nbsp;
+        <i>// takze mame smulu a musime pouzit plnou verzi algoritmu</i>
+&nbsp;
+        <i>// zrcadleni algoritmu pro dalsi oktanty</i>
+        x := x1
+        y := y1
+&nbsp;
+        <i>// konstanty pouzite pri vykreslovani</i>
+        dx := Abs(x2 - x1)
+        dy := Abs(y2 - y1)
+        sx := Step(x1, x2)
+        sy := Step(y1, y2)
+&nbsp;
+        <i>// pocatecni hodnota akumulatoru chyby</i>
+        err := dx &gt;&gt; 1
+        if dx &lt;= dy {
+                err = -dy &gt;&gt; 1
+        }
+&nbsp;
+        <i>// vse je pripraveno k vlastnimu vykresleni usecky</i>
+        for {
+                img.Set(x, y, color)
+                <i>// test, zda se jiz doslo k poslednimu bodu</i>
+                if x == x2 &amp;&amp; y == y2 {
+                        break
+                }
+                e2 := err
+                if e2 &gt; -dx {
+                        <i>// prepocet kumulovane chyby</i>
+                        err -= dy
+                        <i>// posun na predchozi ci dalsi pixel na radku</i>
+                        x += sx
+                }
+                if e2 &lt; dy {
+                        <i>// prepocet kumulovane chyby</i>
+                        err += dx
+                        <i>// posun na predchozi ci nasledujici radek</i>
+                        y += sy
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+&nbsp;
+        outfile, err := os.Create("18.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        c := color.RGBA{255, 255, 255, 255}
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        img.Set(x, y, c)
+                }
+        }
+&nbsp;
+        c = color.RGBA{0, 0, 255, 255}
+        DrawLine(img, c, 20, 10, 245, 10)
+&nbsp;
+        c = color.RGBA{255, 0, 0, 255}
+        DrawLine(img, c, 10, 20, 10, 245)
+&nbsp;
+        c = color.RGBA{0, 255, 0, 255}
+        DrawLine(img, c, 20, 20, width&gt;&gt;1, height&gt;&gt;1)
+&nbsp;
+        c = color.RGBA{0, 0, 0, 255}
+        for x := 10; x &lt; width; x += 10 {
+                DrawLine(img, c, width-5, x, width-x, height-5)
+        }
+        png.Encode(outfile, img)
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/410/golang-14-12.png" class="image-355053" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 12: Několik úseček vykreslených funkcí
+<strong>DrawLine</strong>.</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_empty_image.go</td><td>vytvoření rastrového obrázku s&nbsp;výchozími hodnotami pixelů (zcela průhledné černé pixely)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/01_empty_image.go">https://github.com/tisnik/go-fedora/blob/master/article_14/01_empty_image.go</a></td></tr>
+<tr><td> 2</td><td>02_empty_image_rectangle.go</td><td>alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/02_empty_image_rectangle.go">https://github.com/tisnik/go-fedora/blob/master/article_14/02_empty_image_rectangle.go</a></td></tr>
+<tr><td> 3</td><td>03_filled_image_setrgba.go</td><td>rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/03_filled_image_setrgba.go">https://github.com/tisnik/go-fedora/blob/master/article_14/03_filled_image_setrgba.go</a></td></tr>
+<tr><td> 4</td><td>04_filled_image_set.go</td><td>rastrový obrázek vyplněný konstantní barvou, použití metody Set</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/04_filled_image_set.go">https://github.com/tisnik/go-fedora/blob/master/article_14/04_filled_image_set.go</a></td></tr>
+<tr><td> 5</td><td>05_filled_image_alpha.go</td><td>obrázek, v&nbsp;němž mají pixely různou průhlednost (nekorektní varianta)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/05_filled_image_alpha.go">https://github.com/tisnik/go-fedora/blob/master/article_14/05_filled_image_alpha.go</a></td></tr>
+<tr><td> 6</td><td>06_filled_image_alpha_correct.go</td><td>korektní varianta předchozího příkladu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/06_filled_image_alpha_correct.go">https://github.com/tisnik/go-fedora/blob/master/article_14/06_filled_image_alpha_correct.go</a></td></tr>
+<tr><td> 7</td><td>07_filled_image_alpha_correct.go</td><td>vylepšená varianta předchozího příkladu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/07_filled_image_alpha_correct.go">https://github.com/tisnik/go-fedora/blob/master/article_14/07_filled_image_alpha_correct.go</a></td></tr>
+<tr><td> 8</td><td>08_image_internals.go</td><td>interní struktura záznamu s&nbsp;informacemi o obrázku</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/08_image_internals.go">https://github.com/tisnik/go-fedora/blob/master/article_14/08_image_internals.go</a></td></tr>
+<tr><td> 9</td><td>09_raw_pixels.go</td><td>přímý přístup k&nbsp;jednotlivým pixelům; první varianta</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/09_raw_pixels.go">https://github.com/tisnik/go-fedora/blob/master/article_14/09_raw_pixels.go</a></td></tr>
+<tr><td>10</td><td>10_raw_pixels2.go</td><td>přímý přístup k&nbsp;jednotlivým pixelům; druhá varianta</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/10_raw_pixels2.go">https://github.com/tisnik/go-fedora/blob/master/article_14/10_raw_pixels2.go</a></td></tr>
+<tr><td>11</td><td>11_raw_pixels3.go</td><td>přímý přístup k&nbsp;jednotlivým pixelům; třetí varianta</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/11_raw_pixels3.go">https://github.com/tisnik/go-fedora/blob/master/article_14/11_raw_pixels3.go</a></td></tr>
+<tr><td>12</td><td>12_point_rectangle.go</td><td>datové struktury <strong>Point</strong> a <strong>Rectangle</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/12_point_rectangle.go">https://github.com/tisnik/go-fedora/blob/master/article_14/12_point_rectangle.go</a></td></tr>
+<tr><td>13</td><td>13_point_rectangle_operations.go</td><td>základní operace s&nbsp;obdélníky a body</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/13_point_rectangle_operations.go">https://github.com/tisnik/go-fedora/blob/master/article_14/13_point_rectangle_operations.go</a></td></tr>
+<tr><td>14</td><td>14_rgba_images.go</td><td>základní vlastnosti barvového prostoru RGBA</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/14_rgba_images.go">https://github.com/tisnik/go-fedora/blob/master/article_14/14_rgba_images.go</a></td></tr>
+<tr><td>15</td><td>15_cmyk_images.go</td><td>základní vlastnosti barvového prostoru CMYK</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/15_cmyk_images.go">https://github.com/tisnik/go-fedora/blob/master/article_14/15_cmyk_images.go</a></td></tr>
+<tr><td>16</td><td>16_cmyk_images.go</td><td>základní vlastnosti barvového prostoru CMYK</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/16_cmyk_images.go">https://github.com/tisnik/go-fedora/blob/master/article_14/16_cmyk_images.go</a></td></tr>
+<tr><td>17</td><td>17_chessboard.go</td><td>využití balíčku <strong>draw</strong> pro vykreslení šachovnice (rastrové operace)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/17_chessboard.go">https://github.com/tisnik/go-fedora/blob/master/article_14/17_chessboard.go</a></td></tr>
+<tr><td>18</td><td>18_bresenham_algorithm.go</td><td>implementace Bresenhamova algoritmu pro vykreslení úsečky</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/18_bresenham_algorithm.go">https://github.com/tisnik/go-fedora/blob/master/article_14/18_bresenham_algorithm.go</a></td></tr>
+<tr><td>19</td><td>19_blending.go</td><td>blending v&nbsp;Go (opět rastrové operace)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_14/19_blending.go">https://github.com/tisnik/go-fedora/blob/master/article_14/19_blending.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
