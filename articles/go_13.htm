@@ -1,0 +1,2601 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Při tvorbě webových služeb se v naprosté většině případů nevyhneme použití formátu JSON. Z tohoto důvodu si ukážeme, jak se s JSONem pracuje v programovacím jazyku Go. V závěru článku si vysvětlíme problematiku generování rastrových obrázků ve &bdquo;webových&ldquo; formátech.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Zpracování JSON formátu v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k02">2. &bdquo;Marshalling&ldquo; datových struktur do formátu JSON</a></p>
+<p><a href="#k03">3. Převod celočíselných hodnot do JSONu</a></p>
+<p><a href="#k04">4. Chování systému při pokusu o převod hodnot, které nemají podporu v&nbsp;JSONu</a></p>
+<p><a href="#k05">5. Převod polí a řezů do JSONu</a></p>
+<p><a href="#k06">6. Struktury (záznamy) a jejich přímý převod do JSONu</a></p>
+<p><a href="#k07">7. Jedno z&nbsp;nejčastějších použití: mapy struktur (záznamů)</a></p>
+<p><a href="#k08">8. Složitější (vnořené) datové struktury, změna názvů klíčů ve výsledném JSONu</a></p>
+<p><a href="#k09">9. Export speciálních hodnot do JSONu</a></p>
+<p><a href="#k10">10. Import dat ve formátu JSON</a></p>
+<p><a href="#k11">11. Import jednoduché struktury (záznamu) se známým obsahem</a></p>
+<p><a href="#k12">12. Import polí z&nbsp;JSONu</a></p>
+<p><a href="#k13">13. Import map obsahujících struktury (záznamy)</a></p>
+<p><a href="#k14">14. Specifikace klíčů zapsaných v&nbsp;souborech JSON</a></p>
+<p><a href="#k15">15. Načtení předem neznámé struktury z&nbsp;JSONu</a></p>
+<p><a href="#k16">16. Práce s&nbsp;rastrovými obrázky</a></p>
+<p><a href="#k17">17. Export rastrového obrazu do PNG</a></p>
+<p><a href="#k18">18. Export rastrového obrazu do formátu JPEG</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Zpracování JSON formátu v&nbsp;programovacím jazyce Go</h2>
+
+<p>V&nbsp;první části dnešního článku se zaměříme na popis způsobů použití
+formátu JSON v&nbsp;aplikacích vyvinutých v&nbsp;programovacím jazyku Go. Jedná
+se o poměrně důležitou oblast, protože JSON (a samozřejmě též XML) se
+v&nbsp;současnosti používá v&nbsp;mnoha webových službách a i když stále
+vznikají a jsou postupně adaptovány další formáty, ať již textové (<a
+href="https://yaml.org/">YAML</a>, <a
+href="https://github.com/edn-format/edn">edn</a>) či binární (<a
+href="http://bsonspec.org/">BSON</a>, <a href="http://bjson.org/">B-JSON</a>,
+<a href="https://github.com/FasterXML/smile-format-specification">Smile</a>, <a
+href="https://developers.google.com/protocol-buffers/">Protocol-Buffers</a>),
+je velmi pravděpodobné, že se JSON bude i nadále poměrně masivně využívat.
+Formát JSON tak, jak ho budeme zpracovávat v&nbsp;dnešních demonstračních
+příkladech, je stručně a přitom dostatečně přesně popsán na známé a často
+navštěvované stránce <a href="http://json.org/">http://json.org/</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;některých případech se setkáme
+s&nbsp;různými omezeními na straně některých implementací knihoven pro práci
+s&nbsp;JSONem. Týká se to především těch programovacích jazyků, které používají
+asociativní pole (mapy) v&nbsp;JSONu pro ukládání atributů objektů &ndash; a
+pro názvy atributů jsou pochopitelně vyhrazeny jen některé znaky (typicky se
+zde nesmí vyskytovat mezery a někdy ani pomlčka či lomítko). Nám však tato
+omezení při použití jazyka Go nebudou žádným způsobem vadit, protože klíči map
+mohou být libovolné řetězce.</div></p>
+
+<p>Příklady reálných dat uložených ve formátu JSON není těžké získat. Ukážeme
+si pouze tři příklady získané z&nbsp;veřejně dostupných webových služeb.</p>
+
+<p>Využití služby, která vrátí hlavičky posílané klientem:</p>
+
+<pre>
+$ <strong>curl http://httpbin.org/get</strong>
+&nbsp;
+{
+  "args": {}, 
+  "headers": {
+    "Accept": "*/*", 
+    "Host": "httpbin.org", 
+    "User-Agent": "curl/7.35.0"
+  }, 
+  "origin": "89.24.49.226, 89.24.49.226", 
+  "url": "https://httpbin.org/get"
+}
+</pre>
+
+<p>Služba vracející dokument reprezentovaný ve formátu JSON:</p>
+
+<pre>
+$ <strong>curl http://httpbin.org/json</strong>
+&nbsp;
+{
+  "slideshow": {
+    "author": "Yours Truly", 
+    "date": "date of publication", 
+    "slides": [
+      {
+        "title": "Wake up to WonderWidgets!", 
+        "type": "all"
+      }, 
+      {
+        "items": [
+          "Why &lt;em&gt;WonderWidgets&lt;/em&gt; are great", 
+          "Who &lt;em&gt;buys&lt;/em&gt; WonderWidgets"
+        ], 
+        "title": "Overview", 
+        "type": "all"
+      }
+    ], 
+    "title": "Sample Slide Show"
+  }
+}
+</pre>
+
+<p>Veřejně dostupné REST API nalezneme i v&nbsp;případě GitHubu:</p>
+
+<pre>
+$ <strong>curl https://api.github.com/users/torvalds</strong>
+&nbsp;
+{
+  "login": "torvalds",
+  "id": 1024025,
+  "node_id": "MDQ6VXNlcjEwMjQwMjU=",
+  "avatar_url": "https://avatars0.githubusercontent.com/u/1024025?v=4",
+  "gravatar_id": "",
+  "url": "https://api.github.com/users/torvalds",
+  "html_url": "https://github.com/torvalds",
+  "followers_url": "https://api.github.com/users/torvalds/followers",
+  "following_url": "https://api.github.com/users/torvalds/following{/other_user}",
+  "gists_url": "https://api.github.com/users/torvalds/gists{/gist_id}",
+  "starred_url": "https://api.github.com/users/torvalds/starred{/owner}{/repo}",
+  "subscriptions_url": "https://api.github.com/users/torvalds/subscriptions",
+  "organizations_url": "https://api.github.com/users/torvalds/orgs",
+  "repos_url": "https://api.github.com/users/torvalds/repos",
+  "events_url": "https://api.github.com/users/torvalds/events{/privacy}",
+  "received_events_url": "https://api.github.com/users/torvalds/received_events",
+  "type": "User",
+  "site_admin": false,
+  "name": "Linus Torvalds",
+  "company": "Linux Foundation",
+  "blog": "",
+  "location": "Portland, OR",
+  "email": null,
+  "hireable": null,
+  "bio": null,
+  "public_repos": 6,
+  "public_gists": 0,
+  "followers": 88851,
+  "following": 0,
+  "created_at": "2011-09-03T15:26:22Z",
+  "updated_at": "2019-01-23T02:49:04Z"
+}
+</pre>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. &bdquo;Marshalling&ldquo; datových struktur do formátu JSON</h2>
+
+<p>Pro práci s&nbsp;formátem JSON v&nbsp;programovacím jazyku Go slouží
+standardní balíček nazvaný <a
+href="https://golang.org/pkg/encoding/json/">encoding/json</a>. Všechny dnes
+ukázané demonstrační příklady tedy budou tento balíček importovat:</p>
+
+<pre>
+import (
+        ...
+        "encoding/json"
+        ...
+)
+</pre>
+
+<p>Formát JSON umožňuje uložení a tím pádem i přenos jediné (nijak
+nepojmenované) hodnoty. Podporovány jsou přitom hodnoty, které můžeme zařadit
+do šesti kategorií (viz též <a href="http://json.org/value.gif">příslušná část
+graficky vyjádřené syntaxe</a> formátu JSON):</p>
+
+<table>
+<tr><th>#</th><th>Hodnota</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>string</td><td>řetězec (s&nbsp;plnou podporou Unicode)</td></tr>
+<tr><td>2</td><td>number</td><td>celé číslo popř.&nbsp;hodnota typu <i>double</i></td></tr>
+<tr><td>3</td><td>object</td><td>ve skutečnosti se jedná o asociativní pole (mapu), viz poznámka <a href="#k01">v&nbsp;úvodní kapitole</a></td></tr>
+<tr><td>4</td><td>array</td><td>pole, ovšem v&nbsp;JSONu nemusí mít všechny prvky pole stejný typ</td></tr>
+<tr><td>5</td><td><strong>true</strong>, <strong>false</strong></td><td>pravdivostní hodnota</td></tr>
+<tr><td>6</td><td><strong>null</strong></td><td>prázdná hodnota</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: složitější strukturu lze získat snadno
+&ndash; atributy objektů (prvky asociativních polí) i prvky polí totiž mohou
+obsahovat libovolné hodnoty, takže jsou plně podporovány rekurzivní struktury
+(pole objektů, pole polí, mapy struktur/záznamů atd.).</div></p>
+
+<p>Pro převod libovolného typu (přesněji řečeno hodnoty libovolného typu) do
+JSONu se používá funkce nazvaná <strong>Marshal</strong>, kterou nalezneme
+v&nbsp;balíčku <strong>encoding/json</strong>:</p>
+
+<pre>
+func <strong>Marshal</strong>(v interface{}) ([]byte, error)
+</pre>
+
+<p>Povšimněte si, že tato funkce skutečně akceptuje hodnotu libovolného typu,
+protože prázdné rozhraní implementuje (zcela automaticky!) každý datový typ
+(s&nbsp;tímto zajímavým konceptem &bdquo;univerzálního datového typu&ldquo; se
+ještě několikrát setkáme, zejména v&nbsp;rozhraních mezi Go a dalšími systémy).
+Návratovou hodnotou je sekvence bajtů (nikoli řetězec!) a popř.&nbsp;i
+struktura reprezentující chybový stav, pokud k&nbsp;chybě skutečně došlo.
+V&nbsp;opačném případě se ve druhé návratové hodnotě funkce
+<strong>Marshal</strong> vrací <strong>nil</strong>, jak jsme ostatně zvyklí ze
+všech podobně koncipovaných funkcí.</p>
+
+<p>V&nbsp;typických zdrojových kódech se tedy setkáme s&nbsp;tímto idiomatickým
+zápisem:</p>
+
+<pre>
+json_bytes, err := <strong>json.Marshal(a)</strong>
+&nbsp;
+if err != nil {
+        log.Fatal(err)
+}
+...
+...
+...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to, že funkci <strong>Marshal</strong>
+můžeme zavolat a předat jí libovolnou hodnotu ovšem v&nbsp;žádném případě
+neznamená, že převod bude skutečně proveden. Některé typy hodnot totiž nemají
+v&nbsp;JSONu svoji obdobu (je to například funkce nebo ukazatel). Podrobnosti o
+podporovaných a nepodporovaných typech budou vysvětleny v&nbsp;navazujících
+kapitolách.</div></p>
+
+<p><div class="rs-tip-major">Poznámka<sup>2</sup>: jméno této metody odpovídá
+prováděné operaci, takzvanému <i>marshallingu</i>. Opačná operace,
+tj.&nbsp;převod dat z&nbsp;JSONu do datových struktur Go, se nazývá
+<i>unmarshalling</i>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Převod celočíselných hodnot do JSONu</h2>
+
+<p>V&nbsp;dnešním prvním demonstračním příkladu, jehož zdrojový kód naleznete
+na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/01_json_marshal_basic_signed_types.go">https://github.com/tisnik/go-fedora/blob/master/article_13/01_json_marshal_basic_signed_types.go</a>
+je ukázán způsob konverze celých čísel se znaménkem do formátu JSON. Připomeňme
+si, že v&nbsp;Go existuje několik celočíselných typů se znaménkem, přičemž
+některé typy jsou pouze jmennými aliasy:</p>
+
+<table>
+<tr><th>#</th><th>Označení</th><th>Rozsah hodnot</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>int8 </td><td>-128 až 127</td><td>osmibitové celé číslo se znaménkem</td></tr>
+<tr><td>2</td><td>int16</td><td>-32768 až 32767</td><td>16bitové celé číslo se znaménkem</td></tr>
+<tr><td>3</td><td>int32</td><td>-2147483648 až 2147483647</td><td>32bitové celé číslo se znaménkem</td></tr>
+<tr><td>4</td><td>int64</td><td>-9223372036854775808 až 9223372036854775807</td><td>64bitové celé číslo se znaménkem</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>5</td><td>int</td><td>různý</td><td>odpovídá buď typu int32 nebo int64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>6</td><td>rune</td><td>-2147483648 až 2147483647</td><td>alias pro typ int32, používá se pro znaky</td></tr>
+</table>
+
+<p>Převod hodnot všech skupin celočíselných hodnot se znaménkem může být
+proveden následovně (vynechali jsme pouze typ <strong>int</strong>, který je
+aliasem pro <strong>int32</strong> nebo <strong>int64</strong>):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var a int8 = -10
+        var b int16 = -1000
+        var c int32 = -10000
+        var d int32 = -1000000
+&nbsp;
+        var r1 rune = 'a'
+        var r2 rune = '\x40'
+        var r3 rune = '\n'
+        var r4 rune = '\u03BB'
+&nbsp;
+        a_json, _ := <strong>json.Marshal(a)</strong>
+        fmt.Println(string(a_json))
+&nbsp;
+        b_json, _ := <strong>json.Marshal(b)</strong>
+        fmt.Println(string(b_json))
+&nbsp;
+        c_json, _ := <strong>json.Marshal(c)</strong>
+        fmt.Println(string(c_json))
+&nbsp;
+        d_json, _ := <strong>json.Marshal(d)</strong>
+        fmt.Println(string(d_json))
+&nbsp;
+        r1_json, _ := <strong>json.Marshal(r1)</strong>
+        fmt.Println(string(r1_json))
+&nbsp;
+        r2_json, _ := <strong>json.Marshal(r2)</strong>
+        fmt.Println(string(r2_json))
+&nbsp;
+        r3_json, _ := <strong>json.Marshal(r3)</strong>
+        fmt.Println(string(r3_json))
+&nbsp;
+        r4_json, _ := <strong>json.Marshal(r4)</strong>
+        fmt.Println(string(r4_json))
+}
+</pre>
+
+<p><div class="rs-tip-major">Povšimněte si, že ignorujeme případný chybový stav
+(namísto <strong>err</strong> použijeme zástupný znak <strong>_</strong>), což
+si můžeme dovolit pouze v&nbsp;těchto jednoduchých příkladech, ale v&nbsp;praxi
+je samozřejmě chyby nutné kontrolovat.</div></p>
+
+<p>Po spuštění demonstračního příkladu by se mělo zobrazit osm textových řádků,
+z&nbsp;nichž každý reprezentuje validní JSON:</p>
+
+<pre>
+-10
+-1000
+-10000
+-1000000
+97
+64
+10
+955
+</pre>
+
+<p>Druhý demonstrační příklad, který najdete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/02_json_marshal_basic_unsigned_types.go">https://github.com/tisnik/go-fedora/blob/master/article_13/02_json_marshal_basic_unsigned_types.go</a>,
+provádí tytéž operace, ovšem nad celočíselnými hodnotami bez znaménka:</p>
+
+<table>
+<tr><th>#</th><th>Označení</th><th>Rozsah hodnot</th><th>Stručný popis</th></tr>
+<tr><td>1<td>uint8 </td><td>0 až 255</td><td>osmibitové celé číslo bez znaménka</td></tr>
+<tr><td>2<td>uint16</td><td>0 až 65535</td><td>16bitové celé číslo bez znaménka</td></tr>
+<tr><td>3<td>uint32</td><td>0 až 4294967295</td><td>32bitové celé číslo bez znaménka</td></tr>
+<tr><td>4<td>uint64</td><td>0 až 18446744073709551615</td><td>64bitové celé číslo bez znaménka</td></tr>
+<tr><td>&nbsp;<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>5<td>uint</td><td>různý</td><td>odpovídá buď typu uint32 nebo uint64</td></tr>
+<tr><td>&nbsp;<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>6<td>byte</td><td>0 až 255</td><td>alias pro typ uint8</td></tr>
+</table>
+
+<p>Zdrojový kód tohoto demonstračního příkladu vypadá takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var b8 byte = 0x42
+&nbsp;
+        var a uint8 = 10
+        var b uint16 = 1000
+        var c uint32 = 10000
+        var d uint32 = 1000000
+&nbsp;
+        b8_json, _ := <strong>json.Marshal(b8)</strong>
+        fmt.Println(string(b8_json))
+&nbsp;
+        a_json, _ := <strong>json.Marshal(a)</strong>
+        fmt.Println(string(a_json))
+&nbsp;
+        b_json, _ := <strong>json.Marshal(b)</strong>
+        fmt.Println(string(b_json))
+&nbsp;
+        c_json, _ := <strong>json.Marshal(c)</strong>
+        fmt.Println(string(c_json))
+&nbsp;
+        d_json, _ := <strong>json.Marshal(d)</strong>
+        fmt.Println(string(d_json))
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu získáme pět řádků &ndash; pět korektních JSONů:</p>
+
+<pre>
+66
+10
+1000
+10000
+1000000
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti mohou (ale nemusí) nastat
+problémy s&nbsp;datovými typy <strong>int64</strong>, <strong>uint64</strong>
+popř.&nbsp;některými hodnotami typu <strong>uint32</strong> (těmi, které se
+nevejdou do rozsahu <strong>int32</strong>). Tyto problémy nenastanou na straně
+Go, ale knihoven jiných programovacích jazyků.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Chování systému při pokusu o převod hodnot, které nemají podporu v&nbsp;JSONu</h2>
+
+<p>Hodnoty některých datových typů programovacího jazyka Go ovšem nemají ve
+formátu JSON přímý ekvivalent a proto nejsou převoditelné (alespoň ne
+automaticky). Týká se to například i datových typů <strong>complex64</strong> a
+<strong>complex128</strong>, kterými jsou v&nbsp;jazyku Go reprezentována
+komplexní čísla (dvojice hodnot typu <strong>float32</strong>
+popř.&nbsp;<strong>float64</strong>):</p>
+
+<pre>
+var a complex64 = -1.5 + 0i
+var b complex64 = 1.5 + 1000i
+var c complex64 = 1e30 + 1e30i
+var d complex64 = 1i
+</pre>
+
+<p>Převod (prozatím bez jakékoli kontroly průběhu převodu) je implementován
+v&nbsp;dnešním <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/03_json_marshal_basic_complex_types.go">třetím
+demonstračním příkladu</a> s&nbsp;tímto zdrojovým kódem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var a complex64 = -1.5 + 0i
+        var b complex64 = 1.5 + 1000i
+        var c complex64 = 1e30 + 1e30i
+        var d complex64 = 1i
+&nbsp;
+        a_json, _ := <strong>json.Marshal(a)</strong>
+        fmt.Println(string(a_json))
+&nbsp;
+        b_json, _ := <strong>json.Marshal(b)</strong>
+        fmt.Println(string(b_json))
+&nbsp;
+        c_json, _ := <strong>json.Marshal(c)</strong>
+        fmt.Println(string(c_json))
+&nbsp;
+        d_json, _ := <strong>json.Marshal(d)</strong>
+        fmt.Println(string(d_json))
+}
+</pre>
+
+<p>Po spuštění získáme pouze čtveřici prázdných řádků (tedy prázdných řetězců),
+což samozřejmě neodpovídá očekávaným číselným hodnotám:</p>
+
+<pre>
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+</pre>
+
+<p>Z&nbsp;tohoto důvodu <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/03B_json_marshal_basic_complex_types_err.go">zdrojový
+kód programu nepatrně upravíme</a> takovým způsobem, aby bylo možné
+zkontrolovat chyby, k&nbsp;nimž může při převodu (tedy při <i>marshallingu</i>)
+do JSONu dojít:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var a complex64 = -1.5 + 0i
+        var b complex64 = 1.5 + 1000i
+        var c complex64 = 1e30 + 1e30i
+        var d complex64 = 1i
+&nbsp;
+        a_json, a_err := <strong>json.Marshal(a)</strong>
+        fmt.Println(string(a_json))
+        fmt.Println(a_err)
+&nbsp;
+        b_json, b_err := <strong>json.Marshal(b)</strong>
+        fmt.Println(string(b_json))
+        fmt.Println(b_err)
+&nbsp;
+        c_json, c_err := <strong>json.Marshal(c)</strong>
+        fmt.Println(string(c_json))
+        fmt.Println(c_err)
+&nbsp;
+        d_json, d_err := <strong>json.Marshal(d)</strong>
+        fmt.Println(string(d_json))
+        fmt.Println(d_err)
+}
+</pre>
+
+<p>Po spuštění takto upraveného příkladu je již jasné, že se konverze
+nezadařila &ndash; po každém prázdném řádku (výsledek nepovedené konverze) je
+totiž vypsána i chyba, ke které došlo:</p>
+
+<pre>
+&nbsp;
+json: unsupported type: complex64
+&nbsp;
+json: unsupported type: complex64
+&nbsp;
+json: unsupported type: complex64
+&nbsp;
+json: unsupported type: complex64
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Převod polí a řezů do JSONu</h2>
+
+<p>S&nbsp;JSONy obsahujícími jedinou skalární hodnotu se nesetkáme příliš často
+(i když některé webové služby vrací jednoduché řetězce obsahující stav
+aplikace), proto se nyní podívejme na způsob práce se strukturovanými daty.
+Začneme s&nbsp;poli (<i>arrays</i>), popř.&nbsp;s&nbsp;řezy, které se do JSONu
+provádí naprosto stejným způsobem jako pole. Vyzkoušíme si převod polí,
+v&nbsp;nichž jsou typy prvků shodné:</p>
+
+<pre>
+var a1 [10]byte
+var a2 [10]int32
+a3 := [10]int32{1, 10, 2, 9, 3, 8, 4, 7, 5, 6}
+a4 := []string{"www", "root", "cz"}
+</pre>
+
+<p>Převádět samozřejmě můžeme i dvourozměrné (popř.&nbsp;i vícerozměrné)
+pole:</p>
+
+<pre>
+matice := [4][3]float32{
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9},
+        {0, -1, 0},
+}
+</pre>
+
+<p>V&nbsp;případě, že je nutné pracovat s&nbsp;poli, v&nbsp;nichž mohou mít
+prvky rozdílné typy hodnot (což je v&nbsp;JSONu relativně častý požadavek),
+můžeme si v&nbsp;programovacím jazyce Go pomoci poli s&nbsp;prvky typu
+&bdquo;prázdné rozhraní&ldquo; (přesněji se všemi typy, které prázdné rozhraní
+implementují &ndash; to jsou všechny typy):</p>
+
+<pre>
+a5 := []interface{}{1, "root", 3.1415, true, []int{1, 2, 3, 4}}
+</pre>
+
+<p>Následuje <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/04_json_marshal_arrays.go">úplný
+zdrojový kód</a> dnešního čtvrtého demonstračního příkladu, v&nbsp;němž
+k&nbsp;marshallingu polí dochází:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var a1 [10]byte
+        var a2 [10]int32
+        a3 := [10]int32{1, 10, 2, 9, 3, 8, 4, 7, 5, 6}
+        a4 := []string{"www", "root", "cz"}
+        a5 := []interface{}{1, "root", 3.1415, true, []int{1, 2, 3, 4}}
+        matice := [4][3]float32{
+                {1, 2, 3},
+                {4, 5, 6},
+                {7, 8, 9},
+                {0, -1, 0},
+        }
+&nbsp;
+        a1_json, _ := <strong>json.Marshal(a1)</strong>
+        fmt.Println(string(a1_json))
+&nbsp;
+        a2_json, _ := <strong>json.Marshal(a2)</strong>
+        fmt.Println(string(a2_json))
+&nbsp;
+        a3_json, _ := <strong>json.Marshal(a3)</strong>
+        fmt.Println(string(a3_json))
+&nbsp;
+        a4_json, _ := <strong>json.Marshal(a4)</strong>
+        fmt.Println(string(a4_json))
+&nbsp;
+        a5_json, _ := <strong>json.Marshal(a5)</strong>
+        fmt.Println(string(a5_json))
+&nbsp;
+        matice_json, _ := <strong>json.Marshal(matice)</strong>
+        fmt.Println(string(matice_json))
+}
+</pre>
+
+<p>První tři pole se převedou do formátu JSON takto:</p>
+
+<pre>
+[0,0,0,0,0,0,0,0,0,0]
+[0,0,0,0,0,0,0,0,0,0]
+[1,10,2,9,3,8,4,7,5,6]
+</pre>
+
+<p>Další pole obsahuje řetězce, které mohou vypadat následovně (existuje i
+druhá varianta s&nbsp;apostrofy namísto uvozovek):</p>
+
+<pre>
+["www","root","cz"]
+</pre>
+
+<p>Následuje pole prvků různých typů (resp.&nbsp;hodnot implementujících
+prázdné rozhraní):</p>
+
+<pre>
+[1,"root",3.1415,true,[1,2,3,4]]
+</pre>
+
+<p>A konečně posledním případem je dvourozměrné pole hodnot typu
+<i>float32</i>, které sice nejsou v&nbsp;JSONu přímo podporovány, ale je
+proveden jejich převod na <i>float64/double</i> (což je převod, v&nbsp;němž
+nedochází ke ztrátě přesnosti ani rozsahu). Výsledek bude následující:</p>
+
+<pre>
+[[1,2,3],[4,5,6],[7,8,9],[0,-1,0]]
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Struktury (záznamy) a jejich přímý převod do JSONu</h2>
+
+<p>Do JSONu pochopitelně můžeme převádět i jednotlivé struktury. Struktura se
+zkonvertuje do JSONu ve formě <i>objektu</i> (což je označení pro hodnotu
+s&nbsp;atributy). Ovšem musíme si dát pozor na to, že převedeny budou jen ty
+položky záznamu, jejichž jméno začíná velkým písmenem. Ostatně se o tom můžeme
+snadno přesvědčit při překladu a spuštění <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/05_json_marshal_struct.go">pátého
+demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>User1</strong> struct {
+        id      uint32
+        name    string
+        surname string
+}
+&nbsp;
+type <strong>User2</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        user1 := User1{
+                1,
+                "Pepek",
+                "Vyskoč"}
+&nbsp;
+        user2 := User2{
+                1,
+                "Pepek",
+                "Vyskoč"}
+&nbsp;
+        user1_json, _ := <strong>json.Marshal(user1)</strong>
+        fmt.Println(string(user1_json))
+&nbsp;
+        user2_json, _ := <strong>json.Marshal(user2)</strong>
+        fmt.Println(string(user2_json))
+}
+</pre>
+
+<p>První struktura se převede na prázdný objekt (má položky pojmenované malými
+písmeny), druhá se již převede korektně:</p>
+
+<pre>
+{}
+{"Id":1,"Name":"Pepek","Surname":"Vyskoč"}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;dalším textu si ukážeme, jak lze
+toto omezení částečně obejít s&nbsp;využitím tzv.&nbsp;struktur se
+značkami.</div></p>
+
+<p>Často se taktéž setkáme s&nbsp;poli, jejichž prvky jsou struktury. <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/06_json_mashal_array_of_struct.go">Převod
+takové hierarchické datové struktury</a> je stejně přímočarý, jako
+v&nbsp;předchozím příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        var users = [3]User{
+                User{
+                        Id:      1,
+                        Name:    "Pepek",
+                        Surname: "Vyskoč"},
+                User{
+                        Id:      2,
+                        Name:    "Pepek",
+                        Surname: "Vyskoč"},
+                User{
+                        Id:      3,
+                        Name:    "Josef",
+                        Surname: "Vyskočil"},
+        }
+&nbsp;
+        users_json, _ := <strong>json.Marshal(users)</strong>
+        fmt.Println(string(users_json))
+}
+</pre>
+
+<p>S&nbsp;výsledkem (JSON není nijak naformátovaný):</p>
+
+<pre>
+[{"Id":1,"Name":"Pepek","Surname":"Vyskoč"},{"Id":2,"Name":"Pepek","Surname":"Vyskoč"},{"Id":3,"Name":"Josef","Surname":"Vyskočil"}]
+</pre>
+
+<p>Výsledek po naformátování:</p>
+
+<pre>
+[
+  {
+    "Id": 1,
+    "Name": "Pepek",
+    "Surname": "Vyskoč"
+  },
+  {
+    "Id": 2,
+    "Name": "Pepek",
+    "Surname": "Vyskoč"
+  },
+  {
+    "Id": 3,
+    "Name": "Josef",
+    "Surname": "Vyskočil"
+  }
+]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pro naformátování jsem použil nástroj
+nabízený službou <a
+href="https://duckduckgo.com/">https://duckduckgo.com/</a>.</div></p>
+
+<p>Opět platí, že prvky struktury, jejichž název začíná malým písmenem, nebudou
+převedeny, což je ukázáno <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/06B_json_mashal_array_of_struct.go">v&nbsp;dalším
+příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        id      uint32
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        var users = [3]User{
+                User{
+                        id:      1,
+                        name:    "Pepek",
+                        surname: "Vyskoč"},
+                User{
+                        id:      2,
+                        name:    "Pepek",
+                        surname: "Vyskoč"},
+                User{
+                        id:      3,
+                        name:    "Josef",
+                        surname: "Vyskočil"},
+        }
+&nbsp;
+        users_json, _ := <strong>json.Marshal(users)</strong>
+        fmt.Println(string(users_json))
+}
+</pre>
+
+<p>Výsledek &ndash; pole s&nbsp;prázdnými objekty:</p>
+
+<pre>
+[{},{},{}]
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Jedno z&nbsp;nejčastějších použití: mapy struktur (záznamů)</h2>
+
+<p>Pravděpodobně nejčastěji se při práci s&nbsp;formátem JSON setkáme
+s&nbsp;mapami (asociativními poli), jejichž hodnotami jsou záznamy. Mapy mají
+v&nbsp;JSONu jedno omezené &ndash; klíči mohou být řetězce (toto omezení
+v&nbsp;programovacím jazyce Go neplatí).</p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/07_json_marshal_map_of_structs.go">V&nbsp;dalším
+příkladu</a> je ukázán převod mapy s&nbsp;dvěma dvojicemi klíč-hodnota. Klíče
+jsou typu <strong>string</strong>, hodnotami jsou struktury/záznamy
+s&nbsp;předem známými prvky:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        m1 := make(map[string]User)
+&nbsp;
+        m1["user-id-1"] = User{
+                Id:      1,
+                Name:    "Pepek",
+                Surname: "Vyskoč"}
+&nbsp;
+        m1["user-id-2"] = User{
+                Id:      2,
+                Name:    "Josef",
+                Surname: "Vyskočil"}
+&nbsp;
+        m1_json, _ := <strong>json.Marshal(m1)</strong>
+        fmt.Println(string(m1_json))
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+{"user-id-1":{"Id":1,"Name":"Pepek","Surname":"Vyskoč"},"user-id-2":{"Id":2,"Name":"Josef","Surname":"Vyskočil"}}
+</pre>
+
+<p>Po naformátování:</p>
+
+<pre>
+{
+  "user-id-1": {
+    "Id": 1,
+    "Name": "Pepek",
+    "Surname": "Vyskoč"
+  },
+  "user-id-2": {
+    "Id": 2,
+    "Name": "Josef",
+    "Surname": "Vyskočil"
+  }
+}
+</pre>
+
+<p>Dejte si ovšem skutečně pozor na to, aby klíče mapy byly skutečně řetězci.
+Pokud se použije jiný datový typ, nebude převod proveden, i když například
+použít této struktury jako klíče je v&nbsp;Go legální:</p>
+
+<pre>
+type <strong>Key</strong> struct {
+        Id   uint32
+        Role string
+}
+</pre>
+
+<p>O chování funkce pro marshalling se <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/08_json_marshal_map_of_structs.go">můžeme
+snadno přesvědčit</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>Key</strong> struct {
+        Id   uint32
+        Role string
+}
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        m1 := make(map[Key]User)
+&nbsp;
+        m1[Key{1, "admin"}] = User{
+                Id:      1,
+                Name:    "Pepek",
+                Surname: "Vyskoč"}
+&nbsp;
+        m1[Key{2, "user"}] = User{
+                Id:      2,
+                Name:    "Josef",
+                Surname: "Vyskočil"}
+&nbsp;
+        m1_json, _ := <strong>json.Marshal(m1)</strong>
+        fmt.Println(string(m1_json))
+}
+</pre>
+
+<p>Výsledkem bude v&nbsp;tomto případě prázdný řádek:</p>
+
+<pre>
+&nbsp;
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Složitější (vnořené) datové struktury, změna názvů klíčů ve výsledném JSONu</h2>
+
+<p>Samozřejmě se můžeme pokusit i o marshalling struktur/záznamů, jejichž prvky
+jsou opět záznamy. <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/09_json_marshal_complex_map.go">V&nbsp;dalším
+příkladu</a> se serializuje mapa obsahující struktury, přičemž v&nbsp;prvku
+<strong>Ids</strong> je uložena další struktura:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>Identifiers</strong> struct {
+        UID     uint32
+        GID     uint32
+}
+&nbsp;
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+        Sign    []byte
+        Enabled bool
+        Ids     Identifiers
+}
+&nbsp;
+func <strong>main</strong>() {
+        mapOfUsers := make(map[string]User)
+&nbsp;
+        mapOfUsers["user-id-1"] = User{
+                Ids:     Identifiers{1, 1},
+                Name:    "Pepek",
+                Surname: "Vyskoč",
+                Enabled: true,
+                Sign:    []byte{0,0,0,0}}
+&nbsp;
+        mapOfUsers["user-id-2"] = User{
+                Ids:     Identifiers{2, 1},
+                Name:    "Josef",
+                Surname: "Vyskočil",
+                Enabled: false,
+                Sign:    []byte{42, 10, 0, 255}}
+&nbsp;
+        mapOfUsers["user-id-3"] = User{
+                Ids:     Identifiers{3, 1},
+                Name:    "Varel",
+                Surname: "Frištenský"}
+&nbsp;
+        mapOfUsers_json, _ := <strong>json.Marshal(mapOfUsers)</strong>
+        fmt.Println(string(mapOfUsers_json))
+}
+</pre>
+
+<p>S&nbsp;tímto výsledkem:</p>
+
+<pre>
+{"user-id-1":{"Name":"Pepek","Surname":"Vyskoč","Sign":"AAAAAA==","Enabled":true,"Ids":{"UID":1,"GID":1}},"user-id-2":{"Name":"Josef","Surname":"Vyskočil","Sign":"KgoA/w==","Enabled":false,"Ids":{"UID":2,"GID":1}},"user-id-3":{"Name":"Varel","Surname":"Frištenský","Sign":null,"Enabled":false,"Ids":{"UID":3,"GID":1}}}
+</pre>
+
+<p>Po naformátování:</p>
+
+<pre>
+{
+  "user-id-1": {
+    "Name": "Pepek",
+    "Surname": "Vyskoč",
+    "Sign": "AAAAAA==",
+    "Enabled": true,
+    "Ids": {
+      "UID": 1,
+      "GID": 1
+    }
+  },
+  "user-id-2": {
+    "Name": "Josef",
+    "Surname": "Vyskočil",
+    "Sign": "KgoA/w==",
+    "Enabled": false,
+    "Ids": {
+      "UID": 2,
+      "GID": 1
+    }
+  },
+  "user-id-3": {
+    "Name": "Varel",
+    "Surname": "Frištenský",
+    "Sign": null,
+    "Enabled": false,
+    "Ids": {
+      "UID": 3,
+      "GID": 1
+    }
+  }
+}
+</pre>
+
+<p>Velmi často se ovšem setkáme s&nbsp;požadavkem na to, aby měly položky
+v&nbsp;JSONu odlišné označení &ndash; ostatně pojmenování položek stylem
+<i>CamelCase</i> není ve světě JSON příliš běžné. Řešení tohoto problému
+existuje, i když není příliš elegantní &ndash; v&nbsp;Go jsou totiž podporovány
+takzvané &bdquo;tagged structs&ldquo;, což jsou běžné struktury/záznamy, za
+jejichž položkami jsou v&nbsp;řetězci zapsaném ve zpětných apostrofech uvedeny
+příslušné názvy, které se mají v&nbsp;JSONu objevit:</p>
+
+<pre>
+type <strong>Identifiers</strong> struct {
+        UID uint32 <i>`json:"user-id"`</i>
+        GID uint32 <i>`json:"group-id"`</i>
+}
+</pre>
+
+<p>Nevýhodou tohoto způsobu deklarace je fakt, že obsah řetězců není
+překladačem nijak kontrolován, takže se o případných problémech (chybějící
+uvozovky atd.) dozvíme až v&nbsp;čase běhu aplikace (ideální z&nbsp;testů).</p>
+
+<p>Chování si můžeme snadno odzkoušet na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_13/10_json_different_keys.go">mírně
+upraveném příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>Identifiers</strong> struct {
+        UID uint32 `json:"user-id"`
+        GID uint32 `json:"group-id"`
+}
+&nbsp;
+type <strong>User</strong> struct {
+        Name    string `json:"user-name"`
+        Surname string `json:"user-surname"`
+        Sign    []byte
+        Enabled bool `json:"user-login-enabled"`
+        Ids     Identifiers
+}
+&nbsp;
+func <strong>main</strong>() {
+        mapOfUsers := make(map[string]User)
+&nbsp;
+        mapOfUsers["user-id-1"] = User{
+                Ids:     Identifiers{1, 1},
+                Name:    "Pepek",
+                Surname: "Vyskoč",
+                Enabled: true,
+                Sign:    []byte{0, 0, 0, 0}}
+&nbsp;
+        mapOfUsers["user-id-2"] = User{
+                Ids:     Identifiers{2, 1},
+                Name:    "Josef",
+                Surname: "Vyskočil",
+                Enabled: false,
+                Sign:    []byte{42, 10, 0, 255}}
+&nbsp;
+        mapOfUsers["user-id-3"] = User{
+                Ids:     Identifiers{3, 1},
+                Name:    "Varel",
+                Surname: "Frištenský"}
+&nbsp;
+        mapOfUsers_json, _ := <strong>json.Marshal(mapOfUsers)</strong>
+        fmt.Println(string(mapOfUsers_json))
+}
+</pre>
+
+<p>Nyní je výstup odlišný:</p>
+
+<pre>
+{"user-id-1":{"user-name":"Pepek","user-surname":"Vyskoč","Sign":"AAAAAA==","user-login-enabled":true,"Ids":{"user-id":1,"group-id":1}},"user-id-2":{"user-name":"Josef","user-surname":"Vyskočil","Sign":"KgoA/w==","user-login-enabled":false,"Ids":{"user-id":2,"group-id":1}},"user-id-3":{"user-name":"Varel","user-surname":"Frištenský","Sign":null,"user-login-enabled":false,"Ids":{"user-id":3,"group-id":1}}}
+</pre>
+
+<p>Opět si výsledek naformátujeme:</p>
+
+<pre>
+{
+  "user-id-1": {
+    "user-name": "Pepek",
+    "user-surname": "Vyskoč",
+    "Sign": "AAAAAA==",
+    "user-login-enabled": true,
+    "Ids": {
+      "user-id": 1,
+      "group-id": 1
+    }
+  },
+  "user-id-2": {
+    "user-name": "Josef",
+    "user-surname": "Vyskočil",
+    "Sign": "KgoA/w==",
+    "user-login-enabled": false,
+    "Ids": {
+      "user-id": 2,
+      "group-id": 1
+    }
+  },
+  "user-id-3": {
+    "user-name": "Varel",
+    "user-surname": "Frištenský",
+    "Sign": null,
+    "user-login-enabled": false,
+    "Ids": {
+      "user-id": 3,
+      "group-id": 1
+    }
+  }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Export speciálních hodnot do JSONu</h2>
+
+<p>Ještě si musíme ukázat chování funkce <strong>Marshal</strong> při exportu
+některých speciálních hodnot do formátu JSON. Nejdříve si uveďme zdrojový kód
+celého příkladu; pod samotným kódem jsou pak uvedeny poznámky pro každou
+z&nbsp;hodnot:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        v1 := ""
+        v2 := false
+        v3 := true
+        var v4 *int
+&nbsp;
+        var slice1 []int
+        slice2 := []int{}
+&nbsp;
+        var map1 map[string]string
+        map2 := make(map[string]string)
+        map3 := map[string]string{}
+&nbsp;
+        <i>// https://speakerdeck.com/campoy/understanding-nil</i>
+        var iface interface{} = nil
+&nbsp;
+        v1_json, _ := <strong>json.Marshal(v1)</strong>
+        fmt.Println(string(v1_json))
+&nbsp;
+        v2_json, _ := <strong>json.Marshal(v2)</strong>
+        fmt.Println(string(v2_json))
+&nbsp;
+        v3_json, _ := <strong>json.Marshal(v3)</strong>
+        fmt.Println(string(v3_json))
+&nbsp;
+        v4_json, _ := <strong>json.Marshal(v4)</strong>
+        fmt.Println(string(v4_json))
+&nbsp;
+        slice1_json, _ := <strong>json.Marshal(slice1)</strong>
+        fmt.Println(string(slice1_json))
+&nbsp;
+        slice2_json, _ := <strong>json.Marshal(slice2)</strong>
+        fmt.Println(string(slice2_json))
+&nbsp;
+        map1_json, _ := <strong>json.Marshal(map1)</strong>
+        fmt.Println(string(map1_json))
+&nbsp;
+        map2_json, _ := <strong>json.Marshal(map2)</strong>
+        fmt.Println(string(map2_json))
+&nbsp;
+        map3_json, _ := <strong>json.Marshal(map3)</strong>
+        fmt.Println(string(map3_json))
+&nbsp;
+        iface_json, _ := <strong>json.Marshal(iface)</strong>
+        fmt.Println(string(iface_json))
+&nbsp;
+        var f = func() {}
+        f_json, _ := <strong>json.Marshal(f)</strong>
+        fmt.Println(string(f_json))
+}
+</pre>
+
+<p></p>
+
+<table>
+<tr><th>Hodnota</th><th>Zápis</th><th>Výsledek v&nbsp;JSONu</th></tr>
+<tr><td>prázdný řetězec</td><td>""</td><td>""</td></tr>
+<tr><td>konstanta <strong>false</strong></td><td>false</td><td>false</td></tr>
+<tr><td>konstanta <strong>true</strong></td><td>true</td><td>true</td></tr>
+<tr><td>ukazatel (nulový)</td><td>*int</td><td>null</td></tr>
+<tr><td>řez bez alokace paměti</td><td>[]int</td><td>null</td></tr>
+<tr><td>prázdný řez (nulová kapacita)</td><td>[]int{}</td><td>[]</td></tr>
+<tr><td>neinicializovaná mapa (bez alokace)</td><td>map[string]string</td><td>null</td></tr>
+<tr><td>prázdná mapa</td><td>make(map[string]string)</td><td>{}</td></tr>
+<tr><td>prázdná mapa</td><td>map[string]string{}</td><td>{}</td></tr>
+<tr><td>&bdquo;nulové&ldquo; rozhraní</td><td>interface{}</td><td>null</td></tr>
+<tr><td>funkce</td><td>func() {}</td><td>&times;</td></tr>
+</table>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Import dat ve formátu JSON</h2>
+
+<p>Ve druhé části článku se zaměříme na popis importu dat z&nbsp;formátu JSON
+do interních datových struktur programovacího jazyka Go. Pro tuto operaci,
+která se nazývá <i>unmarshalling</i> s&nbsp;následující hlavičkou:</p>
+
+<pre>
+func Unmarshal(data []byte, v interface{}) error
+</pre>
+
+<p>Vstupem je v&nbsp;tomto případě pole (řez) bajtů, výstup je vrácen přes
+ukazatel předaný ve druhém parametru (což znamená, že se musíme sami postarat o
+případnou alokaci paměti pro strukturu či pro mapu). Samozřejmě, že při
+unmarshallingu může dojít k&nbsp;nějaké chybě, která je vrácena volající
+funkci. Pokud k&nbsp;chybě nedošlo, je návratová hodnota rovna
+<strong>nil</strong>.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Import jednoduché struktury (záznamu) se známým obsahem</h2>
+
+<p>Nejjednodušší je situace ve chvíli, kdy přesně známe strukturu dat. Pokud se
+v&nbsp;JSONu přenáší informace o struktuře (záznamu, objektu), lze tuto
+strukturu deklarovat jako datový typ, vytvořit proměnnou tohoto typu a následně
+zavolat výše zmíněnou funkci <strong>Unmarshal</strong>:</p>
+
+<pre>
+type <strong>User</strong> struct {
+   ...
+   ...
+   ...
+}
+&nbsp;
+var user User
+json.Unmarshal(bytes, &amp;user)
+</pre>
+
+<p>Podívejme se, jak by mohl vypadat celý příklad, v&nbsp;němž je JSON přímo
+uložen ve formě řetězcového literálu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        input_json := `{
+    "Id":1,
+    "Name":"Pepek",
+    "Surname":"Vyskoč"
+}`
+        fmt.Println("Input:")
+        fmt.Println(input_json)
+&nbsp;
+        bytes := []byte(input_json)
+        var user User
+        <strong>json.Unmarshal(bytes, &amp;user)</strong>
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(user)
+&nbsp;
+        fmt.Println("\nFields:")
+        fmt.Printf("ID:      %d\n", user.Id)
+        fmt.Printf("Name:    %s\n", user.Name)
+        fmt.Printf("Surname: %s\n", user.Surname)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+Input:
+{
+    "Id":1,
+    "Name":"Pepek",
+    "Surname":"Vyskoč"
+}
+&nbsp;
+Output:
+{1 Pepek Vyskoč}
+&nbsp;
+Fields:
+ID:      1
+Name:    Pepek
+Surname: Vyskoč
+</pre>
+
+<p>Samozřejmě nám nic nebrání si příslušný JSON <a
+href="https://github.com/tisnik/go-root/blob/master/article_13/user.json">načíst
+ze souboru</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := <strong>ioutil.ReadFile("user.json")</strong>
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        var user User
+        <strong>json.Unmarshal(input_json_as_bytes, &amp;user)</strong>
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(user)
+&nbsp;
+        fmt.Println("\nFields:")
+        fmt.Printf("ID:      %d\n", user.Id)
+        fmt.Printf("Name:    %s\n", user.Name)
+        fmt.Printf("Surname: %s\n", user.Surname)
+}
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+Input (bytes):
+[123 10 32 32 32 32 34 73 100 34 58 49 44 10 32 32 32 32 34 78 97 109 101 34 58 34 80 101 112 101 107 34 44 10 32 32 32 32 34 83 117 114 110 97 109 101 34 58 34 86 121 115 107 111 196 141 34 10 125 10]
+&nbsp;
+Input (string):
+{
+    "Id":1,
+    "Name":"Pepek",
+    "Surname":"Vyskoč"
+}
+&nbsp;
+&nbsp;
+Output:
+{1 Pepek Vyskoč}
+&nbsp;
+Fields:
+ID:      1
+Name:    Pepek
+Surname: Vyskoč
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Import polí z&nbsp;JSONu</h2>
+
+<p>Při importu polí využijeme skutečnosti, že v&nbsp;případě použití řezů je
+možné pole, které je řezem používáno, automaticky zvětšovat při přidávání
+nových prvků. Tuto operaci za nás provede přímo knihovna pro unmarshalling:</p>
+
+<pre>
+var numbers []int
+json.Unmarshal(input_json_as_bytes, &amp;numbers)
+</pre>
+
+<p>Opět si ukažme úplný zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := ioutil.ReadFile("numbers.json")
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        var numbers []int
+        <strong>json.Unmarshal(input_json_as_bytes, &amp;numbers)</strong>
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(numbers)
+&nbsp;
+        fmt.Println("\nItems:")
+        for i, item := range numbers {
+                fmt.Printf("%d\t%d\n", i, item)
+        }
+}
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+Input (bytes):
+[91 49 44 49 48 44 50 44 57 44 51 44 56 44 52 44 55 44 53 44 54 93 10]
+&nbsp;
+Input (string):
+[1,10,2,9,3,8,4,7,5,6]
+&nbsp;
+&nbsp;
+Output:
+[1 10 2 9 3 8 4 7 5 6]
+&nbsp;
+Items:
+0       1
+1       10
+2       2
+3       9
+4       3
+5       8
+6       4
+7       7
+8       5
+9       6
+</pre>
+
+<p>Můžeme samozřejmě zpracovat i pole struktur, tj.&nbsp;tento vstupní
+soubor:</p>
+
+<pre>
+[
+    {
+        "Id":1,
+        "Name":"Pepek",
+        "Surname":"Vyskoč"
+    },
+    {
+        "Id":2,
+        "Name":"Pepek",
+        "Surname":"Vyskoč"
+    },
+    {
+        "Id":3,
+        "Name":"Josef",
+        "Surname":"Vyskočil"
+    }
+]
+</pre>
+
+<p>A to následujícím programem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := ioutil.ReadFile("users.json")
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        var users []User
+        <strong>json.Unmarshal(input_json_as_bytes, &amp;users)</strong>
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(users)
+&nbsp;
+        fmt.Println("\nUsers:")
+        for i, user := range users {
+                fmt.Printf("%d\t%d\t%s\t%s\n", i, user.Id, user.Name, user.Surname)
+        }
+}
+</pre>
+
+<p>Výstup by mohl vypadat takto:</p>
+
+<pre>
+Input (bytes):
+[91 10 32 32 32 32 123 10 32 32 32 32 32 32 32 32 34 73 100 34 58 49 44 10 32 32 32 32 32 32 32 32 34 78 97 109 101 34 58 34 80 101 112 101 107 34 44 10 32 32 32 32 32 32 32 32 34 83 117 114 110 97 109 101 34 58 34 86 121 115 107 111 196 141 34 10 32 32 32 32 125 44 10 32 32 32 32 123 10 32 32 32 32 32 32 32 32 34 73 100 34 58 50 44 10 32 32 32 32 32 32 32 32 34 78 97 109 101 34 58 34 80 101 112 101 107 34 44 10 32 32 32 32 32 32 32 32 34 83 117 114 110 97 109 101 34 58 34 86 121 115 107 111 196 141 34 10 32 32 32 32 125 44 10 32 32 32 32 123 10 32 32 32 32 32 32 32 32 34 73 100 34 58 51 44 10 32 32 32 32 32 32 32 32 34 78 97 109 101 34 58 34 74 111 115 101 102 34 44 10 32 32 32 32 32 32 32 32 34 83 117 114 110 97 109 101 34 58 34 86 121 115 107 111 196 141 105 108 34 10 32 32 32 32 125 10 93 10]
+&nbsp;
+Input (string):
+[
+    {
+        "Id":1,
+        "Name":"Pepek",
+        "Surname":"Vyskoč"
+    },
+    {
+        "Id":2,
+        "Name":"Pepek",
+        "Surname":"Vyskoč"
+    },
+    {
+        "Id":3,
+        "Name":"Josef",
+        "Surname":"Vyskočil"
+    }
+]
+&nbsp;
+&nbsp;
+Output:
+[{1 Pepek Vyskoč} {2 Pepek Vyskoč} {3 Josef Vyskočil}]
+&nbsp;
+Users:
+0       1       Pepek   Vyskoč
+1       2       Pepek   Vyskoč
+2       3       Josef   Vyskočil
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Import map obsahujících struktury (záznamy)</h2>
+
+<p>Ani další konverze (<i>unmarshalling</i>) pravděpodobně nebude nijak
+překvapivá &ndash; načteme JSON obsahující mapu struktur:</p>
+
+<pre>
+{
+    "user-id-1": {
+                  "Id":1,
+                  "Name":"Pepek",
+                  "Surname":"Vyskoč"
+                 },
+     "user-id-2":{
+                  "Id":2,
+                  "Name":"Josef",
+                  "Surname":"Vyskočil"
+                 }
+}
+</pre>
+
+<p>Do map je samozřejmě možné přidávat další prvky, což za nás opět provede
+samotná knihovna JSON:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := ioutil.ReadFile("users_map.json")
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        m1 := map[string]User{}
+        json.Unmarshal(input_json_as_bytes, &amp;m1)
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(m1)
+&nbsp;
+        fmt.Println("\nUsers:")
+        for key, user := range m1 {
+                fmt.Printf("%s\t%d\t%s\t%s\n", key, user.Id, user.Name, user.Surname)
+        }
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Specifikace klíčů zapsaných v&nbsp;souborech JSON</h2>
+
+<p>Podobně jako při marshallingu je možné i při unmarshallingu specifikovat
+jména jednotlivých klíčů načítaných struktur (ovšem opět bez kontroly
+překladačem):</p>
+
+<pre>
+type <strong>User</strong> struct {
+        Id      uint32 `json:"user-id"`
+        Name    string `json:"user-name"`
+        Surname string
+}
+</pre>
+
+<p>Načítat tak budeme moci tento JSON s&nbsp;rozdílnými jmény klíčů:</p>
+
+<pre>
+{
+    "user-id-1": {
+                  "user-id":1,
+                  "user-name":"Pepek",
+                  "surname":"Vyskoč"
+                 },
+     "user-id-2":{
+                  "user-id":2,
+                  "user-name":"Josef",
+                  "surname":"Vyskočil"
+                 }
+}
+</pre>
+
+<p>Celý zdrojový kód vypadá takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+type <strong>User</strong> struct {
+        Id      uint32 `json:"user-id"`
+        Name    string `json:"user-name"`
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := ioutil.ReadFile("users_map_different_keys.json")
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        m1 := map[string]User{}
+        json.Unmarshal(input_json_as_bytes, &amp;m1)
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(m1)
+&nbsp;
+        fmt.Println("\nUsers:")
+        for key, user := range m1 {
+                fmt.Printf("%s\t%d\t%s\t%s\n", key, user.Id, user.Name, user.Surname)
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Načtení předem neznámé struktury z&nbsp;JSONu</h2>
+
+<p>Nakonec se podívejme, jak se načítá JSON s&nbsp;předem neznámou strukturou.
+V&nbsp;tomto případě použijeme mapu, jejímiž klíči musí být řetězce a hodnotami
+libovolný typ implementující prázdné rozhraní <strong>interface{}</strong>:</p>
+
+<pre>
+m1 := map[string]interface{}{}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: dvojice složených závorek je napsána
+naschvál &ndash; první závorky jsou součástí typu, druhé znamenají inicializaci
+mapy.</div></p>
+
+<p>Problém spočívá v&nbsp;další interpretaci hodnot, kdy je nutné použít obdobu
+reflexe. Ta bude vysvětlena v&nbsp;navazujícím článku.</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+)
+&nbsp;
+func <strong>main</strong>() {
+        input_json_as_bytes, err := ioutil.ReadFile("users_map_different_keys.json")
+        if err != nil {
+                log.Fatal(err)
+        }
+        fmt.Println("Input (bytes):")
+        fmt.Println(input_json_as_bytes)
+&nbsp;
+        fmt.Println("\nInput (string):")
+        fmt.Println(string(input_json_as_bytes))
+&nbsp;
+        m1 := map[string]interface{}{}
+        json.Unmarshal(input_json_as_bytes, &amp;m1)
+&nbsp;
+        fmt.Println("\nOutput:")
+        fmt.Println(m1)
+&nbsp;
+        fmt.Println("\nUsers:")
+        for key, user := range m1 {
+                fmt.Printf("%s\t%s\n", key, user)
+        }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Práce s&nbsp;rastrovými obrázky</h2>
+
+<p>V&nbsp;závěrečné části dnešního článku si ukážeme, jakým způsobem je možné
+vytvářet rastrové obrázky a exportovat je do různých formátů. Zaměříme se
+přitom na dva nejčastěji používané &bdquo;webové&ldquo; formáty <a
+href="https://www.root.cz/clanky/png-is-not-gif/">PNG</a> a <a
+href="https://www.root.cz/clanky/jpeg-kral-rastrovych-grafickych-formatu/">JPEG</a>.
+Pro tyto formáty existuje podpora přímo v&nbsp;základní knihovně programovacího
+jazyka Go, takže není nutné instalovat žádné další balíčky. Samotné rastrové
+obrázky jsou reprezentovány následujícími datovými typy, jejichž definici
+najdeme ve standardním balíčku <strong>image</strong>, například:</p>
+
+<table>
+<tr><th>Typ</th><th>Význam</th></tr>
+<tr><td>Alpha</td><td>pixely obsahující pouze alfa složku (průhlednost)</td></tr>
+<tr><td>Alpha16</td><td>pixely obsahující pouze alfa složku (průhlednost) v&nbsp;šestnáctibitové hloubce</td></tr>
+<tr><td>CMYK</td><td>obrázek používající barvový prostor CMYK</td></tr>
+<tr><td>Gray</td><td>obrázek v&nbsp;odstínech šedi</td></tr>
+<tr><td>Gray16</td><td>obrázek v&nbsp;odstínech šedi v&nbsp;šestnáctibitové hloubce</td></tr>
+<tr><td>YCbCr</td><td>obrázek používající barvový prostor YCbCr</td></tr>
+<tr><td>RGBA</td><td>obrázek používající barvový prostor RGB s&nbsp;průhledností</td></tr>
+<tr><td>RGBA64</td><td>obrázek používající barvový prostor RGB s&nbsp;průhledností</td></tr>
+<tr><td>Paletted</td><td>obrázky využívající barvovou paletu</td></tr>
+</table>
+
+<p>Existují sice i další varianty, ovšem dnes si vystačíme s&nbsp;typy
+<strong>Gray</strong> a <strong>RGBA</strong>.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Export rastrového obrazu do PNG</h2>
+
+<p>V&nbsp;dalším příkladu nejdříve vytvoříme rastrový obrázek o rozlišení
+256&times;256 pixelů, přičemž bude použit barvový prostor RGBA:</p>
+
+<pre>
+img := image.NewRGBA(image.Rect(0, 0, width, height))
+</pre>
+
+<p>Obrázek vyplníme gradientním přechodem (což nyní není příliš důležité) a
+následně vytvoříme nový soubor pojmenovaný &bdquo;test.png&ldquo;, samozřejmě
+s&nbsp;kontrolou, zda otevření proběhlo korektně:</p>
+
+<pre>
+outfile, err := os.Create("test.png")
+if err != nil {
+        panic(err)
+}
+defer outfile.Close()
+</pre>
+
+<p>Nakonec jednoduše do otevřeného souboru uložíme obrázek ve formátu PNG:</p>
+
+<pre>
+png.Encode(outfile, img)
+</pre>
+
+<p>Výsledek:</p>
+
+<img src="https://i.iinfo.cz/images/97/golang-13-2.png" class="image-354166" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 1: Obrázek exportovaný demonstračním příkladem.</i></p>
+
+<p>Zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/png"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        var red uint8 = uint8(x)
+                        var green uint8 = uint8((x + y) &gt;&gt; 1)
+                        var blue uint8 = uint8(y)
+                        c := color.RGBA{red, green, blue, 255}
+                        img.SetRGBA(x, y, c)
+                }
+        }
+&nbsp;
+        outfile, err := os.Create("test.png")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+        <strong>png.Encode(outfile, img)</strong>
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Export rastrového obrazu do formátu JPEG</h2>
+
+<p>Prakticky stejným způsobem lze provést export do formátu JPEG, pouze se musí
+nahradit tento řádek:</p>
+
+<pre>
+png.Encode(outfile, img)
+</pre>
+
+<p>za:</p>
+
+<pre>
+jpeg.Encode(outfile, img, nil)
+</pre>
+
+<p>Povšimněte si, že v&nbsp;případě konverze do JPEGu musíme funkci
+<strong>Decode</strong> předat ještě jeden parametr, který bude vysvětlen o
+několik odstavců níže:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/jpeg"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        var red uint8 = uint8(x)
+                        var green uint8 = uint8((x - y))
+                        var blue uint8 = uint8(y)
+                        c := color.RGBA{red, green, blue, 255}
+                        img.SetRGBA(x, y, c)
+                }
+        }
+&nbsp;
+        outfile, err := os.Create("test.jpeg")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+        <strong>jpeg.Encode(outfile, img, nil)</strong>
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/97/golang-13-1.jpg" class="image-354165" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 2: Výsledek předchozího příkladu.</i></p>
+
+<p>Zajímavý je poslední parametr předávaný funkci <strong>jpeg.Encode</strong>,
+protože nám umožňuje specifikovat další vlastnosti použité při komprimaci
+rastrového obrázku do JPEGu. Ovlivnit je možné zejména kvalitu výsledku, takže
+se podívejme, jak se výsledný obrázek změní ve chvíli, kdy nastavíme nejnižší
+možnou kvalitu (a tím pádem největší komprimační poměr):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "image"
+        "image/color"
+        "image/jpeg"
+        "os"
+)
+&nbsp;
+const width = 256
+const height = 256
+&nbsp;
+func <strong>main</strong>() {
+        img := image.NewRGBA(image.Rect(0, 0, width, height))
+        for x := 0; x &lt; width; x++ {
+                for y := 0; y &lt; height; y++ {
+                        var red uint8 = uint8(x)
+                        var green uint8 = uint8((x - y))
+                        var blue uint8 = uint8(y)
+                        c := color.RGBA{red, green, blue, 255}
+                        img.SetRGBA(x, y, c)
+                }
+        }
+&nbsp;
+        outfile, err := os.Create("test2.jpeg")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+        <strong>jpeg.Encode(outfile, img, &amp;jpeg.Options{Quality: 1})</strong>
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/97/golang-13-3.jpg" class="image-354167" alt="&#160;" width="256" height="256" />
+<p><i>Obrázek 3: Obrázek s&nbsp;nejnižší kvalitou a nejvyšším komprimačním
+poměrem.</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_json_marshal_basic_signed_types.go</td><td>marshalling celých čísel se znaménkem do JSONu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/01_json_marshal_basic_signed_types.go">https://github.com/tisnik/go-fedora/blob/master/article_13/01_json_marshal_basic_signed_types.go</a></td></tr>
+<tr><td> 2</td><td>02_json_marshal_basic_unsigned_types.go</td><td>marshalling celých čísel bez znaménka do JSONu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/02_json_marshal_basic_unsigned_types.go">https://github.com/tisnik/go-fedora/blob/master/article_13/02_json_marshal_basic_unsigned_types.go</a></td></tr>
+<tr><td> 3</td><td>03_json_marshal_basic_complex_types.go</td><td>pokus o marshalling komplexních čísel do JSONu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/03_json_marshal_basic_complex_types.go">https://github.com/tisnik/go-fedora/blob/master/article_13/03_json_marshal_basic_complex_types.go</a></td></tr>
+<tr><td> 4</td><td>04_json_marshal_arrays.go</td><td>marshalling jednorozměrných i dvourozměrných polí do JSONu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/04_json_marshal_arrays.go">https://github.com/tisnik/go-fedora/blob/master/article_13/04_json_marshal_arrays.go</a></td></tr>
+<tr><td> 5</td><td>05_json_marshal_struct.go</td><td>marshalling struktury/záznamu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/05_json_marshal_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/05_json_marshal_struct.go</a></td></tr>
+<tr><td> 6</td><td>06_json_mashal_array_of_struct.go</td><td>marshalling pole struktur/záznamů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/06_json_mashal_array_of_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/06_json_mashal_array_of_struct.go</a></td></tr>
+<tr><td> 7</td><td>07_json_marshal_map_of_structs.go</td><td>marshalling map struktur/záznamů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/07_json_marshal_map_of_structs.go">https://github.com/tisnik/go-fedora/blob/master/article_13/07_json_marshal_map_of_structs.go</a></td></tr>
+<tr><td> 8</td><td>08_json_marshal_map_of_structs.go</td><td>marshalling map struktur/záznamů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/08_json_marshal_map_of_structs.go">https://github.com/tisnik/go-fedora/blob/master/article_13/08_json_marshal_map_of_structs.go</a></td></tr>
+<tr><td> 9</td><td>09_json_marshal_complex_map.go</td><td>marshalling map struktur/záznamů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/09_json_marshal_complex_map.go">https://github.com/tisnik/go-fedora/blob/master/article_13/09_json_marshal_complex_map.go</a></td></tr>
+<tr><td>10</td><td>10_json_different_keys.go</td><td>změna názvů klíčů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/10_json_different_keys.go">https://github.com/tisnik/go-fedora/blob/master/article_13/10_json_different_keys.go</a></td></tr>
+<tr><td>11</td><td>11_json_marshal_special_values.go</td><td>pokus o marshalling speciálních hodnot</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/11_json_marshal_special_values.go">https://github.com/tisnik/go-fedora/blob/master/article_13/11_json_marshal_special_values.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>12_json_unmarshal_struct.go</td><td>unmarshalling struktury</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/12_json_unmarshal_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/12_json_unmarshal_struct.go</a></td></tr>
+<tr><td>13</td><td>13_json_unmarshal_struct.go</td><td>unmarshalling struktury</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/13_json_unmarshal_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/13_json_unmarshal_struct.go</a></td></tr>
+<tr><td>14</td><td>14_json_unmarshal_array.go</td><td>unmarshalling pole</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/14_json_unmarshal_array.go">https://github.com/tisnik/go-fedora/blob/master/article_13/14_json_unmarshal_array.go</a></td></tr>
+<tr><td>15</td><td>15_json_unmarshal_array_of_struct.go</td><td>unmarshalling pole struktur</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/15_json_unmarshal_array_of_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/15_json_unmarshal_array_of_struct.go</a></td></tr>
+<tr><td>16</td><td>16_json_unmarshal_map_of_struct.go</td><td>unmarshalling mapy struktur</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/16_json_unmarshal_map_of_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/16_json_unmarshal_map_of_struct.go</a></td></tr>
+<tr><td>17</td><td>17_json_unmarshal_map_of_struct_different_keys.go</td><td>unmarshalling mapy struktur, specifikace klíčů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/17_json_unmarshal_map_of_struct_different_keys.go">https://github.com/tisnik/go-fedora/blob/master/article_13/17_json_unmarshal_map_of_struct_different_keys.go</a></td></tr>
+<tr><td>18</td><td>18_json_unmarshal_unknown_struct.go</td><td>pokus o unmarshalling struktury s&nbsp;obecnými daty</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/18_json_unmarshal_unknown_struct.go">https://github.com/tisnik/go-fedora/blob/master/article_13/18_json_unmarshal_unknown_struct.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>19_png_output.go</td><td>export rastrového obrázku do formátu PNG</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/19_png_output.go">https://github.com/tisnik/go-fedora/blob/master/article_13/19_png_output.go</a></td></tr>
+<tr><td>20</td><td>20_jpeg_output.go</td><td>export rastrového obrázku do formátu JPEG</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/20_jpeg_output.go">https://github.com/tisnik/go-fedora/blob/master/article_13/20_jpeg_output.go</a></td></tr>
+<tr><td>21</td><td>21_jpeg_output_low_quality.go</td><td>export rastrového obrázku do formátu JPEG s&nbsp;ovlivněním kvality</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_13/21_jpeg_output_low_quality.go">https://github.com/tisnik/go-fedora/blob/master/article_13/21_jpeg_output_low_quality.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
