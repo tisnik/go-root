@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 6B:
+//     Marshalling pole struktur/záznamů do JSONu, privátní prvky struktury
+
 package main
 
 import (
