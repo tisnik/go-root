@@ -3,7 +3,7 @@
 // Třináctá část
 //
 // Demonstrační příklad číslo 1:
-//    
+//     Marshalling celých čísel se znaménkem do JSONu
 
 package main
 
