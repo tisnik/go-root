@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 4:
+//     Marshalling jednorozměrných i dvourozměrných polí do JSONu
+
 package main
 
 import (
