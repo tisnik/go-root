@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 10:
+//     Změna názvů klíčů pri marshallingu
+
 package main
 
 import (
