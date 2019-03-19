@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 2:
+//     Marshalling celých čísel bez znaménka do JSONu
+
 package main
 
 import (
