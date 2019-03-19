@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 3B:
+//     Pokus o marshalling komplexních čísel do JSONu, kontrola převodu
+
 package main
 
 import (
