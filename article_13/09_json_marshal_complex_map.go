@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 9:
+//     Marshalling map struktur/záznamů
+
 package main
 
 import (
