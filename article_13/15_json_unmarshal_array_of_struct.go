@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 15:
+//     Unmarshalling pole struktur
+
 package main
 
 import (
