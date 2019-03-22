@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 14:
+//     Unmarshalling pole z JSONu
+
 package main
 
 import (
