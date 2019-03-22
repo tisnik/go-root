@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 19:
+//     Export rastrového obrázku do formátu PNG
+
 package main
 
 import (
