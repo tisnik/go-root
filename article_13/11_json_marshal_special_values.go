@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 11:
+//     Pokus o marshalling speciálních hodnot
+
 package main
 
 import (
