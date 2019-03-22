@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 17:
+//     Unmarshalling mapy struktur, specifikace klíčů
+
 package main
 
 import (
