@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 21:
+//     Export rastrového obrázku do formátu JPEG s ovlivněním kvality
+
 package main
 
 import (
