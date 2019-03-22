@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 18:
+//     Pokus o unmarshalling struktury s obecnými daty
+
 package main
 
 import (
