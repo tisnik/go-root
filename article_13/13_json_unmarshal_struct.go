@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třináctá část
+//
+// Demonstrační příklad číslo 13:
+//     Unmarshalling struktury z JSONu
+
 package main
 
 import (
