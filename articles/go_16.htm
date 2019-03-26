@@ -1,0 +1,2573 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V šestnácté části seriálu o programovacím jazyku Go dokončíme popis možností knihovny GG, která uživatelům nabízí podobné funkce jako Cairo či OpenVG. Budeme se zabývat například vykreslováním cest (path) či textů.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vymazání kreslicí plochy</a></p>
+<p><a href="#k02">2. Změna barvy použité při vykreslování v&nbsp;knihovně GG</a></p>
+<p><a href="#k03">3. Modifikace průhlednosti (alfa kanál)</a></p>
+<p><a href="#k04">4. Specifikace šířky vykreslovaných obrysů</a></p>
+<p><a href="#k05">5. Styl ukončení křivek i úseček</a></p>
+<p><a href="#k06">6. Čárkované a čerchované obrysy</a></p>
+<p><a href="#k07">7. Základní příkazy určené pro vytvoření cesty</a></p>
+<p><a href="#k08">8. Otevřené a uzavřené cesty</a></p>
+<p><a href="#k09">9. Použití kvadratických Bézierových křivek při tvorbě složitějších cest</a></p>
+<p><a href="#k10">10. Vizualizace řídicích bodů i tečných vektorů kvadratických Bézierových křivek</a></p>
+<p><a href="#k11">11. Kubické Bézierovy křivky</a></p>
+<p><a href="#k12">12. Vizualizace řídicích bodů i tečných vektorů kubických Bézierových křivek</a></p>
+<p><a href="#k13">13. Rotace Bézierových křivek s&nbsp;využitím transformace zadané metodou <strong>RotateAbout</strong></a></p>
+<p><a href="#k14">14. Převod sekvence snímků na animaci ve formátu GIF</a></p>
+<p><a href="#k15">15. Rotace pomocí metod <strong>Rotate</strong> a <strong>RotateAbout</strong></a></p>
+<p><a href="#k16">16. Změna měřítka a skládání transformací</a></p>
+<p><a href="#k17">17. Práce s&nbsp;fonty, vykreslování písma (textu)</a></p>
+<p><a href="#k18">18. Vycentrování textu s&nbsp;využitím metody <strong>DrawStringAnchored</strong></a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Vymazání kreslicí plochy</h2>
+
+<p>Dnes navážeme na <a
+href="https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-tvorba-animovanych-gifu-graficka-knihovna-gg/">předchozí
+část</a> <a href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go i o jeho knihovnách</a>, protože si popíšeme další
+koncepty, na nichž je postavena knihovna GG. Připomeňme si, že tato knihovna
+slouží pro vykreslování 2D grafiky do rastrových obrázků, které je následně
+možné uložit na disk popř.&nbsp;poslat jako výsledek nějakého výpočtu přes
+zvolený komunikační protokol (představme si například mapový server generující
+a posílající jednotlivé &bdquo;dlaždice&ldquo;, z&nbsp;nichž se výsledná mapa
+postupně poskládá). Pro ukládání obrázků do souborů se používají formáty <a
+href="https://www.root.cz/clanky/png-is-not-gif/">PNG</a> a <a
+href="https://www.root.cz/clanky/jpeg-kral-rastrovych-grafickych-formatu/">JPEG</a>,
+ovšem <a href="#k14">ve čtrnácté kapitole</a> si ukážeme, jakým způsobem je
+možné provést export sekvence snímků do <a
+href="https://www.root.cz/clanky/gif-animace-a-konkurence/">animovaného formátu
+GIF</a>.</p>
+
+<p>V&nbsp;dnešním <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/01_gg_clear_screen.go">prvním
+demonstračním příkladu</a> si pouze připomeneme základní koncepty, na nichž je
+knihovna GG postavena. Při vykreslování se používá takzvaný <i>kontext
+(context)</i>, což je datová struktura obsahující jak rastrový obrázek, tak i
+parametry vykreslování. Ve výchozím nastavení jsou všechny pixely rastrového
+obrázku průhledné, ovšem celý obraz můžeme vyplnit jakoukoli jinou barvou tak,
+že vykreslíme obdélník se shodnými rozměry, jaké má vlastní obrázek, a to
+s&nbsp;využitím metody nazvané <strong>DrawRectangle</strong> (to není zcela
+přesné, protože musíme brát v&nbsp;potaz i případné <a
+href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">afinní
+transformace</a> popsané dále):</p>
+
+<pre>
+func (dc *Context) <strong>DrawRectangle</strong>(x, y, w, h float64)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: naprostá většina metod, které si dnes
+popíšeme, je vztažena k&nbsp;datové struktuře
+<strong>Context</strong>.</div></p>
+
+<p>V&nbsp;prvním příkladu si povšimněte, že barvové složky definující barvu
+v&nbsp;prostoru RGB (či RGBA) jsou reprezentovány hodnotami typu
+<strong>float64</strong>, které leží v&nbsp;rozsahu &lt;0, 1&gt;:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SavePNG("01.png")
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se měl vytvořit soubor nazvaný
+&bdquo;01.png&ldquo; s&nbsp;tímto obsahem:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-1.png" class="image-356240" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 1: Výsledek běhu prvního demonstračního příkladu.</i></p>
+
+<p>Ve skutečnosti je však možné provést vyplnění celé plochy rastrového obrázku
+ještě jednodušeji, a to pomocí metody nazvané <strong>Clear</strong>. Nemusíme
+tedy explicitně vykreslovat obdélník s&nbsp;rozměry odpovídajícími rozměrům
+obrázku. <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/02_gg_clear_screen.go">Zjednodušený
+příklad</a> může vypadat následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Clear()
+&nbsp;
+        dc.SavePNG("02.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-2.png" class="image-356241" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 2: Výsledek běhu druhého demonstračního příkladu</i></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Změna barvy použité při vykreslování v&nbsp;knihovně GG</h2>
+
+<p>Prakticky v&nbsp;každé aplikaci, která pro tvorbu 2D grafiky nějakým
+způsobem využívá knihovnu GG, se setkáme s&nbsp;nutností nastavení barvy
+vykreslování. Pro tento účel se nejčastěji používá metoda nazvaná
+<strong>SetRGB</strong> nebo <strong>SetRGBA</strong>:</p>
+
+<pre>
+func (dc *Context) <strong>SetRGB</strong>(r, g, b float64)
+&nbsp;
+func (dc *Context) <strong>SetRGBA</strong>(r, g, b, a float64)
+</pre>
+
+<p>Alternativně je možné použít i další metody, v&nbsp;nichž se barva
+vykreslování reprezentuje odlišným typem hodnoty. K&nbsp;dispozici je hned
+několik způsobů:</p>
+
+<pre>
+<i>// využití celočíselných hodnot barvových složek</i>
+func (dc *Context) <strong>SetRGB255</strong>(r, g, b int)
+&nbsp;
+<i>// využití celočíselných hodnot barvových složek</i>
+func (dc *Context) <strong>SetRGBA255</strong>(r, g, b, a int)
+&nbsp;
+<i>// použita strukura z&nbsp;modulu Draw</i>
+func (dc *Context) <strong>SetColor</strong>(c color.Color)
+&nbsp;
+<i>// použita stejná syntaxe, jako v HTML a CSS</i>
+func (dc *Context) <strong>SetHexColor</strong>(x string)
+</pre>
+
+<p>Nastavení barvy je součástí kontextu, tj.&nbsp;barva bude použita pro
+všechny příkazy <strong>Stroke</strong> nebo <strong>Fill</strong>. Následuje
+příklad použití &ndash; vykreslení úseček s&nbsp;rozdílnou intenzitou červené
+barvy:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 4 {
+        x := float64(i + 32)
+        <i>// barvové složky jsou hodnoty v rozsahu 0.0 až 1.0</i>
+        r := float64(i) / 256.0
+        dc.<strong>SetRGB</strong>(r, 0.0, 0.0)
+        dc.DrawLine(x, 20, x, 75)
+        dc.Stroke()
+}
+</pre>
+
+<p>Podobně ovšem můžeme použít i metodu <strong>SetRGBA</strong> a nastavit
+průhlednost na hodnotu 1,0:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 4 {
+        x := float64(i + 32)
+        <i>// barvové složky jsou hodnoty v rozsahu 0.0 až 1.0</i>
+        r := float64(i) / 256.0
+        dc.<strong>SetRGBA</strong>(r, 0.0, 0.0, 1.0)
+        dc.DrawLine(x, 20, x, 75)
+        dc.Stroke()
+}
+</pre>
+
+<p>Tato programová smyčka je použita v&nbsp;dnešním třetím demonstračním
+příkladu, který po svém spuštění vykreslí tři řady úseček, pokaždé
+s&nbsp;odlišnou barvou. Výsledek by měl vypadat takto:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-3.png" class="image-356242" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 3: Výsledek běhu dnešního třetího demonstračního
+příkladu.</i></p>
+
+<p>Následuje úplný <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/03_gg_rgba_color.go">výpis
+zdrojového kódu</a> třetího příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 4 {
+                x := float64(i + 32)
+&nbsp;
+                <i>// barvové složky jsou hodnoty v rozsahu 0.0 až 1.0</i>
+                r := float64(i) / 256.0
+                dc.SetRGBA(r, 0.0, 0.0, 1.0)
+                dc.DrawLine(x, 20, x, 75)
+                dc.Stroke()
+&nbsp;
+                g := float64(i) / 256.0
+                dc.SetRGBA(0.0, g, 0.0, 1.0)
+                dc.DrawLine(x, 92, x, height-92)
+                dc.Stroke()
+&nbsp;
+                b := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, b, 1.0)
+                dc.DrawLine(x, height-75, x, height-20)
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("03.png")
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Modifikace průhlednosti (alfa kanál)</h2>
+
+<p>V&nbsp;případě, že se namísto metody <strong>SetRGB</strong> použije pro
+nastavení barvy vykreslování metoda nazvaná <strong>SetRGBA</strong>, je možné
+specifikovat i průhlednost vykreslovaných pixelů. I hodnota průhlednosti
+(<i>alfa kanál</i>) většinou leží v&nbsp;rozsahu od 0,0 do 1,0, takže je možné
+použít například následující úryvek kódu určený pro vykreslení třiceti dvou
+svislých úseček, každou se stejnou barvou (v&nbsp;tomto případě černou barvou),
+ale s&nbsp;odlišnou průhledností. Úsečka zcela nalevo je na 100% průhledná,
+zatímco úsečka napravo je neprůhledná:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 8 {
+        x := float64(i + 32)
+        <i>// průhlednost je hodnota v rozsahu 0.0 až 1.0</i>
+        alpha := float64(i) / 256.0
+        dc.<strong>SetRGBA</strong>(0.0, 0.0, 0.0, alpha)
+&nbsp;
+        dc.DrawLine(x, 20, x, height/2-20)
+        dc.Stroke()
+}
+</pre>
+
+<p>Ve skutečnosti ovšem bude demonstrační příklad, na němž bude ukázána práce
+s&nbsp;průhledností, nepatrně složitější, neboť si ukážeme, jaký vliv má
+hodnota <i>alfa</i> pro černé úsečky kreslené na bílém pozadí i pro bílé úsečky
+kreslené na pozadí černém. Pozadí má přitom v&nbsp;obou případech (bez ohledu
+na barvu) nastavenou průhlednost na nulu, takže by měl výsledek vypadat
+následovně:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-4.png" class="image-356243" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 4: Výsledek běhu čtvrtého demonstračního příkladu.</i></p>
+
+<p>Opět si ukažme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/04_gg_alpha_component.go">zdrojový
+kód</a> čtvrtého demonstračního příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height/2)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.DrawRectangle(0, height/2, width, height)
+        dc.SetRGB(0.0, 0.0, 0.0)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 8 {
+                x := float64(i + 32)
+&nbsp;
+                <i>// průhlednost je hodnota v rozsahu 0.0 až 1.0</i>
+                alpha := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, 0.0, alpha)
+&nbsp;
+                dc.DrawLine(x, 20, x, height/2-20)
+&nbsp;
+                dc.Stroke()
+&nbsp;
+                dc.SetRGBA(1.0, 1.0, 1.0, alpha)
+                dc.DrawLine(x, height/2+20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("04.png")
+}
+</pre>
+
+<p>Samozřejmě si můžeme vyzkoušet, jak se celá vykreslovaná scéna změní
+v&nbsp;případě, že i pozadí bude vykresleno poloprůhlednou barvou, konkrétně
+barvou s&nbsp;alfa nastavenou na 50%:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-5.png" class="image-356244" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 5: Pozadí je v&nbsp;tomto případě nastaveno na poloprůhlednou
+barvu.</i></p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-6.png" class="image-356245" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 6: Pro zvýraznění (polo)průhledného pozadí můžeme použít
+prakticky jakýkoli rastrový grafický editor, který dokáže pracovat s&nbsp;alfa
+kanálem. Šachovnice v&nbsp;tomto případě není součástí obrázku; jen se tak
+zvýrazňuje průhledná a poloprůhledná plocha.</i></p>
+
+<p>Jen pro úplnost si ukažme, jak by mohl vypadat upravený zdrojový kód
+příkladu. Změní se pouze dvě metody <strong>SetRGB</strong> za
+<strong>SetRGBA</strong>, viz též zvýrazněné části zdrojového kódu:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height/2)
+        dc.<strong>SetRGBA</strong>(1.0, 1.0, 1.0, 0.5)
+        dc.Fill()
+&nbsp;
+        dc.DrawRectangle(0, height/2, width, height)
+        dc.<strong>SetRGBA</strong>(0.0, 0.0, 0.0, 0.5)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 8 {
+                x := float64(i + 32)
+&nbsp;
+                <i>// průhlednost je hodnota v rozsahu 0.0 až 1.0</i>
+                alpha := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, 0.0, alpha)
+&nbsp;
+                dc.DrawLine(x, 20, x, height/2-20)
+&nbsp;
+                dc.Stroke()
+&nbsp;
+                dc.SetRGBA(1.0, 1.0, 1.0, alpha)
+                dc.DrawLine(x, height/2+20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("04B.png")
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Specifikace šířky vykreslovaných obrysů</h2>
+
+<p>Při vykreslování obrysů popř.&nbsp;i jednotlivých úseček (či oblouků) je
+možné modifikovat i šířku pera použitého při renderingu. Ta se udává &ndash;
+ostatně podobně jako naprostá většina ostatních numerických hodnot
+v&nbsp;knihovně GG &ndash; typem <strong>float64</strong>, protože je použita
+subpixelová přesnost a navíc může být šířka modifikována nastavením měřítka
+odlišného od hodnoty 1,00. Pro nastavení šířky obrysů se nejčastěji používá
+metoda nazvaná <strong>SetLineWidth</strong>:</p>
+
+<pre>
+func (dc *Context) <strong>SetLineWidth</strong>(lineWidth float64)
+</pre>
+
+<p>Použití této metody je přímočaré:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 16 {
+        width := float64(i) / 20
+        dc.<strong>SetLineWidth</strong>(width)
+&nbsp;
+        x := float64(i + 32)
+        dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+        dc.Stroke()
+}
+</pre>
+
+<p>Samozřejmě si opět ukážeme, jakým způsobem se tato metoda použije
+v&nbsp;uceleném příkladu, který po svém spuštění vykreslí následující
+obrázek:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-7.png" class="image-356246" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 7: Úsečky vykreslené s&nbsp;různou šířkou obrysů. Povšimněte si,
+jakým způsobem jsou stopy úseček ukončeny i toho, že u širších úseček stopa
+končí až za zadaným koncovým bodem (vrcholem).</i></p>
+
+<p>Úplný zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/05_gg_line_width.go">https://github.com/tisnik/go-fedora/blob/master/article_16/05_gg_line_width.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        for i := 0; i &lt; 256; i += 16 {
+                width := float64(i) / 20
+                dc.SetLineWidth(width)
+&nbsp;
+                x := float64(i + 32)
+                dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SavePNG("05.png")
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Styl ukončení křivek i úseček</h2>
+
+<p>U otevřených geometrických tvarů, tj.&nbsp;především u cest a lomených čar,
+je možné specifikovat i způsob jejich zakončení. Uzavřené tvary,
+tj.&nbsp;kružnice, elipsy, obdélníky či obecné mnohoúhelníky žádný jasně
+definovaný konec nemají, proto na ně nebude mít nastavení stylu ukončení žádný
+význam. V&nbsp;knihovně GG, podobně jako v&nbsp;mnoha dalších podobně
+koncipovaných knihovnách (ostatně i v&nbsp;SVG) je možné specifikovat tři
+způsoby ukončení <i>stopy</i> otevřených tvarů, které jsou specifikovány
+datovým typem <strong>LineCap</strong> odvozeného od základního celočíselného
+datového typu <strong>int</strong>:</p>
+
+<table>
+<tr><th>Hodnota</th><th>Význam</th></tr>
+<tr><td>LineCapRound</td><td>ukončení obrysu či cesty kruhovým obloukem (obecně dochází k&nbsp;prodloužení tvaru)</td></tr>
+<tr><td>LineCapButt</td><td>ukončení obrysu či cesty kolmým řezem v místě koncových bodů (tvar končí přesně na koncovém bodu/vrcholu)</td></tr>
+<tr><td>LineCapSquare</td><td>ukončení obrysu či cesty kolmým řezem vzdáleným od koncových bodů o 1/2 šířky cesty (dochází tak opět k&nbsp;prodloužení tvaru)</td></tr>
+</table>
+
+<p>Pro nastavení stylu ukončení je možné použít buď metodu nazvanou jednoduše
+<strong>SetLineCap</strong>, které se potřebný styl předá v&nbsp;parametru:</p>
+
+<pre>
+func (dc *Context) <strong>SetLineCap</strong>(lineCap LineCap)
+</pre>
+
+<p>Alternativně jsou k&nbsp;dispozici i metody, kterým se kromě příjemce už
+žádný další parametr nepředává (připomeňme si, že příjemce se píše u volání
+metody před tečku):</p>
+
+<pre>
+func (dc *Context) <strong>SetLineCapRound</strong>() {
+&nbsp;
+func (dc *Context) <strong>SetLineCapButt</strong>() {
+&nbsp;
+func (dc *Context) <strong>SetLineCapSquare</strong>() {
+</pre>
+
+<p>V&nbsp;dalším demonstračním příkladu je vliv nastaveného stylu ukončení
+ukázán na úsečkách s&nbsp;rozdílnou šířkou stopy. Povšimněte si vodorovných
+úseček, které naznačují, na kterém místě leží koncové body (vrcholy) &ndash; je
+patrné, že v&nbsp;některých případech je tvar úsečky skutečně přetažen přes
+koncový bod:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-8.png" class="image-356247" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 8: Úsečky proměnné šířky s&nbsp;nakonfigurovaným
+zakončením.</i></p>
+
+<p>Samozřejmě si opět ukážeme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/06_gg_line_caps.go">úplný
+zdrojový kód demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+&nbsp;
+        dc.SetLineWidth(10.0)
+&nbsp;
+        for i := 0; i &lt; 256; i += 16 {
+                x := float64(i + 32)
+&nbsp;
+                width := float64(i) / 20
+                dc.SetLineWidth(width)
+&nbsp;
+                dc.SetLineCapRound()
+                dc.DrawLine(x, 20, x, 75)
+                dc.Stroke()
+&nbsp;
+                dc.SetLineCapButt()
+                dc.DrawLine(x, 92, x, height-92)
+                dc.Stroke()
+&nbsp;
+                dc.SetLineCapSquare()
+                dc.DrawLine(x, height-75, x, height-20)
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.SetLineWidth(1.0)
+&nbsp;
+        dc.DrawLine(32, 20, width-32, 20)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, 75, width-32, 75)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, 92, width-32, 92)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-92, width-32, height-92)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-75, width-32, height-75)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-20, width-32, height-20)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("06.png")
+}
+</pre>
+
+<p>Kromě stylu ukončení úseček je možné specifikovat i tvar použitý při
+navazování jednotlivých segmentů cest, a to konkrétně těmito metodami:</p>
+
+<pre>
+func (dc *Context) <strong>SetLineJoin</strong>(lineJoin LineJoin) {
+&nbsp;
+func (dc *Context) <strong>SetLineJoinRound</strong>() {
+&nbsp;
+func (dc *Context) <strong>SetLineJoinBevel</strong>() {
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Čárkované a čerchované obrysy</h2>
+
+<p>Při kresbě liniových obrazců nebo okrajů plošných obrazců je možné zvolit
+vzorek (styl) úseček &ndash; plná (výchozí nastavení), čárkovaná, čerchovaná,
+střídavá apod. K&nbsp;nastavení vzorku vykreslení úsečky slouží metoda se
+jménem <strong>SetDash</strong>. Parametrem této metody je seznam délek
+vykreslených segmentů prokládaných délkami segmentů nevykreslených:</p>
+
+<pre>
+func (dc *Context) <strong>SetDash</strong>(dashes ...float64)
+</pre>
+
+<p>Nastavit je možné i posun (<i>offset</i>) celého vzorku, a to konkrétně
+metodou <strong>SetDashOffset</strong>:</p>
+
+<pre>
+func (dc *Context) <strong>SetDashOffset</strong>(offset float64)
+</pre>
+
+<p>Podívejme se na několik jednoduchých příkladů.</p>
+
+<p>Čárkovaná čára s&nbsp;délkami úseček deset jednotek (při standardním měřítku
+pixelů):</p>
+
+<pre>
+dc.SetDash(10)
+dc.DrawLine(32, 40, 288, 40)
+dc.Stroke()
+</pre>
+
+<p>Má stejný význam &ndash; délka čárek je stejná jako šířka mezer:</p>
+
+<pre>
+dc.SetDash(10, 10)
+dc.DrawLine(32, 60, 288, 60)
+dc.Stroke()
+</pre>
+
+<p>Čerchovaná úsečka &ndash; čárky mají délku deseti jednotek, mezery pět
+jednotek a tečka je dlouhá dvě jednotky:</p>
+
+<pre>
+dc.SetDash(10, 5, 2, 5)
+dc.DrawLine(32, 220, 288, 220)
+dc.Stroke()
+</pre>
+
+<p>Opět si pochopitelně ukážeme příklad, který vykreslí tento obrázek:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-9.png" class="image-356248" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 9: Úsečky vykreslené s&nbsp;rozdílným stylem (plná, čárkovaná,
+čerchovaná atd.).</i></p>
+
+<p>Zdrojový kód tohoto demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/07_gg_set_dash.go">https://github.com/tisnik/go-fedora/blob/master/article_16/07_gg_set_dash.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("07.png")
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Základní příkazy určené pro vytvoření cesty</h2>
+
+<p>V&nbsp;této kapitole se zmíníme i o důležitém konceptu takzvaných cest
+(<i>paths</i>), protože z&nbsp;cest jsou složeny prakticky všechny složitěji
+tvarované dvourozměrné objekty, ať již se jedná o objekty otevřené či naopak o
+objekty uzavřené. Každá cesta se skládá z&nbsp;prakticky libovolného množství
+takzvaných segmentů (<i>segments</i>), přičemž je zajímavé, že jednotlivé
+segmenty na sebe mohou, ale také nemusí navazovat (cesta tedy může
+v&nbsp;případě potřeby obsahovat i &bdquo;skoky&ldquo;). Použití cest v&nbsp;2D
+grafice samozřejmě není nic nového; spíš by se dalo říci, že se jedná o dlouhým
+časem prověřenou technologii použitou například <a
+href="http://www.root.cz/clanky/vytvarime-krivky-v-postscriptu/">v&nbsp;PostScriptu</a>
+či ve vektorovém formátu <a
+href="http://www.root.cz/clanky/vlastnosti-cest-a-zakladnich-geometrickych-tvaru-v-svg/">SVG</a>
+(PostScript lze přitom chápat jako souborový formát, grafický metaformát,
+programovací jazyk a současně i vykreslovací či možná lépe řečeno renderovací
+knihovnu).</p>
+
+<p>Datový typ <strong>gg.Context</strong> programátorům nabízí poměrně velké
+množství příkazů určených pro definici segmentů cest. Jednotlivé typy segmentů
+budou podrobněji popsány v&nbsp;navazujících kapitolách, proto si zde pouze
+uveďme jednotlivé metody a jejich význam:</p>
+
+<table>
+<tr><th>#</th><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>ClosePath</td><td>uzavření cesty nakreslením úsečky do jejího počátečního vrcholu</td></tr>
+<tr><td>2</td><td>MoveTo</td><td>přesun aktivního bodu bez kreslení</td></tr>
+<tr><td>3</td><td>LineTo</td><td>lineární segment (úsečka), aktivní bod se přesune na konec úsečky</td></tr>
+<tr><td>4</td><td>QuadraticTo</td><td>kvadratická Bézierova křivka (jeden segment), aktivní bod se přesune na konec křivky</td></tr>
+<tr><td>5</td><td>CubicTo</td><td>kubická Bézierova křivka (jeden segment), aktivní bod se opět přesune na konec křivky</td></tr>
+</table>
+
+<p>Ukažme si nyní relativně jednoduchý <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/08_gg_simple_path.go">demonstrační
+příklad</a>, který po svém spuštění vykreslí domek jedním tahem. Pro tento účel
+nám poslouží metody nazvané <strong>MoveTo</strong> (přesun do počátečního bodu
+kreslení) a <strong>LineTo</strong> (kreslení úsečkového segmentu):</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.MoveTo(100, 200)
+        dc.LineTo(200, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(100, 200)
+        dc.LineTo(200, 100)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+&nbsp;
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("08.png")
+}
+</pre>
+
+<p>Výsledek by měl vypadat takto:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-10.png" class="image-356249" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 10: Domeček vykreslený jedním tahem.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Otevřené a uzavřené cesty</h2>
+
+<p>Předchozí příklad si nepatrně upravíme takovým způsobem, že vykreslíme pouze
+obrys domku. Celá cesta reprezentující obrys tedy může být zapsána takto:</p>
+
+<pre>
+dc.MoveTo(100, 200)
+dc.LineTo(100, 100)
+dc.LineTo(150, 50)
+dc.LineTo(200, 100)
+dc.LineTo(200, 200)
+dc.LineTo(100, 200)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-11.png" class="image-356250" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 11: Obrys domku vykreslený otevřenou cestou (i když je počáteční
+a koncový bod čistě náhodou shodný).</i></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/09_gg_open_path.go">Celý
+příklad</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.MoveTo(100, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+        dc.LineTo(100, 200)
+&nbsp;
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("09.png")
+}
+</pre>
+
+<p>Ve skutečnosti však můžeme cestu uzavřít korektně pomocí metody
+<strong>ClosePath</strong>. Samotná deklarace cesty se tedy změní takto:</p>
+
+<pre>
+dc.MoveTo(100, 200)
+dc.LineTo(100, 100)
+dc.LineTo(150, 50)
+dc.LineTo(200, 100)
+dc.LineTo(200, 200)
+dc.ClosePath()
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/10_gg_closed_path.go">Celý
+příklad</a> nyní vypadá takto:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.MoveTo(100, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+        dc.ClosePath()
+&nbsp;
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("10.png")
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-12.png" class="image-356251" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 12: Obrys domku vykreslený uzavřenou cestou.</i></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Použití kvadratických Bézierových křivek při tvorbě složitějších cest</h2>
+
+<p>Při tvorbě cest jsou podporovány jak kvadratické, tak i kubické Bézierovy
+křivky, což je jen dobře, protože kvadratické křivky jsou často používány
+například při definici fontů zatímco křivky kubické najdeme například
+v&nbsp;mnoha vektorových grafických editorech a tím pádem i v&nbsp;souborech
+exportovaných z&nbsp;těchto nástrojů. Bézierovy kvadratické křivky jsou určeny
+pouze jedním řídicím bodem a dvojicí bodů kotvicích (koncových). Křivka
+prochází prvním a třetím bodem (kotvicí body), druhý bod (řídicí) určuje
+současně oba tečné vektory. Ukázka Bézierovy kvadratické křivky spolu
+s&nbsp;jejími určujícími body je zobrazena na následujícím obrázku:</p>
+
+<img alt="404" width="400" height="300" src="http://i.iinfo.cz/urs/40_4-117932623830727.png" />
+<p><i>Obrázek 13: Bézierova kvadratická křivka zadaná dvojicí kotvicích bodů a
+jedním bodem řídicím.</i></p>
+
+<p>Následuje příklad cesty vytvořené jedinou Bézierovou kvadratickou křivkou.
+Povšimněte si nutnosti použít metody <strong>MoveTo</strong> pro specifikaci
+počátečního bodu křivky, protože v&nbsp;metodě <strong>QuadraticTo</strong> se
+uvádí pouze dvojice bodů:</p>
+
+<pre>
+dc.MoveTo(10, 150)
+dc.QuadraticTo(50, 10, 90, 150)
+dc.Stroke()
+</pre>
+
+<p>Hladké napojení Bézierových kvadratických křivek lze zajistit zadáním
+identického koncového bodu první křivky a počátečního bodu křivky druhé.
+Současně musí být shodné tečné vektory v&nbsp;těchto bodech,
+tj.&nbsp;prostřední (řídicí) body musí být středově symetrické okolo společného
+bodu obou křivek.</p>
+
+<p>Další demonstrační příklad vykreslí trojici Bézierových kvadratických
+křivek:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-13.png" class="image-356252" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 14: Trojice Bézierových křivek.</i></p>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/11_gg_quadratic_bezier.go">zdrojového
+kódu tohoto příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(10, 150)
+        dc.QuadraticTo(50, 10, 90, 150)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 1.0, 0.0, 1.0)
+        dc.MoveTo(110, 100)
+        dc.QuadraticTo(190, 100, 150, 190)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 1.0, 1.0)
+        dc.MoveTo(250, 150)
+        dc.QuadraticTo(210, 60, 290, 150)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("11.png")
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Vizualizace řídicích bodů i tečných vektorů kvadratických Bézierových křivek</h2>
+
+<p>Předchozí příklad je možné snadno upravit takovým způsobem, aby se
+vykreslila nejenom samotná Bézierova křivka, ale současně se zobrazily i její
+řídicí body a tečné vektory:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-14.png" class="image-356253" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 15: Kvadratické Bézierovy křivky zobrazení i se svými řídicími
+body a tečnými vektory.</i></p>
+
+<p>Toto vylepšení je implementováno ve funkci
+<strong>drawQuadraticBezier</strong>, kterou nalezneme <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/12_gg_quadratic_bezier_control_points.go">v&nbsp;dnešním
+dvanáctém demonstračním příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>drawQuadraticBezier</strong>(dc *gg.Context, x0 float64, y0 float64, x1 float64, y1 float64, x2 float64, y2 float64) {
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.QuadraticTo(x1, y1, x2, y2)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        drawQuadraticBezier(dc, 10, 150, 50, 10, 90, 150)
+        drawQuadraticBezier(dc, 110, 100, 190, 100, 150, 190)
+        drawQuadraticBezier(dc, 250, 150, 210, 60, 290, 150)
+&nbsp;
+        dc.SavePNG("12.png")
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Kubické Bézierovy křivky</h2>
+
+<p>Kubické Bézierovy křivky většina uživatelů používajících vektorové grafické
+editory již pravděpodobně velmi dobře zná (ale nalezneme je i v&nbsp;rastrových
+grafických editorech, například v&nbsp;GIMPu). Připomeňme si tedy, že tyto
+křivky jsou definovány počátečním bodem, koncovým bodem a dvojicí řídicích bodů
+(těmi křivka sice obecně neprochází, tyto body však ovlivňují její tvar). Větší
+množství řídicích bodů dává uživatelům i větší možnosti tvarování křivky,
+protože je možné vytvořit i esíčko, smyčku atd. Ve&nbsp;knihovně GG se tyto
+křivky (resp.&nbsp;segmenty složené z&nbsp;kubických Bézierových křivek)
+přidávají do cesty pomocí metody <strong>CubicTo</strong>, přičemž tato metoda
+očekává tři body (přesněji šestici souřadnic), protože počáteční bod již známe
+&ndash; je jím dočasný poslední bod aktuálně vytvářené cesty.</p>
+
+<img alt="403" width="400" height="300" src="http://i.iinfo.cz/urs/40_3-117932622699099.png" />
+<p><i>Obrázek 16: Bézierova kubická křivka zadaná dvojicí kotvicích (koncových)
+bodů a dvojicí bodů řídicích.</i></p>
+
+<p>Následuje příklad cesty s&nbsp;jedinou Bézierovou kubickou křivkou. Opět si
+povšimněte nutnosti použít metody <strong>MoveTo</strong> pro specifikaci
+počátečního bodu křivky:</p>
+
+<pre>
+dc.MoveTo(10, 180)
+dc.CubicTo(10, 10, 120, 180, 120, 10)
+dc.Stroke()
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: Bézierovy kubické křivky jsou
+v&nbsp;počítačové grafice velmi rozšířeny. Mezi jejich hlavní přednosti patří
+intuitivní zadávání a snadné hladké navazování křivek na sebe. Také výpočet
+bodů, které leží na křivce, je velmi jednoduchý a rychlý. Pomocí Bézierových
+kubických křivek však nelze přesně modelovat kuželosečky, zejména kruh a
+elipsu, což omezuje použití těchto křivek v&nbsp;CAD systémech. Také nelze
+k&nbsp;obecné Bézierově kubice vytvořit offsetovou křivku, tj.&nbsp;křivku,
+která se od zadané křivky nachází v&nbsp;určité vzdálenosti. Toto omezení se
+teoreticky může projevit i v&nbsp;komerční grafice (doména programů typu
+&bdquo;Illustrator&ldquo;), ale je nutno říci, že chyba vzniklá použitím
+Bézierových křivek bývá velmi malá, mnohdy pod rozlišovací schopností lidského
+oka (opět však platí, že pro přesné CAD a CAM je nutné přijít s&nbsp;přesnějším
+řešením). Většinou postačí (automatické) rozdělení Bézierovy křivky, která má
+tvořit offsetovou cestu, na více částí, čímž se získá i větší množství řídicích
+bodů, se kterými je možné manipulovat. Tuto funkci však přímo v&nbsp;knihovně
+GG (alespoň prozatím) nenajdeme.</div></p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-15.png" class="image-356254" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 17: Výsledek činnosti demonstračního příkladu, jehož zdrojový kód
+je umístěn pod tento obrázek.</i></p>
+
+<p>Trojici kubických Bézierových křivek <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/13_gg_cubic_bezier.go">vykreslíme
+například takto</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(10, 180)
+        dc.CubicTo(10, 10, 120, 180, 120, 10)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 1.0, 0.0, 1.0)
+        dc.MoveTo(110, 180)
+        dc.CubicTo(190, 100, 80, 100, 160, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 1.0, 1.0)
+        dc.MoveTo(230, 180)
+        dc.CubicTo(280, 60, 230, 60, 280, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("13.png")
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Vizualizace řídicích bodů i tečných vektorů kubických Bézierových křivek</h2>
+
+<p>Opět si ukažme, jak se <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/14_gg_cubic_bezier_control_points.go">po
+úpravě příkladu</a> tak, aby se vykreslily řídicí body i tečné vektory
+kubických Bézierových křivek změní výsledek:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-16.png" class="image-356255" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 18: Dvojice Bézierových křivek s&nbsp;tečnými vektory i řídicími
+body.</i></p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-17.png" class="image-356256" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 19: Smyčka vytvořená Bézierovou křivkou.</i></p>
+
+<p>Následuje výpis zdrojového kódu příkladu, který po svém spuštění vytvoří
+dvojici výše zobrazených obrázků:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+        clearCanvas(dc, width, height)
+&nbsp;
+        drawCubicBezier(dc, 10, 180, 10, 10, 120, 180, 120, 10)
+        drawCubicBezier(dc, 230, 180, 280, 60, 230, 60, 280, 180)
+&nbsp;
+        dc.SavePNG("14A.png")
+&nbsp;
+        clearCanvas(dc, width, height)
+&nbsp;
+        drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+&nbsp;
+        dc.SavePNG("14B.png")
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Rotace Bézierových křivek s&nbsp;využitím transformace zadané metodou <strong>RotateAbout</strong></h2>
+
+<p>Řídicí body Bézierovy křivky je možné podrobit afinní transformaci (posun,
+rotace, změna měřítka). Výsledkem aplikace transformace <i>pouze na řídicí
+body</i> bude po vykreslení zcela korektně transformovaná Bézierova křivka, což
+je samozřejmě výhodné, protože je rychlejší transformovat tři nebo čtyři body a
+nikoli všechny body, z&nbsp;nichž se skládají segmenty křivky:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-18.png" class="image-356257" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 20: Rotace Bézierovy křivky.</i></p>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/15_gg_rotation.go">Další
+demonstrační příklad</a> po svém spuštění vytvoří osm snímků s&nbsp;různě
+natočenou Bézierovou kubikou. Význam metody <strong>RotateAbout</strong> je
+vysvětlen v&nbsp;navazujícím textu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "github.com/fogleman/gg"
+)
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        for alpha := 0; alpha &lt; 360; alpha += 30 {
+                clearCanvas(dc, width, height)
+                dc.Push()
+                dc.RotateAbout(gg.Radians(float64(alpha)), width/2, height/2)
+                drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+                dc.Pop()
+                filename := fmt.Sprintf("15_%03d.png", alpha)
+                dc.SavePNG(filename)
+        }
+&nbsp;
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Převod sekvence snímků na animaci ve formátu GIF</h2>
+
+<p>V&nbsp;této kapitole si vysvětlíme, jakým způsobem vznikla následující
+jednoduchá animace:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-19.gif" class="image-356258" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 21: Jednoduchá animace vytvořená demonstračním příkladem.</i></p>
+
+<p>V&nbsp;animaci se používá rotace okolo zadaného bodu. Používáme zde metody
+<strong>Push</strong> a <strong>Pop</strong> pro uložení a pro následné
+obnovení tvaru transformační matice:</p>
+
+<pre>
+for alpha := 0; alpha &lt; 360; alpha += 5 {
+        clearCanvas(dc, width, height)
+        dc.Push()
+        dc.RotateAbout(gg.Radians(float64(alpha)), width/2, height/2)
+        ...
+        vykreslení
+        ...
+        dc.Pop()
+}
+</pre>
+
+<p>Po vykreslení získáme z&nbsp;kontextu knihovny GG vlastní rastrový obrázek,
+převedeme ho na obrázek s&nbsp;barvovou paletou (pomocí nám již známé metody
+<strong>Draw</strong>) a uložíme ho do pole obrázků. Současně inicializujeme i
+pole s&nbsp;časy přechodu mezi jednotlivými snímky:</p>
+
+<pre>
+sourceImage := dc.Image()
+palettedImage := image.NewPaletted(image.Rect(0, 0, width, height), palette.Plan9)
+draw.Draw(palettedImage, palettedImage.Rect, sourceImage, image.ZP, draw.Over)
+images = append(images, palettedImage)
+delays = append(delays, 10)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;příkladu se ve skutečnosti
+nepracuje přímo s&nbsp;poli, ale s&nbsp;řezy (<i>slice</i>), které ovšem
+interně pole používají.</div></p>
+
+<p>A nakonec je nutné všechny snímky vyexportovat do formátu GIF:</p>
+
+<pre>
+outfile, err := os.Create("16.gif")
+if err != nil {
+        panic(err)
+}
+defer outfile.Close()
+&nbsp;
+gif.EncodeAll(outfile, &amp;gif.GIF{
+        Image: images,
+        Delay: delays,
+})
+</pre>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_16/16_gg_to_image.go">celého
+zdrojového kódu tohoto demonstračního příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "github.com/fogleman/gg"
+        "image"
+        "image/color/palette"
+        "image/draw"
+        "image/gif"
+        "os"
+)
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        var images []*image.Paletted
+        var delays []int
+&nbsp;
+        for alpha := 0; alpha &lt; 360; alpha += 5 {
+                clearCanvas(dc, width, height)
+                dc.Push()
+                dc.RotateAbout(gg.Radians(float64(alpha)), width/2, height/2)
+                drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+                dc.Pop()
+                sourceImage := dc.Image()
+                palettedImage := image.NewPaletted(image.Rect(0, 0, width, height), palette.Plan9)
+                draw.Draw(palettedImage, palettedImage.Rect, sourceImage, image.ZP, draw.Over)
+                images = append(images, palettedImage)
+                delays = append(delays, 10)
+                println(alpha, "of", 360)
+        }
+&nbsp;
+        outfile, err := os.Create("16.gif")
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image: images,
+                Delay: delays,
+        })
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Rotace pomocí metod <strong>Rotate</strong> a <strong>RotateAbout</strong></h2>
+
+<p>Všechny vykreslované úsečky a cesty jsou před vlastním renderingem podrobeny
+afinní transformaci: rotaci, změně měřítka, posunu, popř.&nbsp;libovolné
+kombinaci transformací (zkosení atd.). První metodou pro zadání transformace je
+metoda nazvaná <strong>Rotate</strong>, která provádí rotaci okolo počátku
+souřadné soustavy:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-20.png" class="image-356259" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 22: Rotace o 15&deg; okolo počátku souřadné soustavy
+s&nbsp;využitím metody <strong>Rotate</strong>.</i></p>
+
+<p>V&nbsp;dalším příkladu si povšimněte toho, že pro převod radiánů na stupně
+můžeme použít funkci <strong>Radians</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.Rotate(gg.Radians(15.0))
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("17.png")
+}
+</pre>
+
+<p>Mnohem častější bývá požadavek na rotaci okolo zvoleného bodu, nejenom okolo
+počátku souřadné soustavy. Zde využijeme metodu pojmenovanou příhodně
+<strong>RotateAbout</strong>:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-21.png" class="image-356260" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 23: Rotace o 15&deg; okolo bodu [width/2, height/2]
+s&nbsp;využitím  metody <strong>RotateAbout</strong>.</i></p>
+
+<p>Příklad, který tuto metodu používá, vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.RotateAbout(gg.Radians(15.0), width/2.0, height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("18.png")
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Změna měřítka a skládání transformací</h2>
+
+<p>Pro změnu měřítka se používají dvě metody pojmenované <strong>Scale</strong>
+a <strong>ScaleAbout</strong>. Většinou se používá druhá uvedená metoda, a to
+z&nbsp;toho důvodu, že se změna měřítka může vztáhnout k&nbsp;jakémukoli bodu
+v&nbsp;ploše, nejenom tedy k&nbsp;počátku souřadné soustavy:</p>
+
+<pre>
+dc.ScaleAbout(2.0, 2.0, width/2.0, height/2.0)
+</pre>
+
+<p>Výsledek může vypadat například takto:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-22.png" class="image-356261" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 24: Změna měřítka před vykreslením úseček s&nbsp;různými typy čáry.</i></p>
+
+<p>Úplný zdrojový kód příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.ScaleAbout(2.0, 2.0, width/2.0, height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("19.png")
+}
+</pre>
+
+<p>Nic nám samozřejmě nebrání v&nbsp;tom provést složení transformací ručně.
+Rotace o 15&deg; okolo zadaného bodu [width/2, height/2] se může naprogramovat
+i tímto způsobem:</p>
+
+<pre>
+dc.Translate(width/2.0, height/2.0)
+dc.Rotate(gg.Radians(15))
+dc.Translate(-width/2.0, -height/2.0)
+</pre>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-23.png" class="image-356262" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 25: Výsledek ručně složené transformace.</i></p>
+
+<p>Jen pro doplnění následuje úplný zdrojový kód příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.Translate(width/2.0, height/2.0)
+        dc.Rotate(gg.Radians(15))
+        dc.Translate(-width/2.0, -height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        dc.SavePNG("20.png")
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Práce s&nbsp;fonty, vykreslování písma (textu)</h2>
+
+<p>Knihovna GG podporuje i vykreslování textu. Používají se přitom fonty typu
+TrueType, které je nejdříve nutné načíst metodou <strong>LoadFontFace</strong>,
+jíž se předá jak jméno souboru s&nbsp;fontem, tak i požadovaná velikost písma.
+Pro vykreslení lze použít metodu <strong>DrawString</strong>, které se předává
+souřadnice levého dolního rohu pomyslného obdélníku, do něhož se text
+vykreslí:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-24.png" class="image-356263" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 26: Text vykreslený knihovnou GG.</i></p>
+
+<p>Podívejme se na příklad, který po svém spuštění vytvoří obrázek číslo
+25:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+        if err := dc.LoadFontFace("luxisr.ttf", 36); err != nil {
+                println("Cannot load font")
+                panic(err)
+        }
+        dc.DrawString("Hello, world!", 0, height)
+&nbsp;
+        dc.SavePNG("21.png")
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Vycentrování textu s&nbsp;využitím metody <strong>DrawStringAnchored</strong></h2>
+
+<p>V&nbsp;případě, že je nutné text vycentrovat, můžeme namísto metody
+<strong>DrawString</strong> použít metodu <strong>DrawStringAnchored</strong>,
+které se kromě vlastního textu předají i souřadnice vztažného bodu
+(<i>anchor</i>) a taktéž dvojice vah udávajících relativní pozici textu
+k&nbsp;tomuto bodu. Pro vycentrování použijte hodnoty 0,5:</p>
+
+<pre>
+dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-25.png" class="image-356264" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 27: Vycentrovaný text.</i></p>
+
+<p>Opět si samozřejmě ukažme, jak vypadá celý příklad:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+        if err := dc.LoadFontFace("luxisr.ttf", 36); err != nil {
+                println("Cannot load font")
+                panic(err)
+        }
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+&nbsp;
+        dc.SavePNG("22.png")
+}
+</pre>
+
+<p>Můžeme si samozřejmě vyzkoušet, jak se projeví různé hodnoty předané do
+předposledního parametru metody <strong>DrawStringAnchored</strong>. Tento
+parametr určuje, kterou část textu má vztažný bod určovat. Parametry budeme
+měnit od hodnoty -1,0 do 1,0:</p>
+
+<pre>
+var h float64 = 20
+weight := -1.0
+&nbsp;
+for i := 0; i &lt; 11; i++ {
+        dc.DrawStringAnchored("Hello, world!", width/2, h, weight, 0.5)
+        h += 20
+        weight += 0.2
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<img src="https://i.iinfo.cz/images/654/golang-16-26.png" class="image-356265" alt="&#160;" width="320" height="240" />
+<p><i>Obrázek 28: Různé hodnoty váhy udávající relativní vzdálenost textu ke
+vztažnému bodu.</i></p>
+
+<p>Úplný zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/fogleman/gg"
+&nbsp;
+func <strong>main</strong>() {
+        const width = 320
+        const height = 240
+&nbsp;
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+        if err := dc.LoadFontFace("luxisr.ttf", 24); err != nil {
+                println("Cannot load font")
+                panic(err)
+        }
+&nbsp;
+        var h float64 = 20
+        weight := -1.0
+&nbsp;
+        for i := 0; i &lt; 11; i++ {
+                dc.DrawStringAnchored("Hello, world!", width/2, h, weight, 0.5)
+                h += 20
+                weight += 0.2
+        }
+&nbsp;
+        dc.SavePNG("23.png")
+}
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Demonstrační příklad</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_gg_clear_screen.go</td><td>vymazání kreslicí plochy pomocí metody <strong>fill</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/01_gg_clear_screen.go">https://github.com/tisnik/go-fedora/blob/master/article_16/01_gg_clear_screen.go</a></td></tr>
+<tr><td> 2</td><td>02_gg_clear_screen.go</td><td>vymazání kreslicí plochy pomocí metody <strong>clear</strong></td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/02_gg_clear_screen.go">https://github.com/tisnik/go-fedora/blob/master/article_16/02_gg_clear_screen.go</a></td></tr>
+<tr><td> 3</td><td>03_gg_rgba_color.go</td><td>změna barvy vykreslování obrysů (zde jednotlivých úseček)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/03_gg_rgba_color.go">https://github.com/tisnik/go-fedora/blob/master/article_16/03_gg_rgba_color.go</a></td></tr>
+<tr><td> 4</td><td>04_gg_alpha_component.go</td><td>změna průhlednosti při vykreslování obrysů (zde opět jednotlivých úseček)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/04_gg_alpha_component.go">https://github.com/tisnik/go-fedora/blob/master/article_16/04_gg_alpha_component.go</a></td></tr>
+<tr><td> 5</td><td>05_gg_line_width.go</td><td>modifikace šířky kreslených obrysů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/05_gg_line_width.go">https://github.com/tisnik/go-fedora/blob/master/article_16/05_gg_line_width.go</a></td></tr>
+<tr><td> 6</td><td>06_gg_line_caps.go</td><td>modifikace typů ukončení obrysů (úseček atd.)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/06_gg_line_caps.go">https://github.com/tisnik/go-fedora/blob/master/article_16/06_gg_line_caps.go</a></td></tr>
+<tr><td> 7</td><td>07_gg_set_dash.go</td><td>nastavení čárkované, čerchované atd. úsečky</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/07_gg_set_dash.go">https://github.com/tisnik/go-fedora/blob/master/article_16/07_gg_set_dash.go</a></td></tr>
+<tr><td> 8</td><td>08_gg_simple_path.go</td><td>jednoduchá cesta (<i>path</i>)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/08_gg_simple_path.go">https://github.com/tisnik/go-fedora/blob/master/article_16/08_gg_simple_path.go</a></td></tr>
+<tr><td> 9</td><td>09_gg_open_path.go</td><td>otevřená cesta (<i>path</i>)</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/09_gg_open_path.go">https://github.com/tisnik/go-fedora/blob/master/article_16/09_gg_open_path.go</a></td></tr>
+<tr><td>10</td><td>10_gg_closed_path.go</td><td>explicitně uzavřená cesta</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/10_gg_closed_path.go">https://github.com/tisnik/go-fedora/blob/master/article_16/10_gg_closed_path.go</a></td></tr>
+<tr><td>11</td><td>11_gg_quadratic_bezier.go</td><td>kvadratická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/11_gg_quadratic_bezier.go">https://github.com/tisnik/go-fedora/blob/master/article_16/11_gg_quadratic_bezier.go</a></td></tr>
+<tr><td>12</td><td>12_gg_quadratic_bezier_control_points.go</td><td>kvadratická Bézierova křivka s&nbsp;vyznačením řídicích bodů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/12_gg_quadratic_bezier_control_points.go">https://github.com/tisnik/go-fedora/blob/master/article_16/12_gg_quadratic_bezier_control_points.go</a></td></tr>
+<tr><td>13</td><td>13_gg_cubic_bezier.go</td><td>kubická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/13_gg_cubic_bezier.go">https://github.com/tisnik/go-fedora/blob/master/article_16/13_gg_cubic_bezier.go</a></td></tr>
+<tr><td>14</td><td>14_gg_cubic_bezier_control_points.go</td><td>kubická Bézierova křivka s&nbsp;vyznačením řídicích bodů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/14_gg_cubic_bezier_control_points.go">https://github.com/tisnik/go-fedora/blob/master/article_16/14_gg_cubic_bezier_control_points.go</a></td></tr>
+<tr><td>15</td><td>15_gg_rotation.go</td><td>rotace celé Bézierovy křivky</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/15_gg_rotation.go">https://github.com/tisnik/go-fedora/blob/master/article_16/15_gg_rotation.go</a></td></tr>
+<tr><td>16</td><td>16_gg_to_image.go</td><td>animace, export všech snímků do formátu GIF</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/16_gg_to_image.go">https://github.com/tisnik/go-fedora/blob/master/article_16/16_gg_to_image.go</a></td></tr>
+<tr><td>17</td><td>17_gg_transformation_rotate.go</td><td>afinní transformace: rotace</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/17_gg_transformation_rotate.go">https://github.com/tisnik/go-fedora/blob/master/article_16/17_gg_transformation_rotate.go</a></td></tr>
+<tr><td>18</td><td>18_gg_transformation_rotate_about.go</td><td>afinní transformace: rotace okolo zadaného bodu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/18_gg_transformation_rotate_about.go">https://github.com/tisnik/go-fedora/blob/master/article_16/18_gg_transformation_rotate_about.go</a></td></tr>
+<tr><td>19</td><td>19_gg_scale_about.go</td><td>afinní transformace: změna měřítka okolo zadaného bodu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/19_gg_scale_about.go">https://github.com/tisnik/go-fedora/blob/master/article_16/19_gg_scale_about.go</a></td></tr>
+<tr><td>20</td><td>20_gg_translate.go</td><td>skládání několika transformací</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/20_gg_translate.go">https://github.com/tisnik/go-fedora/blob/master/article_16/20_gg_translate.go</a></td></tr>
+<tr><td>21</td><td>21_gg_text.go</td><td>vykreslení textu s&nbsp;využitím TTF fontů</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/21_gg_text.go">https://github.com/tisnik/go-fedora/blob/master/article_16/21_gg_text.go</a></td></tr>
+<tr><td>22</td><td>22_gg_text_centered.go</td><td>vykreslení vycentrovaného textu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/22_gg_text_centered.go">https://github.com/tisnik/go-fedora/blob/master/article_16/22_gg_text_centered.go</a></td></tr>
+<tr><td>23</td><td>23_gg_text_centered.go</td><td>vykreslení textu, který je horizontálně posunut o různou hodnotu</td><td><a href="https://github.com/tisnik/go-fedora/blob/master/article_16/23_gg_text_centered.go">https://github.com/tisnik/go-fedora/blob/master/article_16/23_gg_text_centered.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
