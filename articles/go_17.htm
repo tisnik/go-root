@@ -1,0 +1,2224 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Testování aplikací naprogramovaných v jazyce Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Testování aplikací naprogramovaných v jazyce Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V sedmnácté části seriálu o programovacím jazyce Go se budeme věnovat problematice testování. Nejprve si ukážeme, jakým způsobem se vytváří a spouští standardní jednotkové testy (unit test) a následně se seznámíme s dalšími užitečnými nástroji: go-carpet a GoConvey.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Testování aplikací naprogramovaných v&nbsp;jazyce Go</a></p>
+<p><a href="#k02">2. Vytvoření a spuštění jednotkového testu</a></p>
+<p><a href="#k03">3. Otestování funkcí a metod, které nejsou viditelné mimo svůj balíček</a></p>
+<p><a href="#k04">4. Výsledky testů v&nbsp;případě nesplnění nějaké testované podmínky</a></p>
+<p><a href="#k05">5. Okamžité ukončení jednotkového testu v&nbsp;případě detekce chyby</a></p>
+<p><a href="#k06">6. Jednotkové testy řízené tabulkami</a></p>
+<p><a href="#k07">7. Výběr testů pro spuštění na základě specifikovaného vzorku</a></p>
+<p><a href="#k08">8. Výběr testů na základě štítku (tagu)</a></p>
+<p><a href="#k09">9. Zjištění, které části programového kódu jsou pokryty jednotkovými testy</a></p>
+<p><a href="#k10">10. Nástroj <i>go-carpet</i></a></p>
+<p><a href="#k11">11. Ukázka použití nástroje <i>go-carpet</i></a></p>
+<p><a href="#k12">12. Nástroj <i>GoConvey</i></a></p>
+<p><a href="#k13">13. Použití webového uživatelského rozhraní nástroje <i>GoConvey</i></a></p>
+<p><a href="#k14">14. GoConvey a BDD testy</a></p>
+<p><a href="#k15">15. Mockování funkcí a metod pro potřeby jednotkových testů</a></p>
+<p><a href="#k16">16. Převody měn</a></p>
+<p><a href="#k17">17. Vytvoření mocku funkce <strong>get_exchange_rate_from_url</strong></a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Testování aplikací naprogramovaných v&nbsp;jazyce Go</h2>
+
+<p>Tvorba testů, ať již testů jednotkových, integračních, výkonnostních atd.,
+je v&nbsp;současnosti prakticky nedílnou součástí vývoje nových informačních
+systémů. I z&nbsp;tohoto důvodu se v&nbsp;nabídce standardních nástrojů jazyka
+Go nachází i nástroj určený pro spouštění jednotkových testů (<i>unit
+tests</i>) s&nbsp;vyhodnocením jejich výsledků, zjištěním, která část
+zdrojových kódů je jednotkovými testy pokryta atd. V&nbsp;souvislosti
+s&nbsp;jednotkovými testy je mnohdy nutné určité části programu nahradit jejich
+zjednodušenými (umělými) variantami, které se nazývají <i>mock</i>. Nástroj či
+knihovnu pro <i>mockování</i> sice přímo v&nbsp;základní sadě nástrojů Go
+nenalezneme (lze ji doinstalovat), ovšem jak si ukážeme v&nbsp;navazujících
+kapitolách, je většinou možné si vystačit s&nbsp;možnostmi poskytovanými
+samotným programovacím jazykem (zejména se to týká využití rozhraní &ndash;
+<i>interface</i>).</p>
+
+<p>Jak jsme si již řekli v&nbsp;úvodním odstavci, obsahuje standardní instalace
+programovacího jazyka Go i knihovnu určenou pro psaní jednotkových testů. Tato
+knihovna se jmenuje <strong>testing</strong> a základní informace o ní získáme
+stejným způsobem, jako je tomu v&nbsp;případě všech dalších knihoven či balíčků
+&ndash; příkazem <strong>go doc</strong>. Zde konkrétně následujícím
+způsobem:</p>
+
+<pre>
+$ <strong>go doc testing</strong>
+&nbsp;
+package testing // import "testing"
+&nbsp;
+Package testing provides support for automated testing of Go packages. It is
+intended to be used in concert with the ``go test'' command, which automates
+execution of any function of the form
+&nbsp;
+    func TestXxx(*testing.T)
+&nbsp;
+where Xxx does not start with a lowercase letter. The function name serves
+to identify the test routine.
+...
+...
+...
+</pre>
+
+<p>Samotná implementace jednotkových testů je představována běžnými funkcemi,
+jejichž jména začínají na <strong>Test</strong> a akceptují parametr typu
+<strong>*testing.T</strong>, tj.&nbsp;ukazatel na strukturu obsahující
+informace o kontextu, ve kterém jsou jednotlivé testy spouštěny:</p>
+
+<pre>
+type <strong>T</strong> struct {
+        common <i>// další struktura s informacemi o času spuštění testu atd. atd.</i>
+        isParallel bool
+        context    *testContext <i>// For running tests and subtests.</i>
+}
+</pre>
+
+<p>Důležité je, že existuje množství metod pro strukturu
+<strong>testing.T</strong>, které jsou použity právě při tvorbě jednotkových
+testů. Jedná se především o tyto metody:</p>
+
+<table>
+<tr><th>#</th><th>Metoda</th><th>Stručný popis metody</th></tr>
+<tr><td>1</td><td>Error</td><td>provede se zalogování chyby a funkce s&nbsp;testem se označí příznakem &bdquo;chyba&ldquo;</td></tr>
+<tr><td>2</td><td>Fail</td><td>funkce s&nbsp;testem se označí příznakem &bdquo;chyba&ldquo;</td></tr>
+<tr><td>3</td><td>FailNow</td><td>dtto, ovšem současně se příslušná funkce i ukončí</td></tr>
+<tr><td>4</td><td>Log</td><td>zalogování zprávy, typicky s&nbsp;informací o chybě</td></tr>
+<tr><td>5</td><td>Fatal</td><td>odpovídá kombinaci volání funkcí <strong>Log</strong>+<strong>FailNow</strong></td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: typicky tedy ve funkcích
+<strong>TestXXX</strong> nalezneme volání metody <strong>Error</strong> nebo
+<strong>Fatal</strong>, podle toho, zda se má celá testovací funkce ukončit či
+nikoli.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Vytvoření a spuštění jednotkového testu</h2>
+
+<p>Již v&nbsp;dokumentaci je zmíněno, jakým způsobem se mají jednotkové testy
+tvořit, ovšem jedná se o tak důležité téma, že se mu budeme věnovat podrobněji
+v&nbsp;první polovině dnešního článku. Nejprve se podívejme na <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add.go">zdrojový
+kód</a> obsahující funkci nazvanou <strong>Add</strong>, kterou budeme chtít
+otestovat. Kód funkce <strong>Add</strong> i příslušné funkce
+<strong>main</strong> je uložen v&nbsp;souboru pojmenovaném
+&bdquo;add.go&ldquo;:</p>
+
+<pre>
+package main
+&nbsp;
+func <strong>Add</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(Add(1, 2))
+}
+</pre>
+
+<p>Jakým způsobem se napíše jednotkový test či jednotkové testy pro tuto
+funkci? Testy budou zapisovány do souboru pojmenovaného
+&bdquo;add_test.go&ldquo;, protože právě na základě řetězce &bdquo;_test&ldquo;
+ve jménu souboru nástroje jazyka Go rozpoznávají, jestli se jedná o zdrojový
+kód, který má být součástí výsledné aplikace, či naopak o kód používaný pro
+testování.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti existují i další
+možnosti, jakými je možné rozdělit zdrojové kódy a testy. Někteří programátoři
+dávají přednost tomu, aby byly soubory s&nbsp;jednotkovými testy uloženy ve
+zvláštním (pod)adresáři. To je možné, ovšem v&nbsp;dnešním článku pro
+jednoduchost použijeme standardní postup &ndash; rozlišení běžných zdrojových
+kódů od testů na základě řetězce &bdquo;_test&ldquo;, který se ve jméně
+zdrojových souborů uvádí vždy před koncovku &bdquo;.go&ldquo;.</div></p>
+
+<p>Ukažme si tedy způsob naprogramování <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add_test.go">velmi
+jednoduchého jednotkového testu</a> pro otestování funkcionality funkce
+<strong>Add</strong>. Použijeme přitom metodu <strong></strong>, při jejímž
+zavolání se metodou <strong>Error</strong> zaregistruje, že test nebyl dokončen
+úspěšně:</p>
+
+<pre>
+package main
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := Add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: připomeňme si, že v&nbsp;programovacím
+jazyku Go není podporován příkaz <strong>assert</strong>. Autory Go k&nbsp;tomu
+vedlo několik důvodů, které jsou shrnuty ve FAQ <a
+href="https://golang.org/doc/faq#assertions">https://golang.org/doc/faq#assertions</a>.
+Pro nás je v&nbsp;tuto chvíli důležité, že můžeme snadno řídit, zda se má po
+nesplnění nějaké podmínky celý test ukončit, či zda se má pouze zaznamenat
+chyba a testování bude pokračovat dále. Nevýhodou je, že (bez použití dalších
+pomocných knihoven) se v&nbsp;testech bude opakovat explicitní zápis podmínek
+tvořených strukturovaným příkazem <strong>if</strong>.</div></p>
+
+<p>Pro spuštění jednotkových testů se nepoužívá příkaz <strong>go run</strong>,
+ale příkaz <strong>go test</strong>. Ten nalezne všechny soubory
+<strong>*_test.go</strong> v&nbsp;daném adresáři či podadresářích a pokusí se
+v&nbsp;něm spustit všechny funkce s&nbsp;implementací jednotkových testů:</p>
+
+<pre>
+$ <strong>go test</strong>
+&nbsp;
+PASS
+ok      _/home/tester/go-root/article_17/tests01   0.005s
+</pre>
+
+<p>Lepší je však použít přepínač <strong>-v</strong>, aby se vypsaly
+podrobnější informace o spuštěných testech:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests01   0.004s
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Otestování funkcí a metod, které nejsou viditelné mimo svůj balíček</h2>
+
+<p>V&nbsp;předchozím demonstračním příkladu jsme vytvořili jednotkový test pro
+funkci viditelnou mimo svůj balíček, protože její jméno začíná velkým písmenem.
+Můžeme si ovšem ověřit, že otestovat můžeme i interní funkce volatelné pouze
+v&nbsp;rámci svého balíčku. Podívejme se na <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests02/add.go">zdrojový
+kód</a> druhého příkladu. Ten se od předchozího příkladu odlišuje pouze změnou
+názvu funkce pro součet dvou celočíselných hodnot:</p>
+
+<pre>
+package main
+&nbsp;
+func <strong>add</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(add(1, 2))
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests02/add_test.go">Jednotkový
+test</a> pro funkci <strong>add</strong> bude vypadat prakticky stejně jako
+test pro funkci <strong>Add</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+}
+</pre>
+
+<p>Po spuštění jednotkových testů zjistíme, že je funkce <strong>add</strong>
+prakticky bez problémů testovatelná:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests02   0.006s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde jsme si situaci značně zjednodušili
+tím, že testy jsou vlastně součástí stejného balíčku, jako samotná testovaná
+funkce. Vyzkoušejte si, jak/zda se chování změní ve chvíli, kdy se použijí
+odlišné balíčky, například <strong>adder</strong> a
+<strong>adder_test</strong>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Výsledky testů v&nbsp;případě nesplnění nějaké testované podmínky</h2>
+
+<p>Samozřejmě si můžeme vyzkoušet, jak se bude systém chovat v&nbsp;případě, že
+nějaká podmínka zapsaná v&nbsp;testech nebude splněna. Můžeme například naši
+testovanou funkci <strong>add</strong> <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests03/add.go">nepatrně
+upravit takovým způsobem</a>, aby dávala pro některé hodnoty špatné
+výsledky:</p>
+
+<pre>
+package main
+&nbsp;
+func <strong>add</strong>(x int, y int) int {
+        return x - y
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(add(1, 2))
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests03/add_test.go">Jednotkové
+testy budou vypadat následovně</a>. Povšimněte si, že jsme přidali nový test
+pro zjištění, jak se funkce <strong>add</strong> chová ve chvíli, kdy je druhý
+operand nulový:</p>
+
+<pre>
+package main
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+&nbsp;
+        result = add(10, 20)
+        if result != 30 {
+                t.Error("10+20 should be 30, got ", result, "instead")
+        }
+}
+&nbsp;
+func <strong>TestAddZero</strong>(t *testing.T) {
+        result := add(1, 0)
+        if result != 1 {
+                t.Error("1+0 should be 1, got ", result, "instead")
+        }
+}
+</pre>
+
+<p>Jednotkové testy spustíme s&nbsp;přepínačem <strong>-v</strong>:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- FAIL: TestAdd (0.00s)
+    add_test.go:8: 1+2 should be 3, got  -1 instead
+    add_test.go:13: 10+20 should be 30, got  -10 instead
+=== RUN   TestAddZero
+--- PASS: TestAddZero (0.00s)
+FAIL
+exit status 1
+FAIL    _/home/tester/go-root/article_17/tests03   0.005s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že test
+<strong>TestAddZero</strong> byl spuštěn nezávisle na tom, jak dopadl předchozí
+test <strong>TestAdd</strong>. A ve vykonávání testu <strong>TestAdd</strong>
+se pokračovalo i tehdy, kdy došlo k&nbsp;první chybě.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Okamžité ukončení jednotkového testu v&nbsp;případě detekce chyby</h2>
+
+<p>V&nbsp;případě, že se má nějaký test (reprezentovaný jednou funkcí
+s&nbsp;názvem ve formátu <strong>TestXXX</strong>) ukončit ihned po detekci
+první chyby, je nutné namísto volání metody <strong>Error</strong>:</p>
+
+<pre>
+t.Error("...")
+</pre>
+
+<p>Zavolat buď dvojici metod <strong>Log+FailNow</strong>:</p>
+
+<pre>
+t.Log("...)
+t.FailNow()
+</pre>
+
+<p>Popř.&nbsp;(což je kratší) metodu <strong>Fatal</strong>:</p>
+
+<pre>
+t.Fatal("...)
+</pre>
+
+<p>Ukažme si nyní úpravu jednotkových testů takovým způsobem, aby se ihned po
+nalezení prvního špatného výsledku test ukončil. Zdrojový kód takto upravených
+testů najdete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests04/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests04/add_test.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := add(1, 2)
+        if result != 3 {
+                t.Log("1+2 should be 3, got ", result, "instead")
+                t.FailNow()
+        }
+&nbsp;
+        result = add(10, 20)
+        if result != 30 {
+                t.Log("10+20 should be 30, got ", result, "instead")
+                t.FailNow()
+        }
+}
+&nbsp;
+func <strong>TestAddZero</strong>(t *testing.T) {
+        result := add(1, 0)
+        if result != 1 {
+                t.Log("1+0 should be 1, got ", result, "instead")
+                t.FailNow()
+        }
+}
+</pre>
+
+<p>Nové chování testů je následující:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- FAIL: TestAdd (0.00s)
+    add_test.go:8: 1+2 should be 3, got  -1 instead
+=== RUN   TestAddZero
+--- PASS: TestAddZero (0.00s)
+FAIL
+exit status 1
+FAIL    _/home/tester/go-root/article_17/tests04   0.004s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;původních testech se navíc
+testoval výsledek funkce <strong>add(10, 20).</strong></div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Jednotkové testy řízené tabulkami</h2>
+
+<p>Velmi často se při psaní jednotkových testů v&nbsp;programovacím jazyku Go
+setkáme s&nbsp;tím, že se specifikuje sada vstupních dat pro testovanou funkci
+společně se sadou očekávaných hodnot. Tyto údaje můžeme reprezentovat různým
+způsobem, například je mít uložené v&nbsp;externích souborech (CSV, textové
+soubory, JSON atd. atd.), ovšem mnohdy si vystačíme s&nbsp;tím nejjednodušším a
+nejpřímějším řešením &ndash; zápisem dat ve formě pole. Typicky se jedná o pole
+struktur (záznamů), přičemž každý záznam obsahuje jak zmíněné vstupní hodnoty
+testované funkce, tak i její očekávaný výsledek či výsledky. V&nbsp;našem
+konkrétním případě budeme opět testovat funkci <strong>add</strong>, nyní ovšem
+již s&nbsp;explicitní specifikací přesného typu parametrů i jejich výsledků
+(předtím jsme se spokojili s&nbsp;použitím datového typu <strong>int</strong>,
+nyní použijeme konkrétní typ <strong>int32</strong>):</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests05/add.go">Zdrojový
+kód testovaného modulu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+func <strong>add</strong>(x int32, y int32) int32 {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(add(1, 2))
+}
+</pre>
+
+<p>Jednotkové testy používající tabulku se vstupními hodnotami i hodnotami
+očekávanými (výsledky) mohou v&nbsp;tom nejjednodušším případě <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests05/add_test.go">vypadat
+takto</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "testing"
+)
+&nbsp;
+type <strong>AddTest</strong> struct {
+        x        int32
+        y        int32
+        expected int32
+}
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {0, 0, 0},
+                {1, 0, 1},
+                {2, 0, 2},
+                {2, 1, 3},
+                {2, -2, 0},
+                {math.MaxInt32, 0, math.MaxInt32},
+                {math.MaxInt32, 1, math.MinInt32},
+                {math.MaxInt32, math.MinInt32, -1},
+        }
+&nbsp;
+        for _, i := range addTestInput {
+                result := add(i.x, i.y)
+                if result != i.expected {
+                        msg := fmt.Sprintf("%d + %d should be %d, got %d instead",
+                                i.x, i.y, i.expected, result)
+                        t.Error(msg)
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: použití dat zapsaných v&nbsp;poli
+struktur/záznamů je z&nbsp;pohledu autorů Go spolehlivým řešením, protože není
+nutné implementovat čtečku dalšího souborového formátu, základní rozsah a typ
+dat zkontroluje samotný překladač Go a při zápisu lze využít asistence
+programátorského textového editoru či integrovaného vývojového prostředí
+(kontextová nápověda, automatické doplňování kódu atd. atd.).</div></p>
+
+<p>Výsledky testů:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests05   0.005s
+</pre>
+
+<p>Samozřejmě se můžeme podívat na to, jak se změní výsledky jednotkových testů
+ve chvíli, kdy bude funkce <strong>add</strong> implementována nekorektně:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- FAIL: TestAdd (0.00s)
+    add_test.go:32: 2 + 1 should be 3, got 1 instead
+    add_test.go:32: 2 + -2 should be 0, got 4 instead
+    add_test.go:32: 2147483647 + 1 should be -2147483648, got 2147483646 instead
+FAIL
+exit status 1
+FAIL    _/home/tester/go-root/article_17/tests06   0.004s
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Výběr testů pro spuštění na základě specifikovaného vzorku</h2>
+
+<p>V&nbsp;této kapitole se seznámíme s&nbsp;jedním ze způsobů volby, které
+jednotkové testy mají být spuštěny. V&nbsp;některých situacích totiž
+potřebujeme, aby se spustila pouze určitá sada jednotkových testů. Příkladem
+může být rychlý test (někdy se zde dosti nepřesně používá termín <i>smoke
+test</i>) aplikace přímo z&nbsp;integrovaného vývojového prostředí, jenž může
+být díky rychlosti překladače jazyka Go spuštěn při každém uložení zdrojového
+souboru (stačí si v&nbsp;programátorském textovém editoru či
+v&nbsp;integrovaném vývojovém prostředí nastavit příslušnou událost, což je
+například v&nbsp;případě textového editoru Vim docela snadné s&nbsp;využitím
+události <strong>BufWritePost</strong> popř.&nbsp;dokonce
+<strong>BufLeave</strong>).</p>
+
+<p>V&nbsp;takovém případě většinou nepotřebujeme spouštět všechny testy, ale
+jen jejich podmnožinu. Pokud při pojmenování funkcí s&nbsp;implementací
+jednotkových testů udržujeme nějakou konzistenci v&nbsp;pojmenování, je volba
+jen některých testů pro spuštění relativně snadná, protože můžeme použít
+příkaz:</p>
+
+<pre>
+$ <strong>go test -v -run vzorek/pattern</strong>
+</pre>
+
+<p>Nyní si ukažme, jak se tento příkaz použije v&nbsp;praxi. Jednotkové testy
+funkce <strong>add</strong> rozdělíme do několika samostatných funkcí &ndash;
+základní testy, testy se &bdquo;zajímavými&ldquo; (krajními) hodnotami atd.
+Výsledek může <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests07/add_test.go">vypadat
+takto</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "testing"
+)
+&nbsp;
+type <strong>AddTest</strong> struct {
+        x        int32
+        y        int32
+        expected int32
+}
+&nbsp;
+func <strong>checkAdd</strong>(t *testing.T, testInputs []AddTest) {
+        for _, i := range testInputs {
+                result := add(i.x, i.y)
+                if result != i.expected {
+                        msg := fmt.Sprintf("%d + %d should be %d, got %d instead",
+                                i.x, i.y, i.expected, result)
+                        t.Error(msg)
+                }
+        }
+}
+&nbsp;
+func <strong>TestAddBasicValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {0, 0, 0},
+                {1, 0, 1},
+                {2, 0, 2},
+                {2, 1, 3},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddNegativeValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {0, 0, 0},
+                {1, 0, 1},
+                {2, 0, 2},
+                {2, 1, 3},
+                {2, -2, 0},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddMinValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MinInt32, 0, math.MinInt32},
+                {math.MinInt32, 1, math.MinInt32 + 1},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddMaxValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MaxInt32, 0, math.MaxInt32},
+                {math.MaxInt32, 1, math.MinInt32},
+                {math.MaxInt32, math.MinInt32, -1},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddMinMaxValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MinInt32, 0, math.MinInt32},
+                {math.MinInt32, 1, math.MinInt32 + 1},
+                {math.MaxInt32, 0, math.MaxInt32},
+                {math.MaxInt32, 1, math.MinInt32},
+                {math.MaxInt32, math.MinInt32, -1},
+        }
+        checkAdd(t, addTestInput)
+}
+</pre>
+
+<p>Spuštění všech testů se provede nám známým příkazem bez dalších
+modifikací:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAddBasicValues
+--- PASS: TestAddBasicValues (0.00s)
+=== RUN   TestAddNegativeValues
+--- PASS: TestAddNegativeValues (0.00s)
+=== RUN   TestAddMinValues
+--- PASS: TestAddMinValues (0.00s)
+=== RUN   TestAddMaxValues
+--- PASS: TestAddMaxValues (0.00s)
+=== RUN   TestAddMinMaxValues
+--- PASS: TestAddMinMaxValues (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests07   0.005s
+</pre>
+
+<p>Spuštění těch testů, které v&nbsp;názvu používají slovo
+&bdquo;Max&ldquo;:</p>
+
+<pre>
+$ <strong>go test -v -run Max</strong>
+&nbsp;
+=== RUN   TestAddMaxValues
+--- PASS: TestAddMaxValues (0.00s)
+=== RUN   TestAddMinMaxValues
+--- PASS: TestAddMinMaxValues (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests07   0.006s
+</pre>
+
+<p>Spuštění těch testů, které v&nbsp;názvu používají slovo
+&bdquo;Min&ldquo;:</p>
+
+<pre>
+$ <strong>go test -v -run Min</strong>
+&nbsp;
+=== RUN   TestAddMinValues
+--- PASS: TestAddMinValues (0.00s)
+=== RUN   TestAddMinMaxValues
+--- PASS: TestAddMinMaxValues (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests07   0.004s
+</pre>
+
+<p>V&nbsp;případě, že použijeme vzorek neodpovídající žádnému testu, budeme o
+tom informování varovnou zprávou:</p>
+
+<pre>
+$ <strong>go test -v -run FooBar</strong>
+&nbsp;
+testing: warning: no tests to run
+PASS
+ok      _/home/tester/go-root/article_17/tests07   0.005s
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Výběr testů na základě štítku (tagu)</h2>
+
+<p>Existuje ovšem ještě další způsob určení, jaké testy se mají spustit.
+V&nbsp;tomto případě ovšem nedochází k&nbsp;volbě skupiny <i>funkcí</i>
+s&nbsp;implementacemi jednotkových testů, ale celých souborů, v&nbsp;nichž jsou
+jednotkové testy uloženy. Předchozí příklad si tedy upravíme následujícím
+způsobem:</p>
+
+<ul>
+
+<li>Zdrojový kód testované funkce bude uložen v&nbsp;souboru pojmenovaném
+&bdquo;add.go&ldquo;, tj.&nbsp;tak, jak jsme zvyklí.</li>
+
+<li>Základní testy budou uloženy v&nbsp;souboru &bdquo;add_test.go&ldquo;,
+tj.&nbsp;opět se použije standardní pojmenování.</li>
+
+<li>Ovšem navíc budou existovat i dva soubory &bdquo;add_slow_test.go&ldquo; a
+&bdquo;add_fast_test.go&ldquo; s&nbsp;dalšími (řekněme pomaleji a rychleji
+běžícími) testy.</li>
+
+</ul>
+
+<p>Důležité je, že ve dvou posledně zmíněných souborech použijeme strukturovaný
+komentář, který je rozeznán a zpracováván překladačem programovacího jazyka
+Go:</p>
+
+<pre>
+<i>// +build fast</i>
+&nbsp;
+<i>// +build slow</i>
+&nbsp;
+atd.
+</pre>
+
+<p>Podívejme se nyní na obsahy jednotlivých souborů zmíněných v&nbsp;předchozím
+seznamu.</p>
+
+<p>Soubor <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_test.go">add_test.go</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+}
+</pre>
+
+<p>Soubor <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_fast_test.go">add_fast_test.go</a>:</p>
+
+<pre>
+<i>// +build fast</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "fmt"
+        "testing"
+)
+&nbsp;
+type <strong>AddTest</strong> struct {
+        x        int32
+        y        int32
+        expected int32
+}
+&nbsp;
+func <strong>checkAdd</strong>(t *testing.T, testInputs []AddTest) {
+        for _, i := range testInputs {
+                result := add(i.x, i.y)
+                if result != i.expected {
+                        msg := fmt.Sprintf("%d + %d should be %d, got %d instead",
+                                i.x, i.y, i.expected, result)
+                        t.Error(msg)
+                }
+        }
+}
+&nbsp;
+func <strong>TestAddBasicValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {0, 0, 0},
+                {1, 0, 1},
+                {2, 0, 2},
+                {2, 1, 3},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddNegativeValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {0, 0, 0},
+                {1, 0, 1},
+                {2, 0, 2},
+                {2, 1, 3},
+                {2, -2, 0},
+        }
+        checkAdd(t, addTestInput)
+}
+</pre>
+
+<p>Soubor <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_slow_test.go">add_slow_test.go</a>:</p>
+
+<pre>
+<i>// +build slow</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "testing"
+)
+&nbsp;
+type <strong>AddTest</strong> struct {
+        x        int32
+        y        int32
+        expected int32
+}
+&nbsp;
+func <strong>checkAdd</strong>(t *testing.T, testInputs []AddTest) {
+        for _, i := range testInputs {
+                result := add(i.x, i.y)
+                if result != i.expected {
+                        msg := fmt.Sprintf("%d + %d should be %d, got %d instead",
+                                i.x, i.y, i.expected, result)
+                        t.Error(msg)
+                }
+        }
+}
+&nbsp;
+func <strong>TestAddMinValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MinInt32, 0, math.MinInt32},
+                {math.MinInt32, 1, math.MinInt32 + 1},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddMaxValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MaxInt32, 0, math.MaxInt32},
+                {math.MaxInt32, 1, math.MinInt32},
+                {math.MaxInt32, math.MinInt32, -1},
+        }
+        checkAdd(t, addTestInput)
+}
+&nbsp;
+func <strong>TestAddMinMaxValues</strong>(t *testing.T) {
+        var addTestInput = []AddTest{
+                {math.MinInt32, 0, math.MinInt32},
+                {math.MinInt32, 1, math.MinInt32 + 1},
+                {math.MaxInt32, 0, math.MaxInt32},
+                {math.MaxInt32, 1, math.MinInt32},
+                {math.MaxInt32, math.MinInt32, -1},
+        }
+        checkAdd(t, addTestInput)
+}
+</pre>
+
+<p>Nyní si můžeme jednotlivé testy spustit. Povšimněte si použití přepínače
+<strong>-tags</strong>:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests08   0.003s
+</pre>
+
+<pre>
+$ <strong>go test -v -tags fast</strong>
+&nbsp;
+=== RUN   TestAddBasicValues
+--- PASS: TestAddBasicValues (0.00s)
+=== RUN   TestAddNegativeValues
+--- PASS: TestAddNegativeValues (0.00s)
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests08   0.004s
+</pre>
+
+<pre>
+$ <strong>go test -v -tags slow</strong>
+&nbsp;
+=== RUN   TestAddMinValues
+--- PASS: TestAddMinValues (0.00s)
+=== RUN   TestAddMaxValues
+--- PASS: TestAddMaxValues (0.00s)
+=== RUN   TestAddMinMaxValues
+--- PASS: TestAddMinMaxValues (0.00s)
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests08   0.004s
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Zjištění, které části programového kódu jsou pokryty jednotkovými testy</h2>
+
+<p>Další problematikou, s&nbsp;níž se v&nbsp;dnešním článku seznámíme, je
+zjištění, jaké části zdrojového kódu jsou vůbec pokryty jednotkovými testy. To
+je velmi užitečná informace, která nám umožní soustředit se na efektivní psaní
+jednotkových testů, hledání různých &bdquo;corner cases&ldquo; atd. Již
+v&nbsp;základní sadě nástrojů jazyka Go máme možnost si informace o pokrytí
+testy zjistit, takže si nejprve vytvořme funkci, kterou musíme otestovat. Bude
+se jednat o klasickou funkci <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial.go">určenou
+pro výpočet faktoriálu</a> (&bdquo;školní&ldquo; rekurzivní varianta):</p>
+
+<pre>
+package factorial
+&nbsp;
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+</pre>
+
+<p>Jednotkové testy pro tuto funkci mohou vypadat <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial_test.go">například
+následovně</a>:</p>
+
+<pre>
+package factorial_test
+&nbsp;
+import (
+        "factorial"
+        "testing"
+)
+&nbsp;
+func <strong>TestFactorialForZero</strong>(t *testing.T) {
+        result := factorial.Factorial(0)
+        if result != 1 {
+                t.Errorf("Expected 0! == 1, but got %d instead", result)
+        }
+}
+&nbsp;
+func <strong>TestFactorialForTen</strong>(t *testing.T) {
+        result := factorial.Factorial(10)
+        expected := int64(3628800)
+        if result != expected {
+                t.Errorf("Expected 0! == %d, but got %d instead", expected, result)
+        }
+}
+</pre>
+
+<p>Samotné spuštění testů by nemělo skončit s&nbsp;chybou:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestFactorialForZero
+--- PASS: TestFactorialForZero (0.00s)
+=== RUN   TestFactorialForTen
+--- PASS: TestFactorialForTen (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/factorial 0.005s
+</pre>
+
+<p>Otázkou ovšem je, zda jsme skutečně napsali testy takovým způsobem, že
+pokryjí všechny větve zdrojového kódu. Proto spustíme jiný příkaz:</p>
+
+<pre>
+$ <strong>go test -v --cover</strong>
+&nbsp;
+=== RUN   TestFactorialForZero
+--- PASS: TestFactorialForZero (0.00s)
+=== RUN   TestFactorialForTen
+--- PASS: TestFactorialForTen (0.00s)
+PASS
+coverage: 75.0% of statements
+ok      factorial       0.005s
+</pre>
+
+<p>Popř.&nbsp;si můžeme vygenerovat soubor s&nbsp;informacemi o pokrytí
+testy:</p>
+
+<pre>
+$ <strong>go test -v --coverprofile coverage</strong>
+</pre>
+
+<p>Výsledkem předchozího příkladu bude soubor obsahující informace o tom,
+kterými větvemi program prošel při svém testování. Obsah tohoto souboru by měl
+být přibližně následující:</p>
+
+<pre>
+mode: set
+factorial/factorial.go:3.31,4.9 1 1
+factorial/factorial.go:5.13,6.11 1 0
+factorial/factorial.go:7.14,8.11 1 1
+factorial/factorial.go:9.10,10.28 1 1
+</pre>
+
+<p>Následně z&nbsp;tohoto souboru vygenerujeme HTML stránku
+s&nbsp;podrobnějšími informacemi o jednotlivých testovaných řádcích:</p>
+
+<pre>
+$ <strong>go tool cover -html=cover.out -o cover.html</strong>
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Nástroj <i>go-carpet</i></h2>
+
+<p>Získání informace o tom, kterými větvemi programu se prošlo při testování,
+je však možné ještě více polidštit. Zde si již ovšem nevystačíme se
+standardními nástroji jazyka Go, ale budeme muset použít externí pomocný
+nástroj. Ten se jmenuje <i>go-carpet</i> a instaluje se naprosto stejným
+způsobem, jako jakýkoli jiný balíček jazyka Go, tj.&nbsp;příkazem <strong>go
+get</strong>:</p>
+
+<pre>
+$ <strong>go get github.com/msoap/go-carpet</strong>
+</pre>
+
+<p>Po instalaci tohoto nástroje můžeme použít nový příkaz
+<strong>go-carpet</strong>, ovšem za předpokladu, že máte na
+<strong>PATH</strong> umístěnou i cestu &bdquo;~/go/bin&ldquo; (o tom jsme se
+zmínili již v&nbsp;předchozím článku).  Pokud není proměnná
+<strong>PATH</strong> nastavena, můžete výše uvedený příkaz <strong></strong>
+volat s&nbsp;celou cestou z&nbsp;adresáře, v&nbsp;němž se nachází jednotkové
+testy:</p>
+
+<pre>
+$ <strong>~/go/bin go-carpet</strong>
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Ukázka použití nástroje <i>go-carpet</i></h2>
+
+<p>Výsledek je v&nbsp;tomto případě odlišný, protože bude vypsán zdrojový kód
+testované aplikace se zvýrazněním těch funkcí větví, které byly pokryty
+jednotkovými testy. Kvůli tomu, že odlišení je ve výchozím nastavení provedeno
+odlišnou barvou, ukážeme si screenshot terminálu s&nbsp;výsledky:</p>
+
+<img src="https://i.iinfo.cz/images/190/golang-17-1.png" class="image-356946" alt="&#160;" width="500" height="446" />
+<p><i>Obrázek 1: Screenshot terminálu se zvýrazněním těch částí zdrojového
+kódu, které byly pokryty jednotkovými testy. Ze screenshotu je patrné, že pro
+jednu větev je nutné napsat další test.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Nástroj <i>GoConvey</i></h2>
+
+<p>V&nbsp;závěru článku se &ndash; prozatím pouze v&nbsp;rychlosti &ndash;
+musíme zmínit o velmi užitečné aplikaci nazvané <i>GoConvey</i>. Tato aplikace
+primárně umožňuje spouštět jednotkové testy, a to jak z&nbsp;příkazové řádky,
+tak i z&nbsp;webového uživatelského rozhraní.</p>
+
+<p><div class="rs-tip-major">Poznámka: pravděpodobně jste si již všimli, že
+jazyk Go je primárně používán pro psaní síťových aplikací, síťových služeb či
+právě webových aplikací. Existuje sice několik knihoven pro tvorbu aplikací
+s&nbsp;plnohodnotným grafickým uživatelským rozhraním, ovšem prozatím (a
+pravděpodobně se to nezmění) budou dominovat aplikace vybavené webovým
+rozhraním. A mezi tyto aplikace patří i zde  popisovaný nástroj
+<i>GoConvey</i>.</div></p>
+
+<p>To ovšem není zdaleka vše, protože <i></i> může sloužit i pro psaní BDD testů, ovšem nikoli s&nbsp;využitím doménově specifického jazyka Gherkin, ale &bdquo;pouze&ldquo; s&nbsp;využitím samotného programovacího jazyka Go doplněného o několik funkcí. Této zajímavé a užitečné problematice se budeme věnovat v&nbsp;navazujících kapitolách. Jak je ve světě jazyka Go zvykem, je instalace této aplikace snadná, protože se opět využívá příkazu <strong>go get</strong>:</p>
+
+<pre>
+$ <strong>go get github.com/smartystreets/goconvey</strong>
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Použití webového uživatelského rozhraní nástroje <i>GoConvey</i></h2>
+
+<p>Podívejme se nyní na způsob použití webového uživatelského rozhraní tohoto
+nástroje. Příkaz <strong>goconvey</strong> je nutné spustit v&nbsp;adresáři
+s&nbsp;jednotkovými testy:</p>
+
+<pre>
+$ <strong>cd ~/go/src/factorial/</strong>
+&nbsp;
+$ <strong>~/go/bin/goconvey </strong>
+&nbsp;
+2019/03/25 19:29:42 goconvey.go:63: Initial configuration: [host: 127.0.0.1] [port: 8080] [poll: 250ms] [cover: true]
+2019/03/25 19:29:42 tester.go:19: Now configured to test 10 packages concurrently.
+2019/03/25 19:29:42 goconvey.go:194: Serving HTTP at: http://127.0.0.1:8080
+2019/03/25 19:29:42 goconvey.go:107: Launching browser on 127.0.0.1:8080
+2019/03/25 19:29:42 integration.go:122: File system state modified, publishing current folders... 0 3106557094
+2019/03/25 19:29:42 goconvey.go:120: Received request from watcher to execute tests...
+2019/03/25 19:29:42 executor.go:69: Executor status: 'executing'
+2019/03/25 19:29:42 coordinator.go:46: Executing concurrent tests: factorial
+2019/03/25 19:29:42 goconvey.go:115: 
+2019/03/25 19:29:44 parser.go:24: [passed]: factorial
+2019/03/25 19:29:44 executor.go:69: Executor status: 'idle'
+</pre>
+
+<p>Prakticky okamžitě by se v&nbsp;prohlížeči měla (automaticky) zobrazit
+webová stránka s&nbsp;rozhraním tohoto nástroje:</p>
+
+<a href="https://www.root.cz/obrazek/356947/"><img src="https://i.iinfo.cz/images/190/golang-17-2-prev.png" class="image-356947" alt="&#160;" width="365" height="270" /></a>
+<p><i>Obrázek 2: Webové rozhraní aplikace GoConvey.</i></p>
+
+<a href="https://www.root.cz/obrazek/356948/"><img src="https://i.iinfo.cz/images/190/golang-17-3-prev.png" class="image-356948" alt="&#160;" width="365" height="270" /></a>
+<p><i>Obrázek 3: Změna stylu webového rozhraní aplikace GoConvey.</i></p>
+
+<a href="https://www.root.cz/obrazek/356949/"><img src="https://i.iinfo.cz/images/190/golang-17-4-prev.png" class="image-356949" alt="&#160;" width="365" height="270" /></a>
+<p><i>Obrázek 4: Historie již spuštěných testů.</i></p>
+
+<a href="https://www.root.cz/obrazek/356950/"><img src="https://i.iinfo.cz/images/190/golang-17-5-prev.png" class="image-356950" alt="&#160;" width="365" height="270" /></a>
+<p><i>Obrázek 5: Výsledky v&nbsp;případě, že některé testy neproběhly korektně.</i></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. GoConvey a BDD testy</h2>
+
+<p>Při použití nástroje <i>GoConvey</i> je možné vytvářet i BDD testy,
+s&nbsp;nimiž jsme se seznámili v&nbsp;článku <a
+href="https://www.root.cz/clanky/behavior-driven-development-v-pythonu-s-vyuzitim-knihovny-behave/">Behavior-driven
+development v&nbsp;Pythonu s&nbsp;využitím knihovny Behave</a>. Ovšem
+v&nbsp;případě <i>GoConvey</i> se nepoužívá doménově specifický jazyk Gherkin
+&ndash; testy se zapisují přímo v&nbsp;jazyku Go, ovšem s&nbsp;použitím funkcí
+a metod z&nbsp;knihovny <strong>convey</strong>.</p>
+
+<p>Použití BDD si opět ukážeme na implementaci výpočtu faktoriálu:</p>
+
+<pre>
+package factorial
+&nbsp;
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+</pre>
+
+<p>Samotné testy jsou uloženy v&nbsp;souboru <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/factorial_convey/behaviour_test.go">behaviour_test.go</a>:</p>
+
+<pre>
+package factorial
+&nbsp;
+import(
+        "testing"
+        . "github.com/smartystreets/goconvey/convey"
+)
+&nbsp;
+func <strong>TestFactorial</strong>(t *testing.T) {
+        Convey("0! should be equal 1", t, func() {
+                So(Factorial(0), ShouldEqual, 1)
+        })
+}
+&nbsp;
+func <strong>TestFactorial2</strong>(t *testing.T) {
+        Convey("10! should be greater than 1", t, func() {
+                So(Factorial(10), ShouldBeGreaterThan, 1)
+        })
+        Convey("10! should be between 1 and 10000000", t, func() {
+                So(Factorial(10), ShouldBeBetween, 1, 10000000)
+        })
+}
+</pre>
+
+<p>Spuštění BDD testů je snadné, protože se použije nám již známý příkaz:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestFactorial
+&nbsp;
+  0! should be equal 1 ✔
+&nbsp;
+&nbsp;
+1 total assertion
+&nbsp;
+--- PASS: TestFactorial (0.00s)
+=== RUN   TestFactorial2
+&nbsp;
+  10! should be greater than 1 ✔
+&nbsp;
+&nbsp;
+2 total assertions
+&nbsp;
+&nbsp;
+  10! should be between 1 and 10000000 ✔
+&nbsp;
+&nbsp;
+3 total assertions
+&nbsp;
+--- PASS: TestFactorial2 (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/factorial_convey  0.006s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: podrobnější informace o tom, jakým
+způsobem se BDD testy vytvářejí a spouštějí, si řekneme příště. V&nbsp;dnešním
+článku se o nástroji <i>GoConvey</i> zmiňujeme především z&nbsp;toho důvodu, že
+je potenciálně velmi užitečný a přitom prozatím (relativně) neznámý.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Mockování funkcí a metod pro potřeby jednotkových testů</h2>
+
+<p>Při testování aplikací, zejména při psaní jednotkových testů, se poměrně
+často dostaneme do situace, kdy potřebujeme nahradit nějakou funkci či metodu
+používanou v&nbsp;reálné aplikaci za &bdquo;falešnou&ldquo; funkci
+resp.&nbsp;metodu vytvořenou pouze pro účely testů. V&nbsp;programovacím jazyku
+Go je možné pro tvorbu a použití takových &bdquo;falešných&ldquo; funkcí použít
+hned několik různých knihoven, které se od sebe odlišují jak svými možnostmi,
+tak i způsobem zápisu či deklarace očekávaného chování testované aplikace.
+Ovšem pro lepší pochopení celé problematiky si dnes ukážeme, jak lze mockování
+(většinou) provést pouze s&nbsp;využitím základních možností programovacího
+jazyka Go, zejména s&nbsp;použitím rozhraní.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Převody měn</h2>
+
+<p>Testovat budeme aplikaci, která bude provádět převod měn na základě
+kurzovního lístku. Samotný převod měny je triviální (a ten právě budeme
+testovat). Vstupem do funkce <strong>exchange</strong> je částka ve výchozí
+měně (cokoli mimo Kč) a kód výchozí měny (&bdquo;GBP&ldquo;, &bdquo;USD&ldquo;
+apod.). Výsledkem je hodnota v&nbsp;cílové měně (což jsou vždy Kč):</p>
+
+<pre>
+func <strong>exchange</strong>(amount float64, code string) float64 {
+        rate := get_exchange_rate(code)
+        return rate * amount
+}
+</pre>
+
+<p>Pro získání kurzovního lístku můžeme použít následující funkci, která
+příslušný kurzovní lístek získá v&nbsp;čitelném a jednoduše parsovatelném
+textovém formátu (ostatně si to můžete vyzkoušet <a
+href="https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt">přímo
+v&nbsp;prohlížeči</a>):</p>
+
+<pre>
+func <strong>get_exchange_rate</strong>(code string) float64 {
+        const URL = "https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt"
+&nbsp;
+        response, err := http.Get(URL)
+        if err != nil {
+                panic("Connection refused")
+        }
+        defer response.Body.Close()
+&nbsp;
+        fmt.Printf("Status: %s\n", response.Status)
+        fmt.Printf("Content length: %d\n", response.ContentLength)
+&nbsp;
+        scanner := bufio.NewScanner(response.Body)
+        for scanner.Scan() {
+                s := strings.Split(scanner.Text(), "|")
+                if len(s) == 5 {
+                        code_str := s[3]
+                        rate_str := strings.Replace(s[4], ",", ".", 1)
+                        if code == code_str {
+                                rate_f, err := strconv.ParseFloat(rate_str, 64)
+                                if err != nil {
+                                        panic(err)
+                                }
+                                return rate_f
+                        }
+                }
+        }
+&nbsp;
+        return 0
+}
+</pre>
+
+<p>Kde je tedy problém? Ten spočívá v&nbsp;tom, že budeme chtít otestovat
+funkci <strong>exchange</strong>, ovšem izolovaně od aktuálního kurzovního
+lístku. Navíc funkce pro stažení a parsing lístku nemusí pracovat vždy správně
+(například může být CI schován za firewallem, nebudeme chtít přetěžovat cizí
+webové služby atd.). Proto musíme funkci <strong>get_exchange_rate</strong>
+mockovat funkcí jednodušší.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Vytvoření mocku funkce <strong>get_exchange_rate_from_url</strong></h2>
+
+<p>Celý příklad budeme muset nepatrně upravit. Nejprve nadeklarujeme nový
+datový typ pro jakýkoli &bdquo;getter&ldquo; kurzovního lístku. Jedná se vždy o
+funkci akceptující kód měny a vracející hodnotu na lístku (například pro
+&bdquo;USD&ldquo; by se vrátila hodnota 21.10 popř.&nbsp;podobná okamžitě
+platná hodnota):</p>
+
+<pre>
+type <strong>ExchangeDataGetter</strong> func(code string) float64
+</pre>
+
+<p>Jakákoli funkce tohoto typu (funkce je plnohodnotnou hodnotou!) bude uložena
+v&nbsp;jednoduché struktuře, jejíž prvek bude pojmenován právě
+<strong>get_exchange_rate</strong>:</p>
+
+<pre>
+type <strong>ExchangeGetter</strong> struct {
+        get_exchange_rate ExchangeDataGetter
+}
+</pre>
+
+<p>A nakonec nám zbývá vytvoření &bdquo;konstruktoru&ldquo; vracejícího
+referenci na instanci předchozí struktury. To je nutné, protože ve skutečnosti
+budeme funkci volat jako metodu (viz další zdrojový text):</p>
+
+<pre>
+func <strong>NewExchangeGetter</strong>(g ExchangeDataGetter) *ExchangeGetter {
+        return &amp;ExchangeGetter{get_exchange_rate: g}
+}
+</pre>
+
+<p>Samotná funkce <strong>exchange</strong> se změní na metodu, protože jejím
+příjemcem bude ukazatel na strukturu <strong>ExchangeGetter</strong>:</p>
+
+<pre>
+func (g *ExchangeGetter) exchange(amount float64, code string) float64 {
+        rate := g.get_exchange_rate(code)
+        return rate * amount
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, jak se hodnota
+z&nbsp;kurzovního lístku získává &ndash; zápis odpovídá volání metody, ovšem ve
+skutečnosti &bdquo;pouze&ldquo; získáme prvek ze struktury
+<strong>ExchangeGetter</strong>, což je zmíněná funkce získaná konstruktorem
+<strong>NewExchangeGetter</strong>:</div></p>
+
+<pre>
+g := NewExchangeGetter(get_exchange_rate_from_url)
+fmt.Printf("%5.2f\n", g.exchange(10, "USD"))
+&nbsp;
+g2 := NewExchangeGetter(get_exchange_rate_from_file)
+fmt.Printf("%5.2f\n", g2.exchange(10, "USD"))
+&nbsp;
+g3 := NewExchangeGetter(mocked_get_exchange_rate)
+fmt.Printf("%5.2f\n", g2.exchange(10, "USD"))
+</pre>
+
+<p>Následně již můžeme nadeklarovat několik variant funkcí, které získají kód
+měny a vrátí hodnotu z&nbsp;kurzovního lístku (získaného buď z&nbsp;URL, ze
+souboru nebo se bude jednat o mock). Všechny tyto funkce mají stejný typ
+&ndash; <strong>ExchangeDataGetter</strong>:</p>
+
+<pre>
+func <strong>get_exchange_rate_from_url</strong>(code string) float64 {
+        const URL = "https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt"
+&nbsp;
+        response, err := http.Get(URL)
+        if err != nil {
+                panic("Connection refused")
+        }
+        defer response.Body.Close()
+&nbsp;
+        fmt.Printf("Status: %s\n", response.Status)
+        fmt.Printf("Content length: %d\n", response.ContentLength)
+&nbsp;
+        scanner := bufio.NewScanner(response.Body)
+        for scanner.Scan() {
+                s := strings.Split(scanner.Text(), "|")
+                if len(s) == 5 {
+                        code_str := s[3]
+                        rate_str := strings.Replace(s[4], ",", ".", 1)
+                        if code == code_str {
+                                rate_f, err := strconv.ParseFloat(rate_str, 64)
+                                if err != nil {
+                                        panic(err)
+                                }
+                                return rate_f
+                        }
+                }
+        }
+&nbsp;
+        return 0
+}
+&nbsp;
+func <strong>get_exchange_rate_from_file</strong>(code string) float64 {
+        const FILENAME = "kurzy.txt"
+&nbsp;
+        file, err := os.Open(FILENAME)
+        if err != nil {
+                panic(err)
+        }
+        defer file.Close()
+&nbsp;
+        scanner := bufio.NewScanner(file)
+        for scanner.Scan() {
+                s := strings.Split(scanner.Text(), "|")
+                if len(s) == 5 {
+                        code_str := s[3]
+                        rate_str := strings.Replace(s[4], ",", ".", 1)
+                        if code == code_str {
+                                rate_f, err := strconv.ParseFloat(rate_str, 64)
+                                if err != nil {
+                                        panic(err)
+                                }
+                                return rate_f
+                        }
+                }
+        }
+&nbsp;
+        return 0
+}
+&nbsp;
+func <strong>mocked_get_exchange_rate</strong>(code string) float64 {
+        return 21.5
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se sice funkce jmenují
+odlišně, mají zcela jiné tělo, ovšem hlavička je shodná &ndash; stejné počty a
+typy parametrů i počty a typy návratových hodnot.</div></p>
+
+<p>Úplný kód tedy může vypadat následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "net/http"
+        "os"
+        "strconv"
+        "strings"
+)
+&nbsp;
+type <strong>ExchangeDataGetter</strong> func(code string) float64
+&nbsp;
+type <strong>ExchangeGetter</strong> struct {
+        get_exchange_rate ExchangeDataGetter
+}
+&nbsp;
+func <strong>NewExchangeGetter</strong>(g ExchangeDataGetter) *ExchangeGetter {
+        return &amp;ExchangeGetter{get_exchange_rate: g}
+}
+&nbsp;
+func <strong>get_exchange_rate_from_url</strong>(code string) float64 {
+        const URL = "https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt"
+&nbsp;
+        response, err := http.Get(URL)
+        if err != nil {
+                panic("Connection refused")
+        }
+        defer response.Body.Close()
+&nbsp;
+        fmt.Printf("Status: %s\n", response.Status)
+        fmt.Printf("Content length: %d\n", response.ContentLength)
+&nbsp;
+        scanner := bufio.NewScanner(response.Body)
+        for scanner.Scan() {
+                s := strings.Split(scanner.Text(), "|")
+                if len(s) == 5 {
+                        code_str := s[3]
+                        rate_str := strings.Replace(s[4], ",", ".", 1)
+                        if code == code_str {
+                                rate_f, err := strconv.ParseFloat(rate_str, 64)
+                                if err != nil {
+                                        panic(err)
+                                }
+                                return rate_f
+                        }
+                }
+        }
+&nbsp;
+        return 0
+}
+&nbsp;
+func <strong>get_exchange_rate_from_file</strong>(code string) float64 {
+        const FILENAME = "kurzy.txt"
+&nbsp;
+        file, err := os.Open(FILENAME)
+        if err != nil {
+                panic(err)
+        }
+        defer file.Close()
+&nbsp;
+        scanner := bufio.NewScanner(file)
+        for scanner.Scan() {
+                s := strings.Split(scanner.Text(), "|")
+                if len(s) == 5 {
+                        code_str := s[3]
+                        rate_str := strings.Replace(s[4], ",", ".", 1)
+                        if code == code_str {
+                                rate_f, err := strconv.ParseFloat(rate_str, 64)
+                                if err != nil {
+                                        panic(err)
+                                }
+                                return rate_f
+                        }
+                }
+        }
+&nbsp;
+        return 0
+}
+&nbsp;
+func <strong>mocked_get_exchange_rate</strong>(code string) float64 {
+        return 21.5
+}
+&nbsp;
+func (g *ExchangeGetter) exchange(amount float64, code string) float64 {
+        rate := g.get_exchange_rate(code)
+        return rate * amount
+}
+&nbsp;
+func <strong>main</strong>() {
+        g := NewExchangeGetter(get_exchange_rate_from_file)
+        fmt.Printf("%5.2f\n", g.exchange(10, "USD"))
+        g2 := NewExchangeGetter(mocked_get_exchange_rate)
+        fmt.Printf("%5.2f\n", g2.exchange(10, "USD"))
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>add.go</td><td>modul obsahující testovanou funkci <strong>Add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests01/add.go</a></td></tr>
+<tr><td> 1</td><td>add_test.go</td><td>jednotkové testy funkce <strong>Add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests01/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 2</td><td>add.go</td><td>modul obsahující testovanou funkci <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests02/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests02/add.go</a></td></tr>
+<tr><td> 2</td><td>add_test.go</td><td>jednotkové testy funkce <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests02/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests02/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>add.go</td><td>funkce <strong>add</strong> upravená takovým způsobem, aby vracela špatné výsledky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests03/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests03/add.go</a></td></tr>
+<tr><td> 3</td><td>add_test.go</td><td>rozšířené testy pro funkci <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests03/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests03/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 4</td><td>add.go</td><td>funkce <strong>add</strong> upravená takovým způsobem, aby vracela špatné výsledky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests04/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests04/add.go</a></td></tr>
+<tr><td> 4</td><td>add_test.go</td><td>testy používající metody <strong>Log+FailNow</strong> namísto <strong>Error</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests04/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests04/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>add.go</td><td>opět funkce <strong>add</strong>, tentokrát se správnými výsledky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests05/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests05/add.go</a></td></tr>
+<tr><td> 5</td><td>add_test.go</td><td>jednotkový test řízený tabulkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests05/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests05/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>add.go</td><td>opět funkce <strong>add</strong>, tentokrát se špatnými výsledky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests06/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests06/add.go</a></td></tr>
+<tr><td> 6</td><td>add_test.go</td><td>jednotkový test řízený tabulkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests06/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests06/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>add.go</td><td>implementace funkce <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests07/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests07/add.go</a></td></tr>
+<tr><td> 7</td><td>add_test.go</td><td>testy pojmenované takovým způsobem, aby byly snadno vybíratelné</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests07/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests07/add_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 8</td><td>add.go</td><td>implementace funkce <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add.go">https://github.com/tisnik/go-root/blob/master/article_17/tests08/add.go</a></td></tr>
+<tr><td> 8</td><td>add_test.go</td><td>standardní sada jednotkových testů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_test.go</a></td></tr>
+<tr><td> 8</td><td>add_fast_test.go</td><td>modul používající strukturovaný komentář <i>+build fast</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_fast_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_fast_test.go</a></td></tr>
+<tr><td> 8</td><td>add_slow_test.go</td><td>modul používající strukturovaný komentář <i>+build slow</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_slow_test.go">https://github.com/tisnik/go-root/blob/master/article_17/tests08/add_slow_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>factorial.go</td><td>funkce pro výpočet faktoriálu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial.go">https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial.go</a></td></tr>
+<tr><td> 9</td><td>factorial_test.go</td><td>jednotkové testy funkce pro výpočet faktoriálu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial_test.go">https://github.com/tisnik/go-root/blob/master/article_17/factorial/factorial_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>factorial.go</td><td>výpočet faktoriálu podruhé</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/factorial_convey/factorial.go">https://github.com/tisnik/go-root/blob/master/article_17/factorial_convey/factorial.go</a></td></tr>
+<tr><td>10</td><td>behaviour_test.go</td><td>BDD testy funkce pro výpočet faktoriálu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/factorial_convey/behaviour_test.go">https://github.com/tisnik/go-root/blob/master/article_17/factorial_convey/behaviour_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>kurzy.go</td><td>převod měny na základě kurzovního lístku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/mocking/kurzy.go">https://github.com/tisnik/go-root/blob/master/article_17/mocking/kurzy.go</a></td></tr>
+<tr><td>11</td><td>kurzy.txt</td><td>kurzovní lístek</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_17/mocking/kurzy.txt">https://github.com/tisnik/go-root/blob/master/article_17/mocking/kurzy.txt</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
