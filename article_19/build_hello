@@ -1,0 +1,1 @@
+GOARCH=wasm GOOS=js go build -o hello.wasm hello.go
