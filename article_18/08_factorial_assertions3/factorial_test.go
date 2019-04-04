@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-const success = ""
-
 func TestFactorialForZero(t *testing.T) {
 	assert := GetAssertion(t)
 	result := factorial.Factorial(0)

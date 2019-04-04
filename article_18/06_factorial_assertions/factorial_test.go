@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-const success = ""
-
 func TestFactorialForZero(t *testing.T) {
 	result := factorial.Factorial(0)
 	println(assertions.ShouldEqual(result, 1))
