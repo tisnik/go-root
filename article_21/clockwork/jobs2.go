@@ -10,6 +10,6 @@ func task() {
 
 func main() {
 	scheduler := clockwork.NewScheduler()
-	scheduler.Schedule().Every().Seconds().Do(task)
+	scheduler.Schedule().Every().Second().Do(task)
 	scheduler.Run()
 }
