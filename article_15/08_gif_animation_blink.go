@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 8:
+//     Jednoduchá animace se dvěma snímky o velikosti 32×32 pixelů
+
 package main
 
 import (
