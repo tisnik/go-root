@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Export obrázku o rozlišení 1×1 pixel s dvoubarevnou paletou
+
 package main
 
 import (
