@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 10:
+//     Výchozí hodnota metody použité při přepínání snímků
+
 package main
 
 import (
