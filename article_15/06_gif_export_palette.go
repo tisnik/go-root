@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 6:
+//     Šachovnice vykreslená s dvoubarevnou paletou
+
 package main
 
 import (
