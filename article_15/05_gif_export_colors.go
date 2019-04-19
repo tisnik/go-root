@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 5:
+//     Export se specifikací počtu barev v paletě
+
 package main
 
 import (
