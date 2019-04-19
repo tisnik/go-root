@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 2:
+//     Export obrázku šachovnice do formátu GIF
+
 package main
 
 import (
