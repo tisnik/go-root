@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 9:
+//     Složitější animace pohybující se šachovnice
+
 package main
 
 import (
