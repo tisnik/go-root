@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 7:
+//     Převod obrázku z prostoru RGBA do prostoru s paletou se snižováním počtu barev
+
 package main
 
 import (
