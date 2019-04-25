@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 17:
+//     Vyplnění pozadí konstantní barvou
+
 package main
 
 import "github.com/fogleman/gg"
