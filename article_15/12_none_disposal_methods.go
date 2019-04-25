@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 12:
+//     Nastavení metody přepínání snímků: žádná modifikace snímku
+
 package main
 
 import (
