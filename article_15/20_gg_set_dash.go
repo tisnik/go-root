@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 20:
+//     Specifikace stylu vykreslovaných cest
+
 package main
 
 import "github.com/fogleman/gg"
