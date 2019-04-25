@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 15:
+//     Použití kontextu a nastavení vlastností kreslení
+
 package main
 
 import "github.com/fogleman/gg"
