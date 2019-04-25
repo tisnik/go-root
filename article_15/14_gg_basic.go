@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 14:
+//     Základní způsob použití knihovny GG
+
 package main
 
 import "github.com/fogleman/gg"
