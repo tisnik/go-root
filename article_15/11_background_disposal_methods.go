@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 11:
+//     Nastavení metody přepínání snímků: vykreslení pozadí
+
 package main
 
 import (
