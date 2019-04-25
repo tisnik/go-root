@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 13:
+//     Animace progress baru vytvořená jako animovaný GIF
+
 package main
 
 import (
