@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 19:
+//     Specifikace šířky vykreslovaných cest
+
 package main
 
 import "github.com/fogleman/gg"
