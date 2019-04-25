@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Patnáctá část
+//
+// Demonstrační příklad číslo 18:
+//     Specifikace alfa kanálu (průhlednosti)
+
 package main
 
 import "github.com/fogleman/gg"
