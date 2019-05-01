@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 13:
+//     Kubická Bézierova křivka.
+
 package main
 
 import "github.com/fogleman/gg"
