@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 7:
+//     Nastavení stylu vykreslovaných úseček.
+
 package main
 
 import "github.com/fogleman/gg"
