@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 19:
+//     Transformace (změna měřítka okolo zvoleného bodu).
+
+
 package main
 
 import "github.com/fogleman/gg"
