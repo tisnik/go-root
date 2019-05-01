@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 10:
+//     Uzavřená cesta (closed path).
+
 package main
 
 import "github.com/fogleman/gg"
