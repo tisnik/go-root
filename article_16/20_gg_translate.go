@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 20:
+//     Transformace (posun).
+
+
 package main
 
 import "github.com/fogleman/gg"
