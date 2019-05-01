@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 23:
+//     Vykreslení vycentrovaného textu.
+
+
 package main
 
 import "github.com/fogleman/gg"
