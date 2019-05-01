@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 14:
+//     Kubická Bézierova křivka s řídicími body.
+
 package main
 
 import "github.com/fogleman/gg"
