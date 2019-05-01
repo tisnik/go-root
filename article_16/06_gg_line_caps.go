@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 6:
+//     Nastavení stylu konců úseček.
+
 package main
 
 import "github.com/fogleman/gg"
