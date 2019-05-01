@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 5:
+//     Nastavení šířky čáry.
+
 package main
 
 import "github.com/fogleman/gg"
