@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 1:
+//     Vymazání obrazovky.
+
 package main
 
 import "github.com/fogleman/gg"
