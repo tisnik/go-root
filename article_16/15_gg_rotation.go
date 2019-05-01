@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 15:
+//     Rotace vykreslovaných objektů.
+
 package main
 
 import (
