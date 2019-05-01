@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 8:
+//     Práce s cestou (path).
+
 package main
 
 import "github.com/fogleman/gg"
