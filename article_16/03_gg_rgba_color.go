@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 3:
+//     Barvový prostor RGB a RGBA.
+
 package main
 
 import "github.com/fogleman/gg"
