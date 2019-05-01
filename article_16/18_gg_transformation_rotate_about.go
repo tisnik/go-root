@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 18:
+//     Transformace (rotace okolo zvoleného bodu).
+
+
 package main
 
 import "github.com/fogleman/gg"
