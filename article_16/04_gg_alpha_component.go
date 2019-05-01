@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Alfa kanál v barvovém prostoru RGBA.
+
 package main
 
 import "github.com/fogleman/gg"
