@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šestnáctá část
+//
+// Demonstrační příklad číslo 9:
+//     Otevřená cesta (open path).
+
 package main
 
 import "github.com/fogleman/gg"
