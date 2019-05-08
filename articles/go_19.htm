@@ -1,0 +1,1609 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Využití WebAssembly z programovacího jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Využití WebAssembly z programovacího jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Standardní překladač a linker programovacího jazyka Go dokáže vytvářet spustitelné binární soubory jak pro všechny podporované mikroprocesorové architektury, tak i pro virtuální stroj WebAssembly. Dnes se tedy s touto zajímavou technologií podrobněji seznámíme.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Využití WebAssembly z&nbsp;programovacího jazyka Go</a></p>
+<p><a href="#k02">2. Způsob využití různých programovacích jazyků na WWW stránkách</a></p>
+<p><a href="#k03">3. Transpřekladače do JavaScriptu</a></p>
+<p><a href="#k04">4. Příklady existujících a používaných transpřekladačů do JavaScriptu </a></p>
+<p><a href="#k05">5. Nástroj Emscripten</a></p>
+<p><a href="#k06">6. Virtuální stroj naprogramovaný v&nbsp;JavaScriptu</a></p>
+<p><a href="#k07">7. WebAssembly</a></p>
+<p><a href="#k08">8. Jednoduchý projekt přeložený do WebAssembly</a></p>
+<p><a href="#k09">9. Zařazení bajtkódu do webové stránky</a></p>
+<p><a href="#k10">10. Server, který bude korektně pracovat se soubory s&nbsp;MIME typem &bdquo;application/wasm&ldquo;</a></p>
+<p><a href="#k11">11. WebAssembly a DOM</a></p>
+<p><a href="#k12">12. Změna obsahu vybrané značky</a></p>
+<p><a href="#k13">13. Přidání nových značek do HTML stránky</a></p>
+<p><a href="#k14">14. Kreslení do 2D canvasu</a></p>
+<p><a href="#k15">15. Komunikace mezi Go a JavaScriptem</a></p>
+<p><a href="#k16">16. Překlad programů naprogramovaných v&nbsp;Go do JavaScriptu</a></p>
+<p><a href="#k17">17. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k18">18. Pomocné soubory použité demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na články s&nbsp;tématem WebAssembly</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Využití WebAssembly z&nbsp;programovacího jazyka Go</h2>
+
+<p>Při tvorbě webových aplikací popř.&nbsp;aplikací používajících například
+dnes populární technologii <a href="https://electronjs.org/">Electron</a> se
+mnohdy používá programovací jazyk <a
+href="https://developer.mozilla.org/en-US/docs/Web/JavaScript">JavaScript</a>.
+Je to pochopitelné, protože většina současných webových prohlížečů (samozřejmě
+pokud se nejedná o specializované prohlížeče typu <a
+href="https://lynx.invisible-island.net/">Lynx</a>) obsahuje interpret a
+popř.&nbsp;i JIT (<i>just-in-time</i>) překladač JavaScriptu, přičemž podpora
+pro další programovací jazyky přímo neexistuje. To s&nbsp;sebou přináší některé
+výhody, ale i mnoho záporů, ostatně jako každá monokultura (nejenom) v&nbsp;IT.
+Pro webové aplikace, v&nbsp;nichž se intenzivně pracuje především s&nbsp;DOMem
+HTML stránky, nemusí být toto omezení tak kritické, ovšem pro výpočetně
+náročnější aplikace popř.&nbsp;ve chvíli, kdy se ve větší míře používá grafika
+(2D či 3D <i>canvas</i>) je již podpora pouze relativně vysokoúrovňového a
+dynamicky typovaného (a tím pádem hůře JITovatelného) JavaScriptu dosti
+omezující.</p>
+
+<p>Jedno z&nbsp;možných řešení, které se nabízí, je buď použití nativních
+klientů (se všemi z&nbsp;toho plynoucími bezpečnostními aj.&nbsp;důsledky) nebo
+využití nějaké formy virtuálního stroje, který by ovšem měl být co
+nejjednodušší a ideálně dobře specifikovaný, aby ho bylo možné relativně snadno
+implementovat ve všech používaných prohlížečích. V&nbsp;současnosti je tímto
+virtuálním strojem <i>WebAssembly</i>, což je popis instrukcí tohoto stroje i
+jeho očekávaného chování. Díky tomu, že je WebAssembly <a
+href="https://caniuse.com/#feat=wasm">podporován prakticky všemi relevantními
+prohlížeči</a>, začal se postupně rozšiřovat, zejména ve výpočetně
+intenzivnějších aplikacích (například se jedná o šachový engine atd.). Dnes si
+ukážeme, jak je možné WebAssembly použít společně s&nbsp;programovacím jazykem
+Go pro tvorbu frontendových částí aplikací, nicméně je nutné poznamenat, že
+WebAssembly je dnes velmi populární zejména v&nbsp;komunitě vývojářů
+používajících <a
+href="https://www.root.cz/serialy/programovaci-jazyk-rust/">programovací jazyk
+Rust</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: použití virtuálního stroje přímo ve
+webovém prohlížeči samozřejmě není žádnou žhavou novinkou, protože se podobné
+technologie objevily již dříve, a to dokonce vícekrát. Připomeňme si JVM
+s&nbsp;technologií appletů, samozřejmě Flash či Silverlight. WebAssembly se
+však od těchto technologií poněkud liší, protože se skutečně jedná pouze o
+specifikaci virtuálního stroje (<a
+href="https://webassembly.github.io/spec/core/syntax/instructions.html">instrukce</a>
++ jejich chování); nejedná se zde o snahu vytvořit zcela novou platformu
+s&nbsp;vlastním vykreslovacím engine či s&nbsp;vlastními knihovnami.
+V&nbsp;případě WebAssembly se počítá s&nbsp;tím, že se budou využívat již
+existující a ověřené části prohlížečů, zejména celý DOM a základní funkce pro
+práci s&nbsp;ním. To je podle mého názoru lepší a především praktičtější
+přístup než snaha o nové objevování kola.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Způsob využití různých programovacích jazyků na WWW stránkách</h2>
+
+<p><i>JavaScript is an assembly language. The JavaScript + HTML generate is
+like a .NET assembly. The browser can execute it, but no human should really
+care what's there.<br />
+Erik Meijer</i></p>
+
+<p>Pravděpodobně nejjednodušší a nejpřímější cestou podpory nového
+programovacího jazyka ve webových prohlížečích je integrace jeho interpretru
+přímo do prohlížeče popř.&nbsp;použití pluginu s&nbsp;tímto interpretrem. Ovšem
+i přes snahy některých vývojářů a softwarových společností o začlenění dalších
+skriptovacích jazyků do webových prohlížečů (z&nbsp;historického pohledu se
+jednalo minimálně o Tcl, VBScript, Dart v&nbsp;Dartiu apod.) je patrné, že
+v&nbsp;současnosti je jediným široce akceptovaným <i>skriptovacím jazykem</i>
+na straně webového prohlížeče pouze JavaScript se všemi přednostmi a zápory,
+které tato monokultura přináší. To však v&nbsp;žádném případě neznamená, že by
+se ty části aplikace, které mají být spouštěny na straně klienta, musely psát
+pouze v&nbsp;JavaScriptu, jenž nemusí zdaleka všem vývojářům vyhovovat, ať již
+z&nbsp;objektivních či ze subjektivních příčin (například kvůli dosti <a
+href="https://www.youtube.com/watch?v=et8xNAc2ic8">zvláštně navrženému typovému
+systému</a>, který ovšem umožnil realizovat například <a
+href="http://www.jsfuck.com/">JSF*ck</a>).</p>
+
+<p>V&nbsp;relativně nedávné minulosti proto vzniklo a pořád ještě vzniká mnoho
+projektů, jejichž cílem je umožnit tvorbu webových aplikací pro prohlížeč
+v&nbsp;jiných programovacích jazycích. Zdrojové kódy je pak nutné nějakým
+způsobem zpracovat (transpřeložit, přeložit, ...) takovým způsobem, aby je bylo
+možné ve webovém prohlížeči spustit. Možností je hned několik &ndash; lze
+použít plugin (velmi problematické a dnes značně nepopulární řešení),
+<i>transpřekladač</i> do JavaScriptu či virtuální stroj popř.&nbsp;interpret
+daného jazyka implementovaný opět v&nbsp;JavaScriptu. Právě posledními dvěma
+zmíněnými možnostmi se budeme zabývat v&nbsp;navazujících kapitolách.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Transpřekladače do JavaScriptu</h2>
+
+<p>Jednu z&nbsp;dnes velmi populárních technik umožňujících použití prakticky
+libovolného programovacího jazyka pro tvorbu aplikací běžících na straně
+webového prohlížeče, představuje použití takzvaných <i>transcompilerů
+(source-to-source compiler)</i> zajišťujících překlad programu napsaného ve
+zdrojovém programovacím jazyce do funkčně identického programu napsaného
+v&nbsp;JavaScriptu (někdy se setkáme i s&nbsp;označením <a
+href="https://scotch.io/tutorials/javascript-transpilers-what-they-are-why-we-need-them">transpiler</a>).
+Transpřekladač se většinou spouští jen jednou na vývojářském počítači, samotní
+klienti již mají k&nbsp;dispozici JavaScriptový kód.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti není technologie
+transpřekladačů žádným způsobem svázána právě s&nbsp;JavaScriptem, protože se
+používala (a používá) i pro další manipulace se zdrojovými kódy.</div></p>
+
+<p>Existuje však i druhá možnost, kdy je samotný transpřekladač naprogramován
+v&nbsp;JavaScriptu a spouštěn přímo ve webovém prohlížeči klientů. Oba přístupy
+mají své přednosti, ale pochopitelně i nějaké zápory (například tvůrci
+uzavřených aplikací pravděpodobně budou upřednostňovat první možnost, protože
+výstupy transcompilerů jsou většinou dosti nečitelné; dokonce by mohla snaha o
+prozkoumání kódu spadat pod reverse engineering). Druhá možnost je relativně
+elegantní v&nbsp;tom ohledu, že se z&nbsp;pohledu programátora webové aplikace
+skutečně jedná o nový programovací jazyk, který je jakoby přímo zpracováván
+prohlížečem na stejné úrovni jako JavaScript. Příkladem může být kombinace
+JavaScriptu a jazyka <a
+href="https://www.root.cz/clanky/propojeni-sveta-lispu-se-svetem-javascriptu-s-vyuzitim-transprekladace-wisp/">WISP</a>:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Jazyk WISP na webové stránce&lt;/title&gt;
+        &lt;meta http-equiv="content-type" content="text/html; charset=utf-8"&gt;
+&nbsp;
+        &lt;script src="wisp.min.js" type="application/javascript"&gt;
+        &lt;/script&gt;
+&nbsp;
+        &lt;script type="application/wisp"&gt;
+        (print "část naprogramovaná ve WISPu")
+        &lt;/script&gt;
+&nbsp;
+        &lt;script type="application/javascript"&gt;
+        console.log("část naprogramovaná v JavaScriptu")
+        &lt;/script&gt;
+&nbsp;
+    &lt;/head&gt;
+&nbsp;
+    &lt;body&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Příklady existujících transpřekladačů do JavaScriptu</h2>
+
+<p>Z&nbsp;praxe můžeme uvést například následující projekty založené na
+transpřekladači. Některé z&nbsp;nich je možné použít přímo v&nbsp;prohlížeči,
+jiné provádí překlad do JavaScriptu na příkazovém řádku, existují i kombinace
+obou způsobů (opět viz WISP podporující oba režimy):</p>:
+
+<table>
+<tr><th>#</th><th>Jazyk</th><th>Poznámka</th></tr>
+<tr><td>1</td><td>CoffeeScript</td><td>přidání syntaktického cukru do JavaScriptu</td></tr>
+<tr><td>2</td><td>JSweet</td><td>překlad programů z&nbsp;Javy do JavaScriptu popř.&nbsp;do TypeScriptu</td></tr>
+<tr><td>3</td><td>Transcrypt</td><td>překlad Pythonu do JavaScriptu (tomuto nástroji se budeme věnovat v&nbsp;dalším článku)</td></tr>
+<tr><td>4</td><td>ClojureScript</td><td>překlad aplikací psaných v&nbsp;Clojure do JavaScriptu</td></tr>
+<tr><td>5</td><td>Kaffeine</td><td>rozšíření JavaScriptu o nové vlastnosti</td></tr>
+<tr><td>6</td><td>RedScript</td><td>jazyk inspirovaný Ruby</td></tr>
+<tr><td>7</td><td>GorillaScript</td><td>další rozšíření JavaScriptu</td></tr>
+<tr><td>8</td><td>ghcjs</td><td>transpřekladač pro fanoušky programovacího jazyka Haskell</td></tr>
+<tr><td>9</td><td>wisp</td><td>zjednodušená a dnes již nevyvíjená varianta ClojureScriptu</td></tr>
+<tr><td>10</td><td>Babel</td><td>překlad novějších variant JavaScript (ES2015) a TypeScriptu do zvolené (starší) verze JavaScriptu, stále populární, i přesto, že nové prohlížeče ES2015 podporují</td></tr>
+<tr><td>11</td><td>GopherJS</td><td>překladač programů naprogramovaných v&nbsp;jazyce Go do JavaScriptu</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: seznam všech (či alespoň většiny)
+známých transpřekladačů do JavaScriptu naleznete například na stránce <a
+href="https://github.com/jashkenas/coffeescript/wiki/List-of-languages-that-compile-to-JS">https://github.com/jashkenas/coffeescript/wiki/List-of-languages-that-compile-to-JS</a>,
+i když je nutné varovat, že některé projekty (kromě výše zmíněných) jsou
+v&nbsp;dosti špatném stavu.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Nástroj Emscripten</h2>
+
+<p>Další alternativní technologii, která mi osobně přijde velmi zajímavá a
+v&nbsp;budoucnu možná i přelomová, představují transpřekladače provádějící
+překlad z&nbsp;bajtkódu či mezikódu do JavaScriptu (vstupem zde tedy není
+zdrojový kód v&nbsp;nějakém lidsky čitelném programovacím jazyku, ale většinou
+binárně reprezentovaný výsledek předchozího překladu). Příkladem tohoto typu
+transpřekladače je především nástroj <i>Emscripten</i> [<a
+href="https://emscripten.org/">1</a>] umožňující překlad kódu
+z&nbsp;libovolného jazyka podporovaného LLVM (Rust, C, C++, Objective C, D,
+Ada, Fortran atd.) do JavaScriptu. Podívejme se nyní ve stručnosti na kroky,
+které je zapotřebí provést proto, aby se původní zdrojový kód napsaný například
+v&nbsp;Céčku, mohl nějakým způsobem spustit ve webovém prohlížeči:</p>
+
+<ol>
+<li>Na vstupu celého procesu je program napsaný v&nbsp;céčku</li>
+<li>Nejprve je proveden překlad pomocí <strong>clang</strong> do mezikódu LLVM
+(<i>LLVM Intermediate Representation</i>)</li>
+<li>Následně je zavolán <strong>Fastcomp</strong> (jádro překladače
+Emscriptenu) pro překlad mezikódu z&nbsp;předchozího kroku do JavaScriptu</li>
+<li>Výsledný JavaScriptový zdrojový kód je možné využít různými způsoby
+(node.js na serveru, na WWW stránce atd.)</li>
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: poslední překlad (do JavaScriptu)
+generuje kód kompatibilní s&nbsp;<i>asm.js</i>, tj.&nbsp;používá se zde cíleně
+omezená podmnožina konstrukcí JavaScriptu. Více informací o <i>asm.js</i>
+naleznete například na stránkách <a
+href="https://developer.mozilla.org/en-US/docs/Games/Tools/asm.js">https://developer.mozilla.org/en-US/docs/Games/Tools/asm.js</a>
+a <a href="http://asmjs.org/">http://asmjs.org/</a> (původní verze
+specifikace). Alternativně může být výsledkem i bajtkód pro WebAssembly, o čemž
+se zmíníme v&nbsp;dalších kapitolách.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Virtuální stroj naprogramovaný v&nbsp;JavaScriptu</h2>
+
+<p>Právě projekt <i>Emscripten</i> zmíněný <a href="#k05">v&nbsp;předchozí
+kapitole</a> do značné míry usnadnil další způsob zajištění běhu programů
+napsaných v&nbsp;různých programovacích jazycích ve webovém prohlížeči. Pokud
+je totiž možné přeložit jakýkoli program napsaný v&nbsp;jazycích C či C++ do
+JavaScriptu (samozřejmě za předpokladu, že se vhodným způsobem budou emulovat
+použité knihovní funkce), proč by nebylo možné do JavaScriptu rovnou přeložit
+celý virtuální stroj používaný daným programovacím jazykem? Samozřejmě to možné
+je, a to zejména v&nbsp;těch případech, kdy je překládaný virtuální stroj
+(alespoň z&nbsp;dnešního pohledu) malý, což je příklad VM pro jazyk Lua, tak i
+například poněkud většího virtuálního stroje Pythonu (.NET resp.&nbsp;CLR či
+Java VM už je pochopitelně mnohem těžší oříšek).</p>
+
+<p>Překladem VM do JavaScriptu získáme poměrně mnoho výhod, zejména pak možnost
+mít přímo v&nbsp;HTML stránkách původní zdrojové kódy (Lua, Python atd.) a
+nikoli nečitelný výstup z&nbsp;transpřekladačů. Za tento postup však také
+zaplatíme, zejména pomalejším během aplikací v&nbsp;porovnání s&nbsp;nativní
+VM. V&nbsp;praxi se může jednat o výkonnostní propad zhruba na polovinu, což
+ovšem v&nbsp;mnoha aplikacích vůbec není tak špatný výsledek.</p>
+
+<p>Příkladem takového typu virtuálního stroje je <a
+href="https://github.com/Doridian/LuaJS">LuaJS</a>.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. WebAssembly</h2>
+
+<p>Konečně se dostáváme k&nbsp;technologii <i>WebAssembly</i>. Již <a
+href="#01">v&nbsp;úvodní kapitole</a> jsme si řekli, že se v&nbsp;první řadě
+jedná o specifikaci virtuálního stroje, především jeho <a
+href="https://webassembly.github.io/spec/core/index.html">struktury</a> (je
+založen na zásobníku operandů, podobně jako například <a
+href="https://www.root.cz/serialy/programovaci-jazyk-java-a-jvm/">virtuální
+stroj Javy</a>) a taktéž ze specifikace jeho <a
+href="https://webassembly.github.io/spec/core/appendix/index-instructions.html#index-instr">instrukčního
+souboru</a>. Důležité přitom je, že současně používaná varianta WebAssembly je
+skutečně dosti nízkoúrovňová, takže neobsahuje například ani podporu pro
+automatickou správu paměti a i specifikace runtime je dosti minimalistická. To
+je ovšem v&nbsp;mnoha ohledech výhoda, protože u jazyků typu C, C++ či Rust
+není automatická správa paměti relevantní a jejich runtime je malý a naopak u
+jazyků typu Go je správce paměti přímo součástí <i>runtime</i> (zjednodušeně
+řečeno knihoven, které jsou slinkovány a tvoří výsledný bajtkód předávaný
+WebAssembly). Správa paměti řízená přímo WebAssembly je prozatím ve fázi vývoje
+a dnes ji nebudeme potřebovat.</p>
+
+<p>Již v&nbsp;předchozím odstavci jsme se zmínili o problematice
+<i>runtime</i>. Virtuální stroj WebAssembly akceptuje soubory s&nbsp;MIME typem
+<i>application/wasm</i>, které by měly obsahovat jak vlastní kód aplikace
+přeložený do bajtkódu, tak i veškerý podpůrný kód. V&nbsp;případě jazyka Go to
+konkrétně znamená, že soubory s&nbsp;přeloženou aplikací jsou poměrně velké. I
+ta nejjednodušší aplikace přeložená do WebAssembly má velikost cca 1300 kB,
+protože je ve výsledku obsažený celý potřebný runtime i automatický správce
+paměti.</p>
+
+<p>Velikost výsledného souboru se zvětšujícím se zdrojovým kódem aplikace dále
+již roste jen pomalu, ovšem i přesto je nutné počítat s&nbsp;tím, že první
+načtení a inicializace bajtkódu může být pomalá (mobilní připojení atd.) a může
+se tedy jednat o jeden z&nbsp;důvodů, proč WebAssembly a Go v&nbsp;praxi spíše
+nepoužívat. Na druhou stranu si představme například aplikaci typu
+&bdquo;webové IDE&ldquo; nebo Google Docs &ndash; zde se doba nutná pro přenos
+cca jednoho či dvou megabajtů runtime pravděpodobně ztratí mezi stovkami
+kilobajtů dalších souborů (navíc se vlastně mnohdy mohou odstranit všechny
+JavaScriptové knihovny); u podobných aplikací se navíc očekává, že budou
+spuštěny delší dobu, na rozdíl od běžných webových prezentací.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Jednoduchý projekt přeložený do WebAssembly</h2>
+
+<p>Nyní si ukažme, jakým způsobem se vlastně překládá projekt naprogramovaný
+v&nbsp;jazyce Go do bajtkódu kompatibilního s&nbsp;WebAssembly a jak se
+výsledný bajtkód stane součástí webové aplikace. Samotný projekt je tak
+triviální, že si možná ani nezaslouží označení &bdquo;projekt&ldquo;. <a
+href="https://github.com/tisnik/go-root/blob/master/article_19/hello.go">Jeho
+zdrojový kód totiž vypadá následovně</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("Hello World!")
+}
+</pre>
+
+<p>Běžný překlad by se provedl známým způsobem:</p>
+
+<pre>
+$ <strong>go build</strong>
+</pre>
+
+<p>Přičemž výsledkem by byl nativní spustitelný soubor pro použitou
+architekturu mikroprocesoru a operační systém.</p>
+
+<p>Překlad ovšem můžeme provést i se specifikací jiné architektury, konkrétně
+architektury <i>wasm</i> (ostatně virtuální stroj se zásobníkem a instrukční
+sadou se vlastně nijak zásadně neliší od specifikace mikroprocesoru):</p>
+
+<pre>
+$ <strong>GOARCH=wasm GOOS=js go build -o hello.wasm hello.go</strong>
+</pre>
+
+<p>V&nbsp;tomto případě je výsledkem překladu soubor
+<strong>hello.wasm</strong>, který obsahuje bajtkód výše zmíněného projektu i
+příslušný runtime.</p>
+
+<p><div class="rs-tip-major">Poznámka: výsledný soubor
+<strong>hello.wasm</strong> svou velikostí přesahuje dva megabajty. To je
+v&nbsp;kontextu webových aplikací poměrně veliký objem a je do určité míry
+způsobem tím, že importujeme balíček <strong>fmt</strong>. V&nbsp;případě, že
+se namísto <strong>fmt.Println</strong> použije standardní funkce
+<strong>println</strong>, sníží se velikost <strong>hello.wasm</strong> o celý
+jeden megabajt!</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Zařazení bajtkódu do webové stránky</h2>
+
+<p>Zbývá nám ještě zařídit zařazení a inicializaci bajtkódu na webové stránce.
+To není úplně triviální, na rozdíl od skriptů naprogramovaných
+v&nbsp;JavaScriptu, které stačí pouze přidat do tagu
+<strong>&lt;script&gt;</strong>. V&nbsp;případě WebAssembly potřebujeme
+podpůrný soubor <a
+href="https://github.com/tisnik/go-root/blob/master/article_19/wasm_exec.js">wasm_exec.js</a>,
+který získáte buď z&nbsp;uvedené adresy vedoucí do repositáře na GitHubu nebo
+přímo z&nbsp;adresáře, v&nbsp;němž je nainstalován jazyk Go. Dále si povšimněte
+inicializace objektu typu <strong>Go</strong>. Tento objekt se používá ve
+chvíli, kdy je nutné zajistit kooperaci mezi částí aplikace naprogramované
+v&nbsp;Go a přeložené do WebAssembly s&nbsp;částí vytvořenou v&nbsp;JavaScriptu
+(to si ukážeme v&nbsp;závěru článku). HTML stránka s&nbsp;inicializací
+WebAssembly <a
+href="https://github.com/tisnik/go-root/blob/master/article_19/hello.html">může
+vypadat takto</a>:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;script src="wasm_exec.js"&gt;&lt;/script&gt;
+        &lt;script&gt;
+            const go = new Go();
+            WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) =&gt; {
+                    go.run(result.instance);
+            });
+        &lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Server, který bude korektně pracovat se soubory s&nbsp;MIME typem &bdquo;application/wasm&ldquo;</h2>
+
+<p>Zbývá nám vyřešit ještě jeden problém &ndash; jak vlastně otevřít HTML
+stránku, v&nbsp;níž je umístěn odkaz na bajtkód, který má být spuštěn ve
+<i>WebAssembly</i>. Mohlo by se zdát, že se jedná o triviální úkol &ndash;
+prostě stránku otevřeme přímo ze souboru a prohlížeč si po jejím zparsování
+ostatní potřebné soubory načte automaticky sám. Toto řešení je sice funkční
+v&nbsp;případě obrázků či dalšího multimediálního obsahu, ovšem už
+v&nbsp;případě JavaScriptu nemusí vždy fungovat (tato funkcionalita může být
+zakázána) a nebude funkční ani v&nbsp;případě WebAssembly. Prohlížeč totiž
+v&nbsp;tomto případě striktně požaduje, aby mu byl předán obsah s&nbsp;MIME
+typem &bdquo;application/wasm&ldquo;. To zajistíme spuštěním vlastního HTTP
+serveru, který je v&nbsp;případě použití programovacího jazyka Go implementován
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_19/file_server.go">téměř
+triviálním způsobem</a>:</p>
+
+<pre>
+<i>// HTTP server vracející statický obsah</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>main</strong>() {
+        http.Handle("/", http.FileServer(http.Dir("")))
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Tento HTTP server spustíme přímo v&nbsp;adresáři, kde se nachází i přeložené
+soubory &bdquo;.wasm&ldquo;:</p>
+
+<pre>
+$ <strong>go run file_server.go</strong>
+</pre>
+
+<p>Předností HTTP serveru naprogramovaného přímo v&nbsp;jazyce Go
+s&nbsp;využitím základních balíčků ze standardní knihovny je fakt, že tento
+server správně rozpoznává koncovky souborů &bdquo;.wasm&ldquo; a správně těmto
+souborům přiřazuje MIME typ (což je nutné u jiných HTTP serverů mnohdy ručně
+doplňovat). Ostatně o této funkcionalitě se můžeme velmi snadno přesvědčit,
+například stažením hlavičky nástrojem typu <strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl -I localhost:8000/hello.wasm</strong>
+&nbsp;
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 2424424
+Content-Type: application/wasm
+Last-Modified: Sat, 30 Mar 2019 18:27:52 GMT
+Date: Sat, 30 Mar 2019 18:45:08 GMT
+</pre>
+
+<a href="https://www.root.cz/obrazek/357832/"><img src="https://i.iinfo.cz/images/338/wasm-go-1-prev.png" class="image-357832" alt="&#160;" width="370" height="55" /></a>
+<p><i>Obrázek 1: Webový server dodá prohlížeči postupně jak HTML stránku, tak i
+pomocný JavaScriptový soubor a soubor s&nbsp;bajtkódem WebAssembly.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: po spuštění serveru otevřete HTML
+stránku demonstračního příkladu a v&nbsp;konzoli
+(<strong>Ctrl+Shift+K</strong>) byste měli uvidět zprávu vytištěnou
+z&nbsp;bajtkódu.</div></p>
+
+<a href="https://www.root.cz/obrazek/357833/"><img src="https://i.iinfo.cz/images/338/wasm-go-2-prev.png" class="image-357833" alt="&#160;" width="370" height="247" /></a>
+<p><i>Obrázek 2: V&nbsp;konzoli by se měla objevit zpráva vytištěná
+z&nbsp;WebAssembly.</i></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. WebAssembly a DOM</h2>
+
+<p>V&nbsp;praxi se setkáme s&nbsp;nutností manipulace s&nbsp;DOMem celé HTML
+stránky popř.&nbsp;s&nbsp;DOMem souboru typu SVG. I tato možnost je
+pochopitelně na straně jazyka Go podporována, a to díky tomu, že balíček
+<strong>syscall/js</strong> zpřístupňuje programátorům objekt
+<strong>Global</strong>, který v&nbsp;JavaScriptu odpovídá objektu
+<strong>window</strong> (minimálně pokud se bavíme o HTML stránkách, nikoli o
+node.js):</p>
+
+<pre>
+window := js.Global()
+</pre>
+
+<p>Přes tento objekt můžeme přistoupit k&nbsp;dalšímu známému objektu
+<strong>document</strong> s&nbsp;obsahem HTML stránky:</p>
+
+<pre>
+document := window.Get("document")
+</pre>
+
+<p>Následně již můžeme volat metody objektu <strong>document</strong>, ovšem
+nepřímo přes:</p>
+
+<pre>
+document.Call("jméno_JS_metody", parametry)
+</pre>
+
+<p>popř.&nbsp;měnit atributy s&nbsp;využitím:</p>
+
+<pre>
+document.Set("jméno_atributu", hodnota)
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Změna obsahu vybrané značky</h2>
+
+<p>Podívejme se nyní, jakým způsobem můžeme změnit obsah značky
+s&nbsp;identifikátorem &bdquo;header&ldquo;. V&nbsp;JavaScriptu by se jednalo o
+tento kód:</p>
+
+<pre>
+element = document.getElementById("header");
+element.innerHTML = "foobar";
+</pre>
+
+<p>V&nbsp;jazyce Go a s&nbsp;využitím balíčku <strong>syscall/js</strong> by se
+podobná funkcionalita <a
+href="https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.go">naprogramovala
+následujícím způsobem</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "syscall/js"
+)
+&nbsp;
+func <strong>main</strong>() {
+        println("started")
+&nbsp;
+        window := js.Global()
+        document := window.Get("document")
+        element := document.Call("getElementById", "header")
+&nbsp;
+        element.Set("innerHTML", "foobar")
+&nbsp;
+        println("finished")
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.html">Ve
+zdrojovém kódu HTML stránky</a> si povšimněte elementu s&nbsp;ID nastaveným na
+&bdquo;header&ldquo;:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;script src="wasm_exec.js"&gt;&lt;/script&gt;
+        &lt;script&gt;
+            const go = new Go();
+            WebAssembly.instantiateStreaming(fetch("dom_manipulation.wasm"), go.importObject).then((result) =&gt; {
+                    go.run(result.instance);
+            });
+        &lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 <strong>id="header"</strong>&gt;nic&lt;/h2&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<a href="https://www.root.cz/obrazek/357834/"><img src="https://i.iinfo.cz/images/338/wasm-go-3-prev.png" class="image-357834" alt="&#160;" width="370" height="247" /></a>
+<p><i>Obrázek 3: Změna elementu na HTML stránce.</i></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Přidání nových značek do HTML stránky</h2>
+
+<p>Podobným způsobem můžeme do HTML stránky přidat další značky, což je ukázáno
+na dalším demonstračním příkladu, po jehož inicializaci by se do stránky měla
+přidat tabulka s&nbsp;hodnotami faktoriálů čísel od nuly do deseti. Povšimněte
+si, že nyní voláme metodu <strong>document.createElement()</strong> a taktéž
+<strong>document.body.appendChild()</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        println("started")
+&nbsp;
+        window := js.Global()
+        document := window.Get("document")
+        element := document.Call("getElementById", "header")
+&nbsp;
+        element.Set("innerHTML", "foobar")
+&nbsp;
+        for n := int64(0); n &lt;= 10; n++ {
+                f := Factorial(n)
+                message := fmt.Sprintf("%2d! = %d", n, f)
+                pre := document.Call("createElement", "pre")
+                pre.Set("innerHTML", message)
+                document.Get("body").Call("appendChild", pre)
+        }
+&nbsp;
+        println("finished")
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/357835/"><img src="https://i.iinfo.cz/images/338/wasm-go-4-prev.png" class="image-357835" alt="&#160;" width="370" height="247" /></a>
+<p><i>Obrázek 4: Přidání nových elementů na HTML stránku.</i></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Kreslení do 2D canvasu</h2>
+
+<p>Poměrně často se aplikace překládané do WebAssembly používají pro kreslení
+2D či 3D grafiky, typicky s&nbsp;přímým či nepřímým využitím <a
+href="https://www.khronos.org/webgl/">WebGL</a>. Tomuto zajisté zajímavému
+tématu se však dnes věnovat nebudeme. Namísto toho si ukážeme, jak může
+aplikace naprogramovaná v&nbsp;Go vytvořit 2D canvas (HTML 5) a kreslit do něj.
+Nejdříve si zpřístupníme objekt <strong>document</strong>, což již známe:</p>
+
+<pre>
+window := js.Global()
+document := window.Get("document")
+</pre>
+
+<p>Následně do dokumentu (HTML stránky) vložíme nový canvas se zadanou
+velikostí:</p>
+
+<pre>
+canvas := document.Call("createElement", "canvas")
+canvas.Set("height", CanvasWidth)
+canvas.Set("width", CanvasHeight)
+document.Get("body").Call("appendChild", canvas)
+</pre>
+
+<p>Získáme kontext pro kreslení:</p>
+
+<pre>
+context2d := canvas.Call("getContext", "2d")
+</pre>
+
+<p>A následně například vybarvíme celou plochu canvasu světle šedou barvou:</p>
+
+<pre>
+context2d.Set("fillStyle", "#c0c0c0")
+context2d.Call("fillRect", 0, 0, CanvasWidth, CanvasHeight)
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_19/draw_into_canvas.go">Úplný
+zdrojový kód</a> příkladu s&nbsp;HTML canvasem vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "syscall/js"
+)
+&nbsp;
+func <strong>main</strong>() {
+        const CanvasWidth = 256
+        const CanvasHeight = 256
+&nbsp;
+        println("started")
+&nbsp;
+        window := js.Global()
+        document := window.Get("document")
+&nbsp;
+        canvas := document.Call("createElement", "canvas")
+        canvas.Set("height", CanvasWidth)
+        canvas.Set("width", CanvasHeight)
+        document.Get("body").Call("appendChild", canvas)
+&nbsp;
+        context2d := canvas.Call("getContext", "2d")
+        context2d.Set("fillStyle", "#c0c0c0")
+        context2d.Call("fillRect", 0, 0, CanvasWidth, CanvasHeight)
+&nbsp;
+        context2d.Set("fillStyle", "yellow")
+        context2d.Call("fillRect", 10, 10, CanvasWidth-20, CanvasHeight-20)
+&nbsp;
+        println("finished")
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/357836/"><img src="https://i.iinfo.cz/images/338/wasm-go-5-prev.png" class="image-357836" alt="&#160;" width="370" height="247" /></a>
+<p><i>Obrázek 5: Vykreslení na HTML 5 canvas přes WebAssembly.</i></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Komunikace mezi Go a JavaScriptem</h2>
+
+<p>Nakonec si ukážeme nejsložitější příklad, v&nbsp;němž je ukázána komunikace
+mezi Go a JavaScriptem. V&nbsp;tomto příkladu vytvoříme pomocnou funkci
+naprogramovanou v&nbsp;Go, která bude volatelná z&nbsp;JavaScriptu. Povšimněte
+si, že se této funkci předává řez libovolných JavaScriptových hodnot:</p>
+
+<pre>
+func <strong>PrintHello</strong>(inputs []js.Value) {
+        window := js.Global()
+        document := window.Get("document")
+        element := document.Call("getElementById", "header")
+&nbsp;
+        element.Set("innerHTML", "Hello from Go")
+}
+</pre>
+
+<p>Tuto funkci je nutné zaregistrovat, aby ji viděl i JavaScriptový engine, a
+to pod jménem &bdquo;printHello&ldquo;:</p>
+
+<pre>
+js.Global().Set("printHello", js.NewCallback(PrintHello))
+</pre>
+
+<p>To však není vše &ndash; dále musíme zajistit, aby se hlavní funkce Go
+(<strong>main</strong>) automaticky neukončila, protože by JavaScriptová část
+nemohla přistupovat k&nbsp;objektu <strong>Go</strong>. To se provede
+s&nbsp;využitím kanálu s&nbsp;nulovou kapacitou, z&nbsp;něhož se pokusíme
+přečíst hodnotu. Tato operace je blokující a nikdy neskončí:</p>
+
+<pre>
+func <strong>main</strong>() {
+        println("started")
+        c := make(chan bool)
+        js.Global().Set("printHello", js.NewCallback(PrintHello))
+        &lt;-c
+        println("finished")
+}
+</pre>
+
+<p>Část naprogramovaná v&nbsp;Go vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "syscall/js"
+)
+&nbsp;
+func <strong>PrintHello</strong>(inputs []js.Value) {
+        window := js.Global()
+        document := window.Get("document")
+        element := document.Call("getElementById", "header")
+&nbsp;
+        element.Set("innerHTML", "Hello from Go")
+}
+&nbsp;
+func <strong>main</strong>() {
+        println("started")
+        c := make(chan bool)
+        js.Global().Set("printHello", js.NewCallback(PrintHello))
+        &lt;-c
+        println("finished")
+}
+</pre>
+
+<p>Část naprogramovaná v&nbsp;JavaScriptu je již jednoduchá. Povšimněte si, že
+bez problémů voláme funkci <strong>printHello()</strong>, která není nikde na
+JavaScriptové straně deklarována:</p>
+
+<pre>
+const go = new Go();
+WebAssembly.instantiateStreaming(fetch("js_interop.wasm"), go.importObject).then((result) =&gt; {
+        go.run(result.instance);
+        printHello();
+});
+</pre>
+
+<a href="https://www.root.cz/obrazek/357837/"><img src="https://i.iinfo.cz/images/338/wasm-go-6-prev.png" class="image-357837" alt="&#160;" width="370" height="247" /></a>
+<p><i>Obrázek 6: Výsledek komunikace mezi jazyky Go a JavaScript.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Překlad programů naprogramovaných v&nbsp;Go do JavaScriptu</h2>
+
+<p>Příště si ukážeme alternativní možnost spouštění aplikací naprogramovaných
+v&nbsp;Go ve webových prohlížečích. Jedná se o projekt <i>GopherJS</i>, viz též
+<a
+href="https://github.com/gopherjs/gopherjs/blob/master/doc/packages.md">https://github.com/gopherjs/gopherjs/blob/master/doc/packages.md</a>
+popř.&nbsp;&bdquo;pískoviště&ldquo;, v&nbsp;němž si můžete základní
+funkcionalitu otestovat. Toto pískoviště naleznete na adrese <a
+href="https://gopherjs.github.io/playground/">https://gopherjs.github.io/playground/</a>.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně jeden megabajt), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>hello.go</td><td>zdrojový kód prvního příkladu: výpis zprávy na konzoli webového prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/hello.go">https://github.com/tisnik/go-root/blob/master/article_19/hello.go</a></td></tr>
+<tr><td> 1</td><td>hello.html</td><td>HTML stránka s&nbsp;kódem pro načtení prvního příkladu do prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/hello.html">https://github.com/tisnik/go-root/blob/master/article_19/hello.html</a></td></tr>
+<tr><td> 1</td><td>build_hello</td><td>skript pro překlad prvního příkladu do bajtkódu WebAssembly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/build_hello">https://github.com/tisnik/go-root/blob/master/article_19/build_hello</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 2</td><td>dom_manipulation.go</td><td>zdrojový kód druhého příkladu: manipulace s&nbsp;DOMem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.go">https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.go</a></td></tr>
+<tr><td> 2</td><td>dom_manipulation.html</td><td>HTML stránka s&nbsp;kódem pro načtení druhého příkladu do prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.html">https://github.com/tisnik/go-root/blob/master/article_19/dom_manipulation.html</a></td></tr>
+<tr><td> 2</td><td>build_dom_manipulation</td><td>skript pro překlad druhého příkladu do bajtkódu WebAssembly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/build_dom_manipulation">https://github.com/tisnik/go-root/blob/master/article_19/build_dom_manipulation</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>dom_add_element.go</td><td>zdrojový kód třetího příkladu: přidání elementů do DOMu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/dom_add_element.go">https://github.com/tisnik/go-root/blob/master/article_19/dom_add_element.go</a></td></tr>
+<tr><td> 3</td><td>dom_add_element.html</td><td>HTML stránka s&nbsp;kódem pro načtení třetího příkladu do prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/dom_add_element.html">https://github.com/tisnik/go-root/blob/master/article_19/dom_add_element.html</a></td></tr>
+<tr><td> 3</td><td>build_add_element</td><td>skript pro překlad třetího příkladu do bajtkódu WebAssembly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/build_add_element">https://github.com/tisnik/go-root/blob/master/article_19/build_add_element</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 4</td><td>draw_into_canvas.go</td><td>zdrojový kód čtvrtého příkladu: kreslení do canvasu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/draw_into_canvas.go">https://github.com/tisnik/go-root/blob/master/article_19/draw_into_canvas.go</a></td></tr>
+<tr><td> 4</td><td>draw_into_canvas.html</td><td>HTML stránka s&nbsp;kódem pro načtení čtvrtého příkladu do prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/draw_into_canvas.html">https://github.com/tisnik/go-root/blob/master/article_19/draw_into_canvas.html</a></td></tr>
+<tr><td> 4</td><td>build_draw_into_canvas</td><td>skript pro překlad čtvrtého příkladu do bajtkódu WebAssembly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/build_draw_into_canvas">https://github.com/tisnik/go-root/blob/master/article_19/build_draw_into_canvas</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>js_interop.go</td><td>zdrojový kód pátého příkladu: komunikace s&nbsp;JavaScriptem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/js_interop.go">https://github.com/tisnik/go-root/blob/master/article_19/js_interop.go</a></td></tr>
+<tr><td> 5</td><td>js_interop.html</td><td>HTML stránka s&nbsp;kódem pro načtení pátého příkladu do prohlížeče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/js_interop.html">https://github.com/tisnik/go-root/blob/master/article_19/js_interop.html</a></td></tr>
+<tr><td> 5</td><td>build_js_interop</td><td>skript pro překlad pátého příkladu do bajtkódu WebAssembly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/build_js_interop">https://github.com/tisnik/go-root/blob/master/article_19/build_js_interop</a></td></tr>
+</table>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Pomocné soubory použité demonstračními příklady</h2>
+
+<p>Pomocné soubory jsou taktéž uloženy v&nbsp;repositáři <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>file_server.go</td><td>implementace HTTP serveru popsaná <a href="#k10">v&nbsp;desáté kapitole</a></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/file_server.go">https://github.com/tisnik/go-root/blob/master/article_19/file_server.go</a></td></tr>
+<tr><td> 2</td><td>file_server</td><td>skript pro spuštění HTTP serveru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/file_server">https://github.com/tisnik/go-root/blob/master/article_19/file_server</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>wasm_exec.js</td><td>inicializace WebAssembly (získáno z&nbsp;instalace Go)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/wasm_exec.js">https://github.com/tisnik/go-root/blob/master/article_19/wasm_exec.js</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 4</td><td>clean</td><td>skript pro vymazání všech vygenerovaných .wasm souborů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_19/clean">https://github.com/tisnik/go-root/blob/master/article_19/clean</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na články s&nbsp;tématem WebAssembly</h2>
+
+<ol>
+
+<li>WebAssembly<br />
+<a href="https://webassembly.org/">https://webassembly.org/</a>
+</li>
+
+<li>WebAssembly na Wiki Golangu<br />
+<a href="https://github.com/golang/go/wiki/WebAssembly">https://github.com/golang/go/wiki/WebAssembly</a>
+</li>
+
+<li>The future of WebAssembly - A look at upcoming features and proposals<br />
+<a href="https://blog.scottlogic.com/2018/07/20/wasm-future.html">https://blog.scottlogic.com/2018/07/20/wasm-future.html</a>
+</li>
+
+<li>Writing WebAssembly By Hand<br />
+<a href="https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html">https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html</a>
+</li>
+
+<li>WebAssembly Specification<br />
+<a href="https://webassembly.github.io/spec/core/index.html">https://webassembly.github.io/spec/core/index.html</a>
+</li>
+
+<li>Index of Instructions<br />
+<a href="https://webassembly.github.io/spec/core/appendix/index-instructions.html">https://webassembly.github.io/spec/core/appendix/index-instructions.html</a>
+</li>
+
+<li>The WebAssembly Binary Toolkit<br />
+<a href="https://github.com/WebAssembly/wabt">https://github.com/WebAssembly/wabt</a>
+</li>
+
+<li>Will WebAssembly replace JavaScript? Or Will WASM Make JavaScript More Valuable in Future?<br />
+<a href="https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e">https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e</a>
+</li>
+
+<li>Roadmap (pro WebAssemly)<br />
+<a href="https://webassembly.org/roadmap/">https://webassembly.org/roadmap/</a>
+</li>
+
+<li>S-expression<br />
+<a href="https://en.wikipedia.org/wiki/S-expression">https://en.wikipedia.org/wiki/S-expression</a>
+</li>
+
+<li>Understanding WebAssembly text format<br />
+<a href="https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format">https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format</a>
+</li>
+
+<li>Learning Golang through WebAssembly - Part 1, Introduction and setup<br />
+<a href="https://www.aaron-powell.com/posts/2019-02-04-golang-wasm-1-introduction/">https://www.aaron-powell.com/posts/2019-02-04-golang-wasm-1-introduction/</a>
+</li>
+
+<li>Learning Golang through WebAssembly - Part 2, Writing your first piece of Go<br />
+<a href="https://www.aaron-powell.com/posts/2019-02-05-golang-wasm-2-writing-go/">https://www.aaron-powell.com/posts/2019-02-05-golang-wasm-2-writing-go/</a>
+</li>
+
+<li>Learning Golang through WebAssembly - Part 3, Interacting with JavaScript from Go <br />
+<a href="https://www.aaron-powell.com/posts/2019-02-06-golang-wasm-3-interacting-with-js-from-go/">https://www.aaron-powell.com/posts/2019-02-06-golang-wasm-3-interacting-with-js-from-go/</a>
+</li>
+
+<li>Golang webassembly (wasm) testing with examples <br />
+<a href="https://jelinden.fi/blog/golang-webassembly-wasm-testing-with-examples/qB7Tb2KmR">https://jelinden.fi/blog/golang-webassembly-wasm-testing-with-examples/qB7Tb2KmR</a>
+</li>
+
+<li>Use Cases (of WebAssembly)<br />
+<a href="https://webassembly.org/docs/use-cases/">https://webassembly.org/docs/use-cases/</a>
+</li>
+
+<li>Tabulka s&nbsp;podporou WebAssembly v&nbsp;různých prohlížečích<br />
+<a href="https://caniuse.com/#feat=wasm">https://caniuse.com/#feat=wasm</a>
+</li>
+
+</ol>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Podpora canvasu ve webových prohlížečích<br />
+<a href="https://caniuse.com/#feat=canvas">https://caniuse.com/#feat=canvas</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>JSFuck<br />
+<a href="http://www.jsfuck.com/">http://www.jsfuck.com/</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>Package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
