@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá část část
+//
+// Demonstrační příklad číslo 8:
+//     Zápis příkazů Atari BASICu.
+
 package main
 
 import (
