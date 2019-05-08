@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá část část
+//
+// Demonstrační příklad číslo 4:
+//     Go-prompt: vstup s nápovědou.
+
 package main
 
 import "github.com/c-bata/go-prompt"
