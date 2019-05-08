@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá část část
+//
+// Demonstrační příklad číslo 7:
+//     Go-prompt: vylepšená nápověda.
+//     
+
 package main
 
 import (
