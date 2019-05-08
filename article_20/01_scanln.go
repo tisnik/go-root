@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá část část
+//
+// Demonstrační příklad číslo 1:
+//     Načtení řetězců ze standardního vstupu.
+
 package main
 
 import "fmt"
