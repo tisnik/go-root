@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá část část
+//
+// Demonstrační příklad číslo 10:
+//     Víceslovní příkazy.
+
 package main
 
 import (
