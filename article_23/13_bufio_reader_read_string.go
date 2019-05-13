@@ -9,7 +9,6 @@ import (
 )
 
 const filename = "test_input.txt"
-const buffer_size = 16
 
 func main() {
 	reader, err := os.Open(filename)
