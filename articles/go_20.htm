@@ -1,0 +1,2208 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Jazyk Go a aplikace s vlastním příkazovým řádkem</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Jazyk Go a aplikace s vlastním příkazovým řádkem</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Ve dvacáté části seriálu o programovacím jazyku Go se seznámíme s knihovnou nazvanou <strong>go-prompt</strong>, která se používá v aplikacích s vlastním příkazovým řádkem vybaveným funkcemi pro automatické doplňování příkazů, kontextovou nápovědu i historii příkazů.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Jazyk Go a aplikace s&nbsp;vlastním příkazovým řádkem</a></p>
+<p><a href="#k02">2. Čtení příkazů s&nbsp;využitím funkce <strong>Scanln</strong> ze standardního balíčku <strong>fmt</strong></a></p>
+<p><a href="#k03">3. Čtení ze standardního vstupu pomocí metody <strong>Reader.ReadString</strong></a></p>
+<p><a href="#k04">4. Knihovna GNU Readline</a></p>
+<p><a href="#k05">5. Knihovna <strong>prompt_toolkit</strong> pro tvorbu aplikací s interaktivní smyčkou REPL v&nbsp;jazyku Python</a></p>
+<p><a href="#k06">6. Balíček <strong>go-prompt</strong> pro aplikace naprogramované v&nbsp;jazyku Go</a></p>
+<p><a href="#k07">7. Instalace balíčku <strong>go-prompt</strong></a></p>
+<p><a href="#k08">8. Základní klávesové zkratky používané knihovnou <strong>go-prompt</strong></a></p>
+<p><a href="#k09">9. Přečtení řádku s&nbsp;příkazy funkcí <strong>Input</strong></a></p>
+<p><a href="#k10">10. Plnohodnotný příkazový řádek s&nbsp;vlastní historií příkazů</a></p>
+<p><a href="#k11">11. Zajištění automatického doplňování příkazů na základě statické tabulky</a></p>
+<p><a href="#k12">12. Kontextová nápověda na základě části zapsaného příkazu</a></p>
+<p><a href="#k13">13. Přidání nápovědy k&nbsp;jednotlivým příkazům</a></p>
+<p><a href="#k14">14. Rozsáhlejší příklad se všemi klíčovými slovy BASICu</a></p>
+<p><a href="#k15">15. Pokročilejší vyhledání vhodných příkazů na základě fuzzy filtru</a></p>
+<p><a href="#k16">16. Kontextová nápověda u příkazů, které se skládají ze dvou slov</a></p>
+<p><a href="#k17">17. Implementace kontextové nápovědy víceslovních příkazů</a></p>
+<p><a href="#k18">18. Úplný zdrojový kód příkladu s&nbsp;víceslovními příkazy</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Jazyk Go a aplikace s&nbsp;vlastním příkazovým řádkem</h2>
+
+<p>Již mnohokrát jsme si <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;seriálu o
+programovacím jazyku Go</a> řekli, že se tento jazyk primárně používá pro
+tvorbu síťových utilit, mikroslužeb či dokonce ucelených webových aplikací. Je
+to ostatně logické, protože právě v&nbsp;těchto oblastech se využijí prakticky
+všechny užitečné vlastnosti tohoto programovacího jazyka, zejména pak podpora
+pro práci s&nbsp;<i>gorutinami</i>, komunikace mezi gorutinami s&nbsp;využitím
+<i>kanálů</i> a v&nbsp;neposlední řadě taktéž možnost přeložit nástroj
+naprogramovaný v&nbsp;jazyku Go do jediného binárního souboru (pro určenou
+platformu), který nevyžaduje prakticky žádnou instalaci (na rozdíl od aplikací
+v&nbsp;některých jiných jazycích, v&nbsp;nichž je nutné zajistit buď
+kompatibilní dynamicky linkované knihovny či dokonce celý <i>runtime</i> daného
+programovacího jazyka).</p>
+
+<p>To však samozřejmě neznamená, že by se jazyk Go nemohl využívat i
+v&nbsp;dalších oblastech. Sice se (s&nbsp;poměrně velkou pravděpodobností)
+prozatím neprosadí například pro tvorbu her, ovšem naproti tomu nalezneme velké
+množství nástrojů naprogramovaných právě v&nbsp;jazyce Go, které se ovládají
+interaktivně příkazy zadávanými z&nbsp;příkazového řádku (<i>command
+line</i>).</p>
+
+<p>Tyto aplikace mohou pracovat dvěma způsoby:</p>
+
+<ol>
+
+<li>Příkazy se specifikují vždy při spouštění aplikace/nástroje. V&nbsp;takovém
+případě aplikace/nástroj daný příkaz provede, vypíše případný výstup či chyby a
+ukončí se. Příkladem mohou být prakticky všechny základní nástroje Linuxu (či
+obecně Unixu): <strong>cp</strong>, <strong>ls</strong> atd., dále například
+<strong>git</strong> a z&nbsp;aplikací naprogramovaných v&nbsp;jazyku Go pak
+nástroj <strong>oc</strong> použitý pro práci s&nbsp;<i>OpenShiftem</i>. Pokud
+jsou takové aplikace naprogramované v&nbsp;Go, nepotřebují kromě zpracování
+příkazové řádky žádnou další podpůrnou knihovnu.</li>
+
+<li>Ve druhém typu aplikací se používá vlastní interaktivní smyčka REPL (<a
+href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">Read-Eval-Print
+Loop</a>), tj.&nbsp;aplikace se spustí, vypíše tzv.&nbsp;výzvu (<i>prompt</i>)
+uživateli, akceptuje zadané příkazy, nějakým způsobem je vykoná a opět vypíše
+výzvu. Zde je již většinou nutné investovat více času na přípravu prostředí
+aplikace, protože dnes uživatelé (po právu) vyžadují, aby nástroj
+s&nbsp;vlastní interaktivní smyčkou REPL podporoval historii příkazů,
+vyhledávání v&nbsp;historii, obarvení vstupů, podporu pro automatické
+doplňování příkazů atd. atd. A právě tímto typem aplikací, jejichž typickým
+zástupcem je samotný <strong>BASH</strong> či jakýkoli jiný <i>shell</i>, se
+dnes budeme zabývat.</li>
+
+</ol>
+
+<a href="https://www.root.cz/obrazek/358439/"><img src="https://i.iinfo.cz/images/472/golang-20-1-prev.png" class="image-358439" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 1: Příkladem aplikace s&nbsp;interaktivní smyčkou REPL je
+IPython.</i></p>
+
+<p>Pro aplikace s&nbsp;interaktivní smyčkou REPL programované v&nbsp;jazyku Go
+vzniklo několik knihoven, které nabízí některé vyžadované funkce. Jedná se
+například o tyto knihovny:</p>
+
+<ul>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+</ul>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Čtení příkazů s&nbsp;využitím funkce <strong>Scanln</strong> ze standardního balíčku <strong>fmt</strong></h2>
+
+<p>Podívejme se nejprve na některé prostředky, které nám pro čtení textu
+z&nbsp;příkazového řádku nabízí standardní balíčky programovacího jazyka Go.
+Nutno říci, že se jedná o základní funkce, od nichž nelze očekávat uživatelskou
+přívětivost &ndash; například nebudou fungovat ani příkazy pro pohyb kurzoru
+v&nbsp;rámci vstupního řádku, o neexistenci historie příkazů či kontextové
+nápovědy ani nemluvě. Jednou z&nbsp;funkcí, které nalezneme v&nbsp;základní
+knihovně jazyka Go, je funkce pojmenovaná <strong>Scanln</strong>
+z&nbsp;balíčku <strong>fmt</strong>, viz též <a
+href="https://golang.org/pkg/fmt/#Scanln">https://golang.org/pkg/fmt/#Scanln</a>:</p>
+
+<pre>
+func <strong>Scanln</strong>(a ...interface{}) (n int, err error)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nedejte se zmýlit tím, že tato funkce je
+umístěna v&nbsp;balíčku <strong>fmt</strong>, protože tento balíček obsahuje
+funkce pro formátovaný výstup, ale i vstup.</div></p>
+
+<p>Funkce <strong>Scanln</strong> se pokusí načíst celý textový řádek (ukončený
+Enterem) ze standardního vstupu a následně v&nbsp;tomto řádku nalezne
+jednotlivé elementy, které jsou od sebe odděleny mezerou. Tyto elementy uloží
+do proměnných, jejichž reference jsou předány v&nbsp;seznamu parametrů. Navíc
+funkce <strong>Scanln</strong> vrátí počet skutečně přečtených elementů a
+popř.&nbsp;i objekt reprezentující vstupně-výstupní chybu, která může při práci
+nastat. Můžeme tedy například psát:</p>
+
+<pre>
+var s string
+&nbsp;
+n, err := fmt.Scanln(&amp;s)
+&nbsp;
+if n != 1 || err != nil {
+        println("Error reading login")
+}
+</pre>
+
+<p>Vidíme, že tato funkce nejenom že načítá text ze standardního vstupu, ale
+navíc se snaží text nějakým způsobem &bdquo;rozkouskovat&ldquo; a následně
+částečně zpracovat. V&nbsp;některých případech se může jednat o očekávané
+chování, ovšem mnoho aplikací vyžaduje větší kontrolu nad zapisovaným textem,
+takže v&nbsp;těchto aplikacích nebude možné <strong>Scanln</strong> použít.</p>
+
+<p>Podívejme se nyní na <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/01_scanln.go">zdrojový
+kód dnešního prvního demonstračního příkladu</a>, který si po svém spuštění
+vyžádá zadání jména a hesla, která se pokusí načíst do proměnných
+<strong>login</strong> a <strong>password</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var login string
+        var password string
+&nbsp;
+        print("Login: ")
+        n, err := fmt.Scanln(&amp;login)
+        if n != 1 || err != nil {
+                println("Error reading login")
+        }
+&nbsp;
+        print("Password: ")
+        n, err = fmt.Scanln(&amp;password)
+        if n != 1 || err != nil {
+                println("Error reading password")
+        }
+&nbsp;
+        println(login)
+        println(password)
+}
+</pre>
+
+<p>Sami si vyzkoušejte chování aplikace ve chvíli, kdy se na řádek zadá více
+slov oddělených mezerou či naopak pokud se nezadá žádný text (nebo dokonce jen
+mezery).</p>
+
+<a href="https://www.root.cz/obrazek/358440/"><img src="https://i.iinfo.cz/images/472/golang-20-2-prev.png" class="image-358440" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 2: Zadání jména a hesla v&nbsp;interaktivní aplikaci používající
+čtení ze standardního vstupu.</i></p>
+
+<p>Na dalším obrázku je ukázáno, co se stane ve chvíli, kdy uživatel stiskne
+šipku doleva ve chvíli, kdy chce upravit již zapsaný text. Aplikace se
+evidentně nechová příliš uživatelsky přívětivě:</p>
+
+<a href="https://www.root.cz/obrazek/358441/"><img src="https://i.iinfo.cz/images/472/golang-20-3-prev.png" class="image-358441" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 3: Po stisku klávesy &bdquo;šipka doleva&ldquo; se ve skutečnosti
+do textu vloží sekvence znaků poslaná terminálem.</i></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Čtení ze standardního vstupu pomocí metody <strong>Reader.ReadString</strong></h2>
+
+<p>V&nbsp;případě, že nám z&nbsp;nějakého důvodu nevyhovuje chování <a
+href="#k02">výše popsané</a> funkce <strong>Scanln</strong> a budeme potřebovat
+více kontroly nad textem načítaným ze standardního vstupu, je možné použít
+metodu <strong>ReadString</strong>, která je dostupná pro objekty
+(resp.&nbsp;přesněji řečeno datové struktury) typu <strong>Reader</strong>, viz
+též <a
+href="https://golang.org/pkg/bufio/#Reader.ReadString">https://golang.org/pkg/bufio/#Reader.ReadString</a>.
+Hlavička této metody vypadá následovně:</p>
+
+<pre>
+func (b *Reader) <strong>ReadString</strong>(delim byte) (string, error)
+</pre>
+
+<p>Povšimněte si toho, že funkce akceptuje parametr <strong>delim</strong>, do
+kterého se zapisuje kód ASCII znaku (ne Unicode!) sloužící jako oddělovač či
+ukončovač záznamu, ve skutečnosti se totiž na vstupu pracuje se sekvencí bajtů
+a nikoli Unikódových znaků. V&nbsp;případě, že budeme chtít přečíst celý
+textový řádek, bude tímto oddělovačem pochopitelně znak pro konec řádku:</p>
+
+<pre>
+reader.ReadString('\n')
+</pre>
+
+<p>Metoda <strong>ReadString</strong> vrací jak přečtený text (ve formě běžného
+řetězce, nyní již v&nbsp;Unicode), tak i případnou hodnotu s&nbsp;popisem
+chyby. Správně by se tedy mělo každé načtení ze standardního vstupu testovat, a
+to například následujícím způsobem:</p>
+
+<pre>
+reader := bufio.NewReader(os.Stdin)
+&nbsp;
+login, err := reader.ReadString('\n')
+if err != nil {
+        println("Error reading login")
+}
+</pre>
+
+<p>Opět se samozřejmě podíváme na <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/02_input_via_reader.go">zdrojový
+kód</a> demonstračního příkladu, který načte dva řetězce ze standardního
+vstupu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "os"
+)
+&nbsp;
+func <strong>main</strong>() {
+        reader := bufio.NewReader(os.Stdin)
+&nbsp;
+        print("Login: ")
+        login, err := reader.ReadString('\n')
+        if err != nil {
+                println("Error reading login")
+        }
+&nbsp;
+        print("Password: ")
+        password, err := reader.ReadString('\n')
+        if err != nil {
+                println("Error reading password")
+        }
+&nbsp;
+        println(login)
+        println(password)
+}
+</pre>
+
+<p>Samozřejmě ani v&nbsp;tomto případě nemůžeme očekávat žádné pokročilejší
+funkce &ndash; posuny kurzoru šipkami, přesuny textu, historii příkazů atd. Ve
+chvíli, kdy je tato funkcionalita vyžadována, se musíme uchýlit k&nbsp;externím
+knihovnám popř.&nbsp;aplikaci &bdquo;obalit&ldquo; příkazem
+<strong>rlwrap</strong>.</p>
+
+<a href="https://www.root.cz/obrazek/358442/"><img src="https://i.iinfo.cz/images/472/golang-20-4-prev.png" class="image-358442" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 4: Vstup textu s&nbsp;nabodeníčky je sice možný, ovšem posun
+kurzoru šipkami již nikoli. Navíc se načítá i samotný znak pro konec řádku,
+který však není nijak problematické v&nbsp;případě potřeby odstranit.</i></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Knihovna GNU Readline</h2>
+
+<p>Pro vylepšení příkazové řádky o další vlastnosti se v&nbsp;mnoha aplikacích
+(zejména těch naprogramovaných v&nbsp;jazycích C a C++) používá známá knihovna
+<i>GNU Readline</i>, která dokáže zajistit například:</p>
+
+<ol>
+
+<li>Možnost použití kurzorových šipek pro pohyb na řádku se zapisovaným
+vstupním textem.</li>
+
+<li>Příkazy do určité míry emulující textové editory <a
+href="https://www.root.cz/n/emacs/">Emacs</a> či <a
+href="https://www.root.cz/n/vim/">Vi</a> (v&nbsp;Emacs režimu například
+<strong>Ctrl+A</strong> pro přechod na začátek řádku, <strong>Ctrl+W</strong>
+pro smazání slova atd.)</li>
+
+<li>Doplňování příkazů (vstupních dat).</li>
+
+<li>Vyhledávání v&nbsp;historii již zadaných příkazů (vstupních dat). Tuto
+funkcionalitu je možné zajistit i externě s&nbsp;využitím knihovny
+<strong>rlwrap</strong>.</li>
+
+</ol>
+
+<p>Knihovnu GNU Readline samozřejmě můžeme použít i v&nbsp;jazyce Go, ovšem
+v&nbsp;žádném případě se nejedná o ideální řešení, protože se přidává závislost
+na externích knihovnách a nástrojích, což například může dělat potíže při
+tvorbě distribučních souborů s&nbsp;vyvíjenou aplikací či nástrojem. Dále
+popsaný balíček <strong>go-prompt</strong> tuto závislost odstraňuje, protože
+je kompletně naprogramován v&nbsp;Go. Existuje i několik dalších balíčků,
+jejichž cílem je reimplementovat funkcionalitu GNU Readline v&nbsp;čistém Go
+(viz též úvodní kapitolu, pozor však, že jeden ze zmíněných balíčků je wrapper
+právě nad GNU Readline).</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti se můžeme setkat i
+s&nbsp;tím, že se namísto knihovny GNU Readline používá knihovna
+<strong>libedit</strong> (<i>editline</i>, viz též <a
+href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>).
+Z&nbsp;pohledu uživatele spočívá nejviditelnější rozdíl v&nbsp;tom, že tato
+knihovna využívá odlišný konfigurační soubor. Dalším rozdílem je odlišná
+licence, která může vyhovovat lépe, než GPL.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Knihovna <strong>prompt_toolkit</strong> pro tvorbu aplikací s interaktivní smyčkou REPL v&nbsp;jazyku Python</h2>
+
+<p>Pro aplikace s&nbsp;příkazovým řádkem vytvářené v&nbsp;programovacím jazyku
+Python je určena velmi užitečná knihovna, která se jmenuje
+<strong>prompt_toolkit</strong> (viz <a
+href="https://github.com/prompt-toolkit/python-prompt-toolkit">https://github.com/prompt-toolkit/python-prompt-toolkit</a>).
+Název této knihovny sice naznačuje, že slouží pouze pro implementaci vstupního
+(či příkazového) řádku do aplikací, to však ve skutečnosti není vše. Tato
+knihovna například umožňuje využít víceřádkový vstupní text, dovoluje použití
+myši (kromě implicitní funkce myši v&nbsp;terminálu pro operace výběru textu
+s&nbsp;následným copy &amp; paste) a dokonce obsahuje sadu základních prvků
+uživatelského rozhraní (takzvaných <i>widgetů</i>), mezi něž patří například
+toolbary, menu, checkboxy, tlačítka, či dialogy. Díky tomu lze tuto knihovnu
+použít i pro tvorbu aplikací s&nbsp;plnohodnotným textovým uživatelským
+rozhraním (ne nepodobným starodávnému <i>TurboVision</i>).</p>
+
+<a href="https://www.root.cz/obrazek/331050/"><img src="https://i.iinfo.cz/images/442/pudb-4-prev.png" class="image-331050" alt="&#160;" width="370" height="244" /></a>
+<p><i>Obrázek 5: Pohled na textové uživatelské rozhraní debuggeru
+<strong>pudb</strong>.</i></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Balíček <strong>go-prompt</strong> pro aplikace naprogramované v&nbsp;jazyku Go</h2>
+
+<p><a href="#k05">Výše zmíněnou</a> knihovnou <strong>prompt_toolkit</strong>
+se inspirovali autoři knihovny <strong>go-prompt</strong>, která je určena pro
+použití v&nbsp;aplikacích naprogramovaných v&nbsp;jazyku Go. Jedná se o
+knihovnu přenositelnou na různé operační systémy (pochopitelně včetně všech tří
+nejpoužívanějších desktopových systémů) a aplikace, které tuto knihovnu
+používají, by mělo být možné provozovat na prakticky všech emulátorech
+terminálu (otestováno především s&nbsp;XTermem). Tato knihovna uživatelům
+nabízí následující funkce:</p>
+
+<ol>
+
+<li>Plnohodnotnou editaci na příkazovém řádku, samozřejmě včetně možnosti
+přesunu kurzoru s&nbsp;využitím příkazů Ctrl+znak, specializovaných kláves
+Home, End atd.</li>
+
+<li>Mazání textu před kurzorem, za kurzorem, smazání slova apod.</li>
+
+<li>Automatické doplňování příkazů na základě tabulky, kterou je možné
+dynamicky měnit.</li>
+
+<li>Kontextovou nápovědu s&nbsp;dostupnými příkazy, a to včetně popisu
+jednotlivých příkazů.</li>
+
+<li>Historii již zapsaných příkazů.</li>
+
+</ol>
+
+<p>V&nbsp;navazujících kapitolách si ukážeme základy práce s&nbsp;touto
+knihovnou při tvorbě aplikací s&nbsp;plnohodnotným interaktivním příkazovým
+řádkem, který je stále jedním z&nbsp;nejdokonalejších nástrojů určených pro
+komunikaci mezi člověkem a počítačem [<a
+href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">1</a>].</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Instalace balíčku <strong>go-prompt</strong></h2>
+
+<p>Balíček <strong>go-prompt</strong> nainstalujeme naprosto stejným způsobem,
+jako jakýkoli jiný externí balíček určený pro programovací jazyk Go. Pro
+instalaci použijeme příkaz <strong>go get</strong>, a to v&nbsp;následující
+podobě:</p>
+
+<pre>
+$ <strong>go get</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: podobně jako u instalací dalších balíčků
+se ujistěte, že zda je korektně nastavena proměnná prostředí
+<strong>GOPATH</strong> a že se příkaz <strong>go get</strong> spouští
+v&nbsp;adresáři, na který <strong>GOPATH</strong> ukazuje.</div></p>
+
+<p>Po chvíli by se měly stáhnout všechny potřebné závislé balíčky a knihovna
+<strong>go-prompt</strong> by se měla přeložit. Obsah adresáře, na který
+ukazuje proměnná <strong>GOPATH</strong> by měl obsahovat mj.&nbsp;i
+následující podadresáře:</p>
+
+<pre>
+.
+├── bin
+├── pkg
+│   └── linux_amd64
+│       └── github.com
+│           └── c-bata
+└── src
+    └── github.com
+        ├── c-bata
+        │   └── go-prompt
+        │       ├── completer
+        │       ├── _example
+        │       │   ├── exec-command
+        │       │   ├── http-prompt
+        │       │   ├── live-prefix
+        │       │   └── simple-echo
+        │       │       └── cjk-cyrillic
+        │       ├── internal
+        │       │   ├── bisect
+        │       │   ├── debug
+        │       │   ├── strings
+        │       │   └── term
+        │       └── _tools
+        │           ├── complete_file
+        │           ├── sigwinch
+        │           └── vt100_debug
+        ├── mattn
+        │   └── go-runewidth
+        └── pkg
+            └── term
+                └── termios
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se kromě vlastní
+knihovny nainstalovaly i balíčky s&nbsp;podporou různých terminálů a informací
+o terminálech (<strong>man terminfo</strong>).</div></p>
+
+<p>Samozřejmě je ihned po instalaci dostupná i nápověda k&nbsp;balíčku:</p>
+
+<pre>
+$ <strong>godoc go-prompt</strong>
+&nbsp;
+PACKAGE DOCUMENTATION
+&nbsp;
+package prompt
+    import "go-prompt"
+...
+...
+...
+</pre>
+
+<p>či přímo nápověda k&nbsp;nějakému datovému typu:</p>
+
+<pre>
+$ <strong>godoc go-prompt Prompt</strong>
+&nbsp;
+type Prompt struct {
+    ASCIICodeBindings []ASCIICodeBind
+    // contains filtered or unexported fields
+}
+&nbsp;
+    Prompt is core struct of go-prompt.
+&nbsp;
+func New(executor Executor, completer Completer, opts ...Option) *Prompt
+    New returns a Prompt with powerful auto-completion.
+&nbsp;
+func (p *Prompt) Input() string
+    Input just returns user input text.
+&nbsp;
+func (p *Prompt) Run()
+    Run starts prompt.
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Základní klávesové zkratky používané knihovnou <strong>go-prompt</strong></h2>
+
+<p>V&nbsp;knihovně <strong>go-prompt</strong> jsou deklarovány některé základní
+klávesové zkratky, které se snaží být do určité míry kompatibilní jak
+s&nbsp;BASHem (v&nbsp;režimu Emacs), tak i přímo s&nbsp;textovým editorem
+Emacs. Ovšem všechny zkratky jsou ve skutečnosti plně konfigurovatelné, takže
+je možné vytvořit si vlastní sadu příkazů &ndash; nutno ovšem říci, že pouze
+nemodálních (režim Vi/Vimu není a pravděpodobně ani nebude podporován).</p>
+
+
+
+<h4>Příkazy pro přesuny kurzoru</h4>
+
+<p>Základní příkazy pro přesun kurzoru používají kombinaci
+<strong>Ctrl+znak</strong>. V&nbsp;případě, že je terminál správně
+nakonfigurován, měly by fungovat i kurzorové šipky doleva/doprava a navíc i
+klávesy <strong>Home</strong> a <strong>End</strong> (se zřejmou funkcí):</p>
+
+<table>
+<tr><th>Klávesa</th><th>Význam</th></tr>
+<tr><td>Ctrl+B</td><td>přesun kurzoru na předchozí znak</td></tr>
+<tr><td>šipka doleva</td><td>přesun kurzoru na předchozí znak</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+F</td><td>přesun kurzoru na další znak</td></tr>
+<tr><td>šipka doprava</td><td>přesun kurzoru na další znak</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+A</td><td>přesun kurzoru na začátek řádku</td></tr>
+<tr><td>Home</td><td>přesun kurzoru na začátek řádku</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+E</td><td>přesun kurzoru na konec řádku</td></tr>
+<tr><td>End</td><td>přesun kurzoru na konec řádku</td></tr>
+</table>
+
+
+
+<h4>Mazání textu, práce s&nbsp;kill ringem</h4>
+
+<p>Pro přesun části textu v&nbsp;rámci editovaného řádku se například
+v&nbsp;BASHi používá takzvaný <i>kill ring</i>, do něhož se smazaný text uloží.
+Pro vložení takto smazaného textu do jiné oblasti se používá operace nazvaná
+<i>yank</i> (odpovídá <i>paste</i>). V&nbsp;případě knihovny
+<strong>go-prompt</strong> jsou v&nbsp;současné verzi implementovány pouze
+příkazy pro smazání části textu, nikoli však příkaz <i>yank</i> pro jeho
+vložení na jiné místo (tato operace je však plánována do dalších verzí,
+popravdě ji není příliš složité doimplementovat):</p>
+
+<table>
+<tr><th>Klávesa</th><th>Význam</th></tr>
+<tr><td>Ctrl+D</td><td>smaže jeden znak na pozici kurzoru (pokud je ovšem na řádku nějaký obsah, jinak typicky ukončí vstup či celou aplikaci)</td></tr>
+<tr><td>Delete</td><td>smaže jeden znak na pozici kurzoru</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+H</td><td>smaže jeden znak před kurzorem</td></tr>
+<tr><td>Backspace</td><td>smaže jeden znak před kurzorem</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+W</td><td>smaže předchozí slovo</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+K</td><td>smaže text od pozice kurzoru do konce řádku</td></tr>
+<tr><td>Ctrl+U</td><td>smaže text od začátku řádku do pozice kurzoru</td></tr>
+</table>
+
+
+
+<h4>Práce s&nbsp;historií dříve zadaných příkazů</h4>
+
+<p>Uživatelé mají k&nbsp;dispozici i historii zapsaných příkazů. K&nbsp;jejich
+vyvolání slouží několik klávesových zkratek vypsaných v&nbsp;následující
+tabulce. Prozatím zde však nenajdete zkratky pro vyhledávání v&nbsp;historii
+příkazů; tuto funkcionalitu je však možné v&nbsp;případě potřeby doprogramovat
+a pravděpodobně se s&nbsp;ní setkáme v&nbsp;další verzi knihovny
+<strong>go-prompt</strong>:</p>
+
+<table>
+<tr><th>Klávesa</th><th>Význam</th></tr>
+<tr><td>Ctrl+P</td><td>průchod historií &ndash; předchozí text/příkaz</td></tr>
+<tr><td>šipka nahoru</td><td>průchod historií &ndash; předchozí text/příkaz</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Ctrl+N</td><td>průchod historií &ndash; následující text/příkaz</td></tr>
+<tr><td>šipka dolů</td><td>průchod historií &ndash; předchozí text/příkaz</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: k&nbsp;historii příkazů mají vývojáři
+přístup přes rozhraní poskytované knihovnou <strong>go-prompt</strong>. Proto
+je například možné z&nbsp;historie odstranit neplatné příkazy, získat celou
+historii zapsaných příkazů a uložit ji do externího souboru atd.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Přečtení řádku s&nbsp;příkazy funkcí <strong>Input</strong></h2>
+
+<p>Nyní si ukážeme základní funkcionalitu, kterou nám knihovna
+<strong>go-prompt</strong> nabízí. Bude se jednat o nejjednodušší možnou
+aplikaci, která pouze přečte dva textové údaje z&nbsp;příkazového řádku.
+Aplikace je napsána takovým způsobem, že jsou podporovány všechny výše zmíněné
+editační příkazy, ovšem nikoli historie příkazového řádku (nemáme totiž žádný
+objekt, který by historii držel). Základem je použití funkce
+<strong>Input</strong>:</p>
+
+<pre>
+login := prompt.<strong>Input</strong>("Login: ", completer)
+password := prompt.<strong>Input</strong>("Password: ", completer)
+</pre>
+
+<p>Této funkci je nutné předat referenci na takzvaný <i>completer</i>,
+s&nbsp;jehož významem se setkáme v&nbsp;navazujících kapitolách.</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_20/03_simple_input.go">Zdrojový
+kód</a> příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/c-bata/go-prompt"
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        return []prompt.Suggest{}
+}
+&nbsp;
+func <strong>main</strong>() {
+        login := prompt.Input("Login: ", completer)
+        password := prompt.Input("Password: ", completer)
+        println(login)
+        println(password)
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/358443/"><img src="https://i.iinfo.cz/images/472/golang-20-5-prev.png" class="image-358443" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 6: Povšimněte si, že se stiskem klávesy <strong>Ctrl+A</strong>
+či <strong>Home</strong> můžeme bez problémů přesunout na začátek vstupního
+řádku.  Všechny ostatní editační příkazy budou taktéž funkční.</i></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Plnohodnotný příkazový řádek s&nbsp;vlastní historií příkazů</h2>
+
+<p>Aby bylo možné použít příkazový řádek s&nbsp;vlastní historií příkazů, je
+možné aplikaci poněkud upravit, a to takovým způsobem, že se reakce na příkazy
+zadané uživatelem přesune do samostatné funkce. Tato funkce se většinou nazývá
+<strong>executor</strong>, i když nám samozřejmě nic nebrání použít odlišné
+jméno:</p>
+
+<pre>
+func <strong>executor</strong>(t string) {
+        println(t)
+}
+</pre>
+
+<p>Doplníme i funkci se jménem <strong>completer</strong>, která bude vracet
+prázdnou tabulku s&nbsp;návrhy na doplnění celých slov s&nbsp;příkazy:</p>
+
+<pre>
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        return []prompt.Suggest{}
+}
+</pre>
+
+<p>Nyní již můžeme zkonstruovat objekt (datovou strukturu) typu
+<strong>Prompt</strong> a spustit interní smyčku, která bude jednotlivé příkazy
+načítat a pro každý příkaz zavolá výše zmíněnou callback funkci
+<strong>executor</strong>:</p>
+
+<pre>
+p := prompt.New(executor, completer)
+p.Run()
+</pre>
+
+<a href="https://www.root.cz/obrazek/358444/"><img src="https://i.iinfo.cz/images/472/golang-20-6-prev.png" class="image-358444" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 7: Příkazový řádek začíná výzvou (prompt). Ukončení aplikace lze
+docílit stiskem klávesy <strong>Ctrl+D</strong>.</i></p>
+
+<p>Úplný kód příkladu, který implementuje plnohodnotný příkazový řádek i
+s&nbsp;historií, je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/04_prompt.go">https://github.com/tisnik/go-root/blob/master/article_20/04_prompt.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/c-bata/go-prompt"
+&nbsp;
+func <strong>executor</strong>(t string) {
+        println(t)
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        return []prompt.Suggest{}
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Zajištění automatického doplňování příkazů na základě statické tabulky</h2>
+
+<p>Jednou z&nbsp;velmi užitečných funkcí nabízených knihovnou
+<strong>go-prompt</strong> je automatické doplňování příkazů, a to bez toho,
+aby uživatel musel použít nějakou specializovanou klávesovou zkratku &ndash;
+příkazy se nabízí automaticky přímo při psaní. Taktéž se přímo při psaní
+zobrazuje tabulka s&nbsp;dostupnými příkazy. Interně je tato vlastnost
+zajištěna neustálým voláním callback funkce <strong>completer</strong>, které
+se předá hodnota typu <strong>Document</strong> obsahující informace jak o
+zapsaném textu, tak i o pozici kurzoru v&nbsp;rámci tohoto textu. V&nbsp;tom
+nejjednodušším případě může callback funkce <strong>completer</strong> vracet
+vždy stejnou tabulku s&nbsp;příkazy, nezávisle na tom, co uživatel zapisuje.
+Informace o dostupných příkazech jsou reprezentovány hodnotami typu
+<strong>Suggest</strong>:</p>
+
+<pre>
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        return []prompt.Suggest{
+                {Text: "help"},
+                {Text: "exit"},
+                {Text: "quit"},
+        }
+}
+</pre>
+
+<p>Aby byl příklad úplný, doplníme i kód funkce <strong>executor</strong>,
+který bude jednoduchý &ndash; na každý podporovaný příkaz nějakým způsobem
+zareagujeme. Aplikace se buď ukončí po příkazech &bdquo;exit&ldquo; a
+&bdquo;quit&ldquo;, nebo se zobrazí nápověda popř.&nbsp;informace o tom, že se
+jedná o neznámý příkaz:</p>
+
+<pre>
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        case "help":
+                println("HELP:\nexit\nquit")
+        default:
+                println("Nothing happens")
+        }
+}
+</pre>
+
+<p>Nyní se podívejme na chování aplikace:</p>
+
+<a href="https://www.root.cz/obrazek/358445/"><img src="https://i.iinfo.cz/images/472/golang-20-7-prev.png" class="image-358445" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 8: Po spuštění se pouze očekává příkaz, žádná nápověda se
+nevypíše.</i></p>
+
+<a href="https://www.root.cz/obrazek/358446/"><img src="https://i.iinfo.cz/images/472/golang-20-8-prev.png" class="image-358446" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 9: Vrácením kurzoru se zobrazí tabulka se všemi dostupnými
+příkazy.</i></p>
+
+<a href="https://www.root.cz/obrazek/358447/"><img src="https://i.iinfo.cz/images/472/golang-20-9-prev.png" class="image-358447" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 10: Nápověda prozatím <strong>není</strong> kontextová, ovšem
+klávesou <strong>Tab</strong> lze příkaz doplnit.</i></p>
+
+<a href="https://www.root.cz/obrazek/358448/"><img src="https://i.iinfo.cz/images/472/golang-20-10-prev.png" class="image-358448" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 11: Doplněný příkaz se zobrazí odlišnou barvou.</i></p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/05_basic_completer.go">https://github.com/tisnik/go-root/blob/master/article_20/05_basic_completer.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+)
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        case "help":
+                println("HELP:\nexit\nquit")
+        default:
+                println("Nothing happens")
+        }
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        return []prompt.Suggest{
+                {Text: "help"},
+                {Text: "exit"},
+                {Text: "quit"},
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Kontextová nápověda na základě části zapsaného příkazu</h2>
+
+<p>Předchozí příklad pochopitelně nebyl dokonalý, protože nezávisle na vstupu
+zapsaném uživatelem nabízel stále stejné příkazy. Ovšem díky funkci
+<strong>FilterHasPrefix</strong> je možné z&nbsp;tabulky se všemi dostupnými
+příkazy vyfiltrovat pouze ty, které začínají zadaným řetězcem. Povšimněte si,
+jakým způsobem se získá text umístěný před kurzorem (to je jeden z&nbsp;důvodů,
+proč se funkci <strong>completer</strong> nepředává pouhý řetězec, ale objekt
+typu <strong>Document</strong>:</p>
+
+<pre>
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        s := []prompt.Suggest{
+                {Text: "help"},
+                {Text: "exit"},
+                {Text: "quit"},
+        }
+        return prompt.<strong>FilterHasPrefix</strong>(s, in.<strong>GetWordBeforeCursor()</strong>, true)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: posledním parametrem funkce
+<strong>FilterHasPrefix</strong> se určuje, zda se mají ignorovat velikosti
+znaků či nikoli.</div></p>
+
+<p>Po této nepatrné úpravě se chování aplikace radikálně změní, protože bude
+možné použít plnohodnotné doplňování, kontextovou nápovědu atd.:</p>
+
+<a href="https://www.root.cz/obrazek/358449/"><img src="https://i.iinfo.cz/images/472/golang-20-11-prev.png" class="image-358449" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 12: Stiskem <strong>q</strong> a klávesy <strong>Tab</strong> se
+automaticky doplní příkaz &bdquo;quit&ldquo;.</i></p>
+
+<a href="https://www.root.cz/obrazek/358450/"><img src="https://i.iinfo.cz/images/472/golang-20-12-prev.png" class="image-358450" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 13: Tabulka je nyní již kontextová, protože nabízí jen relevantní
+příkazy.</i></p>
+
+<p>Opět se podívejme na <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/06_prefix_completer.go">úplný
+zdrojový kód tohoto příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+)
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                println("Quitting")
+                os.Exit(0)
+        case "help":
+                println("HELP:\nexit\nquit")
+        default:
+                println("Nothing happens")
+        }
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        s := []prompt.Suggest{
+                {Text: "help"},
+                {Text: "exit"},
+                {Text: "quit"},
+        }
+        return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Přidání nápovědy k&nbsp;jednotlivým příkazům</h2>
+
+<p>Rozšířením datové struktury <strong>Suggest</strong> o položku
+<strong>Description</strong> je možné zajistit zobrazení nápovědy
+k&nbsp;jednotlivým příkazům, které jsou nabízeny v&nbsp;kontextovém okně.
+Úprava zdrojového kódu je snadná:</p>
+
+<pre>
+s := []prompt.Suggest{
+        {Text: "help", Description: "show help with all commands"},
+        {Text: "exit", Description: "quit the application"},
+        {Text: "quit", Description: "quit the application"},
+}
+</pre>
+
+<p>Výsledek by měl vypadat takto:</p>
+
+<a href="https://www.root.cz/obrazek/358451/"><img src="https://i.iinfo.cz/images/472/golang-20-13-prev.png" class="image-358451" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 14: Zobrazení všech příkazů i s&nbsp;nápovědou.</i></p>
+
+<p>Zdrojový kód takto upraveného demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/07_completion_description.go">https://github.com/tisnik/go-root/blob/master/article_20/07_completion_description.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+)
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        case "help":
+                println("HELP:\nexit\nquit")
+        default:
+                println("Nothing happens")
+        }
+        return
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        s := []prompt.Suggest{
+                {Text: "help", Description: "show help with all commands"},
+                {Text: "exit", Description: "quit the application"},
+                {Text: "quit", Description: "quit the application"},
+        }
+        return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Rozsáhlejší příklad se všemi klíčovými slovy BASICu</h2>
+
+<p>Nyní již máme k&nbsp;dispozici všechny informace nutné pro vytvoření
+rozsáhlejšího příkladu, který uživatelům bude na příkazovém řádku nabízet
+všechny příkazy, funkce a klíčová slova Atari BASICu. Jak seznam příkazů, tak i
+jejich popis byl získán <a
+href="https://en.wikipedia.org/wiki/Atari_BASIC#Keywords">z&nbsp;Wikipedie</a>.
+Tento demonstrační příklad by se měl chovat následovně:</p>
+
+<a href="https://www.root.cz/obrazek/358452/"><img src="https://i.iinfo.cz/images/472/golang-20-14-prev.png" class="image-358452" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 15: Nabídka některých příkazů Atari BASICu.</i></p>
+
+<p>V&nbsp;ostatních ohledech se tento příklad neliší od demonstračního kódu,
+s&nbsp;nímž jsme se seznámili <a href="#k13">v&nbsp;předchozí kapitole</a>,
+takže se <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/08_basic_statements.go">podívejme
+na jeho výpis</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+)
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        default:
+                println("READY")
+        }
+        return
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        s := []prompt.Suggest{
+                {Text: "ABS", Description: "Returns the absolute value of a number"},
+                {Text: "ADR", Description: "Returns the address in memory of a variable (mostly used for machine code routines stored in variables)"},
+                {Text: "AND", Description: "Logical conjunction"},
+                {Text: "ASC", Description: "Returns the ATASCII value of a character"},
+                {Text: "ATN", Description: "Returns the arctangent of a number"},
+                {Text: "BYE", Description: "Transfers control to the internal Self Test program"},
+                {Text: "CHR", Description: "Returns a character given an ATASCII value"},
+                {Text: "CLOAD", Description: "Loads from cassette tape a tokenized program that was saved with CSAVE"},
+                {Text: "CLOG", Description: "Returns the common logarithm of a number"},
+                {Text: "CLOSE", Description: "Terminates pending transfers (flush) and closes an I/O channel"},
+                {Text: "CLR", Description: "Clears variables' memory and program stack"},
+                {Text: "COLOR", Description: "Chooses which logical color to draw in"},
+                {Text: "COM", Description: "Implementation of MS Basic's COMMON was cancelled. Recognized but the code for DIM is executed instead"},
+                {Text: "CONT", Description: "Resumes execution of a program after a STOP at the next line number (see STOP)"},
+                {Text: "COS", Description: "Returns the cosine of a number"},
+                {Text: "CSAVE", Description: "Saves to cassette tape a program in tokenized form (see CLOAD)"},
+                {Text: "DATA", Description: "Stores data in lists of numeric or string values"},
+                {Text: "DEG", Description: "Switches trigonometric functions to compute in degrees (radians is the default mode) (see RAD)"},
+                {Text: "DIM", Description: "Defines the size of a string or array (see COM)"},
+                {Text: "DOS", Description: "Transfers control to the Disk Operating System (DOS); if DOS was not loaded, same as BYE"},
+                {Text: "DRAWTO", Description: "Draws a line to given coordinates"},
+                {Text: "END", Description: "Finishes execution of the program, closes open I/O channels and stops any sound"},
+                {Text: "ENTER", Description: "Loads and merges into memory a plain text program from an external device, usually from cassette tape or disk (see LIST)"},
+                {Text: "EXP", Description: "Exponential function"},
+                {Text: "FOR", Description: "Starts a for loop"},
+                {Text: "FRE", Description: "Returns the amount of free memory in bytes"},
+                {Text: "GET", Description: "Reads one byte from an I/O channel (see PUT)"},
+                {Text: "GOSUB", Description: "Jumps to a subroutine at a given line in the program, placing the return address on the stack (see POP and RETURN)"},
+                {Text: "GOTO", Description: "and GO TO  Jumps to a given line in the program. GOTO can be omitted in IF ... THEN GOTO ..."},
+                {Text: "GRAPHICS", Description: "Sets the graphics mode"},
+                {Text: "IF", Description: "Executes code depending on whether a condition is true or not"},
+                {Text: "INPUT", Description: "Retrieves a stream of text from an I/O channel; usually data from keyboard (default), cassette tape or disk"},
+                {Text: "INT", Description: "Returns the floor of a number"},
+                {Text: "LEN", Description: "Returns the length of a string"},
+                {Text: "LET", Description: "Assigns a value to a variable. LET can be omitted"},
+                {Text: "LIST", Description: "Lists (all or part of) the program to screen (default), printer, disk, cassette tape, or any other external device (see ENTER)"},
+                {Text: "LOAD", Description: "Loads a tokenized program from an external device; usually a cassette tape or disk (see SAVE)"},
+                {Text: "LOCATE", Description: "Stores the logical color or ATASCII character at given coordinates"},
+                {Text: "LOG", Description: "Returns the natural logarithm of a number"},
+                {Text: "LPRINT", Description: "Prints text to a printer device (same result can be achieved with OPEN, PRINT and CLOSE statements)"},
+                {Text: "NEW", Description: "Erases the program and all the variables from memory; automatically executed before a LOAD or CLOAD"},
+                {Text: "NEXT", Description: "Continues the next iteration of a FOR loop"},
+                {Text: "NOT", Description: "Logical negation"},
+                {Text: "NOTE", Description: "Returns the current position on an I/O channel"},
+                {Text: "ON", Description: "A computed goto - performs a jump based on the value of an expression"},
+                {Text: "OPEN", Description: "Initialises an I/O channel"},
+                {Text: "OR", Description: "Logical disjunction"},
+                {Text: "PADDLE", Description: "Returns the position of a paddle controller"},
+                {Text: "PEEK", Description: "Returns the value at an address in memory"},
+                {Text: "PLOT", Description: "Draws a point at given coordinates"},
+                {Text: "POINT", Description: "Sets the current position on an I/O channel"},
+                {Text: "POKE", Description: "Sets a value at an address in memory"},
+                {Text: "POP", Description: "Removes a subroutine return address from the stack (see GOSUB and RETURN)"},
+                {Text: "POSITION", Description: "Sets the position of the graphics cursor"},
+                {Text: "PRINT", Description: "and ?     Writes text to an I/O channel; usually to screen (default), printer, cassette tape or disk (see LPRINT and INPUT)"},
+                {Text: "PTRIG", Description: "Indicates whether a paddle trigger is pressed or not"},
+                {Text: "PUT", Description: "Writes one byte to an I/O channel (see GET)"},
+                {Text: "RAD", Description: "Switches trigonometric functions to compute in radians (see DEG)"},
+                {Text: "READ", Description: "Reads data from a DATA statement"},
+                {Text: "REM", Description: "Marks a comment in a program"},
+                {Text: "RESTORE", Description: "Sets the position of where to read data from a DATA statement"},
+                {Text: "RETURN", Description: "Ends a subroutine, effectively branching to the line immediately following the calling GOSUB (see GOSUB and POP)"},
+                {Text: "RND", Description: "Returns a pseudorandom number"},
+                {Text: "RUN", Description: "Starts execution of a program, optionally loading it from an external device (see LOAD)"},
+                {Text: "SAVE", Description: "Writes a tokenized program to an external device; usually a cassette tape or disk (see LOAD)"},
+                {Text: "SETCOLOR", Description: "Maps a logical color to a physical color"},
+                {Text: "SGN", Description: "Returns the signum of a number"},
+                {Text: "SIN", Description: "Returns the sine of a number"},
+                {Text: "SOUND", Description: "Starts or stops playing a tone on a sound channel (see END)"},
+                {Text: "SQR", Description: "Returns the square root of a number"},
+                {Text: "STATUS", Description: "Returns the status of an I/O channel"},
+                {Text: "STEP", Description: "Indicates the increment used in a FOR loop"},
+                {Text: "STICK", Description: "Returns a joystick position"},
+                {Text: "STOP", Description: "Stops the program, allowing later resumption (see CONT)"},
+                {Text: "STRIG", Description: "Indicates whether a joystick trigger is pressed or not"},
+                {Text: "STR", Description: "Converts a number to string form"},
+                {Text: "THEN", Description: "Indicates the statements to execute if the condition is true in an IF statement"},
+                {Text: "TO", Description: "Indicates the limiting condition in a FOR statement"},
+                {Text: "TRAP", Description: "Sets to jump to a given program line if an error occurs (TRAP 40000 cancels this order)"},
+                {Text: "USR", Description: "Calls a machine code routine, optionally with parameters"},
+                {Text: "VAL", Description: "Returns the numeric value of a string"},
+                {Text: "XIO", Description: "General-purpose I/O routine (from Fill screen to Rename file to Format disk instructions) "},
+                {Text: "exit", Description: "Quit the application"},
+                {Text: "quit", Description: "Quit the application"},
+        }
+        if in.GetWordBeforeCursor() == "" {
+                return nil
+        } else {
+                return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Pokročilejší vyhledání vhodných příkazů na základě fuzzy filtru</h2>
+
+<p>V&nbsp;mnoha případech je výhodnější změnit způsob výběru nabízených
+příkazů. Namísto seznamu příkazů, které <i>začínají</i> určitým řetězcem lze
+použít takzvaný <i>fuzzy filtr</i>, který vrátí všechny příkazy obsahující
+zadanou sekvenci znaků (v&nbsp;daném pořadí). Například pro řetězec
+&bdquo;PN&ldquo; se mohou vrátit příkazy <strong><u>P</u>RI<u>N</u>T</strong>,
+<strong>L<u>P</u>RI<u>N</u>T</strong>, <strong><u>P</u>OI<u>N</u>T</strong> a
+<strong><u>P</u>OSITIO<u>N</u></strong>, ale i
+<strong>O<u>P</u>E<u>N</u></strong> apod. Úprava funkce
+<strong>completer</strong> je snadná &ndash; pouze zavoláme funkci
+<strong>FilterFuzzy</strong> namísto funkce
+<strong>FilterHasPrefix</strong>:</p>
+
+<pre>
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        if in.GetWordBeforeCursor() == "" {
+                return nil
+        } else {
+                return prompt.<strong>FilterFuzzy</strong>(suggestions, in.GetWordBeforeCursor(), true)
+        }
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/358453/"><img src="https://i.iinfo.cz/images/472/golang-20-15-prev.png" class="image-358453" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 16: Všech šest příkazů, které jsou zobrazeny v&nbsp;kontextové
+nápovědě, skutečně obsahuje znaky &bdquo;C&ldquo; a &bdquo;L&ldquo;
+v&nbsp;uvedeném pořadí.</i></p>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-root/blob/master/article_20/09_fuzzy_filter.go">zdrojového
+kódu tohoto příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+)
+&nbsp;
+var suggestions = []prompt.Suggest{
+        {Text: "ABS", Description: "Returns the absolute value of a number"},
+        {Text: "ADR", Description: "Returns the address in memory of a variable (mostly used for machine code routines stored in variables)"},
+        {Text: "AND", Description: "Logical conjunction"},
+        {Text: "ASC", Description: "Returns the ATASCII value of a character"},
+        {Text: "ATN", Description: "Returns the arctangent of a number"},
+        {Text: "BYE", Description: "Transfers control to the internal Self Test program"},
+        {Text: "CHR", Description: "Returns a character given an ATASCII value"},
+        {Text: "CLOAD", Description: "Loads from cassette tape a tokenized program that was saved with CSAVE"},
+        {Text: "CLOG", Description: "Returns the common logarithm of a number"},
+        {Text: "CLOSE", Description: "Terminates pending transfers (flush) and closes an I/O channel"},
+        {Text: "CLR", Description: "Clears variables' memory and program stack"},
+        {Text: "COLOR", Description: "Chooses which logical color to draw in"},
+        {Text: "COM", Description: "Implementation of MS Basic's COMMON was cancelled. Recognized but the code for DIM is executed instead"},
+        {Text: "CONT", Description: "Resumes execution of a program after a STOP at the next line number (see STOP)"},
+        {Text: "COS", Description: "Returns the cosine of a number"},
+        {Text: "CSAVE", Description: "Saves to cassette tape a program in tokenized form (see CLOAD)"},
+        {Text: "DATA", Description: "Stores data in lists of numeric or string values"},
+        {Text: "DEG", Description: "Switches trigonometric functions to compute in degrees (radians is the default mode) (see RAD)"},
+        {Text: "DIM", Description: "Defines the size of a string or array (see COM)"},
+        {Text: "DOS", Description: "Transfers control to the Disk Operating System (DOS); if DOS was not loaded, same as BYE"},
+        {Text: "DRAWTO", Description: "Draws a line to given coordinates"},
+        {Text: "END", Description: "Finishes execution of the program, closes open I/O channels and stops any sound"},
+        {Text: "ENTER", Description: "Loads and merges into memory a plain text program from an external device, usually from cassette tape or disk (see LIST)"},
+        {Text: "EXP", Description: "Exponential function"},
+        {Text: "FOR", Description: "Starts a for loop"},
+        {Text: "FRE", Description: "Returns the amount of free memory in bytes"},
+        {Text: "GET", Description: "Reads one byte from an I/O channel (see PUT)"},
+        {Text: "GOSUB", Description: "Jumps to a subroutine at a given line in the program, placing the return address on the stack (see POP and RETURN)"},
+        {Text: "GOTO", Description: "and GO TO  Jumps to a given line in the program. GOTO can be omitted in IF ... THEN GOTO ..."},
+        {Text: "GRAPHICS", Description: "Sets the graphics mode"},
+        {Text: "IF", Description: "Executes code depending on whether a condition is true or not"},
+        {Text: "INPUT", Description: "Retrieves a stream of text from an I/O channel; usually data from keyboard (default), cassette tape or disk"},
+        {Text: "INT", Description: "Returns the floor of a number"},
+        {Text: "LEN", Description: "Returns the length of a string"},
+        {Text: "LET", Description: "Assigns a value to a variable. LET can be omitted"},
+        {Text: "LIST", Description: "Lists (all or part of) the program to screen (default), printer, disk, cassette tape, or any other external device (see ENTER)"},
+        {Text: "LOAD", Description: "Loads a tokenized program from an external device; usually a cassette tape or disk (see SAVE)"},
+        {Text: "LOCATE", Description: "Stores the logical color or ATASCII character at given coordinates"},
+        {Text: "LOG", Description: "Returns the natural logarithm of a number"},
+        {Text: "LPRINT", Description: "Prints text to a printer device (same result can be achieved with OPEN, PRINT and CLOSE statements)"},
+        {Text: "NEW", Description: "Erases the program and all the variables from memory; automatically executed before a LOAD or CLOAD"},
+        {Text: "NEXT", Description: "Continues the next iteration of a FOR loop"},
+        {Text: "NOT", Description: "Logical negation"},
+        {Text: "NOTE", Description: "Returns the current position on an I/O channel"},
+        {Text: "ON", Description: "A computed goto - performs a jump based on the value of an expression"},
+        {Text: "OPEN", Description: "Initialises an I/O channel"},
+        {Text: "OR", Description: "Logical disjunction"},
+        {Text: "PADDLE", Description: "Returns the position of a paddle controller"},
+        {Text: "PEEK", Description: "Returns the value at an address in memory"},
+        {Text: "PLOT", Description: "Draws a point at given coordinates"},
+        {Text: "POINT", Description: "Sets the current position on an I/O channel"},
+        {Text: "POKE", Description: "Sets a value at an address in memory"},
+        {Text: "POP", Description: "Removes a subroutine return address from the stack (see GOSUB and RETURN)"},
+        {Text: "POSITION", Description: "Sets the position of the graphics cursor"},
+        {Text: "PRINT", Description: "and ?     Writes text to an I/O channel; usually to screen (default), printer, cassette tape or disk (see LPRINT and INPUT)"},
+        {Text: "PTRIG", Description: "Indicates whether a paddle trigger is pressed or not"},
+        {Text: "PUT", Description: "Writes one byte to an I/O channel (see GET)"},
+        {Text: "RAD", Description: "Switches trigonometric functions to compute in radians (see DEG)"},
+        {Text: "READ", Description: "Reads data from a DATA statement"},
+        {Text: "REM", Description: "Marks a comment in a program"},
+        {Text: "RESTORE", Description: "Sets the position of where to read data from a DATA statement"},
+        {Text: "RETURN", Description: "Ends a subroutine, effectively branching to the line immediately following the calling GOSUB (see GOSUB and POP)"},
+        {Text: "RND", Description: "Returns a pseudorandom number"},
+        {Text: "RUN", Description: "Starts execution of a program, optionally loading it from an external device (see LOAD)"},
+        {Text: "SAVE", Description: "Writes a tokenized program to an external device; usually a cassette tape or disk (see LOAD)"},
+        {Text: "SETCOLOR", Description: "Maps a logical color to a physical color"},
+        {Text: "SGN", Description: "Returns the signum of a number"},
+        {Text: "SIN", Description: "Returns the sine of a number"},
+        {Text: "SOUND", Description: "Starts or stops playing a tone on a sound channel (see END)"},
+        {Text: "SQR", Description: "Returns the square root of a number"},
+        {Text: "STATUS", Description: "Returns the status of an I/O channel"},
+        {Text: "STEP", Description: "Indicates the increment used in a FOR loop"},
+        {Text: "STICK", Description: "Returns a joystick position"},
+        {Text: "STOP", Description: "Stops the program, allowing later resumption (see CONT)"},
+        {Text: "STRIG", Description: "Indicates whether a joystick trigger is pressed or not"},
+        {Text: "STR", Description: "Converts a number to string form"},
+        {Text: "THEN", Description: "Indicates the statements to execute if the condition is true in an IF statement"},
+        {Text: "TO", Description: "Indicates the limiting condition in a FOR statement"},
+        {Text: "TRAP", Description: "Sets to jump to a given program line if an error occurs (TRAP 40000 cancels this order)"},
+        {Text: "USR", Description: "Calls a machine code routine, optionally with parameters"},
+        {Text: "VAL", Description: "Returns the numeric value of a string"},
+        {Text: "XIO", Description: "General-purpose I/O routine (from Fill screen to Rename file to Format disk instructions) "},
+        {Text: "exit", Description: "Quit the application"},
+        {Text: "quit", Description: "Quit the application"},
+}
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        default:
+                println("Nothing happens")
+        }
+        return
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        if in.GetWordBeforeCursor() == "" {
+                return nil
+        } else {
+                return prompt.FilterFuzzy(suggestions, in.GetWordBeforeCursor(), true)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Kontextová nápověda u příkazů, které se skládají ze dvou slov</h2>
+
+<p>Často se setkáme s&nbsp;požadavkem, aby program umožňoval zadání příkazů,
+které se skládají ze dvou či dokonce z&nbsp;většího množství slov. I
+v&nbsp;takovém případě samozřejmě můžeme použít funkce z&nbsp;knihovny
+<strong>go-prompt</strong>, ovšem budeme muset provést několik úprav ve funkci
+<strong>completer</strong>. Nejprve si však ukažme, jak by mělo vypadat
+očekávané chování aplikace:</p>
+
+<a href="https://www.root.cz/obrazek/358454/"><img src="https://i.iinfo.cz/images/472/golang-20-16-prev.png" class="image-358454" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 17: Nápověda prvních slov příkazu.</i></p>
+
+<a href="https://www.root.cz/obrazek/358455/"><img src="https://i.iinfo.cz/images/472/golang-20-17-prev.png" class="image-358455" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 18: Nápověda dalšího slova dvouslovního příkazu.</i></p>
+
+<a href="https://www.root.cz/obrazek/358456/"><img src="https://i.iinfo.cz/images/472/golang-20-18-prev.png" class="image-358456" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 19: Nápověda dalšího slova odlišného dvouslovního
+příkazu.</i></p>
+
+<p>Vidíme, že kontextová nápověda ke druhému slovu závisí na tom, jakým slovem
+příkaz začíná.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Implementace kontextové nápovědy víceslovních příkazů</h2>
+
+<p>Jedna z&nbsp;možných implementací &bdquo;inteligentní&ldquo; kontextové
+nápovědy pro víceslovní příkazy spočívá v&nbsp;tom, že ve funkci
+<strong>completer</strong> nejprve rozložíme řetězec zadaný uživatelem na
+jednotlivá slova:</p>
+
+<pre>
+blocks := strings.Split(in.TextBeforeCursor(), " ")
+</pre>
+
+<p>Dále si vytvoříme několik tabulek příkazů. První tabulka bude obsahovat
+pouze první slova příkazu:</p>
+
+<pre>
+s := []prompt.Suggest{
+        {Text: "help", Description: "show help with all commands"},
+        {Text: "user", Description: "add/delete user"},
+        {Text: "ls", Description: "list users/storages/computers"},
+        {Text: "list", Description: "list users/storages/computers"},
+        {Text: "exit", Description: "quit the application"},
+        {Text: "quit", Description: "quit the application"},
+}
+</pre>
+
+<p>Další tabulky pak pouze druhá slova příkazů:</p>
+
+<pre>
+user_s := []prompt.Suggest{
+        {Text: "add", Description: "add new user"},
+        {Text: "assign", Description: "assign a role to user"},
+        {Text: "del", Description: "delete user"},
+}
+&nbsp;
+list_s := []prompt.Suggest{...
+&nbsp;
+empty_s := []prompt.Suggest{}
+</pre>
+
+<p>Následně implementujeme primitivní logiku pro rozhodnutí, kterou tabulku
+s&nbsp;nabídkou příkazů vrátit a použít &ndash; zda seznam prvních slov či
+nějaký ze seznamů slov druhých. Ve větvi <strong>default</strong> se vrací
+prázdná tabulka pro jednoslovní či pro neznámé příkazy:</p>
+
+<pre>
+if len(blocks) == 2 {
+        switch blocks[0] {
+        case "user":
+                return prompt.FilterHasPrefix(user_s, blocks[1], true)
+        case "ls":
+                fallthrough
+        case "list":
+                return prompt.FilterHasPrefix(list_s, blocks[1], true)
+        default:
+                return empty_s
+        }
+}
+return prompt.FilterHasPrefix(s, blocks[0], true)
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Úplný zdrojový kód příkladu s&nbsp;víceslovními příkazy</h2>
+
+<p>Úplný zdrojový kód příkladu s&nbsp;víceslovními příkazy nalezneme na adrese
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_20/10_two_word_commands.go">https://github.com/tisnik/go-root/blob/master/article_20/10_two_word_commands.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/c-bata/go-prompt"
+        "os"
+        "strings"
+)
+&nbsp;
+func <strong>executor</strong>(t string) {
+        switch t {
+        case "exit":
+                fallthrough
+        case "quit":
+                os.Exit(0)
+        case "help":
+                println("HELP:\nexit\nquit")
+        case "user add":
+                println("Adding user")
+        case "user del":
+                println("Deleting user")
+        default:
+                println("Nothing happens")
+        }
+        return
+}
+&nbsp;
+func <strong>completer</strong>(in prompt.Document) []prompt.Suggest {
+        blocks := strings.Split(in.TextBeforeCursor(), " ")
+&nbsp;
+        s := []prompt.Suggest{
+                {Text: "help", Description: "show help with all commands"},
+                {Text: "user", Description: "add/delete user"},
+                {Text: "ls", Description: "list users/storages/computers"},
+                {Text: "list", Description: "list users/storages/computers"},
+                {Text: "exit", Description: "quit the application"},
+                {Text: "quit", Description: "quit the application"},
+        }
+&nbsp;
+        user_s := []prompt.Suggest{
+                {Text: "add", Description: "add new user"},
+                {Text: "assign", Description: "assign a role to user"},
+                {Text: "del", Description: "delete user"},
+        }
+&nbsp;
+        list_s := []prompt.Suggest{
+                {Text: "users", Description: "show list of all users"},
+                {Text: "logs", Description: "show list of all logs"},
+                {Text: "storages", Description: "show list of all storages"},
+                {Text: "computers", Description: "show list of all computers"},
+        }
+&nbsp;
+        empty_s := []prompt.Suggest{}
+&nbsp;
+        if len(blocks) == 2 {
+                switch blocks[0] {
+                case "user":
+                        return prompt.FilterHasPrefix(user_s, blocks[1], true)
+                case "ls":
+                        fallthrough
+                case "list":
+                        return prompt.FilterHasPrefix(list_s, blocks[1], true)
+                default:
+                        return empty_s
+                }
+        }
+        return prompt.FilterHasPrefix(s, blocks[0], true)
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := prompt.New(executor, completer)
+        p.Run()
+}
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_scanln.go</td><td>použití standardní funkce <strong>Scanln</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/01_scanln.go">https://github.com/tisnik/go-root/blob/master/article_20/01_scanln.go</a></td></tr>
+<tr><td> 2</td><td>02_input_via_reader.go</td><td>čtení ze standardního vstupu přes <strong>Reader</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/02_input_via_reader.go">https://github.com/tisnik/go-root/blob/master/article_20/02_input_via_reader.go</a></td></tr>
+<tr><td> 3</td><td>03_simple_input.go</td><td>vstupní příkazový řádek realizovaný balíčkem <strong>go-prompt</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/03_simple_input.go">https://github.com/tisnik/go-root/blob/master/article_20/03_simple_input.go</a></td></tr>
+<tr><td> 4</td><td>04_prompt.go</td><td>vstupní příkazový řádek s&nbsp;historií</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/04_prompt.go">https://github.com/tisnik/go-root/blob/master/article_20/04_prompt.go</a></td></tr>
+<tr><td> 5</td><td>05_basic_completer.go</td><td>nabízení slov/příkazů pro automatické doplnění</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/05_basic_completer.go">https://github.com/tisnik/go-root/blob/master/article_20/05_basic_completer.go</a></td></tr>
+<tr><td> 6</td><td>06_prefix_completer.go</td><td>vylepšení automatického doplňování příkazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/06_prefix_completer.go">https://github.com/tisnik/go-root/blob/master/article_20/06_prefix_completer.go</a></td></tr>
+<tr><td> 7</td><td>07_completion_description.go</td><td>popis jednotlivých příkazů zobrazovaný uživateli</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/07_completion_description.go">https://github.com/tisnik/go-root/blob/master/article_20/07_completion_description.go</a></td></tr>
+<tr><td> 8</td><td>08_basic_statements.go</td><td>klíčová slova Atari BASICu i s&nbsp;jejich popisem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/08_basic_statements.go">https://github.com/tisnik/go-root/blob/master/article_20/08_basic_statements.go</a></td></tr>
+<tr><td> 9</td><td>09_fuzzy_filter.go</td><td>použití vylepšeného fuzzy filtru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/09_fuzzy_filter.go">https://github.com/tisnik/go-root/blob/master/article_20/09_fuzzy_filter.go</a></td></tr>
+<tr><td>10</td><td>10_two_word_commands.go</td><td>příkaz složený ze dvou klíčových slov</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_20/10_two_word_commands.go">https://github.com/tisnik/go-root/blob/master/article_20/10_two_word_commands.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>Package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
