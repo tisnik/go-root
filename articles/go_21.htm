@@ -1,0 +1,2257 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Knihovny umožňující naplánování a spouštění periodických úloh</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Knihovny pro Go umožňující naplánování a spouštění periodických úloh</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Mezi další užitečné knihovny programovacího jazyka Go patří knihovny zajišťující periodické spouštění úloh. Jedná se vlastně o reimplementaci chování nástroje cron, ovšem všechny plánované úlohy jsou spouštěny v jediném procesu, každá v samostatné gorutině.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Knihovny pro Go umožňující naplánování a spouštění periodických úloh</a></p>
+<p><a href="#k02">2. Datový typ <strong>Duration</strong> ze standardního balíčku <strong>fmt</strong></a></p>
+<p><a href="#k03">3. Ukázky použití funkcí a metod datového typu <strong>Duration</strong></a></p>
+<p><a href="#k04">4. Balíček <strong>go-cron</strong></a></p>
+<p><a href="#k05">5. Základní použití knihovny <strong>go-cron</strong> pro naplánování úloh</a></p>
+<p><a href="#k06">6. Naplánování většího množství úloh v&nbsp;jediném procesu</a></p>
+<p><a href="#k07">7. Přesnější řízení okamžiků, v&nbsp;nichž má být úloha spuštěna</a></p>
+<p><a href="#k08">8. Použití dalších funkcí knihovny <strong>go-cron</strong> pro naplánování úloh</a></p>
+<p><a href="#k09">9. Balíček <strong>clockwork</strong></a></p>
+<p><a href="#k10">10. Spuštění periodicky se opakující úlohy</a></p>
+<p><a href="#k11">11. Naplánování většího množství úloh</a></p>
+<p><a href="#k12">12. Použití dalších metod pro naplánování úloh</a></p>
+<p><a href="#k13">13. Balíček <strong>clockwerk</strong></a></p>
+<p><a href="#k14">14. Naplánování jedné úlohy</a></p>
+<p><a href="#k15">15. Naplánování několika nezávislých úloh</a></p>
+<p><a href="#k16">16. Použití datového typu <strong>Duration</strong> při plánování úloh</a></p>
+<p><a href="#k17">17. Úprava příkladu s&nbsp;více úlohami</a></p>
+<p><a href="#k18">18. Vylepšení plánování asynchronních úloh s&nbsp;balíčkem <strong>JobRunner</strong></a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Knihovny pro Go umožňující naplánování a spouštění periodických úloh</h2>
+
+<p>Ve dvacáté první části <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> se budeme zabývat knihovnami (resp.&nbsp;přesněji
+řečeno balíčky), které slouží pro naplánování úloh, jež se mají periodicky
+spouštět v&nbsp;určitém časovém intervalu. Příkladem může být úloha, která
+každou minutu zjišťuje, zda je nějaká služba či databáze dostupná
+(&bdquo;živá&ldquo;), popř.&nbsp;jiná úloha, která každý pátek v&nbsp;čase
+23:59 zajistí vyčištění databáze (<i>vacuuming</i>, viz též [<a
+href="https://www.sqlite.org/lang_vacuum.html">1</a>] [<a
+href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">2</a>]).
+V&nbsp;unixových systémech se pro periodické spouštění různých úloh používá
+nástroj nazvaný <strong>cron</strong>, který běží jako služba
+(resp.&nbsp;démon) a je řízen tabulkami s&nbsp;pravidly uloženými
+v&nbsp;souborech, které se typicky nalézají v&nbsp;adresáři
+<strong>/var/spool/cron/crontabs/</strong>. Bližší informace o nástroji
+<strong>cron</strong> lze získat přímo z&nbsp;jeho manuálové stránky, kterou
+s&nbsp;poměrně velkou pravděpodobností máte nainstalovánu i ve svém
+systému:</p>
+
+<pre>
+$ <strong>man cron</strong>
+</pre>
+
+<p>Samotný popis tabulek s&nbsp;definicí periodicky spouštěných úloh ovšem
+naleznete v&nbsp;jiné manuálové stránce, a to v&nbsp;páté sekci:</p>
+
+<pre>
+$ <strong>man 5 crontab</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě je nutné číslo
+sekce uvést, jinak se zobrazí sice stejně pojmenovaná manuálová stránka, ovšem
+z&nbsp;první sekce, která popisuje jiný typ souborů.</div></p>
+
+<p>Příklad tabulky nástroje <strong>cron</strong>:</p>
+
+<pre>
+# Minute   Hour   Day of Month       Month          Day of Week        Command    
+# (0-59)  (0-23)     (1-31)    (1-12 or Jan-Dec)  (0-6 or Sun-Sat)                
+    0        2          12             *                *            /usr/bin/find
+    0       23       15-21             *                1            /usr/something-else foobar
+</pre>
+
+<p>Ovšem i přes velkou užitečnost nástroje <strong>cron</strong> se nemusí ve
+všech případech jednat o to nejlepší možné řešení. Někdy je totiž nutné úlohy
+plánovat dynamicky na základě různých podmínek, samotný zápis pravidel
+v&nbsp;<i>crontabs</i> je někdy komplikovaný a v&nbsp;neposlední řadě nemusí
+být spouštění úloh v&nbsp;určitém čase tak triviální, jak by se mohl na první
+pohled zdát &ndash; mnohdy je totiž nutné zjistit, jak dopadla předchozí úloha,
+zda je již ukončena atd. To lze řešit použitím různých <i>lock filů</i>
+(souborů fungujících jako zámky), ovšem se všemi nevýhodami, které toto řešení
+přináší (zajištění stavu lock filů, pokud proces s&nbsp;úlohou havaruje apod.).
+Některé vlastnosti nástroje <strong>cron</strong> a návrhy na vylepšení jsou
+shrnuty v&nbsp;článku <a
+href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">Rethinking
+Cron</a>.</p>
+
+<p>Samozřejmě, že k&nbsp;nástroji <strong>cron</strong> existují i různé více
+či méně povedené alternativy, které jsou většinou realizovány nějakou
+knihovnou. Samotné naplánované úlohy jsou pak typicky reprezentovány funkcí,
+která se (asynchronně) spustí v&nbsp;určitém časovém intervalu, například
+každou sekundu, poslední pátek v&nbsp;měsíci, v&nbsp;sedm hodin ráno každý
+pracovní den apod. Mnohé z&nbsp;těchto knihoven jsou inspirovány balíčkem
+<strong>whenever</strong> určeným pro programovací jazyk <i>Ruby</i>. Zajímavá
+je například knihovna <strong>schedule</strong> pro <i>Python</i>, ovšem dnes
+se budeme zabývat knihovnami resp.&nbsp;balíčky, které jsou určeny pro
+programovací jazyk <i>Go</i>. Již na tomto místě je nutné říci, že implementace
+takových knihoven v&nbsp;<i>Go</i> bývá dosti zjednodušena, a to díky existenci
+<a
+href="https://www.root.cz/clanky/rozhrani-metody-gorutiny-a-kanaly-v-programovacim-jazyku-go/#k13">gorutin</a>,
+<a
+href="https://www.root.cz/clanky/rozhrani-metody-gorutiny-a-kanaly-v-programovacim-jazyku-go/#k16">kanálů</a>
+a v&nbsp;neposlední řadě taktéž datového typu <strong>Duration</strong> ze
+standardního balíčku <strong>time</strong>, který mnohé tyto knihovny
+používají.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Datový typ <strong>Duration</strong> ze standardního balíčku <strong>fmt</strong></h2>
+
+<p>Jak jsme si již řekli <a href="#k01">v&nbsp;úvodní kapitole</a>, používá se
+u některých dále popsaných knihoven pro plánování periodických úloh standardní
+balíček <strong>time</strong> a jeho datový typ <strong>Duration</strong>
+určený pro reprezentaci časového intervalu, což může být jak doba trvání nějaké
+události, tak i určení nějakého časového intervalu. Samotné hodnoty typu
+<strong>Duration</strong> jsou interně reprezentovány celým 64bitovým číslem
+s&nbsp;přesností nanosekund a rozsahem přibližně 290 let:</p>
+
+<pre>
+type <strong>Duration</strong> int64
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: připomeňme si, že v&nbsp;programovacím
+jazyku Go je nutné provádět explicitní přetypování, což v&nbsp;našem případě
+znamená, že interně je sice typ <strong>Duration</strong> ekvivalentní typu
+<strong>int64</strong>, ovšem tato interní ekvivalence v&nbsp;praxi vůbec
+neznamená, že lze jakoukoli hodnotu typu <strong>int64</strong> použít
+v&nbsp;dále popsaných metodách ve funkci příjemce!</div></p>
+
+<p>Důležité je také znát funkce, které jako svoji výstupní hodnotu vrací
+hodnotu typu <strong>Duration</strong> (a popř.&nbsp;i chybu
+<strong>error</strong> ve druhé návratové hodnotě). Tyto funkce umožňují
+pracovat s&nbsp;časovým intervalem zapsaným v&nbsp;lidsky dobře čitelném
+formátu (formou řetězce):</p>
+
+<table>
+<tr><th>Funkce</th><th>Stručný popis</th></tr>
+<tr><td><strong>ParseDuration</strong>(s string) (Duration, error)</td><td>zpracování vstupního řetězce s&nbsp;lidsky zapsaným časovým intervalem a převod na typ <strong>Duration</strong></td></tr>
+<tr><td><strong>Since</strong>(t Time) Duration</td><td>vrátí čas, který uplynul od okamžiku <strong>t</strong></td></tr>
+<tr><td><strong>Until</strong>(t Time) Duration</td><td>vrátí čas, který musí uplynout do okamžiku <strong>t</strong></td></tr>
+</table>
+
+<p>K&nbsp;datovému typu <strong>Duration</strong> je vztaženo i několik
+užitečných metod:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>(d Duration) <strong>Hours</strong>() float64</td><td>převod časového intervalu na hodiny (může se jednat o desetinné číslo)</td></tr>
+<tr><td>(d Duration) <strong>Minutes</strong>() float64</td><td>převod časového intervalu na minuty (opět se může jednat o desetinné číslo)</td></tr>
+<tr><td>(d Duration) <strong>Seconds</strong>() float64</td><td>převod časového intervalu na sekundy (může se jednat o desetinné číslo)</td></tr>
+<tr><td>(d Duration) <strong>Nanoseconds</strong>() int64</td><td>převod časového intervalu na celý počet nanosekund</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>(d Duration) <strong>String</strong>() string</td><td>převod časového intervalu na řetězec ve formátu "50h30m2.5s", vždy se začíná nenulovým číslem, mění se pouze jednotky</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>(d Duration) <strong>Round</strong>(m Duration) Duration</td><td>zaokrouhlení časového intervalu na nejbližší celé násobky intevalu <strong>m</strong></td></tr>
+<tr><td>(d Duration) <strong>Truncate</strong>(m Duration) Duration</td><td>zaokrouhlení časového intervalu směrem k&nbsp;nule</td></tr>
+</table>
+
+<p>Zajímavá je především metoda <strong>String</strong> vracející řetězcovou
+podobu intervalu. Prakticky vždy, s&nbsp;výjimkou intervalu s&nbsp;nulovou
+délkou, vrací tato metoda řetězec, který začíná nenulovou cifrou, například již
+zmíněných &bdquo;50h30m&ldquo;, nebo &bdquo;30m&ldquo;
+popř.&nbsp;&bdquo;30m10s&ldquo;.</p>
+
+<p>Převody na hodiny, minuty a sekundy vrací hodnotu typu
+<strong>float64</strong>, protože se obecně jedná o desetinná čísla. Výjimkou
+je převod na nanosekundy, protože v&nbsp;tomto případě se vrací přímo nijak
+neupravený počet nanosekund, který je interní reprezentací časového
+intervalu.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Ukázky použití funkcí a metod datového typu <strong>Duration</strong></h2>
+
+<p>Funkce a metody vztažené k&nbsp;datovému typu <strong>Duration</strong> a
+popsané <a href="#k02">v&nbsp;předchozí kapitole</a> si samozřejmě můžeme velmi
+snadno otestovat; vystačíme si přitom pouze se standardními balíčky
+programovacího jazyka Go (prozatím tedy není nutné instalovat další
+knihovny).</p>
+
+<p>Začneme převodem řetězce &bdquo;1h&ldquo; odpovídajícího přesně jedné hodině
+na typ <strong>Duration</strong> a získání informací o tomto intervalu. Tento
+algoritmus je implementován <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration1.go">v&nbsp;dnešním
+prvním demonstračním příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("1h")
+&nbsp;
+        fmt.Println(d.String())
+        fmt.Printf("Hours:   %2.0f\n", d.Hours())
+        fmt.Printf("Minutes: %2.0f\n", d.Minutes())
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+1h0m0s
+Hours:    1
+Minutes: 60
+</pre>
+
+<p>Ve druhém příkladu použijeme <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration2.go">odlišný
+časový interval</a> odpovídající jedné hodině, šesti minutám a deseti
+sekundám:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("1h6m10s")
+&nbsp;
+        fmt.Println(d.String())
+        fmt.Printf("Hours:   %4.2f\n", d.Hours())
+        fmt.Printf("Minutes: %2.0f\n", d.Minutes())
+        fmt.Printf("Seconds: %2.0f\n", d.Seconds())
+        fmt.Printf("ns:      %d\n", d.Nanoseconds())
+}
+</pre>
+
+<p>S&nbsp;výsledkem, včetně převodu na sekundy a celé nanosekundy:</p>
+
+<pre>
+1h6m10s
+Hours:   1.10
+Minutes: 66
+Seconds: 3970
+ns:      3970000000000
+</pre>
+
+<p>Samozřejmě <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration3.go">je
+možné specifikovat i mnohem kratší časové intervaly</a>, například:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("200ms")
+&nbsp;
+        fmt.Println(d.String())
+        fmt.Printf("Seconds: %4.2f\n", d.Seconds())
+        fmt.Printf("ns:      %d\n", d.Nanoseconds())
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+200ms
+Seconds: 0.20
+ns:      200000000
+</pre>
+
+<p>Nic nám nebrání použít dokonce intervaly nanosekundové a mikrosekundové, což
+si ukážeme <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration4.go">v&nbsp;dalším
+příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("0.1µs1ns")
+&nbsp;
+        fmt.Println(d.String())
+&nbsp;
+        fmt.Printf("ns:      %d\n", d.Nanoseconds())
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+101ns
+ns:      101
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pro zápis mikrosekundy lze použít buď
+&bdquo;us&ldquo; nebo &bdquo;µs&ldquo;, protože &ndash; jak již víme &ndash;
+programovací jazyk Go plně podporuje Unicode.</div></p>
+
+<p>Na závěr se ještě podívejme, jakým způsobem je možné provést zaokrouhlení
+nějakého časového intervalu takovým způsobem, aby byl nový interval
+celočíselným násobkem intervalu jiného. V&nbsp;<a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration5.go">pátém
+demonstračním příkladu</a> je ukázáno zaokrouhlení intervalu o délce trvání 3
+hodiny 15 minut na celé hodiny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("3h15m")
+        e, _ := time.ParseDuration("1h")
+        f := d.Round(e)
+&nbsp;
+        fmt.Println(f.String())
+        fmt.Printf("Hours:   %2.0f\n", f.Hours())
+        fmt.Printf("Minutes: %2.0f\n", f.Minutes())
+        fmt.Printf("Seconds: %4.0f\n", f.Seconds())
+        fmt.Printf("ns:      %d\n", f.Nanoseconds())
+}
+</pre>
+
+<p>S&nbsp;očekávatelnými výsledky:</p>
+
+<pre>
+3h0m0s
+Hours:    3
+Minutes: 180
+Seconds: 10800
+ns:      10800000000000
+</pre>
+
+<p>Podobně můžeme interval <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration6.go">zaokrouhlit
+na celé čtvrthodiny</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d, _ := time.ParseDuration("3h25m")
+        e, _ := time.ParseDuration("15m")
+        f := d.Round(e)
+&nbsp;
+        fmt.Println(f.String())
+        fmt.Printf("Hours:   %4.2f\n", f.Hours())
+        fmt.Printf("Minutes: %2.0f\n", f.Minutes())
+        fmt.Printf("Seconds: %4.0f\n", f.Seconds())
+        fmt.Printf("ns:      %d\n", f.Nanoseconds())
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+3h30m0s
+Hours:   3.50
+Minutes: 210
+Seconds: 12600
+ns:      12600000000000
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Balíček <strong>go-cron</strong></h2>
+
+<p>První knihovnou určenou pro plánování periodicky se opakujících úloh
+v&nbsp;Go s&nbsp;níž se v&nbsp;dnešním článku seznámíme, bude knihovna nazvaná
+jednoduše a přímočaře <strong>go-cron</strong>. Tato knihovna, kterou naleznete
+na adrese <a
+href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>,
+umožňuje naplánování úloh, přičemž každá úloha je realizována běžnou funkcí,
+která je v&nbsp;určitý naplánovaný časový okamžik spuštěna. Žádné další
+možnosti tato knihovna nenabízí, což je možné v&nbsp;tomto kontextu považovat
+za výhodu (složitější knihovna bude popsána v&nbsp;závěru tohoto článku, ovšem
+mnohdy si vystačíme právě s&nbsp;možnostmi nabízenými knihovnou
+<strong>go-cron</strong>).</p>
+
+<p>Instalace knihovny <strong>go-cron</strong> proběhne s&nbsp;využitím
+standardního nástroje <strong>go get</strong> a to konkrétně následujícím
+způsobem:</p>
+
+<pre>
+$ <strong>go get github.com/rk/go-cron</strong>
+</pre>
+
+<p>Tato knihovna programátorům nabízí několik funkcí pro naplánování periodické
+úlohy. Tyto funkce jsou zmíněny v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>Funkce</th><th>Parametry</th><th>Stručný popis</th></tr>
+<tr><td>NewDailyJob</td><td>hour, minute, second int8, task func(time.Time)</td><td>spuštění úlohy, která se má opakovat každý den v&nbsp;určitý čas</td></tr>
+<tr><td>NewWeeklyJob</td><td>weekday, hour, minute, second int8, task func(time.Time)</td><td>spuštění úlohy, která se má opakovat v&nbsp;daný den v&nbsp;týdnu v&nbsp;určitý čas</td></tr>
+<tr><td>NewMonthlyJob</td><td>day, hour, minute, second int8, task func(time.Time)</td><td>spuštění úlohy, která se má opakovat v&nbsp;zadaný den v&nbsp;měsíci</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>NewCronJob</td><td>month, day, weekday, hour, minute, second int8, task func(time.Time)</td><td>naplánování obecné periodicky se opakující úlohy</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: existuje speciální hodnota -1, kterou
+můžete ve výše zmíněných funkcích použít ve chvíli, kdy se nemá daná časová
+jednotka brát v&nbsp;úvahu (-1 tedy znamená &bdquo;libovolná hodnota této
+jednotky&ldquo;). Ukázky si uvedeme v&nbsp;navazujících kapitolách.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Základní použití knihovny <strong>go-cron</strong> pro naplánování úloh</h2>
+
+<p>Pro první seznámení se s&nbsp;možnostmi knihovny <strong>go-cron</strong>
+slouží <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs1.go">následující
+demonstrační příklad</a>, v&nbsp;němž je naplánována jediná periodicky se
+opakující úloha implementovaná samostatnou funkcí nazvanou
+<strong>task</strong>:</p>
+
+<pre>
+func <strong>task</strong>(t time.Time) {
+        println(t.String())
+}
+</pre>
+
+<p>Naplánování periodické úlohy proběhne tímto způsobem:</p>
+
+<pre>
+cron.NewDailyJob(-1, -1, -1, task)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak již víme z&nbsp;předchozí kapitoly,
+hodnoty -1 znamenají, že pro danou časovou jednotku neplatí žádné
+omezení.</div></p>
+
+<p>V&nbsp;úplném výpisu zdrojového kódu demonstračního příkladu si povšimněte,
+že je nutné explicitně zajistit, aby gorutina, v&nbsp;níž je spuštěna funkce
+<strong>main</strong>, neskončila, protože by to automaticky znamenalo i
+ukončení celé aplikace, pochopitelně se všemi naplánovanými úlohami. Jedno
+z&nbsp;řešení představuje použití kanálu, z&nbsp;něhož se na konci funkce
+<strong>main</strong> pokusíme přečíst data, i když se ve skutečnosti do kanálu
+žádná data nikde nezapíšou. Jedná se o jasně blokující operaci, která zajistí,
+že k&nbsp;ukončení funkce <strong>main</strong> nedojde (program budeme muset
+ukončit jinak, buď přímo z&nbsp;terminálu, nebo pomocí příkazu
+<strong>kill</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/rk/go-cron"
+        "time"
+)
+&nbsp;
+func <strong>task</strong>(t time.Time) {
+        println(t.String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        cron.NewDailyJob(-1, -1, -1, task)
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se na terminálu postupně měly objevovat
+informace o spuštěné úloze. Vzhledem k&nbsp;tomu, že je funkci (představující
+úlohu) automaticky předáno i časové razítko spuštění, můžeme snadno ověřit
+přibližnou přesnost plánování periodicky se opakujících úloh:</p>
+
+<pre>
+2019-04-11 20:39:20.983537518 +0200 CEST m=+0.000208862
+2019-04-11 20:39:21.983697 +0200 CEST m=+1.000368303
+2019-04-11 20:39:22.983883447 +0200 CEST m=+2.000554827
+2019-04-11 20:39:23.984028499 +0200 CEST m=+3.000699871
+2019-04-11 20:39:24.984184861 +0200 CEST m=+4.000856176
+2019-04-11 20:39:25.984334132 +0200 CEST m=+5.001005468
+2019-04-11 20:39:26.984449806 +0200 CEST m=+6.001121161
+2019-04-11 20:39:27.984610121 +0200 CEST m=+7.001281438
+2019-04-11 20:39:28.984760969 +0200 CEST m=+8.001432300
+...
+...
+...
+</pre>
+
+<p>Příklad je pro lepší čitelnost vhodné upravit takovým způsobem, aby se
+namísto celočíselných konstant <strong>-1</strong> používaly symbolické
+konstanty <strong>ANY</strong>. Úprava příkladu tímto způsobem je triviální,
+což je ostatně patrné i při pohledu <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs2.go">na
+jeho zdrojový kód</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/rk/go-cron"
+        "time"
+)
+&nbsp;
+func <strong>task</strong>(t time.Time) {
+        println(t.String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        cron.NewDailyJob(cron.ANY, cron.ANY, cron.ANY, task)
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Výsledky běhu tohoto příkladu:</p>
+
+<pre>
+2019-04-11 20:41:00.025596852 +0200 CEST m=+34.005213481
+2019-04-11 20:42:00.034019284 +0200 CEST m=+94.013635937
+2019-04-11 20:43:00.042509678 +0200 CEST m=+154.022126308
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Naplánování většího množství úloh v&nbsp;jediném procesu</h2>
+
+<p>Nic nám samozřejmě nebrání naplánovat si v&nbsp;jednom procesu (aplikaci)
+větší množství úloh. V&nbsp;<a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs3.go">dalším
+demonstračním příkladu</a> jsou deklarovány tři funkce, z&nbsp;nichž každá
+obsahuje implementaci jedné úlohy:</p>
+
+<pre>
+func <strong>task1</strong>(t time.Time) {
+        println("task1:", t.String())
+}
+&nbsp;
+func <strong>task2</strong>(t time.Time) {
+        println("task2:", t.String())
+}
+&nbsp;
+func <strong>task3</strong>(t time.Time) {
+        println("task3:", t.String())
+}
+</pre>
+
+<p>Každá z&nbsp;těchto funkcí se bude spouštět s&nbsp;jinou periodou &ndash;
+každou celou minutu, každou desátou sekundu v&nbsp;minutě popř.&nbsp;každou
+sekundu:</p>
+
+<pre>
+cron.NewDailyJob(cron.ANY, cron.ANY, 0, task1)
+cron.NewDailyJob(cron.ANY, cron.ANY, 10, task2)
+cron.NewDailyJob(cron.ANY, cron.ANY, cron.ANY, task3)
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs3.go">Úplný
+zdrojový kód</a> tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/rk/go-cron"
+        "time"
+)
+&nbsp;
+func <strong>task1</strong>(t time.Time) {
+        println("task1:", t.String())
+}
+&nbsp;
+func <strong>task2</strong>(t time.Time) {
+        println("task2:", t.String())
+}
+&nbsp;
+func <strong>task3</strong>(t time.Time) {
+        println("task3:", t.String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        cron.NewDailyJob(cron.ANY, cron.ANY, 0, task1)
+        cron.NewDailyJob(cron.ANY, cron.ANY, 10, task2)
+        cron.NewDailyJob(cron.ANY, cron.ANY, cron.ANY, task3)
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Podívejme se nyní, jak se bude příklad chovat po spuštění. Tučně jsou
+zvýrazněna volání první a druhé úlohy &ndash; povšimněte si, že se skutečně
+spustily v&nbsp;celou minutu popř.&nbsp;v&nbsp;desáté sekundě minuty (čas
+spuštění není pochopitelně zcela přesný a závisí mj.&nbsp;i na tom, kdy přesně
+byl program spuštěn):</p>
+
+<pre>
+task3: 2019-04-15 13:20:59.365354556 +0200 CEST m=+40.007242742
+task3: 2019-04-15 13:21:00.365510079 +0200 CEST m=+41.007398258
+<strong>task1: 2019-04-15 13:21:00.365510079 +0200 CEST m=+41.007398258</strong>
+task3: 2019-04-15 13:21:01.365672334 +0200 CEST m=+42.007560511
+task3: 2019-04-15 13:21:02.365795475 +0200 CEST m=+43.007683682
+task3: 2019-04-15 13:21:03.365963353 +0200 CEST m=+44.007851518
+task3: 2019-04-15 13:21:04.366108946 +0200 CEST m=+45.007997113
+task3: 2019-04-15 13:21:05.366255758 +0200 CEST m=+46.008143950
+task3: 2019-04-15 13:21:06.366433668 +0200 CEST m=+47.008321854
+task3: 2019-04-15 13:21:07.366602436 +0200 CEST m=+48.008490616
+task3: 2019-04-15 13:21:08.366788483 +0200 CEST m=+49.008676649
+task3: 2019-04-15 13:21:09.366968318 +0200 CEST m=+50.008856527
+task3: 2019-04-15 13:21:10.367136886 +0200 CEST m=+51.009025093
+<strong>task2: 2019-04-15 13:21:10.367136886 +0200 CEST m=+51.009025093</strong>
+task3: 2019-04-15 13:21:11.367303105 +0200 CEST m=+52.009191289
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Přesnější řízení okamžiků, v&nbsp;nichž má být úloha spuštěna</h2>
+
+<p>V&nbsp;případě, že je nutné nějakou úlohu spouštět například každých deset
+sekund, lze si vypomoci malým trikem. Samotná funkce s&nbsp;implementovanou
+úlohou sice bude spouštěna každou sekundu, ovšem současně se bude funkci
+předávat i hodnota neustále se zvyšujícího čítače. Ve chvíli, kdy bude tato
+hodnota dělitelná deseti, spustí se skutečný kód úlohy (v&nbsp;našem případě
+implementovaný pouze jako volání funkce <strong>println</strong>):</p>
+
+<pre>
+func <strong>task3</strong>(t time.Time, counter int) {
+        if counter%10 == 0 {
+                println("task3:", t.String())
+        }
+}
+</pre>
+
+<p>Implementace čítače vyžaduje použití anonymní funkce, protože budeme muset
+zajistit, že se funkci <strong>task</strong> předá ještě jeden parametr, kromě
+samotného časového razítka:</p>
+
+<pre>
+task3cnt := 0
+&nbsp;
+cron.NewDailyJob(cron.ANY, cron.ANY, cron.ANY,
+                func(t time.Time) { task3cnt++; task3(t, task3cnt) })
+</pre>
+
+<p>Tato úprava je implementována v&nbsp;následujícím demonstračním příkladu,
+jehož zdrojový kód je dostupný na stránce <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs4.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs4.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/rk/go-cron"
+        "time"
+)
+&nbsp;
+func <strong>task1</strong>(t time.Time) {
+        println("task1:", t.String())
+}
+&nbsp;
+func <strong>task2</strong>(t time.Time) {
+        println("task2:", t.String())
+}
+&nbsp;
+func <strong>task3</strong>(t time.Time, counter int) {
+        if counter%10 == 0 {
+                println("task3:", t.String())
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        task3cnt := 0
+&nbsp;
+        c := make(chan bool)
+        cron.NewDailyJob(cron.ANY, cron.ANY, 0, task1)
+        cron.NewDailyJob(cron.ANY, cron.ANY, 10, task2)
+        cron.NewDailyJob(cron.ANY, cron.ANY, cron.ANY,
+                func(t time.Time) { task3cnt++; task3(t, task3cnt) })
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Podívejme se nyní na chování tohoto příkladu po spuštění. Můžeme vidět, že
+se třetí úloha (resp.&nbsp;přesněji řečeno část zapsaná v&nbsp;podmínce)
+skutečně spouští v&nbsp;desetisekundových intervalech</p>
+
+<pre>
+task1: 2019-04-11 20:48:00.342877606 +0200 CEST m=+4.001062857
+task3: 2019-04-11 20:48:05.343610003 +0200 CEST m=+9.001795162
+task2: 2019-04-11 20:48:10.344500095 +0200 CEST m=+14.002685300
+task3: 2019-04-11 20:48:15.345315733 +0200 CEST m=+19.003500961
+task3: 2019-04-11 20:48:25.346865887 +0200 CEST m=+29.005051058
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Použití dalších funkcí knihovny <strong>go-cron</strong> pro naplánování úloh</h2>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs5.go">V&nbsp;posledním
+příkladu použití knihovny <strong>go-cron</strong></a> je ukázán způsob volání
+dalších tří funkcí určených pro naplánování úlohy. Funkci
+<strong>NewDailyJob</strong> již známe, ovšem prakticky stejným způsobem můžeme
+použít i funkce <strong>NewWeeklyJob</strong>, <strong>NewMonthlyJob</strong> a
+nejobecnější funkci <strong>NewCronJob</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/rk/go-cron"
+        "time"
+)
+&nbsp;
+func <strong>task1</strong>(t time.Time) {
+        println("task1:", t.String())
+}
+&nbsp;
+func <strong>task2</strong>(t time.Time) {
+        println("task2:", t.String())
+}
+&nbsp;
+func <strong>task3</strong>(t time.Time) {
+        println("task3:", t.String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        cron.NewWeeklyJob(cron.ANY, 21, 05, 00, task1)
+        cron.NewMonthlyJob(cron.ANY, 21, 05, 00, task2)
+        cron.NewCronJob(cron.ANY, cron.ANY, cron.ANY, 21, 05, 00, task3)
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě již nebudu ukazovat
+výsledek činnosti příkladu, protože by článek nestihl vyjít tak, jak byl
+naplánován :-)</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Balíček <strong>clockwork</strong></h2>
+
+<p>Druhou knihovnou určenou pro plánování úloh, s&nbsp;níž se v&nbsp;dnešním
+článku seznámíme, je knihovna se jménem <strong>Clockwork</strong>. Tato
+knihovna je založena na poněkud jiném principu, než <strong>go-cron</strong>,
+protože zde plánování úloh probíhá následujícím způsobem:</p>
+
+<pre>
+scheduler := clockwork.NewScheduler()
+scheduler.Schedule().Every(4).Seconds().Do(task)
+scheduler.Run()
+</pre>
+
+<p>Jména a pořadí funkcí je zvoleno tak, aby výsledný zápis připomínal
+anglickou větu. Navíc není nutné použít trik s&nbsp;kanálem pro to, aby se
+zabránilo ukončení gorutiny, v&nbsp;níž běží funkce <strong>main</strong>.</p>
+
+<p>Instalaci knihovny <strong>Clockwork</strong> zajistíme standardním příkazem
+<strong>go get</strong>, konkrétně takto:</p>
+
+<pre>
+$ <strong>go get github.com/whiteShtef/clockwork</strong>
+</pre>
+
+<p>V&nbsp;předchozím úryvku kódu bylo ukázáno, že se nejprve vytvoří objekt
+typu <strong>scheduler</strong> a následně je již možné volat jeho metody,
+které se typicky řetězí, protože každá z&nbsp;metod vrací hodnotu typu
+<strong>*Job</strong>:</p>
+
+<table>
+<tr><th>Metoda</th><th>význam</th></tr>
+<tr><td>Every</td><td>specifikace frekvence opakování, musí být zadáno kladné číslo či žádný argument</td></tr>
+<tr><td>At</td><td>specifikace spuštění zadaná řetězcem (ukážeme si v&nbsp;demonstračním příkladu)</td></tr>
+<tr><td>Do</td><td>určení funkce s&nbsp;implementovanou úlohou</td></tr>
+<tr><td>Second</td><td>uvedeno za Every slouží ke specifikaci jednotky</td></tr>
+<tr><td>Seconds</td><td>dtto</td></tr>
+<tr><td>Minute</td><td>uvedeno za Every slouží ke specifikaci jednotky</td></tr>
+<tr><td>Minutes</td><td>dtto</td></tr>
+<tr><td>Hour</td><td>dtto</td></tr>
+<tr><td>Hours</td><td>dtto</td></tr>
+<tr><td>Day</td><td>dtto</td></tr>
+<tr><td>Days</td><td>dtto</td></tr>
+<tr><td>Week</td><td>dtto</td></tr>
+<tr><td>Weeks</td><td>dtto</td></tr>
+<tr><td>Monday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Tuesday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Wednesday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Thursday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Friday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Saturday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+<tr><td>Sunday</td><td>specifikace dne v&nbsp;týdnu</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: jediným problémem, na který v&nbsp;praxi
+narazíte, je problematické plánování úloh v&nbsp;aktuálním týdnu, viz též <a
+href="https://github.com/whiteShtef/clockwork/issues/10">https://github.com/whiteShtef/clockwork/issues/10</a>.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Spuštění periodicky se opakující úlohy</h2>
+
+<p>V&nbsp;prvním příkladu používajícím knihovnu <strong>Clockwork</strong>
+naplánujeme úlohu, která bude spuštěna každé čtyři sekundy. Samotné naplánování
+úlohy je provedeno na těchto třech řádcích:</p>
+
+<pre>
+scheduler := clockwork.NewScheduler()
+scheduler.Schedule().Every(4).Seconds().Do(task)
+scheduler.Run()
+</pre>
+
+<p>Samotná funkce představující úlohu je nyní zavolána a přitom jí
+<i>nejsou</i> předány žádné parametry, na rozdíl od příkladů předchozích:</p>
+
+<pre>
+func <strong>task</strong>() {
+        println("task/job called")
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs1.go">Úplný
+zdrojový kód</a> tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/whiteShtef/clockwork"
+)
+&nbsp;
+func <strong>task</strong>() {
+        println("task/job called")
+}
+&nbsp;
+func <strong>main</strong>() {
+        scheduler := clockwork.NewScheduler()
+        scheduler.Schedule().Every(4).Seconds().Do(task)
+        scheduler.Run()
+}
+</pre>
+
+<p>Výsledek běhu tohoto příkladu:</p>
+
+<pre>
+Scheduled for  2019-04-15 20:33:26.890561981 +0200 CEST m=+4.002487729
+Scheduled for  2019-04-15 20:33:30.890561981 +0200 CEST m=+8.002487729
+task/job called
+Scheduled for  2019-04-15 20:33:34.890561981 +0200 CEST m=+12.002487729
+task/job called
+</pre>
+
+<p>Příklad ovšem <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs2.go">můžeme
+upravit</a> takovým způsobem, že se funkci <strong>Every</strong> nepředá žádná
+hodnota. To má stejný význam, jako bychom použili hodnotu 1. Navíc ještě
+namísto funkce <strong>Seconds</strong> zavoláme identicky se chovající funkci
+<strong>Second</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+
+import (
+        "github.com/whiteShtef/clockwork"
+)
+
+func <strong>task</strong>() {
+        println("task/job called")
+}
+
+func <strong>main</strong>() {
+        scheduler := clockwork.NewScheduler()
+        scheduler.Schedule().Every().Second().Do(task)
+        scheduler.Run()
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+Scheduled for  2019-04-15 20:37:30.548405696 +0200 CEST m=+1.001758537
+Scheduled for  2019-04-15 20:37:31.548405696 +0200 CEST m=+2.001758537
+task/job called
+Scheduled for  2019-04-15 20:37:32.548405696 +0200 CEST m=+3.001758537
+task/job called
+Scheduled for  2019-04-15 20:37:33.548405696 +0200 CEST m=+4.001758537
+task/job called
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Naplánování většího množství úloh</h2>
+
+<p>Počet naplánovaných úloh není striktně omezen, takže <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs3.go">v&nbsp;dalším
+příkladu</a> naplánujeme periodické spouštění tří úloh, přičemž první úloha
+bude spouštěna každých třicet sekund, druhá úloha každých dvacet sekund a úloha
+třetí každou celou minutu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/whiteShtef/clockwork"
+)
+&nbsp;
+func <strong>task1</strong>() {
+        println("task/job #1 called")
+}
+&nbsp;
+func <strong>task2</strong>() {
+        println("task/job #2 called")
+}
+&nbsp;
+func <strong>task3</strong>() {
+        println("task/job #3 called")
+}
+&nbsp;
+func <strong>main</strong>() {
+        scheduler := clockwork.NewScheduler()
+        scheduler.Schedule().Every(20).Seconds().Do(task1)
+        scheduler.Schedule().Every(30).Seconds().Do(task2)
+        scheduler.Schedule().Every().Minutes().Do(task3)
+        scheduler.Run()
+}
+</pre>
+
+<p>Příklad výstupu (v&nbsp;němž se nám ovšem pletou informace o stavu
+naplánování další úlohy):</p>
+
+<pre>
+Scheduled for  2019-04-12 19:42:04.678628129 +0200 CEST m=+20.002249265
+Scheduled for  2019-04-12 19:42:14.678965746 +0200 CEST m=+30.002586819
+Scheduled for  2019-04-12 19:42:44.678998274 +0200 CEST m=+60.002619364
+Scheduled for  2019-04-12 19:42:24.678628129 +0200 CEST m=+40.002249265
+task/job #1 called
+Scheduled for  2019-04-12 19:42:44.678965746 +0200 CEST m=+60.002586819
+task/job #2 called
+Scheduled for  2019-04-12 19:42:44.678628129 +0200 CEST m=+60.002249265
+task/job #1 called
+Scheduled for  2019-04-12 19:43:04.678628129 +0200 CEST m=+80.002249265
+Scheduled for  2019-04-12 19:43:14.678965746 +0200 CEST m=+90.002586819
+Scheduled for  2019-04-12 19:43:44.678998274 +0200 CEST m=+120.002619364
+task/job #1 called
+task/job #3 called
+task/job #2 called
+</pre>
+
+<p>V&nbsp;případě potřeby můžeme i v&nbsp;knihovně <strong>Clockwork</strong>
+použít trik, s&nbsp;nímž jsme se již seznámili v&nbsp;předchozích kapitolách
+&ndash; jedná se o počitadlo řídicí přesněji, kdy se má jaká úloha spustit.
+Většinou není tento trik nutný (na rozdíl od <strong>go-cron</strong>), takže
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs4.go">jen
+pro úplnost</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/whiteShtef/clockwork"
+)
+&nbsp;
+func <strong>task1</strong>() {
+        println("task/job #1 called")
+}
+&nbsp;
+func <strong>task2</strong>() {
+        println("task/job #2 called")
+}
+&nbsp;
+func <strong>task3</strong>(counter int) {
+        if counter%10 == 0 {
+                println("task/job #3 called")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        task3cnt := 0
+&nbsp;
+        scheduler := clockwork.NewScheduler()
+        scheduler.Schedule().Every(20).Seconds().Do(task1)
+        scheduler.Schedule().Every(30).Seconds().Do(task2)
+        scheduler.Schedule().Every().Seconds().Do(
+                func() { task3cnt++; task3(task3cnt) })
+&nbsp;
+        scheduler.Run()
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Použití dalších metod pro naplánování úloh</h2>
+
+<p>V&nbsp;demonstračním příkladu, který naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs5.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs5.go</a>,
+je ukázán způsob použití dalších metod určených pro naplánování úloh. Použitý
+rozsah časových intervalů začíná na řádu sekund a končí týdny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/whiteShtef/clockwork"
+)
+&nbsp;
+func <strong>task1</strong>() {
+        println("task/job #1 called")
+}
+&nbsp;
+func <strong>task2</strong>() {
+        println("task/job #2 called")
+}
+&nbsp;
+func <strong>task3</strong>() {
+        println("task/job #2 called")
+}
+&nbsp;
+func <strong>task4</strong>() {
+        println("task/job #4 called")
+}
+&nbsp;
+func <strong>task5</strong>() {
+        println("task/job #5 called")
+}
+&nbsp;
+func <strong>task6</strong>() {
+        println("task/job #6 called")
+}
+&nbsp;
+func <strong>task7</strong>() {
+        println("task/job #7 called")
+}
+&nbsp;
+func <strong>task8</strong>() {
+        println("task/job #8 called")
+}
+&nbsp;
+func <strong>main</strong>() {
+        scheduler := clockwork.NewScheduler()
+        scheduler.Schedule().Every(30).Seconds().Do(task1)
+        scheduler.Schedule().Every(30).Minutes().Do(task2)
+        scheduler.Schedule().Every().Hours().Do(task3)
+        scheduler.Schedule().Every(2).Days().Do(task4)
+        scheduler.Schedule().Every(2).Days().At("23:59").Do(task5)
+        scheduler.Schedule().Every(4).Weeks().Do(task6)
+        scheduler.Schedule().Every().Tuesday().Do(task7)
+        scheduler.Schedule().Every().Friday().At("19:55").Do(task8)
+        scheduler.Run()
+}
+</pre>
+
+<p>Výstup nyní může vypadat následovně:</p>
+
+<pre>
+Scheduled for  2019-04-12 19:53:42.402008929 +0200 CEST m=+30.001954737
+Scheduled for  2019-04-12 20:23:12.402387894 +0200 CEST m=+1800.002333658
+Scheduled for  2019-04-12 20:53:12.402419311 +0200 CEST m=+3600.002365068
+Scheduled for  2019-04-14 00:00:00 +0200 CEST
+Scheduled for  2019-04-14 23:59:00 +0200 CEST
+Scheduled for  2019-05-10 19:53:12.402527275 +0200 CEST m=+2419200.002473084
+Scheduled for  2019-04-16 00:00:00 +0200 CEST
+Scheduled for  2019-04-19 19:55:00 +0200 CEST
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět v&nbsp;tomto případě nebudeme čekat
+na skutečné zavolání jednotlivých úloh.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Balíček <strong>clockwerk</strong></h2>
+
+<p>Třetí knihovna, o níž se v&nbsp;dnešním článku zmíníme, se jmenuje
+<strong>Clockwerk</strong> a jak její název, tak i chování, se podobá výše
+zmíněné knihovně <strong>Clockwork</strong>.</p>
+
+<p>I knihovna <strong>Clockwerk</strong> se instaluje standardním příkazem
+<strong>go get</strong>:</p>
+
+<pre>
+$ <strong>go get github.com/onatm/clockwerk</strong>
+</pre>
+
+<p>Časový interval se specifikuje buď v&nbsp;násobcích nějaké časové
+jednotky:</p>
+
+<pre>
+scheduler.Every(1 * time.Second).Do(task)
+</pre>
+
+<p>nebo pomocí hodnoty typu <strong>Duration</strong> popsané ve <a
+href="#k02">druhé</a> a <a href="#k03">třetí kapitole</a>:</p>
+
+<pre>
+duration, _ := time.ParseDuration("2s")
+&nbsp;
+scheduler := clockwerk.New()
+scheduler.Every(duration).Do(task)
+</pre>
+
+<p>V&nbsp;této knihovně je opět nutné zajistit, aby se hlavní gorutina
+předčasně neukončila, takže použijeme náš oblíbený trik s&nbsp;kanálem:</p>
+
+<pre>
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        var task Task
+        scheduler := clockwerk.New()
+        scheduler.Every(1 * time.Second).Do(task)
+        scheduler.Start()
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Naplánování jedné úlohy</h2>
+
+<p>Vzhledem k&nbsp;podobnosti knihoven <strong>Clockwork</strong> a
+<strong>Clockwerk</strong> (a podobnost se netýká jen názvu těchto knihoven)
+bude popis druhé zmíněné knihovny již poměrně stručný. <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs1.go">V&nbsp;následujícím
+příkladu</a> je naplánováno spuštění úlohy s&nbsp;periodou jedné sekundy.
+Povšimněte si použití nového datového typu reprezentujícího úlohu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/onatm/clockwerk"
+        "time"
+)
+&nbsp;
+type <strong>Task</strong> struct{}
+&nbsp;
+func (t Task) <strong>Run</strong>() {
+        println("task/job called")
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        var task Task
+        scheduler := clockwerk.New()
+        scheduler.Every(1 * time.Second).Do(task)
+        scheduler.Start()
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Příklad je velmi jednoduchý, takže se po jeho spuštění pouze začnou
+vypisovat informace o zavolání metody <strong>Run</strong>:</p>
+
+<pre>
+task/job called
+task/job called
+task/job called
+...
+...
+...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;dalších příkladech již budeme
+zobrazovat i časová razítka.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Naplánování několika nezávislých úloh</h2>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs2.go">Ve
+druhém příkladu</a> spustíme dvě úlohy současně, každou pochopitelně
+s&nbsp;odlišnou periodou:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/onatm/clockwerk"
+        "time"
+)
+&nbsp;
+type <strong>Task1</strong> struct{}
+type <strong>Task2</strong> struct{}
+&nbsp;
+func (t Task1) <strong>Run</strong>() {
+        println("task/job #1 called", time.Now().String())
+}
+&nbsp;
+func (t Task2) <strong>Run</strong>() {
+        println("task/job #2 called", time.Now().String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        var task1 Task1
+        var task2 Task2
+&nbsp;
+        scheduler := clockwerk.New()
+        scheduler.Every(2 * time.Second).Do(task1)
+        scheduler.Every(3 * time.Second).Do(task2)
+        scheduler.Start()
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Výsledek je nyní podrobnější a můžeme z&nbsp;něj vidět, že první úloha je
+skutečně spouštěna častěji, než úloha druhá:</p>
+
+<pre>
+task/job #1 called 2019-04-15 13:04:34.219397549 +0200 CEST m=+2.000428334
+task/job #2 called 2019-04-15 13:04:35.219443888 +0200 CEST m=+3.000474675
+task/job #1 called 2019-04-15 13:04:36.219446535 +0200 CEST m=+4.000477320
+task/job #2 called 2019-04-15 13:04:38.319475248 +0200 CEST m=+6.100506032
+task/job #1 called 2019-04-15 13:04:38.319593899 +0200 CEST m=+6.100624681
+task/job #1 called 2019-04-15 13:04:40.419388545 +0200 CEST m=+8.200419330
+task/job #2 called 2019-04-15 13:04:41.419430345 +0200 CEST m=+9.200461144
+task/job #1 called 2019-04-15 13:04:42.419400301 +0200 CEST m=+10.200431100
+task/job #2 called 2019-04-15 13:04:44.519401501 +0200 CEST m=+12.300432286
+task/job #1 called 2019-04-15 13:04:44.519473001 +0200 CEST m=+12.300503798
+task/job #1 called 2019-04-15 13:04:46.619424601 +0200 CEST m=+14.400455397
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Použití datového typu <strong>Duration</strong> při plánování úloh</h2>
+
+<p>Většinou je mnohem jednodušší, než výpočty typu:</p>
+
+<pre>
+scheduler.Every(2 * time.Second).Do(task1)
+scheduler.Every(3 * time.Second).Do(task2)
+</pre>
+
+<p>použít přímo typ <strong>Duration</strong>, jenž umožňuje zapsat časový
+interval v&nbsp;řetězci:</p>
+
+<pre>
+duration1, _ := time.ParseDuration("2s")
+duration2, _ := time.ParseDuration("3s")
+&nbsp;
+scheduler.Every(duration1).Do(task1)
+scheduler.Every(duration2).Do(task2)
+</pre>
+
+<p>Tento postup je použitý v&nbsp;předposledním demonstračním příkladu, jehož
+zdrojový kód naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs3.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs3.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/onatm/clockwerk"
+        "time"
+)
+&nbsp;
+type <strong>Task</strong> struct{}
+&nbsp;
+func (t Task) <strong>Run</strong>() {
+        println("task/job #1 called", time.Now().String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        var task Task
+&nbsp;
+        d, _ := time.ParseDuration("2s")
+&nbsp;
+        scheduler := clockwerk.New()
+        scheduler.Every(d).Do(task)
+        scheduler.Start()
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Výsledek běhu tohoto příkladu ukazuje, že se skutečně použila perioda dvou
+sekund:</p>
+
+<pre>
+task/job #1 called 2019-04-15 13:05:32.247415431 +0200 CEST m=+2.000454760
+task/job #1 called 2019-04-15 13:05:34.347451009 +0200 CEST m=+4.100490339
+task/job #1 called 2019-04-15 13:05:36.447406587 +0200 CEST m=+6.200445933
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Úprava příkladu s&nbsp;více úlohami</h2>
+
+<p>Dnešní <a
+href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs4.go">poslední
+demonstrační příklad</a> taktéž využívá datový typ <strong>Duration</strong>,
+tentokrát pro dvojici úloh s&nbsp;rozdílnou periodou spouštění:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/onatm/clockwerk"
+        "time"
+)
+&nbsp;
+type <strong>Task1</strong> struct{}
+type <strong>Task2</strong> struct{}
+&nbsp;
+func (t Task1) <strong>Run</strong>() {
+        println("task/job #1 called", time.Now().String())
+}
+&nbsp;
+func (t Task2) <strong>Run</strong>() {
+        println("task/job #2 called", time.Now().String())
+}
+&nbsp;
+func <strong>main</strong>() {
+        c := make(chan bool)
+&nbsp;
+        var task1 Task1
+        var task2 Task2
+&nbsp;
+        duration1, _ := time.ParseDuration("2s")
+        duration2, _ := time.ParseDuration("3s")
+&nbsp;
+        scheduler := clockwerk.New()
+        scheduler.Every(duration1).Do(task1)
+        scheduler.Every(duration2).Do(task2)
+        scheduler.Start()
+&nbsp;
+        &lt;-c
+}
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+task/job #1 called 2019-04-15 13:05:57.144960688 +0200 CEST m=+2.000520694
+task/job #2 called 2019-04-15 13:05:58.144870964 +0200 CEST m=+3.000430958
+task/job #1 called 2019-04-15 13:05:59.244838911 +0200 CEST m=+4.100398907
+task/job #2 called 2019-04-15 13:06:01.244834227 +0200 CEST m=+6.100394247
+task/job #1 called 2019-04-15 13:06:01.344863602 +0200 CEST m=+6.200423601
+task/job #1 called 2019-04-15 13:06:03.344941817 +0200 CEST m=+8.200501879
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Vylepšení plánování asynchronních úloh s&nbsp;balíčkem <strong>JobRunner</strong></h2>
+
+<p>Pro složitější aplikace, v&nbsp;nichž je nutné úlohy jak plánovat, tak i
+sledovat, je určena knihovna nazvaná <strong>JobRunner</strong>, kterou
+naleznete na adrese <a
+href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>.
+Popisem této knihovny, která uživatelům (či administrátorům) dokonce dává
+k&nbsp;dispozici konzoli s&nbsp;uživatelským rozhraním, se budeme zabývat
+v&nbsp;navazující části seriálu o programovacím jazyce Go.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>duration1.go</td><td>převod řetězce &bdquo;1h&ldquo; odpovídajícího přesně jedné hodině
+na typ <strong>Duration</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration1.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration1.go</a></td></tr>
+<tr><td> 2</td><td>duration2.go</td><td>odlišný časový interval odpovídající jedné hodině, šesti minutám a deseti sekundám</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration2.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration2.go</a></td></tr>
+<tr><td> 3</td><td>duration3.go</td><td>použití kratšího časového intervalu, konkrétně 200ms</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration3.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration3.go</a></td></tr>
+<tr><td> 4</td><td>duration4.go</td><td>intervaly nanosekundové a mikrosekundové</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration4.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration4.go</a></td></tr>
+<tr><td> 5</td><td>duration5.go</td><td>zaokrouhlení časového intervalu o délce trvání 3 hodiny 15 minut na celé hodiny</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration5.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration5.go</a></td></tr>
+<tr><td> 6</td><td>duration6.go</td><td>zaokrouhlení časového intervalu na celé čtvrthodiny</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/duration/duration6.go">https://github.com/tisnik/go-root/blob/master/article_21/duration/duration6.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>jobs1.go</td><td>knihovna <strong>go-cron</strong>: úloha, která se volá periodicky každou sekundu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs1.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs1.go</a></td></tr>
+<tr><td> 8</td><td>jobs2.go</td><td>knihovna <strong>go-cron</strong>: úprava předchozího příkladu volajícího periodicky se opakující úlohu každou sekundu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs2.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs2.go</a></td></tr>
+<tr><td> 9</td><td>jobs3.go</td><td>knihovna <strong>go-cron</strong>: spuštění tří samostatně volaných periodických úloh</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs3.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs3.go</a></td></tr>
+<tr><td>10</td><td>jobs4.go</td><td>knihovna <strong>go-cron</strong>: přesnější řízení, kdy se má úloha spustit</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs4.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs4.go</a></td></tr>
+<tr><td>11</td><td>jobs5.go</td><td>knihovna <strong>go-cron</strong>: použití dalších funkcí knihovny <strong>go-cron</strong> pro naplánování úloh</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs5.go">https://github.com/tisnik/go-root/blob/master/article_21/go-cron/jobs5.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>jobs1.go</td><td>knihovna <strong>clockwork</strong>: spuštění úlohy každé čtyři sekundy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs1.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs1.go</a></td></tr>
+<tr><td>13</td><td>jobs2.go</td><td>knihovna <strong>clockwork</strong>: spuštění úlohy s&nbsp;periodou jedné sekundy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs2.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs2.go</a></td></tr>
+<tr><td>14</td><td>jobs3.go</td><td>knihovna <strong>clockwork</strong>: naplánování většího množství úloh</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs3.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs3.go</a></td></tr>
+<tr><td>15</td><td>jobs4.go</td><td>knihovna <strong>clockwork</strong>: přesnější řízení, kdy se má úloha spustit</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs4.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs4.go</a></td></tr>
+<tr><td>16</td><td>jobs5.go</td><td>knihovna <strong>clockwork</strong>: další funkce určené pro naplánování úloh</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs5.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwork/jobs5.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>17</td><td>jobs1.go</td><td>knihovna <strong>clockwerk</strong>: spuštění úlohy s&nbsp;periodou jedné sekundy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs1.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs1.go</a></td></tr>
+<tr><td>18</td><td>jobs2.go</td><td>knihovna <strong>clockwerk</strong>: spuštění dvou úloh s&nbsp;odlišnou periodou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs2.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs2.go</a></td></tr>
+<tr><td>19</td><td>jobs3.go</td><td>knihovna <strong>clockwerk</strong>: spuštění jedné úlohy, použití <strong>Duration</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs3.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs3.go</a></td></tr>
+<tr><td>20</td><td>jobs4.go</td><td>knihovna <strong>clockwerk</strong>: spuštění dvou úloh s&nbsp;odlišnou periodou, použití <strong>Duration</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs4.go">https://github.com/tisnik/go-root/blob/master/article_21/clockwerk/jobs4.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package <strong>testing</strong><br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
