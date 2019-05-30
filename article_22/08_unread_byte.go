@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 8:
+//     Použití metody UnreadByte.
+
 package main
 
 import (
