@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 5:
+//     Zápis bajtu do bufferu.
+
 package main
 
 import (
