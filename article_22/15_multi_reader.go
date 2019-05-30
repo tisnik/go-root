@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 15:
+//     Multi reader se třemi vstupy.
+
 package main
 
 import (
