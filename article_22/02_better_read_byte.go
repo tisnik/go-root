@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 2:
+//     Postupné načtení bajtů z řetězce, lepší reakce na chyby.
+
 package main
 
 import (
