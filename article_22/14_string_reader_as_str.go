@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 14:
+//     Načítání ze standardního vstupu.
+
 package main
 
 import (
