@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 6:
+//     Zápis bajtů du bufferu, přečtení ve formě run.
+
 package main
 
 import (
