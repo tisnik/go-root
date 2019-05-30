@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 10:
+//     Použití metody UnreadRune.
+
 package main
 
 import (
