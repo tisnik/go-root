@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 3:
+//     Postupné načtení bajtů z řetězce, ukázka použití Unicode.
+
 package main
 
 import (
