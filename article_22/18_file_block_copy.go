@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá druhá část část
+//
+// Demonstrační příklad číslo 18:
+//     Blokové přenosy dat při kopii souboru.
+
 package main
 
 import (
