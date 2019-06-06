@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 3:
+//     Přenos dat s využitím roury (pipe) alokované v operační paměti.
+
 package main
 
 import (
