@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 7:
+//     Použití operace Seek pro posun počítaný od konce souboru.
+
 package main
 
 import (
