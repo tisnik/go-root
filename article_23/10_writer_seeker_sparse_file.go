@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 10:
+//     Vytvoření řídkého souboru.
+
 package main
 
 import (
