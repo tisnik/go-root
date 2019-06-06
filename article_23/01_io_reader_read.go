@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 1:
+//     	Čtení dat ze souboru s využitím metody Read z rozhraní Reader.
+
 package main
 
 import (
