@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 2:
+//     Použití metody Write z rozhraní Writer pro zápis do souboru.
+
 package main
 
 import (
