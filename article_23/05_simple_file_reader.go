@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 5:
+//     Čtení dat z řetězce po blocích.
+
 package main
 
 import (
