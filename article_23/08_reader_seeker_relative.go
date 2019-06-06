@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 8:
+//     Použití operace Seek pro relativní posun v souboru.
+
 package main
 
 import (
