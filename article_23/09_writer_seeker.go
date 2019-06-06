@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 9:
+//     Použití operace Seek při zápisu do souboru.
+
 package main
 
 import (
