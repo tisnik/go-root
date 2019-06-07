@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 15:
+//     Čtení sekvence bajtů s využitím funkcí z balíčku bufio.
+
 package main
 
 import (
