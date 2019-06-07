@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 12:
+//     Zápis řetězců (StringWriter).
+
 package main
 
 import (
