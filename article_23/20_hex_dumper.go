@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 20:
+//     Zobrazení libovolných binárních dat ve formě hexadecimálního výpisu.
+
 package main
 
 import (
