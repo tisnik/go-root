@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 18:
+//     Přečtení zkomprimovaných dat zpět.
+
 package main
 
 import (
