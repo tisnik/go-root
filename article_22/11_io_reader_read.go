@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá druhá část část
+// Dvacátá druhá část
 //
 // Demonstrační příklad číslo 11:
 //     Čtení dat ze souboru.

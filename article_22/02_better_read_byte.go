@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá druhá část část
+// Dvacátá druhá část
 //
 // Demonstrační příklad číslo 2:
 //     Postupné načtení bajtů z řetězce, lepší reakce na chyby.

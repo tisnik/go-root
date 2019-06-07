@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá druhá část část
+// Dvacátá druhá část
 //
 // Demonstrační příklad číslo 3:
 //     Postupné načtení bajtů z řetězce, ukázka použití Unicode.

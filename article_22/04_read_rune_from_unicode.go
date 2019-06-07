@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá druhá část část
+// Dvacátá druhá část
 //
 // Demonstrační příklad číslo 4:
 //     Načítání jednotlivých run (ne bajtů) z řetězce.
