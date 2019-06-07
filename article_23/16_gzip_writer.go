@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 16:
+//     Komprimace dat metodou Deflate.
+
 package main
 
 import (
