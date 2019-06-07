@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 21:
+//     Zakódování binárních dat do tisknutelné podoby podle Base64.
+
 package main
 
 import (
