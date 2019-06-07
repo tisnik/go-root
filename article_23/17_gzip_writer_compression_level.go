@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 17:
+//     Volba metody a úrovně komprimace.
+
 package main
 
 import (
