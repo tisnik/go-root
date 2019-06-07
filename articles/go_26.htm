@@ -1,0 +1,2818 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Problematika nulových hodnot v Go, aneb proč nil != nil</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Problematika nulových hodnot v Go, aneb proč nil != nil</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešní části seriálu o programovacím jazyku Go si podrobněji vysvětlíme koncept takzvaných nulových hodnot a taktéž typového systému jazyka Go. Na první pohled se sice může jednat o triviální problematiku, ovšem vlastní řešení typového systému může vývojáře překvapit.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Problematika nulových hodnot v Go, aneb proč nil != nil</a></p>
+<p><a href="#k02">2. Význam nulových hodnot v&nbsp;jazyce Go</a></p>
+<p><a href="#k03">3. Koncept <strong>nil</strong> v&nbsp;programovacích jazycích</a></p>
+<p><a href="#k04">4. Chyba v&nbsp;návrhu, která nás stála miliardy dolarů?</a></p>
+<p><a href="#k05">5. <strong>nil</strong> není rezervované klíčové slovo</a></p>
+<p><a href="#k06">6. Typ identifikátoru <strong>nil</strong></a></p>
+<p><a href="#k07">7. <strong>nil</strong> a ukazatele</a></p>
+<p><a href="#k08">8. <strong>nil</strong> a řezy (<i>slices</i>)</a></p>
+<p><a href="#k09">9. Prohlížení obsahu řezů v&nbsp;debuggeru</a></p>
+<p><a href="#k10">10. Identifikátor <strong>nil</strong> a mapy</a></p>
+<p><a href="#k11">11. Identifikátor <strong>nil</strong> a kanály</a></p>
+<p><a href="#k12">12. Čtení a zápis do nulového kanálu</a></p>
+<p><a href="#k13">13. Identifikátor <strong>nil</strong> a rozhraní</a></p>
+<p><a href="#k14">14. Proč někdy platí <strong>nil != nil</strong>?</a></p>
+<p><a href="#k15">15. Porovnání hodnot <strong>nil</strong> různých typů</a></p>
+<p><a href="#k16">16. Datový typ <strong>Option</strong> v&nbsp;programovacím jazyku Rust</a></p>
+<p><a href="#k17">17. Datový typ <strong>Result</strong>, opět v&nbsp;Rustu</a></p>
+<p><a href="#k18">18. Nebylo by tedy výhodnější použít obdobu typu <strong>Option</strong>?</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Problematika nulových hodnot v Go, aneb proč nil != nil</h2>
+
+<p>V&nbsp;úvodních částech <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> jsme se seznámili s&nbsp;prakticky všemi
+vlastnostmi tohoto jazyka, ať již se jednalo o jeho základní syntaxi, tak i
+sémantiku, využití gorutin a kanálů atd. Mj.&nbsp;jsme si, prozatím alespoň ve
+stručnosti, popsali i koncept takzvaných &bdquo;nulových hodnot&ldquo; (<i>zero
+values</i>), který nepřímo vychází z&nbsp;toho, že se v&nbsp;jazyku Go
+nepoužívají klasické konstruktory. Dále jsme si řekli, jak se definují a
+používají rozhraní (<i>interface</i>), včetně možnosti využití prázdných
+rozhraní definovaných takto:</p>
+
+<pre>
+type I interface {}
+</pre>
+
+<p>Ovšem právě existence takzvaných nulových hodnot a (prázdných) rozhraní nás
+dovádí ke specifickému typovému systému programovacího jazyka Go, který se
+pravděpodobněji nejčastěji projeví (v&nbsp;negativním slova smyslu) ve chvíli,
+kdy porovnáváme dvě zdánlivě shodné nulové hodnoty <strong>nil</strong> a
+výsledkem porovnání na ekvivalenci je překvapivě hodnota
+<strong>false</strong>. V&nbsp;navazujících kapitolách si vysvětlíme proč tomu
+tak je, a jak se ve skutečnosti <strong>nil</strong> používá v&nbsp;různých
+datových typech, především právě u rozhraní.</p>
+
+<p><div class="rs-tip-major">Poznámka: to, že <strong>nil</strong> má
+v&nbsp;jazyku Go doslova &bdquo;polymorfní&ldquo; vlastnosti (v&nbsp;původním
+smyslu tohoto slova) je dosti zajímavé a vlastně i výjimečné, protože naprostá
+většina ostatních konstrukcí tohoto programovacího jazyka je navržena takovým
+způsobem, aby bylo jejich použití jednoznačné a ideálně i kontrolovatelné
+překladačem. V&nbsp;případě <strong>nil</strong> tomu tak není, o čemž ostatně
+svědčí i relativně časté dotazy začátečníků, proč v&nbsp;jejich aplikacích
+nastala situace naznačená v&nbsp;titulku dnešního článku: <strong>nil !=
+nil</strong>.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Význam nulových hodnot v&nbsp;jazyce Go</h2>
+
+<p>Popis konceptu nulových hodnot v&nbsp;programovacím jazyku Go začneme u
+základních primitivních datových typů. V&nbsp;Go je možné, jak již ostatně víme
+z&nbsp;úvodních částí seriálu, deklarovat proměnnou popř.&nbsp;její deklaraci
+doplnit i o její inicializaci. Přitom platí, že pokud inicializaci explicitně
+neprovedeme, bude proměnná automaticky inicializována <i>nulovou hodnotou</i>
+(<i>zero value</i>), přičemž se ovšem (pochopitelně) liší význam slova
+&bdquo;nulová&ldquo; pro jednotlivé datové typy. V&nbsp;následující tabulce
+jsou uvedeny implicitní nulové hodnoty pro většinu standardních datových typů
+jazyka Go:</p>
+
+<table>
+<tr><th>#</th><th>Datový typ</th><th>Nulová hodnota</th></tr>
+<tr><td>1</td><td>bool</td><td>false</td></tr>
+<tr><td>2</td><td>int (a varianty)</td><td>0</td></tr>
+<tr><td>3</td><td>float (obě varianty)</td><td>0.0</td></tr>
+<tr><td>4</td><td>complex (obě varianty)</td><td>0.0+0.0i</td></tr>
+<tr><td>5</td><td>string</td><td>""</td></tr>
+<tr><td>6</td><td>pointer</td><td>nil</td></tr>
+<tr><td>7</td><td>slice</td><td>nil</td></tr>
+<tr><td>8</td><td>map</td><td>nil</td></tr>
+<tr><td>9</td><td>channel</td><td>nil</td></tr>
+<tr><td>10</td><td>function</td><td>nil</td></tr>
+<tr><td>11</td><td>interface</td><td>nil</td></tr>
+<tr><td>12</td><td>struct</td><td>prvky s&nbsp;nulovými hodnotami</td></tr>
+</table>
+
+<p>Pro úplnost si vyzkoušíme, jestli jsou vlastnosti datových typů vypsané
+v&nbsp;předchozí tabulce skutečně pravdivé.</p>
+
+<p>Nejjednodušší je to pochopitelně v&nbsp;případě primitivních datových typů,
+například u pravdivostního typu <strong>bool</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>main</strong>() {
+        var b bool
+&nbsp;
+        println(b)
+}
+</pre>
+
+<p>Výsledkem běhu programu bude výpis &bdquo;nulové hodnoty&ldquo; datového
+typu <strong>bool</strong>:</p>
+
+<pre>
+false
+</pre>
+
+<p>Podobně existují velmi dobře nadefinované nulové hodnoty i pro všechny
+numerické datové typy, tj.&nbsp;jak pro typy celočíselné, tak i pro typy
+s&nbsp;plovoucí řádovou čárkou i pro komplexní čísla:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>main</strong>() {
+        var i1 int8
+        var i2 int32
+        var u1 uint8
+        var u2 uint32
+&nbsp;
+        var f1 float32
+        var f2 float64
+        var c1 complex64
+        var c2 complex128
+&nbsp;
+        println(i1)
+        println(i2)
+        println(u1)
+        println(u2)
+&nbsp;
+        println(f1)
+        println(f2)
+        println(c1)
+        println(c2)
+}
+</pre>
+
+<p>Výsledky běhu tohoto demonstračního příkladu by opět neměly být
+překvapující:</p>
+
+<pre>
+0
+0
+0
+0
++0.000000e+000
++0.000000e+000
+(+0.000000e+000+0.000000e+000i)
+(+0.000000e+000+0.000000e+000i)
+</pre>
+
+<p>Podobně tomu bude v&nbsp;případě &bdquo;nulové hodnoty&ldquo; řetězce; touto
+hodnotou je prázdný řetězec:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>main</strong>() {
+        var s string
+&nbsp;
+        println(s)
+}
+</pre>
+
+<p>Při spuštění příkladu by se měl zobrazit pouze jeden prázdný řádek (ten není
+pravda příliš viditelný):</p>
+
+<pre>
+&nbsp;
+</pre>
+
+<p>Z&nbsp;tabulky, kterou jsme si uvedli na začátku této kapitoly, již víme, že
+pro ostatní datové typy je &bdquo;nulová hodnota&ldquo; zapisována pomocí
+identifikátoru <strong>nil</strong>. Ovšem při výpisu hodnot
+<strong>nil</strong> (pokaždé jiného typu) se chování systému může lišit podle
+toho, jakou funkci pro výpis použijeme. Ukažme si nejprve použití vestavěné
+funkce <strong>println</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>main</strong>() {
+        var p *int
+        var s []int
+        var m map[string]int
+        var c chan int
+        var f func()
+        var i interface{}
+&nbsp;
+        println(p)
+        println(s)
+        println(m)
+        println(c)
+        println(f)
+        println(i)
+}
+</pre>
+
+<p>Tato funkce vypíše pro všech šest hodnot <strong>nil</strong> nějakou formu
+nuly popř.&nbsp;u řezů a rozhraní několik nul:</p>
+
+<pre>
+0x0
+[0/0]0x0
+0x0
+0x0
+0x0
+(0x0,0x0)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: funkce <strong>println()</strong> je
+poměrně nízkoúrovňová (nesnaží se správně interpretovat všechny typy hodnot) a
+nedoporučuje se ji používat v&nbsp;produkčním kódu, protože se její chování
+může v&nbsp;budoucích verzích programovacího jazyka Go změnit.</div></p>
+
+<p>Lepší je použít funkci <strong>fmt.Println()</strong>, mezi jejíž přednosti
+patří fakt, že dokáže vytisknout i obsah polí, což vestavěná funkce
+<strong>println()</strong> nepodporuje:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var a [10]complex64
+        var p *int
+        var s []int
+        var m map[string]int
+        var c chan int
+        var f func()
+        var i interface{}
+&nbsp;
+        fmt.Println(a)
+        fmt.Println(p)
+        fmt.Println(s)
+        fmt.Println(m)
+        fmt.Println(c)
+        fmt.Println(f)
+        fmt.Println(i)
+}
+</pre>
+
+<p>Výsledek běhu tohoto demonstračního příkladu je již odlišný a čitelnější (na
+druhou stranu je &bdquo;vysokoúrovňový&ldquo; například v&nbsp;tom smyslu, že
+nevypíše podrobnější informace o řezu ani o rozhraní:</p>
+
+<pre>
+[(0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)]
+&lt;nil&gt;
+[]
+map[]
+&lt;nil&gt;
+&lt;nil&gt;
+&lt;nil&gt;
+</pre>
+
+<p>A nakonec se podívejme, jaká je &bdquo;nulová hodnota&ldquo; struktury
+neboli záznamu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var s struct {
+                a int
+                b bool
+                c chan int
+                d []int
+        }
+&nbsp;
+        fmt.Println(s)
+}
+</pre>
+
+<p>Z&nbsp;výpisu je patrné, že záznam je sice vytvořen, ovšem všechny jeho
+prvky obsahují &bdquo;nulové hodnoty&ldquo; tak, jak jsou definovány pro
+jednotlivé základní datové typy:</p>
+
+<pre>
+{0 false &lt;nil&gt; []}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tato pravidla platí i pro strukturu ve
+struktuře:</div></p>
+
+<pre>
+var s struct {
+        a int
+        s2 struct {
+            a int
+            b int
+        }
+        s3 struct {
+            a byte
+            b []int
+        }
+}
+&nbsp;
+fmt.Println(s)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+{0 {0 0} {0 []}}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Koncept <strong>nil</strong> v&nbsp;programovacích jazycích</h2>
+
+<p>V&nbsp;předchozím textu při zmínce o &bdquo;nulových hodnotách&ldquo; a
+vlastně i v&nbsp;mnoha demonstračních příkladech jsme se již několikrát setkali
+s&nbsp;identifikátorem <strong>nil</strong>. Tento identifikátor se
+v&nbsp;programovacím jazyku Go používá pro reprezentaci &bdquo;nulové
+hodnoty&ldquo; u ukazatelů i u většiny složených datových typů. Nejedná se
+vlastně o žádnou novinku, protože <strong>nil</strong> najdeme i v&nbsp;dalších
+programovacích jazycích. Poprvé se, i když v&nbsp;poněkud jiném významu,
+objevil <a
+href="https://www.root.cz/clanky/programovaci-jazyk-lisp-a-lisp-machines/">v&nbsp;Lispu</a>
+a jazycích od něho odvozených (<a
+href="https://www.root.cz/clanky/zaklady-programovani-v-jazyku-scheme/">Scheme</a>,
+<a href="https://www.root.cz/vyhledavani/?qs=clojure">Clojure</a>); najdeme ho
+i v&nbsp;<a
+href="https://www.root.cz/serialy/programovaci-jazyk-lua/">programovacím jazyce
+Lua</a> či v&nbsp;klasickém Pascalu. V&nbsp;některých dalších programovacích
+jazycích se objevují jiná označení pro neznámou či nulovou hodnotu; typicky se
+jedná o identifikátory <strong>NULL</strong>, <strong>null</strong> a taktéž
+<strong>None</strong>. V&nbsp;následující tabulce se pro zajímavost můžete
+podívat, jaký je vznik a význam všech těchto názvů:</p>
+
+<table>
+<tr><th>Slovo</th><th>Původ</th><th>Význam</th></tr>
+<tr><td>null</td><td>latina</td><td>ne+ullus, žádný</td></tr>
+<tr><td>nil</td><td>latina</td><td>nihil, nic (též zkratka &bdquo;Not In List&ldquo;)</td></tr>
+<tr><td>none</td><td>stará angličtina</td><td>ne+an, ani jeden</td></tr>
+</table>
+
+<p>Jak jsme si již napsali v&nbsp;předchozím odstavci, můžeme se
+s&nbsp;identifikátorem <strong>nil</strong> setkat hned v&nbsp;několika
+programovacích jazycích; ve skutečnosti se ovšem samotný význam
+<strong>nil/null/None</strong> může lišit a nemusí přesně odpovídat významu
+daného slova. Příkladem může být klasický LISP, ve kterém se
+<strong>nil</strong> používá pro označení prázdného seznamu, neznámé hodnoty a
+taktéž logické nepravdy (ve Scheme se namísto toho setkáme
+s&nbsp;<strong>#f</strong> pro nepravdu). <a
+href="http://wiki.freepascal.org/Nil">V&nbsp;Pascalu</a> se naproti tomu
+<strong>nil</strong> používá pouze jako nulová hodnota ukazatele
+(<i>pointer</i>) popř.&nbsp;dynamicky generovaných polí a tříd; nikde jinde
+nelze použít.</p>
+
+<p>Programovací jazyk Go používá identifikátor <strong>nil</strong> taktéž
+v&nbsp;několika významech. Především se jím označují, jak již víme, <i>nulové
+hodnoty</i> několika datových typů, ovšem samotný způsob uložení nulové hodnoty
+je obecně dosti rozdílný (nejvíc patrné je to u řezů a rozhraní). Dále má ovšem
+<strong>nil</strong> i další sémantický význam, protože se používá tehdy, pokud
+potřebujeme specifikovat <i>neexistenci</i> nějaké hodnoty. Typickým příkladem
+použití jsou druhé návratové hodnoty těch funkcí, které vrací informaci o tom,
+zda při jejich běhu došlo k&nbsp;chybě. Druhá návratová hodnota obsahuje
+<strong>nil</strong> v&nbsp;případě, že k&nbsp;chybě nedošlo a jinou hodnotu
+(nějakou strukturu implementující standardní vestavěné rozhraní
+<strong>error</strong>) ve chvíli, kdy při běhu funkce byla detekována nějaká
+chyba. Způsob vracení dvou hodnot z&nbsp;funkce je v&nbsp;Go jednoduchý:</p>
+
+<pre>
+func <strong>copyFile</strong>(srcName, dstName string) (written int64, err error) {
+        src, err := os.Open(srcName)
+        if err != nil {
+                return 0, err
+        }
+        defer src.Close()
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                return 0, err
+        }
+        defer dst.Close()
+&nbsp;
+        return io.Copy(dst, src)
+}
+</pre>
+
+<p>Detekce a zpracování chyby je založena na testování druhé návratové hodnoty
+na <strong>nil</strong>:</p>
+
+<pre>
+func <strong>testCopyFile</strong>(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pokud má funkce vracet více než jednu
+hodnotu a jednu chybovou hodnotu, je podle zaběhaných konvencí vhodné, aby byla
+chybová hodnota vždy vrácena jako <i>poslední</i>.</div></p>
+
+<p>Zajímavé je, že <strong>nil</strong> je v&nbsp;programovacím jazyku Go
+naprosto běžný identifikátor a nikoli klíčové slovo.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Chyba v&nbsp;návrhu, která nás stála miliardy dolarů?</h2>
+
+<p><i>&bdquo;I call it my billion-dollar mistake. It was the
+invention of the null reference in 1965. At that time, I was
+designing the first comprehensive type system for references
+in an object oriented language (ALGOL W). My goal was to
+ensure that all use of references should be absolutely safe,
+with checking performed automatically by the compiler. But I
+couldn't resist the temptation to put in a null reference,
+simply because it was so easy to implement. This has led to
+innumerable errors, vulnerabilities, and system crashes,
+which have probably caused a billion dollars of pain and
+damage in the last forty years.&ldquo;<br />
+Sir C.A.R. Hoare</i></p>
+
+<p>V&nbsp;souvislosti s&nbsp;hodnotami <strong>nil/null/None</strong> se hovoří
+o miliardové chybě v&nbsp;návrhu programovacích jazyků. Jedná se o nadsázku, o
+které rád hovoří spolutvůrce tohoto konceptu Sir C.A.R Hoare, viz například
+následující video: <a
+href="https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare">Null
+References: The Billion Dollar Mistake</a>. V&nbsp;Go může použití
+<strong>nil</strong> vést k&nbsp;podobným chybám, a to u ukazatelů, rozhraní a
+map (teoreticky i u funkcí, to však bude méně častý případ); řešení tohoto
+problému přitom v&nbsp;Go prozatím neexistuje, na rozdíl od programovacího
+jazyka Rust (<a
+href="https://hackernoon.com/fixing-the-billion-dollar-mistake-in-go-by-borrowing-from-rust-66fab3ea715e">Fixing
+the Billion Dollar Mistake in Go by Borrowing from Rust</a>), popř.&nbsp;jazyků
+s&nbsp;podporou anotací a dekorátorů.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. <strong>nil</strong> není rezervované klíčové slovo</h2>
+
+<p>V&nbsp;předchozích částech tohoto seriálu jsme si kromě dalších věcí
+vysvětlili i význam všech klíčových slov tohoto jazyka. Pro upřesnění si tato
+rezervovaná slova ještě naposledy uvedeme:</p>
+
+<table>
+<tr><td>break</td><td>default</td><td>func</td><td>interface</td><td>select</td></tr>
+<tr><td>case</td><td>defer</td><td>go</td><td>map</td><td>struct</td></tr>
+<tr><td>chan</td><td>else</td><td>goto</td><td>package</td><td>switch</td></tr>
+<tr><td>const</td><td>fallthrough</td><td>if</td><td>range</td><td>type</td></tr>
+<tr><td>continue</td><td>for</td><td>import</td><td>return</td><td>var</td></tr>
+</table>
+
+<p>Za povšimnutí stojí především fakt, že slovo <strong>nil</strong> se
+v&nbsp;tomto seznamu vůbec nevyskytuje, ostatně podobně jako slova
+<strong>true</strong> a <strong>false</strong>. To není opomenutí autora tohoto
+článku, protože se skutečně (minimálně v&nbsp;Go) nejedná o klíčová slova.
+Ostatně se o tom můžeme velmi snadno přesvědčit, jelikož následující program
+naprogramovaných v&nbsp;Go je korektní a běžně spustitelný (i když případným
+čtenářům pochopitelně radost neudělá):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(nil)
+&nbsp;
+        <strong>nil</strong> := 42
+&nbsp;
+        fmt.Println(<strong>nil</strong>)
+}
+</pre>
+
+<p>Po spuštění zjistíme, že se hodnota <strong>nil</strong> skutečně změnila a
+je pro celou druhou polovinu funkce <strong>main</strong> odlišná od zbytku
+(rozumné části) vesmíru:</p>
+
+<pre>
+&lt;nil&gt;
+42
+</pre>
+
+<p>Mimochodem, naprosto stejným způsobem si můžeme předefinovat hodnoty
+<strong>true</strong> a <strong>false</strong>, protože ani ty nejsou
+v&nbsp;programovacím jazyku Go neměnitelné ani rezervované:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(true)
+        fmt.Println(false)
+&nbsp;
+        x := true
+        true := false
+        false := x
+&nbsp;
+        fmt.Println("oh no...")
+&nbsp;
+        fmt.Println(true)
+        fmt.Println(false)
+}
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+true
+false
+oh no...
+false
+true
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;pohledu tvorby rozsáhlejších
+projektů se jedná o potenciálně problematickou vlastnost samotného jazyka Go.
+V&nbsp;jiných programovacích jazycích tuto zvláštnost většinou nenajdeme (ovšem
+jednou z&nbsp;výjimek je céčko, které řeší konstanty typu <strong>NULL</strong>
+formou maker), o čemž se můžeme poměrně snadno přesvědčit.</div></p>
+
+<p>Tento program napsaný v&nbsp;Clojure není korektní a nepůjde spustit:</p>
+
+<pre>
+(println <strong>nil</strong>)
+&nbsp;
+(def <strong>nil</strong> 42)
+&nbsp;
+(println <strong>nil</strong>)
+</pre>
+
+<p>Ani v&nbsp;programovacím jazyce Lua není předefinování <strong>nil</strong>
+přípustné:</p>
+
+<pre>
+print(<strong>nil</strong>)
+&nbsp;
+<strong>nil</strong> = 42
+&nbsp;
+print(<strong>nil</strong>)
+</pre>
+
+<p>V&nbsp;Pascalu tento program nepůjde ani přeložit:</p>
+
+<pre>
+program Riddle;
+&nbsp;
+var
+    <strong>nil</strong>:integer;
+begin
+    writeln('oh no...');
+end.
+</pre>
+
+<p>Totéž platí pro pokus o spuštění následujícího skriptu napsaného
+v&nbsp;Pythonu:</p>
+
+<pre>
+print(<strong>None</strong>)
+&nbsp;
+<strong>None</strong> = 42
+&nbsp;
+print(<strong>None</strong>)
+</pre>
+
+<p>A pochopitelně i:</p>
+
+<pre>
+print(<strong>True</strong>)
+&nbsp;
+<strong>True</strong> = <strong>False</strong>
+&nbsp;
+print(<strong>True</strong>)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;Javě nejsou
+<strong>null</strong>, <strong>true</strong> a <strong>false</strong>
+<i>klíčovými slovy</i>, ale patří mezi <i>rezervovaná slova</i>.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Typ identifikátoru <strong>nil</strong></h2>
+
+<p>V&nbsp;následujících kapitolách si podrobněji vysvětlíme, jakým způsobem se
+vlastně používají <i>nulové hodnoty</i> u těch datových typů, u nichž se nulová
+hodnota zapisuje s&nbsp;využitím identifikátoru <strong>nil</strong>. Uvidíme,
+že vnitřní reprezentace <strong>nil</strong> je ve skutečnosti dosti různorodá
+a mnohdy se nejedná o pouhé číslo 0 uložené do operační paměti.</p>
+
+<p>Nejprve si ukažme demonstrační příklad, v&nbsp;němž se snažíme hodnotu
+<strong>nil</strong> přiřadit proměnné současně s&nbsp;deklarací této proměnné
+s&nbsp;automatickým odvozením jejího datového typu (můžeme zde s&nbsp;výhodou
+využít operátor &bdquo;:=&ldquo;). Programovací jazyk Go nám samozřejmě
+umožňuje zapsat například:</p>
+
+<pre>
+x := 42
+</pre>
+
+<p>nebo:</p>
+
+<pre>
+s := "Go...go...go!"
+</pre>
+
+<p>Tyto zápisy jsou pro překladač jazyka Go zcela jednoznačné, protože na
+základě přiřazované hodnoty dokáže překladač odvodit i typ proměnné. Ovšem
+samotný identifikátor <strong>nil</strong> vlastně žádnou hodnotu (a tudíž ani
+její typ) nereprezentuje a tudíž následující příklad nebude možné přeložit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        v := nil
+&nbsp;
+        fmt.Println(v)
+}
+</pre>
+
+<p>Při pokusu o překlad se zobrazí chybová zpráva:</p>
+
+<pre>
+# command-line-arguments
+./09_nil_value.go:6:4: use of untyped nil
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tímto chováním se jazyk Go odlišuje od
+čistě dynamicky typovaných jazyků, mezi něž patří například Python.
+V&nbsp;Pythonu je totiž typ svázaný přímo s&nbsp;hodnotou a nikoli
+s&nbsp;proměnnou. Proto je v&nbsp;Pythonu možné bez problému napsat
+například:</div></p>
+
+<pre>
+x = None
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. <strong>nil</strong> a ukazatele</h2>
+
+<p>Podobně jako například v&nbsp;Pascalu či v&nbsp;céčku (NULL) je možné
+identifikátor <strong>nil</strong> použít při inicializaci ukazatele na
+&bdquo;nulovou hodnotu&ldquo;. V&nbsp;takovém případě je ovšem zaručeno, že
+jakýkoli přístup do paměti přes tento ukazatel skončí s&nbsp;běhovou chybou. To
+platí pro pokus o čtení z&nbsp;paměti:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var v *int = nil
+&nbsp;
+        fmt.Println(v)
+&nbsp;
+        fmt.Println(*v)
+}
+</pre>
+
+<p>S&nbsp;chybou:</p>
+
+<pre>
+&lt;nil&gt;
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x484bf8]
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/tester/temp/go-root/article_26/10B_nil_pointer.go:10 +0x68
+</pre>
+
+<p>I pro pokus o zápis do paměti:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var v *int = nil
+&nbsp;
+        fmt.Println(v)
+&nbsp;
+        *v = 42
+}
+</pre>
+
+<p>Se stejnou chybou:</p>
+
+<pre>
+&lt;nil&gt;
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x484b6c]
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/tester/go-root/article_26/10_nil_pointer.go:10 +0x5c
+exit status 2
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je ovšem nutné
+poznamenat, že přístup přes <strong>nil</strong> ukazatel je v&nbsp;naprosté
+většině případů jediným důvodem, proč dojde k&nbsp;<i>segmentation
+violation</i>. Na rozdíl od programovacího jazyka C totiž není v&nbsp;Go možné
+do ukazatele přímo uložit jinou konstantu než zmíněný <strong>nil</strong>,
+takže přístup na náhodnou adresu není možný (a zbylé problémy typu
+&bdquo;přístup na uvolněnou paměť&ldquo;vyřeší GC):</div></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var v *int = 1234
+&nbsp;
+        fmt.Println(v)
+&nbsp;
+        *v = 42
+}
+</pre>
+
+<p>Tento program nepůjde přeložit, protože do ukazatele není možné přiřadit
+libovolnou hodnotu:</p>
+
+<pre>
+# command-line-arguments
+./11_other_pointer.go:6:6: cannot use 1234 (type int) as type *int in assignment
+</pre>
+
+<p><div class="rs-tip-major">Poznámka<sup>2</sup>: to, že po deklaraci nové
+proměnné typu ukazatel je do ní přiřazena právě hodnota <strong>nil</strong>,
+lze snadno zjistit i z&nbsp;debuggeru příkazem
+<strong>p/print</strong>:</div></p>
+
+<pre>
+&gt; main.main() ./t.go:13 (PC: 0x4a0bb8)
+     8:         var m map[string]int
+     9:         var c chan int
+    10:         var f func()
+    11:         var i interface{}
+    12:
+=&gt;  13:         fmt.Println(p)
+    14:         fmt.Println(s)
+    15:         fmt.Println(m)
+    16:         fmt.Println(c)
+    17:         fmt.Println(f)
+    18:         fmt.Println(i)
+&nbsp;
+(dlv) <strong>p p</strong>
+*int nil
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. <strong>nil</strong> a řezy (<i>slices</i>)</h2>
+
+<p>Zatímco <strong>nil</strong> reprezentující nulový ukazatel se v&nbsp;mnoha
+ohledech podobá nulovému ukazateli v&nbsp;céčku (<strong>NULL</strong>)
+popř.&nbsp;neexistující referenci v&nbsp;Javě (<strong>null</strong>), má
+&bdquo;nulová hodnota&ldquo; <strong>nil</strong> použitá v&nbsp;kontextu řezů
+(<i>slices</i>) zcela odlišnou povahu. Připomeňme si, že řez je interně
+reprezentován trojicí hodnot:</p>
+
+<ol>
+
+<li>Ukazatelem (referencí) na zvolený prvek pole s&nbsp;daty, ke kterým přes
+řez přistupujeme. Toto pole se deklaruje explicitně popř.&nbsp;se vytváří a
+realokuje automaticky funkcí <strong>append</strong>.</li>
+
+<li>Délky řezu, tj.&nbsp;počtu prvků, který je aktuálně řezem
+reprezentován.</li>
+
+<li>Kapacity řezu (do jaké míry může řez narůstat v&nbsp;důsledku přidávání
+dalších prvků); kapacita je buď stejná nebo větší, než délka řezu.</li>
+
+</ol>
+
+<p>Tato interní struktura řezů s&nbsp;sebou přináší několik zajímavých
+důsledků. Je totiž možné, aby existovalo větší množství řezů ukazujících na
+obecně různé prvky jediného pole. Pokud nyní změníme prvek v&nbsp;jednom řezu,
+znamená to, že se vlastně modifikuje obsah původního pole a i ostatní řezy nový
+prvek uvidí:</p>
+
+<pre>
+var a [10]int
+&nbsp;
+slice := a[:]
+&nbsp;
+fmt.Printf("Pole před modifikací: %v\n", a)
+fmt.Printf("Řez před modifikací:  %v\n", slice)
+&nbsp;
+for i := 0; i &lt; len(a); i++ {
+        a[i] = i * 2
+}
+&nbsp;
+fmt.Printf("Pole po modifikací:   %v\n", a)
+fmt.Printf("Řez po modifikaci:    %v\n", slice)
+&nbsp;
+for i := 0; i &lt; len(slice); i++ {
+        slice[i] = 42
+}
+&nbsp;
+fmt.Printf("Pole po modifikací:   %v\n", a)
+fmt.Printf("Řez po modifikaci:    %v\n", slice)
+</pre>
+
+<p>Co je však většinou ještě užitečnější &ndash; s&nbsp;řezy jako
+s&nbsp;datovým typem se velmi snadno pracuje; řezy mohou být předávány do
+funkcí, vráceny z&nbsp;funkcí atd.</p>
+
+<p>Otázka ovšem je, co se stane ve chvíli, kdy v&nbsp;programu nadeklarujeme
+proměnnou typu <i>řez</i>, ovšem nepřiřadíme jí žádnou hodnotu:</p>
+
+<pre>
+var s []int
+</pre>
+
+<p>víme již, že řezu bude v&nbsp;takovém případě přiřazena <i>nulová
+hodnota</i> <strong>nil</strong>. Ve skutečnosti se i v&nbsp;tomto případě
+vytvoří výše zmíněná trojice, která bude obsahovat následující konkrétní
+hodnoty:</p>
+
+<table>
+<tr><th>Prvek</th><th>Hodnota</th></tr>
+<tr><td>Ukazatel na pole</td><td><strong>nil</strong></td></tr>
+<tr><td>Délka řezu</td><td>0</td></tr>
+<tr><td>Kapacita řezu</td><td>0</td></tr>
+</table>
+
+<p>Právě takto vytvořený řez považuje runtime programovacího jazyka Go za
+nulový a je tedy představován identifikátorem <strong>nil</strong>, i když se
+ve skutečnosti jedná o datovou strukturu obsahující tři hodnoty.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Prohlížení obsahu řezů v&nbsp;debuggeru</h2>
+
+<p>Podívejme se nyní, jak se interně odlišuje &bdquo;nulový řez&ldquo; od řezu
+s&nbsp;nulovou kapacitou a délkou i od řezu s&nbsp;kapacitou a délkou
+nastavenou na hodnotu 10 prvků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var s0 []int
+        s1 := []int{}
+        s2 := make([]int, 0)
+        s3 := make([]int, 10)
+&nbsp;
+        fmt.Println(s0)
+        fmt.Println(s1)
+        fmt.Println(s2)
+        fmt.Println(s3)
+}
+</pre>
+
+<p>Po nastavení <i>breakpointu</i> na první řádek s&nbsp;příkazem
+<strong>fmt.Println()</strong> si můžeme prohlédnout obsah všech čtyř lokálních
+proměnných. Již <a
+href="https://www.root.cz/clanky/ladeni-aplikaci-v-go-s-vyuzitim-gnu-debuggeru-a-debuggeru-delve/">minule</a>
+jsme si řekli, že se pro tento účel používá příkaz <strong>print</strong>,
+který můžeme zkrátit na <strong>p</strong>:</p>
+
+<pre>
+(gdb) <strong>p s0</strong>
+$1 = {array = 0x0, len = 0, cap = 0}
+&nbsp;
+(gdb) <strong>p s1</strong>
+$2 = {array = 0x593080 &lt;runtime.zerobase&gt;, len = 0, cap = 0}
+&nbsp;
+(gdb) <strong>p s2</strong>
+$3 = {array = 0x593080 &lt;runtime.zerobase&gt;, len = 0, cap = 0}
+&nbsp;
+(gdb) <strong>p s3</strong>
+$4 = {array = 0xc0000a4000, len = 10, cap = 10}
+</pre>
+
+<p>Můžeme si dokonce zobrazit obsah paměti, v&nbsp;níž je řez uložen. Vzhledem
+k&nbsp;tomu, že řez je představován trojicí hodnot (každá konkrétně bude mít
+šířku 64bitů na mém testovacím počítači), zkusíme si u každého řezu zobrazit
+šest 32bitových slov příkazem <strong>x/6xw</strong>, kterému předáme adresu
+řezu:</p>
+
+<pre>
+(gdb) <strong>x/6xw &amp;s0</strong>
+0xc00008cf10:   0x00000000      0x00000000      0x00000000      0x00000000
+0xc00008cf20:   0x00000000      0x00000000
+&nbsp;
+(gdb) <strong>x/6xw &amp;s1</strong>
+0xc00008cef8:   0x00593080      0x00000000      0x00000000      0x00000000
+0xc00008cf08:   0x00000000      0x00000000
+&nbsp;
+(gdb) <strong>x/6xw &amp;s2</strong>
+0xc00008cee0:   0x00593080      0x00000000      0x00000000      0x00000000
+0xc00008cef0:   0x00000000      0x00000000
+&nbsp;
+(gdb) <strong>x/6xw &amp;s3</strong>
+0xc00008cec8:   0x000a4000      0x000000c0      0x0000000a      0x00000000
+0xc00008ced8:   0x0000000a      0x00000000
+</pre>
+
+<p>Výsledky jsou jednoznačné: první řez je skutečně nulovým řezem (tedy je
+reprezentován identifikátorem <strong>nil</strong>), další dva řezy obsahují
+ukazatel na pole nulové délky (a řez má tedy nulovou kapacitu) a čtvrtý řez má
+kapacitu rovnu 0x0a=10 prvkům, délku taktéž 0x0a=10 prvků a obsahuje ukazatel
+na pole s&nbsp;příslušnou délkou.</p>
+
+<p><div class="rs-tip-major">Poznámka: způsob uložení řezu v&nbsp;paměti:
+64bitů ukazatel na pole, 64bitů délka řezu, 64bitů kapacita řezu.</div></p>
+
+<p>Chování funkce <strong>append</strong> však nezávisí na tom, zda se jedná o
+nulový řez či nikoli:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var s0 []int
+        s1 := []int{}
+        s2 := make([]int, 0)
+        s3 := make([]int, 10)
+&nbsp;
+        fmt.Println(s0)
+        fmt.Println(s1)
+        fmt.Println(s2)
+        fmt.Println(s3)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        s0 = append(s0, 1, 2, 3)
+        s1 = append(s1, 1, 2, 3)
+        s2 = append(s2, 1, 2, 3)
+        s3 = append(s3, 1, 2, 3)
+&nbsp;
+        fmt.Println(s0)
+        fmt.Println(s1)
+        fmt.Println(s2)
+        fmt.Println(s3)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+[]
+[]
+[]
+[0 0 0 0 0 0 0 0 0 0]
+&nbsp;
+[1 2 3]
+[1 2 3]
+[1 2 3]
+[0 0 0 0 0 0 0 0 0 0 1 2 3]
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Identifikátor <strong>nil</strong> a mapy</h2>
+
+<p>Dalším datovým typem inicializovaným na nulovou hodnotu zapisovanou
+identifikátorem <strong>nil</strong> jsou mapy (<i>maps</i>).
+V&nbsp;programovacím jazyce Go můžeme vytvořit novou mapu, která bude
+&bdquo;nulová&ldquo; a nebude do ní možné přidávat další prvky. Podívejme se
+nyní na dva příklady deklarace takových map:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var m1 map[string]int = nil
+        var m2 map[string]int
+&nbsp;
+        fmt.Printf("%v\n", m1)
+        fmt.Printf("%v\n", m2)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se vypíšou dvě shodné hodnoty naznačující, že
+explicitní inicializace proměnné typu <strong>map</strong> na
+<strong>nil</strong> vede k&nbsp;vytvoření proměnné se stejným obsahem, jako
+když se žádná inicializace neprovede a překladač tedy použije implicitní
+&bdquo;nulovou hodnotu&ldquo; pro tento datový typ:</p>
+
+<pre>
+map[]
+map[]
+</pre>
+
+<p>O tom, že prázdná mapa je skutečně ekvivalentní <strong>nil</strong> se
+můžeme velmi snadno přesvědčit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var m1 map[string]int = nil
+        var m2 map[string]int
+&nbsp;
+        fmt.Printf("%v %v\n", m1, m1 == nil)
+        fmt.Printf("%v %v\n", m2, m2 == nil)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+map[] true
+map[] true
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě nemůžeme dvě mapy
+porovnat operátorem <strong>==</strong>, protože mapy se v&nbsp;jazyku Go mohou
+porovnávat pouze s&nbsp;hodnotou <strong>nil</strong>!</div></p>
+
+<p>Problém je, že do takové mapy není možné přidávat další dvojice
+klíč-hodnota. Pokud se o tuto operaci pokusíme, dojde k&nbsp;běhové chybě:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var m1 map[string]int = nil
+        fmt.Printf("%v %v\n", m1, m1 == nil)
+&nbsp;
+        m1["foo"] = 3
+}
+</pre>
+
+<p>Pokus o spuštění tohoto příkladu skutečně skončí běhovou chybou:</p>
+
+<pre>
+map[] true
+panic: assignment to entry in nil map
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/tisnik/temp/t3.go:9 +0xb7
+exit status 2
+</pre>
+
+<p>Korektní zápis již vyžaduje použití interní funkce <strong>make</strong>,
+která zde vystupuje v&nbsp;roli konstruktoru mapy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        m1 := make(map[string]int)
+        fmt.Printf("%v %v\n", m1, m1 == nil)
+&nbsp;
+        m1["foo"] = 3
+        fmt.Printf("%v %v\n", m1, m1 == nil)
+}
+</pre>
+
+<p>Nyní již bude možné program spustit, a to bez chyby:</p>
+
+<pre>
+map[] false
+map[foo:3] false
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: můžeme zde vidět zásadní rozdíl mezi
+&bdquo;nulovou mapou&ldquo; a &bdquo;prázdnou mapou&ldquo;. Prakticky nulovou
+mapu v&nbsp;běžných programech nepoužijeme, takže je nutné ve většině případů
+mapy vytvářet pomocí funkce <strong>make</strong>.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Identifikátor <strong>nil</strong> a kanály</h2>
+
+<p>Programovací jazyk Go podporuje &bdquo;nulové hodnoty&ldquo; i u kanálů.
+Můžeme si vyzkoušet, jakým způsobem se takové kanály vytvoří; princip je
+prakticky stejný, jako u map:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var c1 chan int = nil
+        var c2 chan int
+&nbsp;
+        fmt.Printf("%v %v\n", c1, c1 == nil)
+        fmt.Printf("%v %v\n", c2, c2 == nil)
+        fmt.Printf("%v\n", c1 ==  c2)
+}
+</pre>
+
+<p>Po spuštění programu získáme očekávané výsledky:</p>
+
+<pre>
+&lt;nil&gt; true
+&lt;nil&gt; true
+true
+</pre>
+
+<p>Rozdíl mezi nulovým a nenulovým kanálem je interně dosti podstatný, což nám
+odhalí debugger na následujícím příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var c1 chan int = nil
+        var c2 chan int = make(chan int)
+&nbsp;
+        fmt.Printf("%v %v\n", c1, c1 == nil)
+        fmt.Printf("%v %v\n", c2, c2 == nil)
+</pre>
+
+<p>V&nbsp;debuggeru Delve si můžeme zobrazit, jak se liší nulový a nenulový
+kanál:</p>
+
+<pre>
+     4:
+     5: func main() {
+     6:         var c1 chan int = nil
+     7:         var c2 chan int = make(chan int)
+     8:
+=&gt;   9:         fmt.Printf("%v %v\n", c1, c1 == nil)
+    10:         fmt.Printf("%v %v\n", c2, c2 == nil)
+    11: }
+&nbsp;
+(dlv) <strong>p c1</strong>
+chan int {}
+&nbsp;
+(dlv) <strong>p c2</strong>
+chan int {
+        qcount: 0,
+        dataqsiz: 0,
+        buf: *[0]int [],
+        elemsize: 8,
+        closed: 0,
+        elemtype: *runtime._type {
+                size: 8,
+                ptrdata: 0,
+                hash: 4149441018,
+                tflag: tflagUncommon|tflagExtraStar|tflagNamed (7),
+                align: 8,
+                fieldalign: 8,
+                kind: 130,
+                alg: *(*runtime.typeAlg)(0x577df0),
+                gcdata: *1,
+                str: 1051,
+                ptrToThis: 47456,},
+        sendx: 0,
+        recvx: 0,
+        recvq: waitq<int> {
+                first: *sudog<int> nil,
+                last: *sudog<int> nil,},
+        sendq: waitq<int> {
+                first: *sudog<int> nil,
+                last: *sudog<int> nil,},
+        lock: runtime.mutex {key: 0},}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Čtení a zápis do nulového kanálu</h2>
+
+<p>Při práci s&nbsp;kanály je nutné brát do úvahy následující čtyři speciální
+případy:</p>
+
+<ol>
+<li>zápis do zavřeného kanálu vyvolá <strong>panic</strong></li>
+<li>čtení ze zavřeného kanálu vrátí &bdquo;nulovou hodnotu&ldquo;, a to ihned (bez čekání na zápis, který nemůže být proveden)</li>
+<li>zápis do nulového kanálu zablokuje příslušnou gorutinu</li>
+<li>čtení z&nbsp;nulového kanálu taktéž zablokuje příslušnou gorutinu</li>
+</ol>
+
+<p>Poslední dva body si můžeme snadno vyzkoušet. Nejdříve zápis do nulového
+kanálu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var c1 chan int = nil
+&nbsp;
+        fmt.Printf("%v %v\n", c1, c1 == nil)
+&nbsp;
+        c1 &lt;- 10
+}
+</pre>
+
+<p>Výsledkem je detekce deadlocku:</p>
+
+<pre>
+&lt;nil&gt; true
+fatal error: all goroutines are asleep - deadlock!
+&nbsp;
+goroutine 1 [chan send (nil chan)]:
+main.main()
+        /home/tester/go-root/article_26/24_nil_channel_write.go:10 +0xab
+exit status 2
+</pre>
+
+<p>Čtení z&nbsp;nulového kanálu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var c1 chan int = nil
+&nbsp;
+        fmt.Printf("%v %v\n", c1, c1 == nil)
+&nbsp;
+        fmt.Printf("%d\n", &lt;-c1)
+}
+</pre>
+
+<p>Výsledkem je opět detekce deadlocku:</p>
+
+<pre>
+&lt;nil&gt; true
+fatal error: all goroutines are asleep - deadlock!
+&nbsp;
+goroutine 1 [chan receive (nil chan)]:
+main.main()
+        /home/tester/go-root/article_26/25_nil_channel_read.go:10 +0xb5
+exit status 2
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Identifikátor <strong>nil</strong> a rozhraní</h2>
+
+<p>Konečně se dostáváme k&nbsp;datovému typu <strong>interface</strong>. I pro
+rozhraní existuje &bdquo;nulová hodnota&ldquo;, která je proměnným automaticky
+přiřazena ve chvíli, kdy se nespecifikuje jiná hodnota:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{}
+&nbsp;
+        fmt.Printf("%v %v\n", i1, i1 == nil)
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu se vypíše:</p>
+
+<pre>
+&lt;nil&gt; true
+</pre>
+
+<p>Ve skutečnosti nezáleží na tom, zda jsou v&nbsp;rozhraní specifikovány
+nějaké metody, protože i následující příklad vypíše hodnoty
+<strong>nil</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{}
+&nbsp;
+        fmt.Printf("%v %v\n", i1, i1 == nil)
+&nbsp;
+        var i2 interface{Foo()}
+        fmt.Printf("%v %v\n", i2, i2 == nil)
+&nbsp;
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+&lt;nil&gt; true
+&lt;nil&gt; true
+true
+</pre>
+
+<p>Vidíme, že výchozí nulová hodnota datového typu <strong>interface</strong>
+je taktéž <strong>nil</strong>, který je dokonce shodný pro všechna nulová
+rozhraní. Ovšem právě zde se projevují jedna méně známá vlastnost typového
+systému programovacího jazyka Go, protože u typu <strong>interface</strong> se
+v&nbsp;runtime pamatuje jak definovaný typ proměnné (takzvaný <i>statický
+typ</i>), tak i datový typ hodnoty, která je do proměnné přiřazena (takzvaný
+<i>dynamický typ</i>). Proč tomu tak je? V&nbsp;Go je možné do proměnné typu
+<strong>interface</strong> přiřadit jakoukoli instanci typu, který toto
+rozhraní implementuje. A konkrétně prázdné rozhraní <strong>interface
+{}</strong> je automaticky implementováno všemi datovými typy. Podrobnosti jsou
+vysvětleny v&nbsp;další kapitole.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Proč někdy platí <strong>nil != nil</strong>?</h2>
+
+<p>Zkusme si nyní přeložit následující příklad, v&nbsp;němž je definován
+uživatelský datový typ <strong>T</strong> a jsou vytvořeny dvě proměnné.
+Proměnná <strong>i1</strong> je typu <strong>interface{}</strong> a obsahuje
+hodnotu <strong>nil</strong>:</p>
+
+<pre>
+var i1 interface{}
+</pre>
+
+<p>Proměnná <strong>i2</strong> je typu <strong>T</strong> a taktéž obsahuje
+hodnotu <strong>nil</strong>:</p>
+
+<pre>
+var i2 T = nil
+</pre>
+
+<p>Kód příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type T *int
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{}
+&nbsp;
+        fmt.Printf("%v %v\n", i1, i1 == nil)
+&nbsp;
+        var i2 T = nil
+        fmt.Printf("%v %v\n", i2, i2 == nil)
+&nbsp;
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se vypíše:</p>
+
+<pre>
+&lt;nil&gt; true
+&lt;nil&gt; true
+false
+</pre>
+
+<p>Platí tedy současně:</p>
+
+<pre>
+i1 == nil
+i2 == nil
+i1 != i2
+</pre>
+
+<p>Obě hodnoty jsou porovnatelné, protože typ <strong>T</strong> zcela jistě
+implementuje prázdné rozhraní, ovšem hodnoty <strong>nil</strong> se nerovnají.
+Je tomu tak z&nbsp;toho důvodu, že se liší jejich dynamické typy, protože
+porovnání dvou rozhraní vrátí hodnotu <strong>true</strong> za předpokladu:</p>
+
+<ol>
+<li>Obě rozhraní jsou nulové (<strong>nil</strong>)</li>
+<li>Dynamický typ obou rozhraní je porovnatelný (int s&nbsp;int například) a shodný a současně jsou i dynamické hodnoty shodné.</li>
+</ol>
+
+<p>Informaci o typu lze relativně snadno získat a vytisknout:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type T *int
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{}
+        var i2 T = nil
+&nbsp;
+        fmt.Printf("%T\n", i1)
+        fmt.Printf("%T\n", i2)
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+&lt;nil&gt;
+main.T
+false
+</pre>
+
+<p>Příklad porovnání dvou proměnných typu rozhraní, které se rovnají na základě
+pravidla číslo 2:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type T int
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{} = "abcd"
+        var i2 interface{} = "a" + "b" + "c" + "d"
+&nbsp;
+        fmt.Printf("%T\n", i1)
+        fmt.Printf("%T\n", i2)
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>A konečně si ukažme příklad, v&nbsp;němž je porušeno pravidlo číslo 2:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type T int
+&nbsp;
+func <strong>main</strong>() {
+        var p1 *int = nil
+        var p2 *string = nil
+&nbsp;
+        var i1 interface{} = nil
+        var i2 interface{} = p1
+        var i3 interface{} = p2
+&nbsp;
+        fmt.Printf("%T\t%v\n", i1, i1)
+        fmt.Printf("%T\t%v\n", i2, i2)
+        fmt.Printf("%T\t%v\n", i3, i3)
+&nbsp;
+        fmt.Println()
+        fmt.Printf("%v\n", i1==i2)
+        fmt.Printf("%v\n", i1==i3)
+        fmt.Printf("%v\n", i2==i3)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+&lt;nil&gt; &lt;nil&gt;
+*int        &lt;nil&gt;
+*string     &lt;nil&gt;
+&nbsp;
+false
+false
+false
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Porovnání hodnot <strong>nil</strong> různých typů</h2>
+
+<p>V&nbsp;programovacím jazyce Go existují striktní pravidla pro porovnávání
+hodnot různých typů, což se pochopitelně týká i speciálních nulových hodnot.
+Porovnat je například možné dva ukazatele stejného typu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var p1 *int
+        var p2 *int
+&nbsp;
+        fmt.Printf("%v %v\n", p1, p1 == nil)
+        fmt.Printf("%v %v\n", p2, p2 == nil)
+        fmt.Printf("%v\n", p1 == p2)
+}
+</pre>
+
+<p>Ovšem například porovnání ukazatelů různých typů již není povoleno a povede
+k&nbsp;detekci chyby při překladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var i1 *int
+        var i2 *int32
+&nbsp;
+        fmt.Printf("%v %v\n", i1, i1 == nil)
+        fmt.Printf("%v %v\n", i2, i2 == nil)
+&nbsp;
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>Zajímavé je, že můžeme porovnat ukazatel s&nbsp;rozhraním:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var i1 interface{}
+&nbsp;
+        fmt.Printf("%v %v\n", i1, i1 == nil)
+&nbsp;
+        var i2 *int
+        fmt.Printf("%v %v\n", i2, i2 == nil)
+&nbsp;
+        fmt.Printf("%v\n", i1 == i2)
+}
+</pre>
+
+<p>V&nbsp;tomto konkrétním případě se vypíše:</p>
+
+<pre>
+&lt;nil&gt; true
+&lt;nil&gt; true
+false
+</pre>
+
+<p>To znamená, že (poněkud neintuitivně) současně platí:</p>
+
+<pre>
+i1 == nil
+i2 == nil
+i1 != i2
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Datový typ <strong>Option</strong> v&nbsp;programovacím jazyku Rust</h2>
+
+<p>V&nbsp;předchozím textu jsme si řekli, že <strong>nil</strong> se
+v&nbsp;programovacím jazyku Go používá například i tehdy, pokud potřebujeme
+volající funkci sdělit, zda došlo či naopak nedošlo k&nbsp;chybě. Současně se
+může <strong>nil</strong> použít pro reprezentaci neznámé či nezjistitelné
+hodnoty. To je poměrně problematický přístup, který je v&nbsp;dalších
+programovacích jazycích vyřešen odlišným způsobem. Velmi dobrým příkladem může
+být <a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">programovací
+jazyk Rust</a>, v&nbsp;němž existují dva důležité datové typy
+<strong>Option</strong> a <strong>Result</strong>.</p>
+
+<p>V&nbsp;programovacím jazyku Rust se poměrně často používá datový typ
+<strong>Option</strong>, a to ve chvílích, kdy je zapotřebí reprezentovat
+neznámou hodnotu, vytvořit funkci s&nbsp;volitelnými parametry či vytvořit
+typově bezpečnou obdobu odkazu typu <strong>null</strong> či
+<strong>nil</strong>.</p>
+
+<p>Deklarace datového typu <strong>Option</strong> je ve skutečnosti velmi
+přímočará:</p>
+
+<pre>
+enum <strong>Option&lt;T&gt;</strong> {
+    None,
+    Some(T),
+}
+</pre>
+
+<p>Vidíme, že se jedná o výčtový typ s&nbsp;pouhými dvěma hodnotami
+<strong>None</strong> a <strong>Some</strong>, přičemž <strong>Some</strong>
+&bdquo;obaluje&ldquo; vlastní hodnotu typu <strong>T</strong>, se kterou chceme
+pracovat (může se jednat o prakticky libovolný typ Rustu, pochopitelně včetně
+uživatelských typů).</p>
+
+<p>Ukažme si příklad použití ve chvíli, kdy logika aplikace požaduje, aby byl
+výsledek dělení 0/0 nedefinovaný, ovšem aby se nejednalo o chybu:</p>
+
+<pre>
+fn <strong>div</strong>(x: i32, y: i32) -&gt; <strong>Option&lt;i32&gt;</strong> {
+    if y != 0 {
+        <strong>Some(x/y)</strong>
+    }
+    else {
+        <strong>None</strong>
+    }
+}
+</pre>
+
+<p>Nejjednodušší způsob volání uživatelsky definované funkce
+<strong>div</strong> vypadá následovně (je nutné použít {:?}):</p>
+
+<pre>
+fn <strong>main</strong>() {
+    let z1 = div(2, 1);
+    println!("{:?}", z1);
+&nbsp;
+    let z2 = div(2, 0);
+    println!("{:?}", z2);
+}
+</pre>
+
+<p>S&nbsp;následujícím výsledkem:</p>
+
+<pre>
+Some(2)
+None
+</pre>
+
+<p>Jednou z&nbsp;největších předností datového typu <strong>Option</strong> je
+fakt, že jeho používání je v&nbsp;programovacím jazyku Rust do značné míry
+standardní a navíc idiomatické, takže programátoři nemusí hledat, která
+&bdquo;magická konstanta&ldquo; je pro danou funkci použita. Dále je zaručeno,
+že pokud budeme chtít získat zabalenou hodnotu přes pattern matching, bude
+nutné explicitně použít i druhou větev pracující s&nbsp;výsledkem
+<strong>None</strong>:</p>
+
+<pre>
+fn div_and_print(x: i32, y :i32) {
+    let result = div(x, y);
+    println!("{:?}", result);
+&nbsp;
+    <strong>match</strong> result {
+        <strong>None      =&gt;</strong> println!("Divide by zero"),
+        <strong>Some(val) =&gt;</strong> println!("{} / {} = {}", x, y, <strong>val</strong>),
+    }
+&nbsp;
+    println!("");
+}
+</pre>
+
+<p>Pro hodnoty typu <strong>Option</strong> je navíc možné volat různé více či
+méně užitečné metody, například <strong>is_none()</strong>,
+<strong>is_some()</strong>, <strong>expect()</strong>,
+<strong>unwrap()</strong>, <strong>and_then()</strong>,
+<strong>or_else()</strong> a různé varianty funkce vyššího řádu
+<strong>map()</strong>. Mimochodem &ndash; tato struktura se používá i
+v&nbsp;případě, že potřebujeme pracovat s&nbsp;referencemi, které
+v&nbsp;některých situacích nemusí existovat (což nám jinak Rust nedovolí).</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Datový typ <strong>Result</strong>, opět v&nbsp;Rustu</h2>
+
+<p>V&nbsp;mnoha případech však nemusí být použití datového typu
+<strong>Option</strong> tím nejlepším řešením, popř.&nbsp;se nemusí jednat o
+řešení idiomatické. Pro příklad nemusíme chodit daleko &ndash; předpokládejme,
+že budeme chtít, aby naše funkce pro dělení celých čísel vracela v&nbsp;případě
+pokusu o dělení nulou chybové hlášení a nikoli nicneříkající hodnotu
+<strong>None</strong>. K&nbsp;tomuto účelu se v&nbsp;programovacím jazyku Rust
+používá datová struktura nazvaná příhodně <strong>Result</strong>. Tato datová
+struktura se podobá <a href="#k16">výše popsané</a> struktuře
+<strong>Option</strong>, ovšem s&nbsp;tím podstatným rozdílem, že obaluje buď
+výsledek (třeba návratovou hodnotu volané funkce) nebo informaci o chybě.
+Deklarace struktury <strong>Result</strong> z&nbsp;tohoto důvodu vypadá
+následovně:</p>
+
+<pre>
+enum <strong>Result&lt;T, E&gt;</strong> {
+    Ok(T),
+    Err(E),
+}
+</pre>
+
+<p>což se liší od deklarace typu <strong>Option</strong>:</p>
+
+<pre>
+enum <strong>Option&lt;T&gt;</strong> {
+    None,
+    Some(T),
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se u datové struktury
+<strong>Result</strong> specifikují dva typy &ndash; typ návratové hodnoty
+<strong>T</strong> a typ hodnoty reprezentující chybu <strong>E</strong>. To je
+poměrně užitečná vlastnost, protože se programátoři mohou sami rozhodnout,
+jakým způsobem budou reprezentovat chybu &ndash; zda se bude jednat o
+jednoduchý řetězec či o složitější datovou strukturu, ve které může být
+například uloženo jméno otevíraného souboru a současně chybové hlášení systému
+při pokusu o jeho otevření.</div></p>
+
+<p>Zkusme si nyní upravit naši funkci určenou pro dělení dvou celých čísel
+takovým způsobem, aby se v&nbsp;případě dělení nulou namísto hodnoty
+<strong>None</strong> vracelo plnohodnotné chybové hlášení ve formě řetězce.
+Úprava je velmi snadná a může vypadat následovně:</p>
+
+<pre>
+fn <strong>div</strong>(x: i32, y: i32) -&gt; Result&lt;i32, &amp;'static str&gt; {
+    if y != 0 {
+        <strong>Ok(x/y)</strong>
+    } else {
+        <strong>Err("Divide by zero!")</strong>
+    }
+}
+</pre>
+
+<p>Prozatím si vypočtené hodnoty vytiskneme jednoduše makrem
+<strong>println!()</strong> a formátovacím příkazem &bdquo;?:&ldquo;:</p>
+
+<pre>
+fn <strong>main</strong>() {
+    let z1 = div(2, 1);
+    println!("{:?}", z1);
+&nbsp;
+    let z2 = div(2, 0);
+    println!("{:?}", z2);
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se na prvním řádku vypíše vypočtená hodnota
+obalená do &bdquo;Ok&ldquo; a na řádku druhém pak chybové hlášení, tentokrát
+obalené do &bdquo;Err&ldquo;:</p>
+
+<pre>
+Ok(2)
+Err("Divide by zero!")
+</pre>
+
+<p>Ve skutečnosti se často namísto predikátů a čtení zabalené hodnoty či
+chybové zprávy používá pattern matching. Další příklad se nápadně podobá
+příkladu, který již známe z&nbsp;předchozí kapitoly:</p>
+
+<pre>
+fn print_div_result(result: Result&lt;i32, &amp;'static str&gt;) {
+    <strong>match result</strong> {
+        <strong>Ok(value)  =&gt;</strong> println!("value: {}", value),
+        <strong>Err(error) =&gt;</strong> println!("error: {}", error)
+    }
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Nebylo by tedy výhodnější použít obdobu typu <strong>Option</strong>?</h2>
+
+<p>Řešení nabízené programovacím jazykem Rust pro rozlišení mezi skutečnou
+hodnotou a chybou, popř.&nbsp;mezi skutečnou hodnotou a nedefinovaným
+výsledkem, je v&nbsp;několika ohledech lepší, než například řešení jazyka Go (a
+většinou i lepší, než pouhé vrácení hodnoty s&nbsp;tím, že případná chyba
+povede k&nbsp;vyhození výjimky). Velkou předností Rustu je v&nbsp;tomto ohledu
+ta skutečnost, že si překladač sám hlídá, zda programátor správně testuje
+všechny stavy, které mohou v&nbsp;aplikaci nastat. Pokud bude nějaká větev
+v&nbsp;řídicí struktuře <strong>match</strong> chybět, program se
+nepřeloží:</p>
+
+<pre>
+fn div_and_print(x: i32, y :i32) {
+    let result = div(x, y);
+&nbsp;
+    <strong>match</strong> result {
+        <strong>Some(val) =&gt;</strong> println!("{} / {} = {}", x, y, <strong>val</strong>),
+    }
+&nbsp;
+    println!("");
+}
+</pre>
+
+<p>Ani tento kód není korektní a nepřeloží se:</p>
+
+<pre>
+fn print_div_result(result: Result&lt;i32, &amp;'static str&gt;) {
+    <strong>match result</strong> {
+        <strong>Ok(value)  =&gt;</strong> println!("value: {}", value),
+    }
+}
+</pre>
+
+<p>V&nbsp;programovacím jazyce Go není tato situace hlídána &ndash; funkce
+pouze (v&nbsp;typických případech) vrací dvojici hodnot a záleží jen na
+programátorovi, zda druhou (chybovou) hodnotu nějak zpracuje či nikoli:</p>
+
+<pre>
+func <strong>testCopyFile</strong>(srcName, dstName string) {
+        copied, _ := copyFile(srcName, dstName)
+        fmt.Printf("Copied %d bytes\n", copied)
+}
+</pre>
+
+<p>Základ problému pravděpodobně spočívá v&nbsp;tom, že by zavedení typu
+<strong>Option</strong> a <strong>Result</strong> vyžadovalo úpravu samotného
+programovacího jazyka takovým způsobem, aby podporoval generické datové typy.
+Tato vlastnost je však prozatím pouze ve fázi návrhu; případné změny a
+rozšíření se případně promítnou až do Go 2.0. Prozatím je tedy nutné pracovat
+s&nbsp;hodnotami <strong>nil</strong> a nezapomenou do programů zapisovat
+podmínky pro otestování tohoto (většinou) chybového či jinak výjimečného stavu.
+A pochopitelně si hlavně dát pozor na to, že není <strong>nil</strong> jako
+<strong>nil</strong>.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_boolean_type.go</td><td>&bdquo;nulová hodnota&ldquo; pro typ <strong>bool</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/01_boolean_type.go">https://github.com/tisnik/go-root/blob/master/article_26/01_boolean_type.go</a></td></tr>
+<tr><td> 2</td><td>02_number_types.go</td><td>&bdquo;nulové hodnoty&ldquo; pro všechny numerické datové typy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/02_number_types.go">https://github.com/tisnik/go-root/blob/master/article_26/02_number_types.go</a></td></tr>
+<tr><td> 3</td><td>03_string_type.go</td><td>&bdquo;nulová hodnota&ldquo; pro řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/03_string_type.go">https://github.com/tisnik/go-root/blob/master/article_26/03_string_type.go</a></td></tr>
+<tr><td> 4</td><td>04_other_types.go</td><td>&bdquo;nulové hodnoty&ldquo; pro ostatní standardní typy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/04_other_types.go">https://github.com/tisnik/go-root/blob/master/article_26/04_other_types.go</a></td></tr>
+<tr><td> 5</td><td>05_other_types_better_solution.go</td><td>vylepšení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/05_other_types_better_solution.go">https://github.com/tisnik/go-root/blob/master/article_26/05_other_types_better_solution.go</a></td></tr>
+<tr><td> 6</td><td>06_structs.go</td><td>&bdquo;nulové hodnoty&ldquo; pro struktury/záznamy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/06_structs.go">https://github.com/tisnik/go-root/blob/master/article_26/06_structs.go</a></td></tr>
+<tr><td> 7</td><td>07_nil_as_variable.go</td><td><strong>nil</strong> použitý jako jméno proměnné</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/07_nil_as_variable.go">https://github.com/tisnik/go-root/blob/master/article_26/07_nil_as_variable.go</a></td></tr>
+<tr><td> 8</td><td>08_true_false_vars.go</td><td><strong>true</strong> a <strong>false</strong> použité jako jméno proměnné</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/08_true_false_vars.go">https://github.com/tisnik/go-root/blob/master/article_26/08_true_false_vars.go</a></td></tr>
+<tr><td> 9</td><td>09_nil_value.go</td><td><strong>nil</strong> ve funkci hodnoty s&nbsp;dále nespecifikovaným datovým typem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/09_nil_value.go">https://github.com/tisnik/go-root/blob/master/article_26/09_nil_value.go</a></td></tr>
+<tr><td>10</td><td>10_nil_pointer.go</td><td>ukazatel s&nbsp;implicitní hodnotou <strong>nil</strong> a jeho chování v&nbsp;runtime</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/10_nil_pointer.go">https://github.com/tisnik/go-root/blob/master/article_26/10_nil_pointer.go</a></td></tr>
+<tr><td>11</td><td>11_other_pointer.go</td><td>běžný ukazatel, který se snažíme nastavit na určitou hodnotu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/11_other_pointer.go">https://github.com/tisnik/go-root/blob/master/article_26/11_other_pointer.go</a></td></tr>
+<tr><td>12</td><td>12_nil_slice.go</td><td>&bdquo;nulová hodnota&ldquo; řezu a další typy řezů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/12_nil_slice.go">https://github.com/tisnik/go-root/blob/master/article_26/12_nil_slice.go</a></td></tr>
+<tr><td>13</td><td>13_nil_map.go</td><td>&bdquo;nulová hodnota&ldquo; mapy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/13_nil_map.go">https://github.com/tisnik/go-root/blob/master/article_26/13_nil_map.go</a></td></tr>
+<tr><td>14</td><td>14_nil_map_is_really_nil.go</td><td>test mapy na hodnotu <strong>nil</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/14_nil_map_is_really_nil.go">https://github.com/tisnik/go-root/blob/master/article_26/14_nil_map_is_really_nil.go</a></td></tr>
+<tr><td>15</td><td>15_add_into_nil_map.go</td><td>pokus o přidání prvku do nulové mapy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/15_add_into_nil_map.go">https://github.com/tisnik/go-root/blob/master/article_26/15_add_into_nil_map.go</a></td></tr>
+<tr><td>16</td><td>16_empty_map.go</td><td>pokus o přidání prvku do prázdné mapy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/16_empty_map.go">https://github.com/tisnik/go-root/blob/master/article_26/16_empty_map.go</a></td></tr>
+<tr><td>17</td><td>17_nil_interface.go</td><td>&bdquo;nulová hodnota&ldquo; pro rozhraní</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/17_nil_interface.go">https://github.com/tisnik/go-root/blob/master/article_26/17_nil_interface.go</a></td></tr>
+<tr><td>18</td><td>18_two_interfaces.go</td><td>dvě rozdílná rozhraní</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/18_two_interfaces.go">https://github.com/tisnik/go-root/blob/master/article_26/18_two_interfaces.go</a></td></tr>
+<tr><td>19</td><td>19_nil_is_not_nil.go</td><td>příklad, v&nbsp;němž se dvě hodnoty <strong>nil</strong> nerovnají</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/19_nil_is_not_nil.go">https://github.com/tisnik/go-root/blob/master/article_26/19_nil_is_not_nil.go</a></td></tr>
+<tr><td>20</td><td>20_two_nil_pointers.go</td><td>porovnání dvou ukazatelů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/20_two_nil_pointers.go">https://github.com/tisnik/go-root/blob/master/article_26/20_two_nil_pointers.go</a></td></tr>
+<tr><td>21</td><td>21_comparing_interface_to_pointer.go</td><td>porovnání hodnoty typu ukazatel a rozhraní</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/21_comparing_interface_to_pointer.go">https://github.com/tisnik/go-root/blob/master/article_26/21_comparing_interface_to_pointer.go</a></td></tr>
+<tr><td>22</td><td>22_compare_two_different_pointer_types.go</td><td>pokus o porovnání dvou ukazatelů rozdílného typu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_26/22_compare_two_different_pointer_types.go">https://github.com/tisnik/go-root/blob/master/article_26/22_compare_two_different_pointer_types.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
