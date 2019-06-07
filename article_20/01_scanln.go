@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá část část
+// Dvacátá část
 //
 // Demonstrační příklad číslo 1:
 //     Načtení řetězců ze standardního vstupu.

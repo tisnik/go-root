@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá část část
+// Dvacátá část
 //
 // Demonstrační příklad číslo 2:
 //     Použití metody Reader.ReadString pro načítání ze standardního vstupu.

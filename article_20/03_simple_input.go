@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá část část
+// Dvacátá část
 //
 // Demonstrační příklad číslo 3:
 //     Go-prompt: vstup dat.

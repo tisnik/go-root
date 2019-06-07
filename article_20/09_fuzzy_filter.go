@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá část část
+// Dvacátá část
 //
 // Demonstrační příklad číslo 9:
 //     Vylepšení zápisu příkazů Atari BASICu.

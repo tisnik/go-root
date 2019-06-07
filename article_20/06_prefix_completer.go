@@ -1,6 +1,6 @@
 // Seriál "Programovací jazyk Go"
 //
-// Dvacátá část část
+// Dvacátá část
 //
 // Demonstrační příklad číslo 6:
 //     Go-prompt: vstup s nápovědou, reakce na zadaný příkaz.
