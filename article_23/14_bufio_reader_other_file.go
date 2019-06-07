@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 14:
+//     Čtení řetězců pomocí funkcí z balíčku bufio.
+
 package main
 
 import (
