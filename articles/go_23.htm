@@ -1,0 +1,2656 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Pokročilejší použití vstupně-výstupních funkcí standardní knihovny programovacího jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Pokročilejší použití vstupně-výstupních funkcí standardní knihovny programovacího jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešní části seriálu o programovacím jazyku Go si ukážeme další možnosti, které nám poskytuje standardní knihovna tohoto jazyka u vstupně-výstupních operací. Popíšeme si například komprimaci dat, přesun (seek) v načítaných a ukládaných souborech, tvorbu rour (pipe) atd.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Pokročilejší použití vstupně-výstupních funkcí standardní knihovny programovacího jazyka Go</a></p>
+<p><a href="#k02">2. Krátké zopakování: rozhraní <strong>io.Reader</strong> a <strong>io.Writer</strong> a jejich význam v&nbsp;systému jazyka Go</a></p>
+<p><a href="#k03">3. Roura (pipe) vytvořená v&nbsp;operační paměti</a></p>
+<p><a href="#k04">4. Rozhraní <strong>io.Seeker</strong> a jeho varianty</a></p>
+<p><a href="#k05">5. Přesun (<i>seek</i>) při čtení dat ze souboru</a></p>
+<p><a href="#k06">6. Přesun (<i>seek</i>) při zápisu dat do souboru</a></p>
+<p><a href="#k07">7. Vytvoření řídkého souboru (<i>sparse file</i>)</a></p>
+<p><a href="#k08">8. Použití rozhraní <strong>io.MultiWriter</strong> pro souběžné zpracování výstupních dat</a></p>
+<p><a href="#k09">9. Využití rozhraní <strong>StringWriter</strong></a></p>
+<p><a href="#k10">10. Načítání řetězců &ndash; typ <strong>Reader</strong> z&nbsp;balíčku <strong>bufio</strong></a></p>
+<p><a href="#k11">11. Chování readeru při dosažení konce souboru</a></p>
+<p><a href="#k12">12. Přečtení sekvence bajtů z&nbsp;bufferovaného vstupu</a></p>
+<p><a href="#k13">13. Zápis dat s&nbsp;jejich komprimací s&nbsp;využitím algoritmu Deflate</a></p>
+<p><a href="#k14">14. Konfigurace komprimačního algoritmu</a></p>
+<p><a href="#k15">15. Přímé získání zkomprimovaných dat přes rouru (<i>pipe</i>)</a></p>
+<p><a href="#k16">16. Ukázka použití <strong>MultiWriteru</strong> pro současnou komprimaci dat do více souborů s&nbsp;různě nastaveným algoritmem</a></p>
+<p><a href="#k17">17. Využití <i>hex dumperu</i> (nejenom) pro ladicí účely</a></p>
+<p><a href="#k18">18. Konverze binárních dat s&nbsp;využitím kódování Base64</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Pokročilejší použití vstupně-výstupních funkcí standardní knihovny programovacího jazyka Go</h2>
+
+<p>V&nbsp;předchozí části tohoto seriálu jsme si popsali základní rozhraní
+používaná při čtení či při zápisu dat, ať již dat binárních či textových
+(Unicode). Připomeňme si, že se jednalo o tato rozhraní:</p>
+
+<table>
+<tr><th>Typ operace</th><th>Čtení</th><th>Zápis</th></tr>
+<tr><td>jednotlivých bajtů</td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k03">io.ByteReader</a></td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k07">io.ByteWriter</a></td></tr>
+<tr><td>jednotlivých znaků</td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k06">io.RuneReader</a></td><td>&times;</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>jednotlivých bajtů s&nbsp;bufferem</td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k09">io.ByteScanner</a></td><td>&times;</td></tr>
+<tr><td>jednotlivých znaků s&nbsp;bufferem</td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k11">io.RuneScanner</a></td><td>&times;</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>bloku bajtů</td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k12">io.Reader</a></td><td><a href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/#k15">io.Writer</a></td></tr>
+</table>
+
+<p>Tato rozhraní, především pak <strong>io.Reader</strong> a
+<strong>io.Writer</strong>, jsou implementována mnoha různými způsoby, které
+umožňují tvořit mnohdy i poměrně složité aplikace, v&nbsp;nichž se však budou
+pro vstup a výstup používat ty samé operace:</p>
+
+<table>
+<tr><th>Rozhraní</th><th>Implementované operace</th></tr>
+<tr><td>io.MultiReader</td><td>postupné čtení z&nbsp;několika zdrojů</td></tr>
+<tr><td>io.MultiWriter</td><td>zápis jednoho proudu dat do několika výstupních proudů</td></tr>
+<tr><td>encoding/base64.Encoding</td><td>kódování podle BASE64</td></tr>
+<tr><td>encoding/hex.Dumper</td><td>výstup dat v&nbsp;hexadecimálním formátu, například pro ladicí účely</td></tr>
+<tr><td>compress/gzip.Writer</td><td>komprimace dat s&nbsp;využitím algoritmu Deflate</td></tr>
+<tr><td>compress/gzip.Reader</td><td>dekomprimace dat s&nbsp;využitím algoritmu Deflate</td></tr>
+</table>
+
+<p>V&nbsp;předchozí tabulce je uvedeno pouze několik příkladů, protože ve
+skutečnosti obsahují balíčky <strong>encoding</strong> a
+<strong>compress</strong> větší množství podbalíčků.</p>
+
+<p>To ovšem není vše, protože rozhraní je možné jak <i>implementovat</i>, tak i
+<i>rozšiřovat</i> a vytvářet z&nbsp;nich složitější rozhraní. To je případ
+rozhraní <strong>Seeker</strong>, z&nbsp;něhož se odvozují například rozhraní
+<strong>ReadSeeker</strong>, <strong>WriteSeeker</strong> a
+<strong>ReadWriteSeeker</strong>, s&nbsp;nimiž se taktéž dnes seznámíme.</p>
+
+<p><div class="rs-tip-major">Poznámka: některé demonstrační příklady popsané
+v&nbsp;navazujících kapitolách vytvářejí binární soubory. Ty je možné si
+prohlédnout několika způsoby, typicky s&nbsp;využitím hexa prohlížečů, o nichž
+jsme se zmínili v&nbsp;článku <a
+href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">Hexadecimální
+prohlížeče a editory s textovým uživatelským rozhraním</a>. V&nbsp;dnešním
+článku budeme konkrétně využívat nástroj <a
+href="https://github.com/vim/vim/tree/master/src/xxd">xxd</a> popsaný <a
+href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/#k07">zde</a>.
+Jak je z&nbsp;výše zmíněného odkazu patrné, je nástroj <strong>xxd</strong>
+součástí nástrojů postavených okolo <a
+href="https://www.root.cz/n/vim/">textového editoru Vim</a>, ovšem lze ho
+používat i zcela samostatně. Jeho předností je možnost obousměrné konverze dat
+(binární &rarr; hexadecimální, hexadecimální &rarr; binární).</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Krátké zopakování: rozhraní <strong>io.Reader</strong> a <strong>io.Writer</strong> a jejich význam v&nbsp;systému jazyka Go</h2>
+
+<p>Nejprve si krátce zopakujeme, jak se používají rozhraní
+<strong>io.Reader</strong> a <strong>io.Writer</strong>. V&nbsp;rozhraní
+<strong>io.Reader</strong> je deklarována jediná metoda <strong>Read</strong>
+určená pro načtení sekvence bajtů do připraveného bufferu a nastavené
+kapacitě:</p>
+
+<pre>
+type <strong>Reader</strong> interface {
+        <strong>Read</strong>(p []byte) (n int, err error)
+}
+</pre>
+
+<p>Počet načítaných bajtů závisí na velikosti/kapacitě pole bajtů a taktéž na
+tom, kolik bajtů se ještě na vstupu nachází. Ideálně se vždy načte tolik bajtů,
+kolik odpovídá kapacitě předaného pole, ovšem například na konci souboru (pokud
+provádíme načítání ze souboru) to bude méně. Počet skutečně načtených bajtů
+získáme snadno &ndash; z&nbsp;první návratové hodnoty.</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_23/01_io_reader_read.go">V&nbsp;prvním
+demonstračním příkladu</a> je ukázáno, jak lze postupně načíst soubor a
+zpracovávat ho v&nbsp;bufferu o předem známé a programátorem nastavené
+kapacitě:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_input.txt"
+const buffer_size = 16
+&nbsp;
+func <strong>main</strong>() {
+        reader, err := os.Open(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer reader.Close()
+&nbsp;
+        buffer := make([]byte, buffer_size)
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes\n", read)
+                        fmt.Println(buffer[:read])
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se postupně zobrazí informace o načtení
+jednotlivých bloků, přičemž poslední blok bude obecně kratší:</p>
+
+<pre>
+read 16 bytes
+[108 105 110 101 32 35 49 10 108 105 110 101 32 35 50 10]
+read 16 bytes
+[108 105 110 101 32 35 51 10 108 105 110 101 32 35 52 10]
+read 8 bytes
+[108 105 110 101 32 35 53 10]
+reached end of file
+</pre>
+
+<p>Opakem rozhraní <strong>io.Reader</strong> je pochopitelně rozhraní
+pojmenované <strong>io.Writer</strong>. Toto rozhraní předepisuje jedinou
+metodu určenou pro zápis bloku bajtů do libovolného výstupu. Metoda vrací počet
+skutečně zapsaných bajtů (ten se může lišit od kapacitu bufferu, například při
+chybě) a případnou hodnotu reprezentující chybu:</p>
+
+<pre>
+type <strong>Writer</strong> interface {
+        <strong>Write</strong>(p []byte) (n int, err error)
+}
+</pre>
+
+<p>Ukázka použití rozhraní <strong>io.Writer</strong> je uvedena <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/02_io_writer_write.go">v&nbsp;dnešním
+druhém demonstračním příkladu</a>, který po svém spuštění vytvoří nový soubor a
+zapíše do něj textovou zprávu převedenou na sekvenci bajtů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.txt"
+const message = "Hello world!"
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        buffer := []byte(message)
+        written, err := writer.Write(buffer)
+&nbsp;
+        if written &gt; 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Roura (pipe) vytvořená v&nbsp;operační paměti</h2>
+
+<p>V&nbsp;balíčku <strong>io</strong> nalezneme mj.&nbsp;i velmi užitečnou
+pomůcku. Jedná se o rouru (<i>pipe</i>) vytvořenou přímo v&nbsp;operační
+paměti. Tuto rouru lze používat prakticky stejným způsobem, jako souborovou
+rouru podporovanou Unixovými systémy &ndash; z&nbsp;jedné strany se provádí
+zápis dat, ze druhé strany pak její čtení. Roura se vytvoří funkcí:</p>
+
+<pre>
+func <strong>Pipe</strong>() (*PipeReader, *PipeWriter)
+</pre>
+
+<p>tato funkce vrací dvě hodnoty; první hodnota mj.&nbsp;implementuje
+<strong>io.Reader</strong>, druhá pak pochopitelně <strong>io.Writer</strong>.
+Typicky se roura vytvořená v&nbsp;operační používá pro komunikaci mezi několika
+gorutinami, podobně jako kanály (které však mají odlišnou sémantiku
+operací).</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_23/03_memory_pipe.go">V&nbsp;dnešním
+třetím demonstračním příkladu</a> je ukázán způsob použití roury vytvořené
+v&nbsp;operační paměti. V&nbsp;jedné gorutině se do roury zapíšou data
+(zpráva), ve druhé (konkrétně v&nbsp;hlavní gorutině) se data naopak
+přečtou:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+)
+&nbsp;
+func <strong>main</strong>() {
+        reader, writer := io.Pipe()
+&nbsp;
+        done := make(chan bool)
+&nbsp;
+        go func() {
+                fmt.Fprint(writer, "Hello Mario!")
+                writer.Close()
+                done &lt;- true
+        }()
+&nbsp;
+        buffer := make([]byte, 100)
+&nbsp;
+        read, err := reader.Read(buffer)
+        if err != nil {
+                panic(err)
+        } else {
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes translated into '%s'\n", read, buffer)
+                }
+        }
+        &lt;-done
+        reader.Close()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se s&nbsp;oběma konci
+roury skutečně pracuje stejně, jako například s&nbsp;otevřenými soubory
+atd.</div></p>
+
+<p>Po spuštění příkladu by se měla zpráva přes rouru přenést do readeru:</p>
+
+<pre>
+read 12 bytes translated into 'Hello Mario!'
+</pre>
+
+<p>Příklad si můžeme <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/04_memory_pipe_bytes_buffer.go">zjednodušit</a>,
+pokud použijeme buffer <strong>bytes.Buffer</strong>, který zjednodušuje proces
+čtení dat. Upravená varianta bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bytes"
+        "fmt"
+        "io"
+)
+&nbsp;
+func <strong>main</strong>() {
+        reader, writer := io.Pipe()
+&nbsp;
+        go func() {
+                fmt.Fprint(writer, "Hello Mario!")
+                writer.Close()
+        }()
+&nbsp;
+        buffer := new(bytes.Buffer)
+        buffer.ReadFrom(reader)
+&nbsp;
+        fmt.Printf("Message read from pipe: '%s'\n", buffer.String())
+        writer.Close()
+}
+</pre>
+
+<p>Opět si ukažme, jak se tento příklad bude chovat po svém spuštění:</p>
+
+<pre>
+Message read from pipe: 'Hello Mario!'
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Rozhraní <strong>io.Seeker</strong> a jeho varianty</h2>
+
+<p>V&nbsp;balíčku <strong>io</strong> nalezneme i další užitečné rozhraní
+nazvané jednoduše <strong>Seeker</strong>. V&nbsp;tomto rozhraní je předepsána
+jediná metoda pojmenovaná <strong>Seek</strong>, která slouží pro přesun
+ukazovátka aktuálně čtených či zapisovaných dat v&nbsp;Readeru či Writeru.
+Samozřejmě ne vždy je toto rozhraní implementováno, protože některé zdroje/cíle
+dat přesun ukazovátka neumožňují. Ovšem například u souborů je to možné:</p>
+
+<pre>
+type <strong>Seeker</strong> interface {
+        <strong>Seek</strong>(offset int64, whence int) (int64, error)
+}
+</pre>
+
+<p>První parametr metody <strong>Seek</strong> určuje offset, o který se má
+ukazovátko posunout. Povšimněte si, že se jedná o hodnotu se znaménkem, protože
+posun lze provést jak dopředu, tak i dozadu. Druhým parametrem se specifikuje,
+od jaké hodnoty se offset počítá:</p>
+
+<table>
+<tr><th>Hodnota</th><th>Význam</th></tr>
+<tr><td>SeekStart</td><td>offset se počítá od začátku souboru (takže je absolutní)</td></tr>
+<tr><td>SeekCurrent</td><td>offset se počítá relativně k&nbsp;aktuální hodnotě ukazovátka</td></tr>
+<tr><td>SeekEnd</td><td>offset se počítá od začátku souboru (takže je absolutní)</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: použitím datového typu
+<strong>int64</strong> se (prozatím) teoreticky omezuje maximální posun, který
+lze v&nbsp;rámci souboru provést, ovšem prakticky na stejné omezení většinou
+narazíme již na úrovni operačního systému a/nebo jeho souborového
+systému.</div></p>
+
+<p>Od rozhraní <strong>Seeker</strong> jsou kombinací
+s&nbsp;<strong>Reader</strong> a <strong>Writer</strong> odvozena další
+rozhraní:</p>
+
+<pre>
+type <strong>ReadSeeker</strong> interface {
+        Reader
+        Seeker
+}
+&nbsp;
+type <strong>WriteSeeker</strong> interface {
+        Writer
+        Seeker
+}
+&nbsp;
+type <strong>ReadWriteSeeker</strong> interface {
+        Reader
+        Writer
+        Seeker
+}
+</pre>
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Přesun (<i>seek</i>) při čtení dat ze souboru</h2>
+
+<p>Nejprve si ukažme, jak se provádí přesun (<i>seek</i>) ukazovátka při čtení
+ze souboru nebo z&nbsp;jiného prostředku poskytujícího data. <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/05_simple_string_reader.go">V&nbsp;následujícím
+příkladu</a> se provádí čtení dat z&nbsp;řetězce, a to po blocích o velikosti
+šest bajtů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "strings"
+)
+&nbsp;
+const input_string = "*** Hello world! ***"
+const buffer_size = 6
+&nbsp;
+func <strong>main</strong>() {
+        reader := strings.NewReader(input_string)
+&nbsp;
+        buffer := make([]byte, buffer_size)
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes translated into '%s'\n", read, buffer[:read])
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Výsledek je predikovatelný &ndash; prostě se postupně přečte celý obsah
+řetězce:</p>
+
+<pre>
+read 6 bytes translated into '*** He'
+read 6 bytes translated into 'llo wo'
+read 6 bytes translated into 'rld! *'
+read 2 bytes translated into '**'
+reached end of file
+</pre>
+
+<p>S&nbsp;využitím operace <strong>Seek</strong> však můžeme první čtyři bajty
+přeskočit (viz zvýrazněná část). <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/06_reader_seeker_absolute.go">Posun
+se počítá od začátku souboru</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "strings"
+)
+&nbsp;
+const input_string = "*** Hello world! ***"
+const buffer_size = 6
+&nbsp;
+func <strong>main</strong>() {
+        reader := strings.NewReader(input_string)
+&nbsp;
+        buffer := make([]byte, buffer_size)
+        <strong>reader.Seek(4, io.SeekStart)</strong>
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes translated into '%s'\n", read, buffer[:read])
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+read 6 bytes translated into 'Hello '
+read 6 bytes translated into 'world!'
+read 4 bytes translated into ' ***'
+reached end of file
+</pre>
+
+<p>Naopak v&nbsp;dalším <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/07_reader_seeker_from_end.go">demonstračním
+příkladu</a> se posun vypočte od konce souboru, takže je záporný:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "strings"
+)
+&nbsp;
+const input_string = "*** Hello world! ***"
+const buffer_size = 6
+&nbsp;
+func <strong>main</strong>() {
+        reader := strings.NewReader(input_string)
+&nbsp;
+        buffer := make([]byte, buffer_size)
+        <strong>reader.Seek(-10, io.SeekEnd)</strong>
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes translated into '%s'\n", read, buffer[:read])
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Na výstupu je patrné, že se skutečně načetlo jen posledních deset bajtů:</p>
+
+<pre>
+read 6 bytes translated into 'world!'
+read 4 bytes translated into ' ***'
+reached end of file
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_23/08_reader_seeker_relative.go">A
+konečně si ukažme</a>, jak se provede relativní přeskok vypočítaný na základě
+aktuální polohy ukazovátka:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "strings"
+)
+&nbsp;
+const input_string = "****** Hello world! ******[END]"
+const buffer_size = 6
+&nbsp;
+func <strong>main</strong>() {
+        reader := strings.NewReader(input_string)
+&nbsp;
+        buffer := make([]byte, buffer_size)
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes translated into '%s'\n", read, buffer[:read])
+                        <strong>reader.Seek(7, io.SeekCurrent)</strong>
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Přesun se povede celkově třikrát:</p>
+
+<pre>
+read 6 bytes translated into '******'
+read 6 bytes translated into 'world!'
+read 5 bytes translated into '[END]'
+reached end of file
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Přesun (<i>seek</i>) při zápisu dat do souboru</h2>
+
+<p>Přesun ukazovátka lze ovšem provést i <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/09_writer_seeker.go">při
+zápisu dat</a> do souboru (s&nbsp;určitým omezením pro soubory otevřené
+v&nbsp;režimu <i>append</i>).  Jednou zapsaná data je tedy možné přepsat (posun
+zpět) či naopak v&nbsp;souboru vytvořit &bdquo;díru&ldquo; (posun vpřed):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "small.bin"
+&nbsp;
+func <strong>writeMark</strong>(writer io.Writer) {
+        buffer := []byte("**")
+        written, err := writer.Write(buffer)
+&nbsp;
+        if written &gt; 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        writeMark(writer)
+        writer.Seek(100, io.SeekCurrent)
+        writeMark(writer)
+        writer.Seek(100, io.SeekCurrent)
+        writeMark(writer)
+}
+</pre>
+
+<p>Výsledný soubor obsahuje automaticky doplněné &bdquo;díry&ldquo;, což je
+patrné z&nbsp;jeho hexadecimálního zobrazení:</p>
+
+<pre>
+0000000: 2a 2a 00 00 00 00 00 00 00 00 00 00 00 00 00 00  **..............
+0000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000060: 00 00 00 00 00 00 2a 2a 00 00 00 00 00 00 00 00  ......**........
+0000070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00000a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00000b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00000c0: 00 00 00 00 00 00 00 00 00 00 00 00 2a 2a        ............**
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Vytvoření řídkého souboru (<i>sparse file</i>)</h2>
+
+<p>Některé souborové systémy podporují takzvané řídké soubory neboli <i>sparse
+files</i>. Jedná se o takové soubory, jejichž celý obsah nemusí být fyzicky
+celý umístěn na datovém médiu ve formě bitové kopie &ndash; soubor tedy může
+obsahovat &bdquo;díry&ldquo; a zabírat na disku méně fyzického místa, než
+odpovídá jeho logické velikosti. Takový řídký soubor můžeme vytvořit velmi
+snadno, samozřejmě za předpokladu, že jsou řídké soubory podporovány souborovým
+systémem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "huge.bin"
+&nbsp;
+func <strong>writeMark</strong>(writer io.Writer) {
+        buffer := []byte("**")
+        written, err := writer.Write(buffer)
+&nbsp;
+        if written &gt; 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        writeMark(writer)
+        <strong>writer.Seek(1000000, io.SeekCurrent)</strong>
+        writeMark(writer)
+        <strong>writer.Seek(1000000, io.SeekCurrent)</strong>
+        writeMark(writer)
+}
+</pre>
+
+<p>Povšimněte si, že se mezi jednotlivými zápisy dvou hvězdiček provedl přesun
+ukazovátka o milion bajtů. Výsledný soubor by měl mít logickou velikost
+2+1000000+2+1000000+2=2000002 bajtů. Jeho podobu si tedy zobrazíme jen ve
+zkrácené podobě (vynecháme sekvenci milionu nulových bajtů):</p>
+
+<pre>
+0000000: 2a 2a 00 00 00 00 00 00 00 00 00 00 00 00 00 00  **..............
+0000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+...
+...
+...
+00f41f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4200: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4210: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4220: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4230: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4240: 00 00 2a 2a 00 00 00 00 00 00 00 00 00 00 00 00  ..**............
+00f4250: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4260: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4270: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4280: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+00f4290: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+...
+...
+...
+01e8440: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+01e8450: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+01e8460: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+01e8470: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+01e8480: 00 00 00 00 2a 2a                                ....**
+</pre>
+
+<p>Fyzická velikost tohoto souboru je ovšem ve skutečnosti mnohem menší, o čemž
+se můžeme snadno přesvědčit, pokud příkazu <strong>ls</strong> předáme parametr
+<strong>-s</strong>, jenž zajistí, že se v&nbsp;levém sloupci zobrazí skutečná
+velikost souboru v&nbsp;kilobajtech:</p>
+
+<pre>
+$ <strong>ls -ls huge.bin </strong>
+&nbsp;
+12 -rw-r--r-- 1 tester tester 2000006 dub 28 09:50 huge.bin
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: vidíme tedy, že je obsazeno pouze
+dvanáct bloků a nikoli více než 1900 bloků, které by bylo zapotřebí pro uložení
+celého neřídkého souboru.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Použití rozhraní <strong>io.MultiWriter</strong> pro souběžné zpracování výstupních dat</h2>
+
+<p>Další užitečné rozhraní se jmenuje <strong>io.MultiWriter</strong>. Slouží
+například pro souběžné zpracování dat a jeho činnost se do jisté míry podobá
+nástroji <strong>tee</strong> &ndash; data zapsaná do vytvořené instance
+MultiWriteru se interně &bdquo;propíšou&ldquo; do několika dalších writerů.
+Podívejme se na jednoduchý příklad. Nejprve vytvoříme dva objekty sloužící pro
+zápis dat do dvojice souborů:</p>
+
+<pre>
+writer1, err := os.Create(filename1)
+&nbsp;
+writer2, err := os.Create(filename2)
+</pre>
+
+<p>Zápis do souborů však nebudeme provádět přímo. Namísto toho vytvoříme
+instanci MultiWriteru:</p>
+
+<pre>
+writer := io.MultiWriter(writer1, writer2)
+</pre>
+
+<p>Nyní jakákoli operace <strong>writer.Write()</strong> interně zavolá
+<strong>writer1.Write()</strong> a souběžně i <strong>writer2.Write()</strong>
+(ve skutečnosti nemusí nutně dojít ke skutečně souběžnému zápisu, ovšem to jako
+uživatelé nijak neovlivníme).</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_23/11_multi_writer.go">Úplný
+demonstrační příklad</a> používající MultiWriter vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename1 = "test_output_1.txt"
+const filename2 = "test_output_2.txt"
+const message = "Hello world!"
+&nbsp;
+func <strong>main</strong>() {
+        writer1, err := os.Create(filename1)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer1.Close()
+&nbsp;
+        writer2, err := os.Create(filename2)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer2.Close()
+&nbsp;
+        writer := io.MultiWriter(writer1, writer2)
+&nbsp;
+        buffer := []byte(message)
+&nbsp;
+        written, err := writer.Write(buffer)
+&nbsp;
+        if written &gt; 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+<p>Po spuštění příkladu by měly vzniknout dva soubory se stejným obsahem.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Využití rozhraní <strong>StringWriter</strong></h2>
+
+<p>Tato kapitola bude velmi stručná, protože si v&nbsp;ní pouze ukážeme použití
+metody <strong>WriteString</strong> pro zápis řetězce do souboru. Zavolání této
+metody je přímočaré a interně se samozřejmě provádí konverze z&nbsp;Unicode na
+sekvenci bajtů podle kódování UTF-8:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.txt"
+const message = "Hello world!"
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        written, err := writer.WriteString(message)
+&nbsp;
+        if written &gt; 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Načítání řetězců &ndash; typ <strong>Reader</strong> z&nbsp;balíčku <strong>bufio</strong></h2>
+
+<p>Zajímavé je, že při čtení řetězců (například ze souborů, ale i z&nbsp;jiných
+vstupů) si již nevystačíme s&nbsp;možnostmi balíčku <strong>io</strong>, ale
+musíme využít možnosti nabízené balíčkem <strong>bufio</strong>, v&nbsp;němž je
+deklarován typ <strong>Reader</strong>, který kromě implementace rozhraní
+<strong>io.Reader</strong> implementuje mj.&nbsp;i tyto metody:</p>
+
+<pre>
+func (b *Reader) <strong>ReadString</strong>(delim byte) (string, error)
+&nbsp;
+func (b *Reader) <strong>ReadLine</strong>() (line []byte, isPrefix bool, err error)
+</pre>
+
+<p>Doporučuje se používat první metodu <strong>ReadString</strong>, které se
+předá znak tvořící oddělovač jednotlivých záznamů v&nbsp;řetězci. Pokud tento
+znak bude nastaven na konec řádku (\n), bude metoda pracovat
+s&nbsp;jednotlivými textovými řádky. Metoda vrátí načtený řetězec a případný
+identifikátor chyby, pokud k&nbsp;ní dojde (více viz navazující kapitolu).</p>
+
+<p>Můžeme si to vyzkoušet na následujícím demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_input.txt"
+const buffer_size = 16
+&nbsp;
+func <strong>main</strong>() {
+        reader, err := os.Open(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer reader.Close()
+&nbsp;
+        bufferedReader := bufio.NewReader(reader)
+&nbsp;
+        for {
+                str, err := bufferedReader.ReadString('\n')
+&nbsp;
+                fmt.Printf("read string with size %d bytes: %s", len(str), str)
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("\nreached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("\nother error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Chování si můžeme otestovat na běžném textovém souboru, na jehož konci je
+znak konce řádku:</p>
+
+<pre>
+read string with size 8 bytes: line #1
+read string with size 8 bytes: line #2
+read string with size 8 bytes: line #3
+read string with size 8 bytes: line #4
+read string with size 8 bytes: line #5
+<strong>read string with size 0 bytes: </strong>
+reached end of file
+</pre>
+
+<p>Zvýrazněný řádek nám naznačuje, že při posledním pokusu o čtení již došlo
+k&nbsp;indikaci konce souboru, což ovšem obecně nemusí znamenat, že přečtenou
+hodnotu máme zahodit &ndash; viz následující kapitolu.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Chování readeru při dosažení konce souboru</h2>
+
+<p><a href="#k10">V&nbsp;předchozím příkladu</a> jsme načítali textový soubor,
+jehož hexadecimální tvar je následující:</p>
+
+<pre>
+0000000: 6c 69 6e 65 20 23 31 <strong>0a</strong> 6c 69 6e 65 20 23 32 <strong>0a</strong>  line #1.line #2.
+0000010: 6c 69 6e 65 20 23 33 <strong>0a</strong> 6c 69 6e 65 20 23 34 <strong>0a</strong>  line #3.line #4.
+0000020: 6c 69 6e 65 20 23 35 <strong>0a</strong>                          line #5.
+</pre>
+
+<p>Povšimněte si, že posledním znakem tohoto souboru je znak s&nbsp;ASCII kódem
+0x0a, což je (v&nbsp;Unixu) znak pro konec řádku. Co se ovšem stane, pokud
+tento znak nebude na konci posledního řádku umístěn, tj.&nbsp;pokud bude mít
+soubor tento tvar?:</p>
+
+<pre>
+0000000: 6c 69 6e 65 20 23 31 <strong>0a</strong> 6c 69 6e 65 20 23 32 <strong>0a</strong>  line #1.line #2.
+0000010: 6c 69 6e 65 20 23 33 <strong>0a</strong> 6c 69 6e 65 20 23 34 <strong>0a</strong>  line #3.line #4.
+0000020: 6c 69 6e 65 20 23 35                             line #5
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: takový soubor vytvoříte například ve
+Vimu po zadání příkazů:</div></p>
+
+<pre>
+:set binary
+:set noendofline
+:w
+</pre>
+
+<p>Zdrojový kód příkladu bude prakticky stejný, pouze změníme vstupní soubor
+z&nbsp;<a
+href="https://github.com/tisnik/go-root/blob/master/article_23/test_input.txt">test_input.txt</a>
+na <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/test_input_no_eoln.txt">test_input_no_eoln.txt</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_input_no_eoln.txt"
+const buffer_size = 16
+&nbsp;
+func <strong>main</strong>() {
+        reader, err := os.Open(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer reader.Close()
+&nbsp;
+        bufferedReader := bufio.NewReader(reader)
+&nbsp;
+        for {
+                str, err := bufferedReader.ReadString('\n')
+&nbsp;
+                fmt.Printf("read string with size %d bytes: %s", len(str), str)
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("\nreached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("\nother error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Povšimněte si, že při posledním čtení se přečte pouze sedm bajtů (chybí
+odřádkování) a následující čtení již neproběhne, protože poslední čtení
+nastavilo &bdquo;chybu&ldquo; na hodnotu <strong>io.EOF</strong>:</p>
+
+<pre>
+read string with size 8 bytes: line #1
+read string with size 8 bytes: line #2
+read string with size 8 bytes: line #3
+read string with size 8 bytes: line #4
+read string with size 7 bytes: line #5
+reached end of file
+</pre>
+
+<p>Co to znamená v&nbsp;praxi? I když bude při čtení platit <strong>err ==
+nil</strong>, musíme se podívat na hodnotu chyby, aby bylo zřejmé, jaká situace
+nastala &ndash; zda se pouze jedná o poslední řádek či zda došlo k&nbsp;jiné
+specifikované chybě.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Přečtení sekvence bajtů z&nbsp;bufferovaného vstupu</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu opět použijeme balíček
+<strong>bufio</strong>, ovšem nikoli pro čtení celých řádků ve formě textu
+(řetězců), ale pro čtení sekvence bajtů až do chvíle, kdy se narazí na
+specifikovaný oddělovač. Tento oddělovač opět nastavíme na ASCII hodnotu znaku
+pro konec řádku:</p>
+
+<pre>
+array, err := bufferedReader.ReadBytes('\n')
+</pre>
+
+<p>Samotná logika čtení je prakticky stejná, jako tomu bylo v&nbsp;případě
+řetězců; budeme tedy rozlišovat mezi koncem dat (souboru) a jinou chybou:</p>
+
+<pre>
+if err == io.EOF {
+        fmt.Println("reached end of file")
+        break
+}
+&nbsp;
+if err != nil {
+        fmt.Printf("other error %v\n", err)
+        break
+}
+</pre>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/15_bufio_reader_read_bytes.go">zdrojového
+kódu tohoto demonstračního příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "io"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_input_no_eoln.txt"
+const buffer_size = 16
+&nbsp;
+func <strong>main</strong>() {
+        reader, err := os.Open(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer reader.Close()
+&nbsp;
+        bufferedReader := bufio.NewReader(reader)
+&nbsp;
+        for {
+                array, err := bufferedReader.ReadBytes('\n')
+&nbsp;
+                fmt.Printf("read array of bytes with size %d bytes: %v\n", len(array), array)
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+        }
+}
+</pre>
+
+<p>Z&nbsp;výpisu zpráv tohoto demonstračního příkladu je patrné, že každá
+načtená sekvence bajtů skutečně končí bajtem s&nbsp;kódem 10 (což odpovídá 0x0a
+neboli '\n'), pochopitelně až na poslední sekvenci, která je načtena bez ohledu
+na to, jakým bajtem končí:</p>
+
+<pre>
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 49 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 50 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 51 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 52 10]
+read array of bytes with size 7 bytes: [108 105 110 101 32 35 53]
+reached end of file
+</pre>
+
+<p>Při pokusu o přečtení souboru končícího znakem '\n' vrátí poslední čtení již
+jen prázdnou sekvenci a chyba bude reprezentována hodnotou
+<strong>io.EOF</strong>:</p>
+
+<pre>
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 49 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 50 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 51 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 52 10]
+read array of bytes with size 8 bytes: [108 105 110 101 32 35 53 10]
+read array of bytes with size 0 bytes: []
+reached end of file
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Zápis dat s&nbsp;jejich komprimací s&nbsp;využitím algoritmu Deflate</h2>
+
+<p>Dalšími užitečnými datovými typy, které implementují nám již velmi dobře
+známé rozhraní <strong>io.Writer</strong>, jsou typy nacházející se
+v&nbsp;balíčku <strong>compress</strong>. Dnes se konkrétně budeme věnovat
+podbalíčku <strong>gzip</strong>, ovšem kromě něho zde nalezneme podbalíčky
+<strong>bzip2</strong>, <strong>flate</strong>, <strong>lzw</strong> a
+<strong>zlib</strong>. V&nbsp;podbalíčku <strong>compress/gzip</strong> je
+implementace komprimovacího algoritmu Deflate používaného v&nbsp;Gzipu a taktéž
+ve známém DOSovém komprimačním nástroji <strong>pkzip</strong>. Komprimace dat
+je z&nbsp;pohledu běžného programátora snadná, právě díky použití rozhraní
+<strong>io.Writer</strong>:</p>
+
+<pre>
+writer, err := os.Create(filename)
+&nbsp;
+gzipWriter := gzip.NewWriter(writer)
+&nbsp;
+buffer := []byte(message)
+written, err := gzipWriter.Write(buffer)
+</pre>
+
+<p>Data jsou před fyzickým zápisem automaticky zkomprimována. Úplná
+implementace příkladu bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "compress/gzip"
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.txt.gz"
+const message = "Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello "
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        gzipWriter := gzip.NewWriter(writer)
+        defer gzipWriter.Close()
+&nbsp;
+        buffer := []byte(message)
+        written, err := gzipWriter.Write(buffer)
+&nbsp;
+        if written &gt;= 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+<p>Po jeho spuštění se objeví informace o tom, že byla zapsána zpráva o délce
+šedesát bajtů:</p>
+
+<pre>
+written 60 bytes
+</pre>
+
+<p>Ovšem pohledem na vytvořený soubor se můžeme přesvědčit, že jeho skutečná
+délka bude menší, právě kvůli použití komprimačního algoritmu:</p>
+
+<pre>
+$ <strong>ls -l test_output.txt.gz </strong>
+&nbsp;
+-rw-r--r-- 1 tester tester 32 dub 28 09:46 test_output.txt.gz
+</pre>
+
+<p>Obsah vytvořeného souboru bude vypadat takto:</p>
+
+<pre>
+$ xxd -g 1 test_output.txt.gz 
+&nbsp;
+0000000: 1f 8b 08 00 00 00 00 00 00 ff f2 48 cd c9 c9 57  ...........H...W
+0000010: 20 8f 04 04 00 00 ff ff 73 a9 91 e2 3c 00 00 00   .......s...<...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: první dva bajty 0x1f 0x8b tvoří
+<i>magickou konstantu</i> umožňující rozpoznání formátu dat i v&nbsp;případě,
+že se například nejedná o pojmenovaný soubor, ale o pouhou sekvenci bajtů.
+Další bajt 0x08 určuje typ komprimace (zde Deflate), následují příznaky
+souboru, případné časové razítko, a další dva příznaky. Celková délka hlavičky
+je v&nbsp;tomto případě deset bajtů, samotná zkomprimovaná data začínají až za
+touto hlavičkou. Hlavička vypadá takto:</div></p>
+
+<table>
+<tr><th>Offset</th><th>Velikost</th><th>Hodnota</th><th>Význam</th></tr>
+<tr><td>0</td><td>2</td><td>0x1f 0x8b</td><td>magické číslo identifikující formát Gzip</td></tr>
+<tr><td>2</td><td>1</td><td>?</td><td>metoda použitá při komprimaci dat</td></tr>
+<tr><td>3</td><td>1</td><td>?</td><td>příznaky souboru</td></tr>
+<tr><td>4</td><td>4</td><td>?</td><td>časové razítko</td></tr>
+<tr><td>8</td><td>1</td><td>?</td><td>další příznaky komprimačního algoritmu</td></tr>
+<tr><td>9</td><td>1</td><td>?</td><td>identifikace operačního systému, na němž byla data zkomprimována</td></tr>
+</table>
+
+<p>Pokud vás zajímá tabulka s&nbsp;kódy operačních systémů, ponoříme se hluboko
+do minulosti:</p>
+
+<table>
+<tr><th>Hodnota</th><th>Operační systém (varianty)</th></tr>
+<tr><td>0  </td><td>FAT (MS-DOS, OS/2, NT/Win32)</td></tr>
+<tr><td>1  </td><td>Amiga</td></tr>
+<tr><td>2  </td><td>VMS (OpenVMS)</td></tr>
+<tr><td>3  </td><td>Unix</td></tr>
+<tr><td>4  </td><td>VM/CMS</td></tr>
+<tr><td>5  </td><td>Atari TOS</td></tr>
+<tr><td>6  </td><td>HPFS (OS/2, NT)</td></tr>
+<tr><td>7  </td><td>Macintosh</td></tr>
+<tr><td>8  </td><td>Z-System</td></tr>
+<tr><td>9  </td><td>CP/M</td></tr>
+<tr><td>10 </td><td>TOPS-20</td></tr>
+<tr><td>11 </td><td>NTFS filesystem (NT)</td></tr>
+<tr><td>12 </td><td>QDOS</td></tr>
+<tr><td>13 </td><td>Acorn RISCOS</td></tr>
+<tr><td>255</td><td>neznámý</td></tr>
+</table>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Konfigurace komprimačního algoritmu</h2>
+
+<p>Ve skutečnosti lze instanci implementace komprimačního algoritmu Deflate
+vytvořit dvěma možnými způsoby. První z&nbsp;nich již známe &ndash;
+konstruktoru předáme pouze jiný <i>writer</i>:</p>
+
+<pre>
+gzipWriter := gzip.NewWriter(writer)
+</pre>
+
+<p>Druhý způsob umožňuje specifikovat typ komprimace a její úroveň, například
+můžeme nastavit nejvyšší úroveň komprimace (která pochopitelně může prodloužit
+dobu komprimace):</p>
+
+<pre>
+gzipWriter, err := gzip.NewWriterLevel(writer, gzip.BestCompression)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se v&nbsp;tomto
+případě kromě samotné instance writeru vrací i hodnota reprezentující případnou
+chybu.</div></p>
+
+<p>Upravený tvar demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "compress/gzip"
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.txt.gz"
+const message = "Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello "
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        gzipWriter, err := gzip.NewWriterLevel(writer, gzip.BestCompression)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        defer gzipWriter.Close()
+&nbsp;
+        buffer := []byte(message)
+        written, err := gzipWriter.Write(buffer)
+&nbsp;
+        if written &gt;= 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Přímé získání zkomprimovaných dat přes rouru (<i>pipe</i>)</h2>
+
+<p><a href="#k03">Ve třetí kapitole</a> jsme se seznámili s&nbsp;posíláním dat
+přes rouru vytvořenou v&nbsp;operační paměti. Podobným způsobem ovšem můžeme
+získat i zkomprimovaná data, a to bez nutnosti jejich zápisu do souboru. Celý
+postup zpracování bude následující:</p>
+
+<pre>
+data &rarr; gzipWriter &rarr; roura &rarr; běžný reader &rarr; zkomprimovaná data
+</pre>
+
+<p>Opět se podívejme na způsob implementace, který není příliš složitý:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "compress/gzip"
+        "fmt"
+        "io"
+)
+&nbsp;
+const message = "Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello "
+&nbsp;
+func <strong>main</strong>() {
+        reader, writer := io.Pipe()
+&nbsp;
+        gzipWriter := gzip.NewWriter(writer)
+&nbsp;
+        go func() {
+                buffer := []byte(message)
+                written, err := gzipWriter.Write(buffer)
+&nbsp;
+                if written &gt;= 0 {
+                        fmt.Printf("written %d bytes\n", written)
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("I/O error %v\n", err)
+                }
+&nbsp;
+                gzipWriter.Close()
+                writer.Close()
+        }()
+&nbsp;
+        buffer := make([]byte, 100)
+&nbsp;
+        for {
+                read, err := reader.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes:", read)
+                        for i := 0; i &lt; read; i++ {
+                                fmt.Printf(" %02x", buffer[i])
+                        }
+                        fmt.Println()
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        break
+                }
+&nbsp;
+        }
+}
+</pre>
+
+<p>Výsledkem práce tohoto programu bude informace o uložení šedesáti
+nezkomprimovaných bajtů a o přečtení celkem třiceti dvou bajtů představujících
+zkomprimovanou zprávu:</p>
+
+<pre>
+read 10 bytes: 1f 8b 08 00 00 00 00 00 00 ff
+written 60 bytes
+read 10 bytes: f2 48 cd c9 c9 57 20 8f 04 04
+read 4 bytes: 00 00 ff ff
+read 8 bytes: 73 a9 91 e2 3c 00 00 00
+reached end of file
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Ukázka použití <strong>MultiWriteru</strong> pro současnou komprimaci dat do více souborů s&nbsp;různě nastaveným algoritmem</h2>
+
+<p>Otestování jednotlivých nastavení algoritmu Delfate je možné provést
+v&nbsp;dalším demonstračním příkladu, v&nbsp;němž je využit již výše popsaný
+<strong>MultiWriter</strong> umožňující &bdquo;rozvětvení&ldquo; toku dat.
+Zapisovaná zpráva je nejdříve rozvětvena a následně je každá větev
+zkomprimována, ovšem s&nbsp;odlišným nastavením algoritmu:</p>
+
+<pre>
+     &nearr; MultiWriter &rarr; gzipWriter#1 &rarr; zkomprimovaná data#1
+data &rarr; MultiWriter &rarr; gzipWriter#1 &rarr; zkomprimovaná data#1
+     &searr; MultiWriter &rarr; gzipWriter#1 &rarr; zkomprimovaná data#1
+</pre>
+
+<p>Samozřejmě opět následuje výpis úplného zdrojového kódu takto upraveného
+programu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "compress/gzip"
+        "fmt"
+        "io"
+        "log"
+        "os"
+        "strings"
+)
+&nbsp;
+const filename1 = "test_output.txt.1.gz"
+const filename2 = "test_output.txt.2.gz"
+const filename3 = "test_output.txt.3.gz"
+const filename4 = "test_output.txt.4.gz"
+&nbsp;
+func <strong>fileWriter</strong>(filename string) io.WriteCloser {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        return writer
+}
+&nbsp;
+func <strong>gzipWriter</strong>(writer io.Writer, compressionLevel int) io.WriteCloser {
+        gzipWriter, err := gzip.NewWriterLevel(writer, compressionLevel)
+        if err != nil {
+                log.Fatal(err)
+        }
+        return gzipWriter
+}
+&nbsp;
+func <strong>writeMessage</strong>(writer io.Writer, message string) {
+        buffer := []byte(message)
+        written, err := writer.Write(buffer)
+&nbsp;
+        if written &gt;= 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        message := strings.Repeat("Hello ", 100)
+&nbsp;
+        writer1 := fileWriter(filename1)
+        defer writer1.Close()
+&nbsp;
+        writer2 := fileWriter(filename2)
+        defer writer2.Close()
+&nbsp;
+        writer3 := fileWriter(filename3)
+        defer writer3.Close()
+&nbsp;
+        writer4 := fileWriter(filename4)
+        defer writer4.Close()
+&nbsp;
+        gzipWriter1 := gzipWriter(writer1, gzip.BestCompression)
+        defer gzipWriter1.Close()
+&nbsp;
+        gzipWriter2 := gzipWriter(writer2, gzip.BestSpeed)
+        defer gzipWriter2.Close()
+&nbsp;
+        gzipWriter3 := gzipWriter(writer3, gzip.HuffmanOnly)
+        defer gzipWriter3.Close()
+&nbsp;
+        gzipWriter4 := gzipWriter(writer4, gzip.NoCompression)
+        defer gzipWriter4.Close()
+&nbsp;
+        writer := io.MultiWriter(gzipWriter1, gzipWriter2, gzipWriter3, gzipWriter4)
+&nbsp;
+        writeMessage(writer, message)
+}
+</pre>
+
+<p>Výsledné soubory mají rozdílnou délku:</p>
+
+<pre>
+$ <strong>ls -l *.gz</strong>
+&nbsp;
+-rw-r--r-- 1 tester tester  36 dub 28 09:49 test_output.txt.1.gz
+-rw-r--r-- 1 tester tester  52 dub 28 09:49 test_output.txt.2.gz
+-rw-r--r-- 1 tester tester 228 dub 28 09:49 test_output.txt.3.gz
+-rw-r--r-- 1 tester tester 628 dub 28 09:49 test_output.txt.4.gz
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Využití <i>hex dumperu</i> (nejenom) pro ladicí účely</h2>
+
+<p>V&nbsp;některých situacích je nutné prozkoumat binární data získaná
+například z&nbsp;dalších zdrojů (síťové protokoly atd.) popř.&nbsp;přímo
+generovaná vyvíjenou aplikací. Samozřejmě je vždy možné tato data vyexportovat
+do binárních souborů a použít výše zmíněný nástroj <strong>xxd</strong>,
+popř.&nbsp;jeho varianty <strong>od</strong>, <strong>hd</strong>
+(<strong>hexdump</strong>) apod., ovšem mnohdy je výhodnější si nechat vypsat
+hexadecimální podobu binárních dat přímo na standardní výstup. A právě
+k&nbsp;tomuto účelu slouží balíček <strong>encoding/hex</strong> a v&nbsp;něm
+definovaný datový typ <strong>Dumper</strong> (zkrácenina celého názvu <i>hex
+dumper</i>). Použití tohoto typu je jednoduché, protože implementuje nám již
+velmi dobře známé rozhraní <strong>io.Writer</strong>. Jakýkoli zápis binárních
+dat se převede na hexadecimální podobu, která se následně vypíše do terminálu
+(výsledek je kompatibilní s&nbsp;nástrojem <strong>hexdump</strong> při použití
+přepínače <strong>-C</strong> (&bdquo;kanonický formát&ldquo;) popř.&nbsp;přímo
+při zavolání <strong>hd</strong> bez přepínače. Samotná instance typu
+<strong>Dumper</strong> se vytvoří konstruktorem:</p>
+
+<pre>
+func <strong>Dumper</strong>(w io.Writer) io.WriteCloser
+</pre>
+
+<p>Použití hex dumperu je snadné a nijak se neliší od dalších typů
+implementujících rozhraní <strong>io.Writer</strong>:</p>
+
+<pre>
+writer, err := os.Create(filename)
+&nbsp;
+hexDumper := hex.Dumper(writer)
+&nbsp;
+buffer := []byte(message)
+hexDumper.Write(buffer)
+</pre>
+
+<p>Podívejme se nyní na <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/20_hex_dumper.go">úplný
+zdrojový kód</a> demonstračního příkladu, který převede řetězec &bdquo;***
+Hello world! ***&ldquo; (považovaný za sled bajtů) do kanonické hexadecimální
+podoby:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/hex"
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.hex"
+const message = "*** Hello world! ***"
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        hexDumper := hex.Dumper(writer)
+        defer hexDumper.Close()
+&nbsp;
+        buffer := []byte(message)
+        written, err := hexDumper.Write(buffer)
+&nbsp;
+        if written &gt;= 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+<p>Výsledkem běhu tohoto příkladu by měla být tato dvojice řádků vypsaná na standardní výstup:</p>
+
+<pre>
+00000000  2a 2a 2a 20 48 65 6c 6c  6f 20 77 6f 72 6c 64 21  |*** Hello world!|
+00000010  20 2a 2a 2a                                       | ***|
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Konverze binárních dat s&nbsp;využitím kódování Base64</h2>
+
+<p>V&nbsp;dnešním posledním demonstračním příkladu si ukážeme způsob použití
+dalšího datového typu implementujícího rozhraní <strong>io.Writer</strong>.
+Jedná se o datový typ <strong>Encoding</strong> z&nbsp;balíčku
+<strong>encoding/base64</strong>, který &ndash; jak již jeho název správně
+napovídá &ndash; slouží pro zakódování libovolných binárních dat podle
+specifikace Base64, která je používána mj.&nbsp;i v&nbsp;několika síťových
+protokolech. Vždy tři bajty ze vstupních dat (24 bitů) jsou rozděleny po šesti
+bitech a každá šestice je zakódována do jednoho výstupního znaku podle
+následující tabulky:</p>
+
+<table>
+<tr><th>Index</th><th>Znak</th><th>Index</th><th>Znak</th><th>Index</th><th>Znak</th><th>Index</th><th>Znak</th></tr>
+<tr><td>0 </td><td>A</td><td>16</td><td>Q</td><td>32</td><td>g</td><td>48</td><td>w</td></tr>
+<tr><td>1 </td><td>B</td><td>17</td><td>R</td><td>33</td><td>h</td><td>49</td><td>x</td></tr>
+<tr><td>2 </td><td>C</td><td>18</td><td>S</td><td>34</td><td>i</td><td>50</td><td>y</td></tr>
+<tr><td>3 </td><td>D</td><td>19</td><td>T</td><td>35</td><td>j</td><td>51</td><td>z</td></tr>
+<tr><td>4 </td><td>E</td><td>20</td><td>U</td><td>36</td><td>k</td><td>52</td><td>0</td></tr>
+<tr><td>5 </td><td>F</td><td>21</td><td>V</td><td>37</td><td>l</td><td>53</td><td>1</td></tr>
+<tr><td>6 </td><td>G</td><td>22</td><td>W</td><td>38</td><td>m</td><td>54</td><td>2</td></tr>
+<tr><td>7 </td><td>H</td><td>23</td><td>X</td><td>39</td><td>n</td><td>55</td><td>3</td></tr>
+<tr><td>8 </td><td>I</td><td>24</td><td>Y</td><td>40</td><td>o</td><td>56</td><td>4</td></tr>
+<tr><td>9 </td><td>J</td><td>25</td><td>Z</td><td>41</td><td>p</td><td>57</td><td>5</td></tr>
+<tr><td>10</td><td>K</td><td>26</td><td>a</td><td>42</td><td>q</td><td>58</td><td>6</td></tr>
+<tr><td>11</td><td>L</td><td>27</td><td>b</td><td>43</td><td>r</td><td>59</td><td>7</td></tr>
+<tr><td>12</td><td>M</td><td>28</td><td>c</td><td>44</td><td>s</td><td>60</td><td>8</td></tr>
+<tr><td>13</td><td>N</td><td>29</td><td>d</td><td>45</td><td>t</td><td>61</td><td>9</td></tr>
+<tr><td>14</td><td>O</td><td>30</td><td>e</td><td>46</td><td>u</td><td>62</td><td>+</td></tr>
+<tr><td>15</td><td>P</td><td>31</td><td>f</td><td>47</td><td>v</td><td>63</td><td>/</td></tr>
+</table>
+
+<p>Následně je zajišťěno případné dorovnání posledních bajtů (pokud není délka
+dat dělitelná třemi) znakem rovnítka.</p>
+
+<p>Zakódování dat do Base64 je snadné:</p>
+
+<pre>
+writer, err := os.Create(filename)
+&nbsp;
+base64Encoder := base64.NewEncoder(base64.RawStdEncoding, writer)
+&nbsp;
+buffer := []byte(message)
+written, err := base64Encoder.Write(buffer)
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_23/21_base_64_encoder.go">https://github.com/tisnik/go-root/blob/master/article_23/21_base_64_encoder.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/base64"
+        "fmt"
+        "log"
+        "os"
+)
+&nbsp;
+const filename = "test_output.base64"
+const message = "*** Hello world! ***"
+&nbsp;
+func <strong>main</strong>() {
+        writer, err := os.Create(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer writer.Close()
+&nbsp;
+        base64Encoder := base64.NewEncoder(base64.RawStdEncoding, writer)
+        defer base64Encoder.Close()
+&nbsp;
+        buffer := []byte(message)
+        written, err := base64Encoder.Write(buffer)
+&nbsp;
+        if written &gt;= 0 {
+                fmt.Printf("written %d bytes\n", written)
+        }
+&nbsp;
+        if err != nil {
+                fmt.Printf("I/O error %v\n", err)
+        }
+}
+</pre>
+
+<p>Vstupní řetězec &bdquo;*** Hello world! ***&ldquo; by se měl zkonvertovat do
+následující sekvence znaků z&nbsp;množiny definované pro BASE64:</p>
+
+<pre>
+KioqIEhlbGxvIHdvcmxkISAqKio
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_io_reader_read.go</td><td>čtení dat ze souboru s&nbsp;využitím metody <strong>Read</strong> z&nbsp;rozhraní <strong>Reader</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/01_io_reader_read.go">https://github.com/tisnik/go-root/blob/master/article_23/01_io_reader_read.go</a></td></tr>
+<tr><td> 2</td><td>02_io_writer_write.go</td><td>použití metody <strong>Write</strong> z&nbsp;rozhraní <strong>Writer</strong> pro zápis do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/02_io_writer_write.go">https://github.com/tisnik/go-root/blob/master/article_23/02_io_writer_write.go</a></td></tr>
+<tr><td> 3</td><td>03_memory_pipe.go</td><td>přenos dat s&nbsp;využitím roury (pipe) alokované v&nbsp;operační paměti</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/03_memory_pipe.go">https://github.com/tisnik/go-root/blob/master/article_23/03_memory_pipe.go</a></td></tr>
+<tr><td> 4</td><td>04_memory_pipe_bytes_buffer.go</td><td>vylepšení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/04_memory_pipe_bytes_buffer.go">https://github.com/tisnik/go-root/blob/master/article_23/04_memory_pipe_bytes_buffer.go</a></td></tr>
+<tr><td> 5</td><td>05_simple_file_reader.go</td><td>čtení dat z&nbsp;řetězce po blocích</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/05_simple_file_reader.go">https://github.com/tisnik/go-root/blob/master/article_23/05_simple_file_reader.go</a></td></tr>
+<tr><td> 6</td><td>06_reader_seeker_absolute.go</td><td>použití operace <strong>Seek</strong> pro posun počítaný od začátku souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/06_reader_seeker_absolute.go">https://github.com/tisnik/go-root/blob/master/article_23/06_reader_seeker_absolute.go</a></td></tr>
+<tr><td> 7</td><td>07_reader_seeker_from_end.go</td><td>použití operace <strong>Seek</strong> pro posun počítaný od konce souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/07_reader_seeker_from_end.go">https://github.com/tisnik/go-root/blob/master/article_23/07_reader_seeker_from_end.go</a></td></tr>
+<tr><td> 8</td><td>08_reader_seeker_relative.go</td><td>použití operace <strong>Seek</strong> pro relativní posun v&nbsp;souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/08_reader_seeker_relative.go">https://github.com/tisnik/go-root/blob/master/article_23/08_reader_seeker_relative.go</a></td></tr>
+<tr><td> 9</td><td>09_writer_seeker.go</td><td>použití operace <strong>Seek</strong> při zápisu do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/09_writer_seeker.go">https://github.com/tisnik/go-root/blob/master/article_23/09_writer_seeker.go</a></td></tr>
+<tr><td>10</td><td>10_writer_seeker_sparse_file.go</td><td>vytvoření řídkého souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/10_writer_seeker_sparse_file.go">https://github.com/tisnik/go-root/blob/master/article_23/10_writer_seeker_sparse_file.go</a></td></tr>
+<tr><td>11</td><td>11_multi_writer.go</td><td>souběžný zápis do více souborů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/11_multi_writer.go">https://github.com/tisnik/go-root/blob/master/article_23/11_multi_writer.go</a></td></tr>
+<tr><td>12</td><td>12_string_writer.go</td><td>zápis řetězců (<strong>StringWriter</strong>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/12_string_writer.go">https://github.com/tisnik/go-root/blob/master/article_23/12_string_writer.go</a></td></tr>
+<tr><td>13</td><td>13_bufio_reader_read_string.go</td><td>čtení řetězců pomocí funkcí z&nbsp;balíčku <strong>bufio</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/13_bufio_reader_read_string.go">https://github.com/tisnik/go-root/blob/master/article_23/13_bufio_reader_read_string.go</a></td></tr>
+<tr><td>14</td><td>14_bufio_reader_other_file.go</td><td>čtení řetězců pomocí funkcí z&nbsp;balíčku <strong>bufio</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/14_bufio_reader_other_file.go">https://github.com/tisnik/go-root/blob/master/article_23/14_bufio_reader_other_file.go</a></td></tr>
+<tr><td>15</td><td>15_bufio_reader_read_bytes.go</td><td>čtení sekvence bajtů s&nbsp;využitím funkcí z&nbsp;balíčku <strong>bufio</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/15_bufio_reader_read_bytes.go">https://github.com/tisnik/go-root/blob/master/article_23/15_bufio_reader_read_bytes.go</a></td></tr>
+<tr><td>16</td><td>16_gzip_writer.go</td><td>komprimace dat metodou Deflate</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/16_gzip_writer.go">https://github.com/tisnik/go-root/blob/master/article_23/16_gzip_writer.go</a></td></tr>
+<tr><td>17</td><td>17_gzip_writer_compression_level.go</td><td>volba metody a úrovně komprimace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/17_gzip_writer_compression_level.go">https://github.com/tisnik/go-root/blob/master/article_23/17_gzip_writer_compression_level.go</a></td></tr>
+<tr><td>18</td><td>18_gzip_writer_fifo.go</td><td>přečtení zkomprimovaných dat zpět</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/18_gzip_writer_fifo.go">https://github.com/tisnik/go-root/blob/master/article_23/18_gzip_writer_fifo.go</a></td></tr>
+<tr><td>19</td><td>19_gzip_multiwriter.go</td><td>souběžná komprimace dat více metodami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/19_gzip_multiwriter.go">https://github.com/tisnik/go-root/blob/master/article_23/19_gzip_multiwriter.go</a></td></tr>
+<tr><td>20</td><td>20_hex_dumper.go</td><td>zobrazení libovolných binárních dat ve formě hexadecimálního výpisu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/20_hex_dumper.go">https://github.com/tisnik/go-root/blob/master/article_23/20_hex_dumper.go</a></td></tr>
+<tr><td>21</td><td>21_base_64_encoder.go</td><td>zakódování binárních dat do tisknutelné podoby podle Base64</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_23/21_base_64_encoder.go">https://github.com/tisnik/go-root/blob/master/article_23/21_base_64_encoder.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
