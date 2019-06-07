@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 19:
+//     Souběžná komprimace dat více metodami.
+
 package main
 
 import (
