@@ -1,0 +1,2975 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Kontejnery v základní knihovně programovacího jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Kontejnery v základní knihovně programovacího jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>I dnešní část seriálu o programovacím jazyku Go je věnována popisu možností poskytovaných standardní knihovnou. Dnes se konkrétně zaměříme na protokol HTTP, popis balíčků s implementací různých datových struktur a taktéž na popis balíčku s rozhraními a typy pro řazení a vyhledávání.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Jednoduchý HTTP server využívající rozhraní ResponseWriter a strukturu Request</a></p>
+<p><a href="#k02">2. Chování HTTP serveru v&nbsp;případě odpovědi, která je zpracovávána delší dobu</a></p>
+<p><a href="#k03">3. Využití metody <strong>Flush</strong> rozhraní <strong>Flusher</strong></a></p>
+<p><a href="#k04">4. Test, zda se klient odpojil</a></p>
+<p><a href="#k05">5. Základní kolekce podporované základní knihovnou programovacího jazyka Go</a></p>
+<p><a href="#k06">6. Obousměrně vázaný seznam</a></p>
+<p><a href="#k07">7. Použití seznamů ve funkci zásobníku pro implementaci RPN</a></p>
+<p><a href="#k08">8. Cyklická fronta (cyklický seznam)</a></p>
+<p><a href="#k09">9. Naplnění cyklické fronty hodnotami, hodnoty neinicializovaných prvků</a></p>
+<p><a href="#k10">10. Procházení všemi prvky cyklické fronty: metoda <strong>Do</strong></a></p>
+<p><a href="#k11">11. Balíček <strong>sort</strong>: řadicí a vyhledávací algoritmy</a></p>
+<p><a href="#k12">12. Práce s&nbsp;poli či řezy s&nbsp;prvky typu <strong>int</strong> a <strong>float64</strong></a></p>
+<p><a href="#k13">13. Složitější příklad: seřazení všech slov načtených z&nbsp;textového souboru</a></p>
+<p><a href="#k14">14. Typy <strong>IntSlice</strong>, <strong>Float64Slice</strong> a <strong>StringSlice</strong></a></p>
+<p><a href="#k15">15. Řazení prvků na základě vlastní porovnávací funkce</a></p>
+<p><a href="#k16">16. Řazení pole/řezů struktur podle vlastních kritérií</a></p>
+<p><a href="#k17">17. Rozhraní <strong>Heap</strong> a jeho význam v&nbsp;praxi</a></p>
+<p><a href="#k18">18. Interní změna pozice prvků při práci s&nbsp;haldou</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Jednoduchý HTTP server využívající rozhraní ResponseWriter a strukturu Request</h2>
+
+<p>V&nbsp;předchozích dvou částech [<a
+href="https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/">1</a>]
+[<a
+href="https://www.root.cz/clanky/pokrocilejsi-pouziti-vstupne-vystupnich-funkci-standardni-knihovny-jazyka-go/">2</a>]
+<a href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> jsme se seznámili se základními rozhraními a jejich
+implementacemi, které se používají pro vstupně-výstupní operace (standardní
+vstup, standardní výstup, soubory, síťová připojení, FIFO, paměťové buffery
+atd.). Dnes se tímto tématem budeme zabývat pouze okrajově, protože si ukážeme
+některé další možnosti poskytované implementací HTTP serveru, konkrétně
+datovými typy <strong>http.Server</strong> a <strong>http.ServeMUX</strong>.
+Touto problematikou jsme se již částečně zabývali v&nbsp;předchozích částech
+tohoto seriálu, takže si jen ve stručnosti ukažme, jakým způsobem je možné
+v&nbsp;programovacím jazyku Go vytvořit aplikaci, která bude pracovat jako HTTP
+server poskytující klientům statický obsah načítaný ze specifikované adresářové
+struktury:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "io"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Zajímavější je pochopitelně implementace HTTP serveru, která bude generovat
+dynamický obsah. Ten lze tvořit buď přímo &bdquo;ručně&ldquo; v&nbsp;programu,
+nebo můžeme využít některé balíčky ze standardní knihovny programovacího jazyka
+Go pro generování dat ve formátu JSON, XML popř.&nbsp;knihovny
+s&nbsp;implementací šablon (<i>templates</i>). Dnes nás ovšem bude zajímat
+první způsob, tj.&nbsp;&bdquo;ruční&ldquo; generování odpovědi, která je
+serverem posílána klientovi na základě jeho dotazu (<i>request</i>). Jedna
+z&nbsp;nejjednodušších implementací takového HTTP serveru může vypadat
+například následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        response := "Hello world!\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Funkci takového serveru si můžeme snadno otestovat, například
+s&nbsp;využitím nástroje <strong>wget</strong> nebo ještě lépe
+<strong>curl</strong>. Vzhledem k&nbsp;tomu, že víme, na jakém portu server
+běží a jaký <i>endpoint</i> máme zavolat, sestavíme příkaz pro
+<strong>curl</strong> tímto způsobem:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+</pre>
+
+<p>Výstup bude obsahovat i ladicí informace vyžádané přepínačem <strong>-v</strong>:</p>
+
+<pre>
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Mon, 06 May 2019 18:14:06 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+<strong>Hello world!</strong>
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Ve zdrojovém kódu si povšimněte především funkce, v&nbsp;níž je
+implementováno generování a posílání odpovědi. Této funkci jsou předány dvě
+hodnoty, přičemž první je typu rozhraní <strong>http.ResponseWriter</strong> a
+druhá je typu ukazatel na <strong>http.Request</strong>:</p>
+
+<pre>
+type <strong>ResponseWriter</strong> interface {
+        Header() Header
+        Write([]byte) (int, error)
+        WriteHeader(statusCode int)
+}
+</pre>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Chování HTTP serveru v&nbsp;případě odpovědi, která je zpracovávána delší dobu</h2>
+
+<p>Předchozí implementace HTTP serveru sice ukázala, jakým způsobem se generuje
+dynamický obsah, ovšem v&nbsp;některých případech je situace složitější, neboť
+je nutné zajistit, aby se po HTTP protokolu přenášelo větší množství dat, které
+klient bude zpracovávat postupně, jakoby se jednalo o <i>stream</i> (jedná se
+sice o určité zneužití původní oblasti použití HTTP, ovšem setkáme se
+s&nbsp;ním poměrně často). Vyzkoušejme si tedy, jak bude komunikace mezi
+klientem a serverem vypadat ve chvíli, kdy server bude dodávat data rozdělená
+do záznamů (<i>record</i>). V&nbsp;tomto případě využijeme toho, že
+v&nbsp;rozhraní <strong>http.ResponseWriter</strong> je předepsána metoda:</p>
+
+<pre>
+<strong>Write</strong>([]byte) (int, error)
+</pre>
+
+<p>Tuto metodu pochopitelně již dobře známe, protože jsme se s&nbsp;ní
+několikrát setkali v&nbsp;předchozích dvou článcích. Samotná funkce, která bude
+na HTTP dotaz postupně dodávat odpověď rozdělenou na mnoho záznamů, tedy může
+v&nbsp;tom nejjednodušším případě vypadat následovně:</p>
+
+<pre>
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                writer.Write([]byte("Hello world!\n"))
+        }
+        println("handler finished")
+}
+</pre>
+
+<p>Úplnou implementaci takto modifikovaného HTTP serveru nalezneme na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/01_server.go">https://github.com/tisnik/go-root/blob/master/article_24/01_server.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                writer.Write([]byte("Hello world!\n"))
+        }
+        println("handler finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/data", handler)
+        http.ListenAndServe(":8080", nil)
+}
+</pre>
+
+<p>Chování HTTP serveru opět otestujeme nástrojem <strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/data</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /data HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sat, 04 May 2019 17:43:57 GMT
+&lt; Content-Length: 650
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+...
+...
+...
+Hello world!
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Přidat můžeme i simulaci postupného vytváření a posílání jednotlivých
+záznamů:</p>
+
+<pre>
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                writer.Write([]byte("Hello world!\n"))
+                time.Sleep(100 * time.Millisecond)
+                print(".")
+        }
+        println("\nhandler finished")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: časové odstupy mezi záznamy jsou zde
+simulovány uspáním gorutiny na určitý časový interval.</div></p>
+
+<p>Následuje výpis <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/02_slow_server.go">úplného
+zdrojového kódu</a> tohoto příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "time"
+)
+&nbsp;
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                writer.Write([]byte("Hello world!\n"))
+                time.Sleep(100 * time.Millisecond)
+                print(".")
+        }
+        println("\nhandler finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/data", handler)
+        http.ListenAndServe(":8080", nil)
+}
+</pre>
+
+<p>Nyní si chování této nové implementace HTTP serveru můžeme otestovat, a to
+opět s&nbsp;využitím nástroje <strong>curl</strong>. Po poslání požadavku:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/data</strong>
+</pre>
+
+<p>Server ihned pošle první část odpovědi (konkrétně hlavičku HTTP
+odpovědi):</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/data</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /data HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Fri, 03 May 2019 19:34:51 GMT
+&lt; Content-Length: 650
+&lt; Content-Type: text/plain; charset=utf-8
+</pre>
+
+<p>V&nbsp;této chvíli sice server postupně vytváří jednotlivé části těla
+odpovědi, ovšem klient tuto činnost nebude vidět, a to kvůli tomu, že se na
+straně klienta (a někdy i celého síťového stacku) používají buffery.
+Z&nbsp;pohledu klienta tedy v&nbsp;této chvíli dojde k&nbsp;jediné časové
+prodlevě o délce přibližně 100&times;50 ms = 5 sekund.</p>
+
+<p>Až po této prodlevě klient přijme všechny části odpovědi, a to najednou:</p>
+
+<pre>
+Hello world!
+Hello world!
+Hello world!
+...
+...
+...
+Hello world!
+Hello world!
+Hello world!
+* Connection #0 to host localhost left intact
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti ovšem bude chování
+serveru v&nbsp;praxi komplikovanější, protože klient bude přijímat bloky o
+velikosti odpovídající velikosti bufferu. V&nbsp;našem konkrétním značně
+zjednodušeném příkladu je však buffer větší, než suma velikosti všech poslaných
+částí odpovědi.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Využití metody <strong>Flush</strong> rozhraní <strong>Flusher</strong></h2>
+
+<p>V&nbsp;případě, že je skutečně nutné, aby klient dostal jednotlivé části
+odpovědi ihned po jejich vygenerování serverem, musíme se podívat na to, jak
+vlastně metoda <strong>http.ResponseWriter.Write()</strong> interně pracuje.
+Její činnost je poměrně přesně popsána v&nbsp;dokumentaci:</p>
+
+<pre>
+$ <strong>go doc http ResponseWriter.Write</strong>
+&nbsp;
+// Write writes the data to the connection as part of an HTTP reply.
+//
+// If WriteHeader has not yet been called, Write calls
+// WriteHeader(http.StatusOK) before writing the data. If the Header
+// does not contain a Content-Type line, Write adds a Content-Type set
+// to the result of passing the initial 512 bytes of written data to
+// DetectContentType. Additionally, if the total size of all written
+// data is under a few KB and there are no Flush calls, the
+// Content-Length header is added automatically.
+//
+// Depending on the HTTP protocol version and the client, calling
+// Write or WriteHeader may prevent future reads on the
+// Request.Body. For HTTP/1.x requests, handlers should read any
+// needed request body data before writing the response. Once the
+// headers have been flushed (due to either an explicit Flusher.Flush
+// call or writing enough data to trigger a flush), the request body
+// may be unavailable. For HTTP/2 requests, the Go HTTP server permits
+// handlers to continue to read the request body while concurrently
+// writing the response. However, such behavior may not be supported
+// by all HTTP/2 clients. Handlers should read before writing if
+// possible to maximize compatibility.
+func Write([]byte) (int, error)
+</pre>
+
+<p>Řešením (i když zdaleka ne dokonalým) je tedy volání metody
+<strong>Flush</strong> po každém volání <strong>Write</strong>. Tato metoda je
+předepsána v&nbsp;rozhraní <strong>http.Flusher</strong>:</p>
+
+<pre>
+type <strong>Flusher</strong> interface {
+    Flush()
+}
+</pre>
+
+<p>Teoreticky by tedy handler mohl být upraven takto:</p>
+
+<pre>
+writer.Write([]byte("Hello world!\n"))
+f.Flush()
+</pre>
+
+<p>Ve skutečnosti však nemusí všechny hodnoty implementující rozhraní
+<strong>ResponseWriter</strong> současně implementovat i rozhraní
+<strong>Flusher</strong>, takže musíme přidat test, zda je možné zavolat metodu
+<strong>Flush</strong>. Kód se nám nepatrně zkomplikuje:</p>
+
+<pre>
+writer.Write([]byte("Hello world!\n"))
+&nbsp;
+if f, ok := writer.(http.Flusher); ok {
+        f.Flush()
+}
+</pre>
+
+<p>Úplný zdrojový kód upravené implementace HTTP serveru naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go">https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "time"
+)
+&nbsp;
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                writer.Write([]byte("Hello world!\n"))
+                print(".")
+                if f, ok := writer.(http.Flusher); ok {
+                        f.Flush()
+                }
+                time.Sleep(100 * time.Millisecond)
+        }
+        println("\nhandler finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/data", handler)
+        http.ListenAndServe(":8080", nil)
+}
+</pre>
+
+<p>Chování nové implementace HTTP serveru si můžeme otestovat, opět
+s&nbsp;využitím nástroje <strong>curl</strong>. Nyní by se již jednotlivé
+odpovědi měly objevovat postupně a přibližně v&nbsp;takových intervalech,
+v&nbsp;jakých je posílá server:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/data</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /data HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Fri, 03 May 2019 19:36:50 GMT
+&lt; Content-Length: 650
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+</pre>
+
+<p>Postupné odpovědi serveru:</p>
+
+<pre>
+Hello world!
+Hello world!
+Hello world!
+* Connection #0 to host localhost left intact
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: i když budeme metodu
+<strong>Flush</strong> volat po každém zápisu části odpovědi, nemusí to vždy
+znamenat, že klient bude tyto části postupně přijímat. Mezi klientem a serverem
+totiž může stát HTTP proxy fungující mj.&nbsp;i jako buffer. V&nbsp;případě, že
+jsou požadavky na postupné posílání jednotlivých záznamů skutečně striktní
+(chování aplikace na ní zcela závisí), je nutné využití jiné technologie, než
+HTTP protokolu založeného na principu požadavek &rarr; odpověď (<i>request
+&rarr; response</i>).</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Test, zda se klient odpojil</h2>
+
+<p>V&nbsp;případě, že HTTP server popsaný <a href="#k03">v&nbsp;předchozí
+kapitole</a> spustíme, s&nbsp;využitím nástroje <strong>curl</strong> vytvoříme
+požadavek a následně spojení ukončíme, například stiskem
+<strong>Ctrl+C</strong>, bude se server pokoušet dále volat metodu
+<strong>Write</strong> a posílat data do již uzavřeného připojení. Pro korektní
+činnost tedy musíme přidat testy na to, zda se zápis podařil:</p>
+
+<pre>
+n, err := writer.Write([]byte("Hello world!\n"))
+if err != nil {
+        println("\nI/O error:", err.Error())
+        return
+}
+</pre>
+
+<p>Tuto novou implementaci HTTP serveru, kterou naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go">https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go</a>,
+vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "time"
+)
+&nbsp;
+func <strong>handler</strong>(writer http.ResponseWriter, request *http.Request) {
+        println("handler started")
+        for i := 0; i &lt; 50; i++ {
+                n, err := writer.Write([]byte("Hello world!\n"))
+                if err != nil {
+                        println("\nI/O error:", err.Error())
+                        return
+                }
+                if n == 0 {
+                        println("\nnothing written")
+                        return
+                }
+                print(".")
+                if f, ok := writer.(http.Flusher); ok {
+                        f.Flush()
+                }
+                time.Sleep(100 * time.Millisecond)
+        }
+        println("\nhandler finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/data", handler)
+        http.ListenAndServe(":8080", nil)
+}
+</pre>
+
+<p>Začátek testování:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/data</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /data HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Fri, 03 May 2019 19:38:41 GMT
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; Transfer-Encoding: chunked
+&lt; 
+Hello world!
+Hello world!
+Hello world!
+Hello world!
+<strong>^C</strong>
+</pre>
+
+<p>Po stisku klávesové zkratky <strong>Ctrl+C</strong> by se na straně serveru
+mělo objevit toto hlášení:</p>
+
+<pre>
+handler started
+.......
+I/O error: write tcp 127.0.0.1:8080-&gt;127.0.0.1:47698: write: broken pipe
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Základní kolekce podporované základní knihovnou programovacího jazyka Go</h2>
+
+<p>Ve druhé části dnešního článku si popíšeme ty balíčky, v&nbsp;nichž jsou
+implementovány takzvané <i>kontejnery</i> (<i>containers</i>). Ve skutečnosti
+se nejedná o nic složitého, pouze o rozšíření množiny složených datových
+struktur poskytovaných samotným programovacím jazykem Go. Připomeňme si, že
+mezi složené struktury patří zejména záznamy (<i>struct</i>), pole
+(<i>array</i>), od nich odvozený koncept řezů (<i>slice</i>) a samozřejmě
+taktéž mapy (<i>map</i>). Další kontejnery nalezneme v&nbsp;podbalíčcích
+balíčku <strong>container</strong>:</p>
+
+<table>
+<tr><th>Podbalíček</th><th>Stručný popis</th></tr>
+<tr><td>container/heap</td><td>rozhraní předepisující metody a chování datového typu halda (<i>heap</i>)</td></tr>
+<tr><td>container/list</td><td>obousměrně vázaný lineární seznam</td></tr>
+<tr><td>container/ring</td><td>kruhová fronta či seznam s&nbsp;pevnou kapacitou</td></tr>
+</table>
+
+<p>Do těchto kontejnerů se ukládají prvky typu <strong>interface{}</strong>,
+což v&nbsp;programovacím jazyku Go de facto znamená &bdquo;hodnoty neznámého
+typu&ldquo;. Pokud z&nbsp;kontejneru nějakou hodnotu přečteme, musí se většinou
+explicitně specifikovat, jaký typ prvků očekáváme. K&nbsp;tomuto účelu se
+v&nbsp;Go používají takzvané <a
+href="https://golang.org/ref/spec#Type_assertions">typové aserce</a>, které se
+zapisují následujícím způsobem:</p>
+
+<pre>
+i := x.(T)
+&nbsp;
+i, ok := x.(T)
+</pre>
+
+<p>kde se za <strong>T</strong> doplní konkrétní datový typ, například
+<strong>int</strong> nebo <strong>string</strong>. Ve druhém případě se do nové
+proměnné <strong>ok</strong> zapíše pravdivostní hodnota značící, zda se
+operace provedla či nikoli.</p>
+
+<p><div class="rs-tip-major">Poznámka: před popisem možností, které
+programátorům nabízí rozhraní pro datový typ <i>halda</i> si nejprve ukážeme
+některé možnosti nabízené balíčkem <strong>sort</strong>, protože právě možnost
+(resp.&nbsp;přesněji řečeno nutnost) porovnávání a řazení prvků je pro použití
+haldy nezbytná.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Obousměrně vázaný seznam</h2>
+
+<p>Touto datovou strukturou jsme se již zabývali <a
+href="https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-jazyka-go/#k12">v&nbsp;deváté
+části seriálu o programovacím jazyku Go</a>, takže si jen ve stručnosti ukažme,
+jak se vytvoří nový (prázdný) seznam, vloží se do něj tři prvky a následně se
+celý seznam vypíše s&nbsp;využitím iterace přes všechny jeho prvky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/list"
+        "fmt"
+)
+&nbsp;
+func <strong>printList</strong>(l *list.List) {
+        for e := l.Front(); e != nil; e = e.Next() {
+                fmt.Println(e.Value)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        l := list.New()
+        l.PushBack("foo")
+        l.PushBack("bar")
+        l.PushBack("baz")
+        printList(l)
+}
+</pre>
+
+<p>Výsledkem běhu tohoto příkladu budou následující tři řádky:</p>
+
+<pre>
+foo
+bar
+baz
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Použití seznamů ve funkci zásobníku pro implementaci RPN</h2>
+
+<p>I s&nbsp;využitím obousměrně vázaného seznamu ve funkci zásobníku
+(<i>stack</i>) jsme se seznámili v&nbsp;deváté části tohoto seriálu. Stačí se
+pouze rozhodnout, který konec seznamu bude sloužit jako vrchol zásobníku
+(<i>TOS &ndash; Top of Stack</i>). Pokud zvolíme, že <i>TOS</i> bude ležet na
+konci seznamu, můžeme si vytvořit dvě pomocné funkce pro dvě základní operace
+se zásobníkem &ndash; <strong>push</strong> a <strong>pop</strong>.
+V&nbsp;případě, že zásobník bude obsahovat pouze celá čísla, může implementace
+obou zmíněných funkcí vypadat následovně:</p>
+
+<h3>Implementace operace <strong>push</strong></h3>
+
+<pre>
+func <strong>push</strong>(l *list.List, number int) {
+        l.PushBack(number)
+}
+</pre>
+
+<h3>Implementace operace <strong>pop</strong></h3>
+
+<pre>
+func <strong>pop</strong>(l *list.List) int {
+        tos := l.Back()
+        l.Remove(tos)
+        return tos.Value.(int)
+}
+</pre>
+
+<p>Zásobník využijeme například při implementaci kalkulačky, která rozpozná
+priority operátorů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/list"
+        "fmt"
+        "strconv"
+        "strings"
+)
+&nbsp;
+type Stack list.List
+&nbsp;
+func <strong>printStack</strong>(l *list.List) {
+        for e := l.Front(); e != nil; e = e.Next() {
+                fmt.Println(e.Value)
+        }
+}
+&nbsp;
+func <strong>push</strong>(l *list.List, number int) {
+        l.PushBack(number)
+}
+&nbsp;
+func <strong>pop</strong>(l *list.List) int {
+        tos := l.Back()
+        l.Remove(tos)
+        return tos.Value.(int)
+}
+&nbsp;
+func <strong>main</strong>() {
+        expression := "1 2 + 2 3 * 8 + *"
+        terms := strings.Split(expression, " ")
+        stack := list.New()
+&nbsp;
+        for _, term := range terms {
+                switch term {
+                case "+":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand1+operand2)
+                case "-":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand2-operand1)
+                case "*":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand1*operand2)
+                case "/":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand2/operand1)
+                default:
+                        number, err := strconv.Atoi(term)
+                        if err == nil {
+                                push(stack, number)
+                        }
+                }
+        }
+        printStack(stack)
+}
+</pre>
+
+<p>Výsledek výpočtu je jednoznačný:</p>
+
+<pre>
+42
+</pre>
+
+<p>Nepatrnou úpravou tohoto programu získáme nástroj, který nejenže daný RPN
+výraz vypočítá, ale bude v&nbsp;průběhu výpočtu vypisovat i aktuální obsah
+zásobníku. Úprava spočívá v&nbsp;přidání řádků vypisujících prováděné operace a
+jejich operandy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/list"
+        "fmt"
+        "strconv"
+        "strings"
+)
+&nbsp;
+type Stack list.List
+&nbsp;
+func <strong>printStack</strong>(l *list.List) {
+        for e := l.Front(); e != nil; e = e.Next() {
+                fmt.Printf("%2d ", e.Value)
+        }
+        println()
+}
+&nbsp;
+func <strong>push</strong>(l *list.List, number int) {
+        l.PushBack(number)
+}
+&nbsp;
+func <strong>pop</strong>(l *list.List) int {
+        tos := l.Back()
+        l.Remove(tos)
+        return tos.Value.(int)
+}
+&nbsp;
+func <strong>main</strong>() {
+        expression := "1 2 + 2 3 * 8 + *"
+        terms := strings.Split(expression, " ")
+        stack := list.New()
+&nbsp;
+        for _, term := range terms {
+                switch term {
+                case "+":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand1+operand2)
+                        print("+ :     ")
+                        printStack(stack)
+                case "-":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand2-operand1)
+                        print("- :     ")
+                        printStack(stack)
+                case "*":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand1*operand2)
+                        print("* :     ")
+                        printStack(stack)
+                case "/":
+                        operand1 := pop(stack)
+                        operand2 := pop(stack)
+                        push(stack, operand2/operand1)
+                        print("/ :     ")
+                        printStack(stack)
+                default:
+                        number, err := strconv.Atoi(term)
+                        if err == nil {
+                                push(stack, number)
+                        }
+                        fmt.Printf("%-2d:     ", number)
+                        printStack(stack)
+                }
+        }
+        print("Result: ")
+        printStack(stack)
+}
+</pre>
+
+<p>Postupné provádění výpočtu s&nbsp;jeho vizualizací:</p>
+
+<pre>
+1 :      1
+2 :      1  2
++ :      3
+2 :      3  2
+3 :      3  2  3
+* :      3  6
+8 :      3  6  8
++ :      3 14
+* :     42
+Result: 42
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Cyklická fronta (cyklický seznam)</h2>
+
+<p>Druhým typem kontejneru, který si v&nbsp;dnešním článku popíšeme, je kruhová
+fronta popř.&nbsp;kruhový seznam s&nbsp;pevnou kapacitou, který se označuje
+termínem <i>ring</i>. Vlastní kontejner, který obsahuje prvky typu
+<strong>Ring</strong>, se vytváří konstruktorem <strong>New</strong>
+(pochopitelně se zadáním názvu balíčku v&nbsp;prefixu), kterému je nutné předat
+požadovanou kapacitu kontejneru:</p>
+
+<pre>
+func <strong>New</strong>(n int) *Ring
+</pre>
+
+<p>Příkladem může být cyklická fronta s&nbsp;kapacitou deseti prvků:</p>
+
+<pre>
+r := ring.New(10)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti by se termín <i>cyklická
+fronta</i> měl použít jen tehdy, pokud by se ukazatele čteného a zapisovaného
+prvku měnily nezávisle na sobě. To lze programově snadno dosáhnout.</div></p>
+
+<p>Ve chvíli, kdy je kontejner o požadované kapacitě vytvořen, je vrácena
+hodnota představovaná ukazatelem na strukturu nazvanou taktéž
+<strong>Ring</strong>. Tato struktura představující první prvek v&nbsp;kruhovém
+seznamu interně obsahuje jediný prvek nazvaný <strong>Value</strong>, který je
+typu <strong>interface{}</strong>:</p>
+
+<pre>
+type <strong>Ring</strong> struct {
+    Value interface{}
+}
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že prázdné rozhraní <strong>interface{}</strong> je
+implementováno všemi datovými typy programovacího jazyka Go (jak těmi
+základními, tak i uživatelskými), je možné do kontejneru ukládat prvky
+libovolného typu, pochopitelně včetně celých čísel:</p>
+
+<pre>
+r := ring.New(10)
+r.Value = 42
+</pre>
+
+<p>Na předchozí resp.&nbsp;na následující prvek v&nbsp;kontejneru se přechází
+metodami <strong>:</strong></p>
+
+<pre>
+func (r *Ring) <strong>Next</strong>() *Ring
+</pre>
+
+<p>a:</p>
+
+<pre>
+func (r *Ring) <strong>Prev</strong>() *Ring
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že tyto metody vrací
+ukazatel na jiný prvek patřící do kontejneru. To vlastně znamená, že
+programátoři nemají k&nbsp;dispozici žádný &bdquo;obal&ldquo; nad jednotlivými
+prvky a <i>ring</i> je skutečně tvořen pouze vázaným seznamem jednotlivých
+prvků typu <strong>Ring</strong>. A právě tato volnost nám umožňuje snadno
+vytvořit i cyklickou frontu.</div></p>
+
+<p>Celková kapacita kontejneru se získá metodou <strong>Len()</strong>, která
+však musí všemi prvky projít, takže její časová složitost je <i>O(n)</i>.</p>
+
+<p>Mezi další užitečné metody patří:</p>
+
+<table>
+<tr><th>Metoda</th><th>Význam</th></tr>
+<tr><td>Move</td><td>přesun ukazatele na aktivní prvek dopředu či dozadu o <i>n</i> prvků</td></tr>
+<tr><td>Link</td><td>spojení dvou cyklických seznamů</td></tr>
+<tr><td>Unlink</td><td>odstranění <i>n</i> elementů z&nbsp;kontejneru</td></tr>
+<tr><td>Do</td><td>umožňuje iterovat nad jednotlivými prvky cyklického seznamu</td></tr>
+</table>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Naplnění cyklické fronty hodnotami, hodnoty neinicializovaných prvků</h2>
+
+<p>Základní vlastnosti cyklické fronty či cyklického seznamu si ukážeme na
+několika následujících demonstračních příkladech.</p>
+
+<p>V&nbsp;prvním demonstračním příkladu, jehož zdrojový kód naleznete na adrese
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_24/08_empty_ring.go">https://github.com/tisnik/go-root/blob/master/article_24/08_empty_ring.go</a>,
+je vytvořen kontejner o kapacitě deseti prvků, které ovšem nejsou žádným
+způsobem inicializovány. Tyto prvky (<strong>Ring.Value</strong>) ve výchozím
+stavu obsahují hodnotu <strong>nil</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/ring"
+        "fmt"
+)
+&nbsp;
+func <strong>printRing</strong>(r *ring.Ring) {
+        length := r.Len()
+        for i := 0; i &lt; length; i++ {
+                fmt.Println(i, r.Value)
+                r = r.Next()
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        r := ring.New(10)
+        printRing(r)
+}
+</pre>
+
+<p>O tom, že se skutečně jedná o prvky s&nbsp;hodnotou <strong>nil</strong> se
+snadno přesvědčíme:</p>
+
+<pre>
+0 &lt;nil&gt;
+1 &lt;nil&gt;
+2 &lt;nil&gt;
+3 &lt;nil&gt;
+4 &lt;nil&gt;
+5 &lt;nil&gt;
+6 &lt;nil&gt;
+7 &lt;nil&gt;
+8 &lt;nil&gt;
+9 &lt;nil&gt;
+</pre>
+
+<p>Druhý demonstrační příklad ukazuje, jakým způsobem je možné naplnit prvky
+kontejneru a jak se hodnoty uložené do prvků opět vytisknou (či zpracují jiným
+způsobem). Musíme mít přitom na paměti, že se jedná o kruhový seznam/frontu,
+takže když se budeme pohybovat pouze jedním směrem
+(<strong>Ring.Next()</strong> či naopak pouze <strong>Ring.Prev()</strong>),
+budou se prvky cyklicky opakovat. To je patrné i z&nbsp;funkce provádějící
+výpis, protože zde procházíme každým prvkem dvakrát:</p>
+
+<pre>
+length := r.Len()
+for i := 0; i &lt; length*2; i++ {
+        fmt.Println(i, r.Value)
+        r = r.Next()
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_24/09_filled_ring.go">Úplný
+zdrojový kód</a> tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/ring"
+        "fmt"
+)
+&nbsp;
+func <strong>printRing</strong>(r *ring.Ring) {
+        length := r.Len()
+        for i := 0; i &lt; length*2; i++ {
+                fmt.Println(i, r.Value)
+                r = r.Next()
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        r := ring.New(3)
+        r.Value = "foo"
+        r = r.Next()
+        r.Value = "bar"
+        r = r.Next()
+        r.Value = "baz"
+        printRing(r)
+}
+</pre>
+
+<p>Jeho výsledky:</p>
+
+<pre>
+0 baz
+1 foo
+2 bar
+3 baz
+4 foo
+5 bar
+</pre>
+
+<p>V&nbsp;dalším příkladu jsou některé prvky kontejneru naplněny a jiné naopak
+přeskočeny:</p>
+
+<pre>
+r := ring.New(10)
+r.Value = "foo"
+r = r.Next()
+r.Value = "bar"
+r = r.Next()
+r.Value = "baz"
+</pre>
+
+<p>To se pochopitelně projeví i ve výpisu, ovšem je nutné mít na paměti, že
+s&nbsp;hodnotami <strong>nil</strong> je možné v&nbsp;programovacím jazyce Go
+pracovat zcela bez obavy.</p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_24/10_ring_empty_items.go">Úplný
+zdrojový kód</a> tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package &lt;strong&gt;main&lt;/strong&gt;
+&nbsp;
+import (
+        "container/ring"
+        "fmt"
+)
+&nbsp;
+func &lt;strong&gt;printRing&lt;/strong&gt;(r *ring.Ring) {
+        length := r.Len()
+        for i := 0; i &lt; length*2; i++ {
+                fmt.Println(i, r.Value)
+                r = r.Next()
+        }
+}
+&nbsp;
+func &lt;strong&gt;main&lt;/strong&gt;() {
+        r := ring.New(10)
+        r.Value = "foo"
+        r = r.Next()
+        r.Value = "bar"
+        r = r.Next()
+        r.Value = "baz"
+        printRing(r)
+}
+</pre>
+
+<p>Z&nbsp;výstupu je patrné, že se skutečně naplnily pouze některé prvky:</p>
+
+<pre>
+0 baz
+1 &lt;nil&gt;
+2 &lt;nil&gt;
+3 &lt;nil&gt;
+4 &lt;nil&gt;
+5 &lt;nil&gt;
+6 &lt;nil&gt;
+7 &lt;nil&gt;
+8 foo
+9 bar
+10 baz
+11 &lt;nil&gt;
+12 &lt;nil&gt;
+13 &lt;nil&gt;
+14 &lt;nil&gt;
+15 &lt;nil&gt;
+16 &lt;nil&gt;
+17 &lt;nil&gt;
+18 foo
+19 bar
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Procházení všemi prvky cyklické fronty: metoda <strong>Do</strong></h2>
+
+<p>Pro procházení všemi prvky cyklické fronty/seznamu je určena metoda nazvaná
+<strong>Do</strong>, která umožňuje, aby se při průchodu každým prvkem (tedy
+v&nbsp;každé iteraci) zavolala určitá funkce, která se předá hodnota uložená do
+prvku. V&nbsp;následujícím &ndash; nutno říci, že velmi jednoduchém &ndash;
+příkladu je ukázáno, jak je možné zavolat funkci nazvanou
+<strong>printItem</strong>:</p>
+
+<pre>
+func <strong>printItem</strong>(item interface{}) {
+        fmt.Println(item)
+}
+</pre>
+
+<p>Samotný průchod se pro cyklickou frontu <strong>r</strong> zajistí jediným
+programovým řádkem:</p>
+
+<pre>
+r.Do(printItem)
+</pre>
+
+<p>Následuje <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/11_ring_do_iterator.go">výpis
+zdrojového kódu</a> tohoto příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/ring"
+        "fmt"
+)
+&nbsp;
+func <strong>printItem</strong>(item interface{}) {
+        fmt.Println(item)
+}
+&nbsp;
+func <strong>main</strong>() {
+        r := ring.New(3)
+        r.Value = "foo"
+        r = r.Next()
+        r.Value = "bar"
+        r = r.Next()
+        r.Value = "baz"
+        r.Do(printItem)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+baz
+foo
+bar
+</pre>
+
+<p>V&nbsp;případě, že budeme chtít funkci volané pro každý prvek předávat i
+další parametr, například spočítaný index prvku:</p>
+
+<pre>
+func <strong>printItem</strong>(index int, item interface{}) {
+        fmt.Println(index, item)
+}
+</pre>
+
+<p>Je nutné použít <i>uzávěr</i> (<i>closure</i>), který je v&nbsp;jazyku Go
+taktéž podporován:</p>
+
+<pre>
+r.Do(func(item interface{}) {
+        printItem(i, item)
+        i++
+})
+</pre>
+
+<p>Opět si ukažme upravený zdrojový kód příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/ring"
+        "fmt"
+)
+&nbsp;
+func <strong>printItem</strong>(index int, item interface{}) {
+        fmt.Println(index, item)
+}
+&nbsp;
+func <strong>main</strong>() {
+        r := ring.New(3)
+        r.Value = "foo"
+        r = r.Next()
+        r.Value = "bar"
+        r = r.Next()
+        r.Value = "baz"
+&nbsp;
+        i := 1
+        r.Do(func(item interface{}) {
+                printItem(i, item)
+                i++
+        })
+}
+</pre>
+
+<p>Nyní se ve výsledcích objeví i indexy jednotlivých prvků (pokud ovšem mají
+v&nbsp;kruhové struktuře nějaký zvláštní význam):</p>
+
+<pre>
+1 baz
+2 foo
+3 bar
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Balíček <strong>sort</strong>: řadicí a vyhledávací algoritmy</h2>
+
+<p>Nyní popis kontejnerů, které nalezneme ve standardní knihovně programovacího
+jazyka Go na chvíli opustíme, protože si popíšeme některé možnosti poskytované
+balíčkem nazvaným <strong>sort</strong>. Jak již název tohoto balíčku
+naznačuje, jsou v&nbsp;něm implementovány algoritmy pro řazení prvků; kromě
+toho zde však nalezneme i algoritmy pro vyhledávání prvků. Datové typy a metody
+v&nbsp;balíčku <strong>sort</strong> jsou vybrány poněkud zvláštním způsobem,
+protože zde nalezneme jak zcela obecné metody (řazení prvků libovolných typů),
+tak i metody určené pro některé konkrétní vybrané typy: pole celých čísel typu
+<strong>int</strong>, pole čísel s&nbsp;plovoucí řádovou čárkou typu
+<strong>float64</strong> a konečně pole řetězců (<strong>string</strong>).</p>
+
+<p>Pro samotné řazení prvků se používají následující funkce:</p>
+
+<table>
+<tr><th>#</th><th>Funkce</th><th>Význam</th></tr>
+<tr><td>1</td><td>func <strong>Ints</strong>(a []int)</td><td>seřazení řezu celých čísel</td></tr>
+<tr><td>2</td><td>func <strong>Float64s</strong>(a []float64)</td><td>seřazení řezu čísel typu <strong>float64</strong></td></tr>
+<tr><td>3</td><td>func <strong>Strings</strong>(a []string)</td><td>seřazení řezu řetězců</td></tr>
+<tr><td>4</td><td>func <strong>Sort</strong>(data Interface)</td><td>seřazení libovolné kolekce implementující rozhraní <strong>sort.Interface</strong></td></tr>
+<tr><td>5</td><td>func <strong>Stable</strong>(data Interface)</td><td>stabilní varianta algoritmu řazení libovolné kolekce implementující rozhraní <strong>sort.Interface</strong></td></tr>
+<tr><td>6</td><td>func <strong>Reverse</strong>(data Interface)</td><td>otočení pořadí prvků v&nbsp;kolekci</td></tr>
+</table>
+
+<p>Kromě toho je možné zavolat i další funkce, které zjistí, zda je určitý řez
+nebo kolekce již seřazená:</p>
+
+<table>
+<tr><th>#</th><th>Funkce</th><th>Význam</th></tr>
+<tr><td>1</td><td>func <strong>IntsAreSorted</strong>(a []int) bool</td><td>test, zda je řez celých čísel setříděn</td></tr>
+<tr><td>2</td><td>func <strong>Float64sAreSorted</strong>(a []float64) bool</td><td>test, zda je řez čísel typu <strong>float64</strong> setříděn</td></tr>
+<tr><td>3</td><td>func <strong>StringsAreSorted</strong>(a []string) bool</td><td>test, zda je řez obsahující řetězce setříděn</td></tr>
+<tr><td>4</td><td>func <strong>IsSorted</strong>(data Interface) bool</td><td>test, zda jsou prvky v&nbsp;obecné kolekci setříděny</td></tr>
+</table>
+
+<p>Tyto funkce si popíšeme v&nbsp;dalších demonstračních příkladech.</p>
+
+<p>Důležité je taktéž rozhraní nazvané přímočaře <strong>Interface</strong>,
+v&nbsp;němž jsou předepsány metody volané při řazení sekvencí. Toto rozhraní se
+používá u všech datových typů, tj.&nbsp;i u uživatelských typů:</p>
+
+<pre>
+type <strong>Interface</strong> interface {
+    Len() int
+    Less(i, j int) bool
+    Swap(i, j int)
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Práce s&nbsp;poli či řezy s&nbsp;prvky typu <strong>int</strong> a <strong>float64</strong></h2>
+
+<p>V&nbsp;prvním demonstračním příkladu, jehož zdrojový kód naleznete na adrese
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_24/13_integer_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/13_integer_sort.go</a>,
+je ukázán způsob seřazení sekvence celých čísel a současně i zjištění, jestli
+je již řez, v&nbsp;němž je sekvence uložena, setříděn či nikoli. Na začátku je
+řez inicializován sekvencí náhodných hodnot; tato sekvence je vypsána,
+setříděna a poté znovu vypsána:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/rand"
+        "sort"
+)
+&nbsp;
+func <strong>printArray</strong>(prefix string, numbers []int) {
+        var state string
+        if sort.IntsAreSorted(numbers) {
+                state = "sorted"
+        } else {
+                state = "unsorted"
+        }
+        fmt.Printf("%s variant of %s array: %v\n", prefix, state, numbers)
+}
+&nbsp;
+func <strong>main</strong>() {
+        numbers := make([]int, 20)
+&nbsp;
+        for i := 0; i &lt; len(numbers); i++ {
+                numbers[i] = rand.Int() % 10
+        }
+        printArray("1st", numbers)
+&nbsp;
+        sort.Ints(numbers)
+        printArray("2nd", numbers)
+}
+</pre>
+
+<p>Po spuštění příkladu se nejdříve zobrazí původní náhodná sekvence a následně
+sekvence seřazená:</p>
+
+<pre>
+1st variant of unsorted array: [0 1 1 1 7 0 8 8 6 9 4 7 4 6 5 3 8 1 0 1]
+2nd variant of sorted array: [0 0 0 1 1 1 1 1 3 4 4 5 6 6 7 7 8 8 8 9]
+</pre>
+
+<p>Druhý demonstrační příklad se do značné míry podobá příkladu předchozímu,
+ovšem nyní budeme pracovat s&nbsp;polem čísel s&nbsp;plovoucí řádovou čárkou,
+konkrétně s&nbsp;datovým typem <strong>float64</strong>. Až na rozdílný způsob
+inicializace hodnot se tento příklad podobá příkladu předchozímu. Jeho zdrojový
+kód naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/14_float_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/14_float_sort.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "sort"
+)
+&nbsp;
+func <strong>printArray</strong>(prefix string, numbers []float64) {
+        var state string
+        if sort.Float64sAreSorted(numbers) {
+                state = "sorted"
+        } else {
+                state = "unsorted"
+        }
+        fmt.Printf("%s variant of %s array: %v\n", prefix, state, numbers)
+}
+&nbsp;
+func <strong>main</strong>() {
+        numbers := make([]float64, 20)
+&nbsp;
+        for i := 0; i &lt; len(numbers); i++ {
+                numbers[i] = math.Sin(float64(i) * math.Pi / float64(len(numbers)))
+        }
+        printArray("1st", numbers)
+&nbsp;
+        sort.Float64s(numbers)
+        printArray("2nd", numbers)
+}
+</pre>
+
+<p></p>
+
+<p>Výsledek činnosti tohoto příkladu:</p>
+
+<pre>
+1st variant of unsorted array: [0 0.15643446504023087 0.3090169943749474 0.45399049973954675 0.5877852522924731 0.7071067811865475 0.8090169943749475 0.8910065241883678 0.9510565162951535 0.9876883405951377 1 0.9876883405951378 0.9510565162951536 0.8910065241883679 0.8090169943749475 0.7071067811865477 0.5877852522924732 0.45399049973954686 0.3090169943749475 0.15643446504023098]
+2nd variant of sorted array: [0 0.15643446504023087 0.15643446504023098 0.3090169943749474 0.3090169943749475 0.45399049973954675 0.45399049973954686 0.5877852522924731 0.5877852522924732 0.7071067811865475 0.7071067811865477 0.8090169943749475 0.8090169943749475 0.8910065241883678 0.8910065241883679 0.9510565162951535 0.9510565162951536 0.9876883405951377 0.9876883405951378 1]
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Složitější příklad: seřazení všech slov načtených z&nbsp;textového souboru</h2>
+
+<p>Třetí příklad je již nepatrně složitější, protože se v&nbsp;něm pokusíme o
+načtení textového souboru, rozdělení obsahu tohoto souboru na jednotlivá slova
+a následně o lexikografické seřazení těchto slov. V&nbsp;první části je nutné
+načíst soubor a rozdělit ho na slova. To se provede takto:</p>
+
+<pre>
+reader, err := os.Open(filename)
+if err != nil {
+        log.Fatal(err)
+}
+defer reader.Close()
+&nbsp;
+bufferedReader := bufio.NewReader(reader)
+&nbsp;
+words := []string{}
+&nbsp;
+for {
+        str, err := bufferedReader.ReadString('\n')
+        if err != nil {
+                break
+        } else {
+                str = strings.Trim(str, "\n")
+                ws := strings.Split(str, " ")
+                words = <strong>append(words, ws...)</strong>
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka #1: povšimněte si triku při volání funkce
+<strong>append</strong> sloužící pro přidání nového prvku do řezu
+(<i>slice</i>). Tato funkce totiž akceptuje libovolný počet
+argumentů:</div></p>
+
+<pre>
+func <strong>append</strong>(slice []Type, elems ...Type) []Type
+</pre>
+
+<p>Zápisem:</p>
+
+<pre>
+words = append(words, ws...)
+</pre>
+
+<p>je možné zajistit, že se řez řetězců rozdělí a jeho jednotlivé prvky se do
+funkce <strong>append</strong> předají jako samostatné parametry.</p>
+
+<p><div class="rs-tip-major">Poznámka #2: ve skutečnosti není výše uvedený kód
+zcela korektní, protože nedokáže odfiltrovat znaky umístěné přímo za slovy.
+V&nbsp;našem konkrétním případě se jedná o čárky a tečky. Úpravu příkladu
+takovým způsobem, aby byl zcela korektní, již ponechám na váženém
+čtenáři.</div></p>
+
+<p><a
+href="https://github.com/tisnik/go-root/blob/master/article_24/15_string_sort.go">Úplný
+zdrojový kód</a> tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "log"
+        "os"
+        "sort"
+        "strings"
+)
+&nbsp;
+func <strong>printArray</strong>(prefix string, values []string) {
+        var state string
+        if sort.StringsAreSorted(values) {
+                state = "sorted"
+        } else {
+                state = "unsorted"
+        }
+        fmt.Printf("%s variant of %s array:\n", prefix, state)
+        for _, s := range values {
+                fmt.Printf("    %s\n", s)
+        }
+}
+&nbsp;
+const filename = "test_input.txt"
+&nbsp;
+func <strong>main</strong>() {
+        reader, err := os.Open(filename)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer reader.Close()
+&nbsp;
+        bufferedReader := bufio.NewReader(reader)
+&nbsp;
+        words := []string{}
+&nbsp;
+        for {
+                str, err := bufferedReader.ReadString('\n')
+                if err != nil {
+                        break
+                } else {
+                        str = strings.Trim(str, "\n")
+                        ws := strings.Split(str, " ")
+                        words = append(words, ws...)
+                }
+        }
+&nbsp;
+        printArray("1st", words)
+&nbsp;
+        sort.Strings(words)
+        printArray("2nd", words)
+}
+</pre>
+
+<p>Příklad si otestujeme na textovém souboru s&nbsp;následujícím obsahem:</p>
+
+<pre>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+</pre>
+
+<p>Výsledek činnosti příkladu &ndash; nejdříve se vypíše seznam slov a následně
+se tento seznam seřadí:</p>
+
+<pre>
+1st variant of unsorted array:
+    Lorem
+    ipsum
+    dolor
+    sit
+    amet,
+    consectetur
+    adipiscing
+    elit,
+    sed
+    do
+    eiusmod
+    tempor
+    incididunt
+    ut
+    labore
+    et
+    dolore
+    magna
+    aliqua.
+    Ut
+    enim
+    ad
+    minim
+    veniam,
+    quis
+    nostrud
+    exercitation
+    ullamco
+    laboris
+    nisi
+    ut
+    aliquip
+    ex
+    ea
+    commodo
+    consequat.
+    Duis
+    aute
+    irure
+    dolor
+    in
+    reprehenderit
+    in
+    voluptate
+    velit
+    esse
+    cillum
+    dolore
+    eu
+    fugiat
+    nulla
+    pariatur.
+    Excepteur
+    sint
+    occaecat
+    cupidatat
+    non
+    proident,
+    sunt
+    in
+    culpa
+    qui
+    officia
+    deserunt
+    mollit
+    anim
+    id
+    est
+    laborum.
+2nd variant of sorted array:
+    Duis
+    Excepteur
+    Lorem
+    Ut
+    ad
+    adipiscing
+    aliqua.
+    aliquip
+    amet,
+    anim
+    aute
+    cillum
+    commodo
+    consectetur
+    consequat.
+    culpa
+    cupidatat
+    deserunt
+    do
+    dolor
+    dolor
+    dolore
+    dolore
+    ea
+    eiusmod
+    elit,
+    enim
+    esse
+    est
+    et
+    eu
+    ex
+    exercitation
+    fugiat
+    id
+    in
+    in
+    in
+    incididunt
+    ipsum
+    irure
+    labore
+    laboris
+    laborum.
+    magna
+    minim
+    mollit
+    nisi
+    non
+    nostrud
+    nulla
+    occaecat
+    officia
+    pariatur.
+    proident,
+    qui
+    quis
+    reprehenderit
+    sed
+    sint
+    sit
+    sunt
+    tempor
+    ullamco
+    ut
+    ut
+    velit
+    veniam,
+    voluptate
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Typy <strong>IntSlice</strong>, <strong>Float64Slice</strong> a <strong>StringSlice</strong></h2>
+
+<p>Kromě výše zmíněných funkcí nalezneme v&nbsp;balíčku <strong>sort</strong> i
+několik užitečných datových typů a jedno rozhraní:</p>
+
+<table>
+<tr><th>#</th><th>Typ/rozhraní</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>Interface</td><td>rozhraní, kterou musí splňovat jakákoli kolekce, která má být seřaditelná</td></tr>
+<tr><td>2</td><td>IntSlice</td><td>implementace (nejenom) rozhraní <strong>Interface</strong> pro řez celých čísel</td></tr>
+<tr><td>3</td><td>Float64Slice</td><td>implementace (nejenom) rozhraní <strong>Interface</strong> pro řez čísel typu <strong>float64</strong></td></tr>
+<tr><td>4</td><td>StringSlice</td><td>implementace (nejenom) rozhraní <strong>Interface</strong> pro řez řetězců</td></tr>
+</table>
+
+<p>Datové typy <strong>xxxSlice</strong> umožňují snadnější práci s&nbsp;řezy
+celých čísel, čísel s&nbsp;plovoucí řádovou čárkou a taktéž s&nbsp;řezy
+řetězců; například je možné zavolat operaci pro otočení celé sekvence
+<strong>Reverse</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/rand"
+        "sort"
+)
+&nbsp;
+func <strong>printArray</strong>(prefix string, numbers []int) {
+        var state string
+        if sort.IntsAreSorted(numbers) {
+                state = "sorted"
+        } else {
+                state = "unsorted"
+        }
+        fmt.Printf("%s variant of %s array: %v\n", prefix, state, numbers)
+}
+&nbsp;
+func <strong>main</strong>() {
+        numbers := make([]int, 20)
+&nbsp;
+        for i := 0; i &lt; len(numbers); i++ {
+                numbers[i] = rand.Int() % 10
+        }
+        printArray("1st", numbers)
+&nbsp;
+        sort.Sort(sort.Reverse(sort.IntSlice(numbers)))
+        printArray("2nd", numbers)
+}
+</pre>
+
+<p>Univerzální funkce <strong>Reverse</strong> skutečně otočila i běžný řez
+celých čísel:</p>
+
+<pre>
+1st variant of unsorted array: [0 1 1 1 7 0 8 8 6 9 4 7 4 6 5 3 8 1 0 1]
+2nd variant of unsorted array: [9 8 8 8 7 7 6 6 5 4 4 3 1 1 1 1 1 0 0 0]
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Řazení prvků na základě vlastní porovnávací funkce</h2>
+
+<p>Další způsob využití typů <strong>xxxSlice</strong> spočívá v&nbsp;tom, že
+je možné daný řez seřadit na základě vlastní callback funkce volané při
+porovnávání dvou prvků v&nbsp;sekvenci. Používá se přitom metoda nazvaná
+<strong>Slice</strong>, které se předá jak sekvence, která se má seřadit, tak i
+definice příslušné callback funkce:</p>
+
+<pre>
+sort.Slice(numbers, func(i, j int) bool {
+        return numbers[i] &gt; numbers[j]
+})
+</pre>
+
+<p>Výše uvedená callback funkce způsobí, že se sekvence seřadí
+<i>sestupně</i>:</p>
+
+<pre>
+IntSlice: [0 1 1 1 7 0 8 8 6 9 4 7 4 6 5 3 8 1 0 1]
+IntSlice: [9 8 8 8 7 7 6 6 5 4 4 3 1 1 1 1 1 0 0 0]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pro seřazení <i>vzestupně</i> pouze
+otočte operátor &gt;.</div></p>
+
+<p>Samozřejmě si opět ukážeme <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/17_int_slice.go">celý
+zdrojový kód demonstračního příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/rand"
+        "sort"
+)
+&nbsp;
+func <strong>printIntSlice</strong>(numbers sort.IntSlice) {
+        fmt.Printf("IntSlice: %v\n", numbers)
+}
+&nbsp;
+func <strong>main</strong>() {
+        numbers := make([]int, 20)
+&nbsp;
+        for i := 0; i &lt; len(numbers); i++ {
+                numbers[i] = rand.Int() % 10
+        }
+        printIntSlice(numbers)
+&nbsp;
+        sort.Slice(numbers, func(i, j int) bool {
+                return numbers[i] &gt; numbers[j]
+        })
+&nbsp;
+        printIntSlice(numbers)
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Řazení pole/řezů struktur podle vlastních kritérií</h2>
+
+<p>Poslední příklad, který se týká přímo balíčku <strong>sort</strong>,
+ukazuje, jakým způsobem lze zajistit seřazení pole/řezu obsahujícího
+uživatelsky definované struktury, zde konkrétně strukturu:</p>
+
+<pre>
+type <strong>Role</strong> struct {
+        name    string
+        surname string
+}
+</pre>
+
+<p>Seřazení podle jména zajistí nám již známá funkce
+<strong>sort.Slice</strong> s&nbsp;vhodně upravenou callback funkcí:</p>
+
+<pre>
+sort.Slice(roles, func(i, j int) bool { return roles[i].name &lt; roles[j].name })
+</pre>
+
+<p>Naopak seřazení podle příjmení bude implementováno takto:</p>
+
+<pre>
+sort.Slice(roles, func(i, j int) bool { return roles[i].surname &lt; roles[j].surname })
+</pre>
+
+<p>Následuje <a
+href="https://github.com/tisnik/go-root/blob/master/article_24/18_sort_by.go">výpis
+příkladu</a>, který seřadí postavy ze hry Švestka napřed podle jména a potom
+podle příjmení:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "sort"
+)
+&nbsp;
+type <strong>Role</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>printRoles</strong>(roles []Role) {
+        for i, role := range roles {
+                fmt.Printf("#%d: %s %s\n", i, role.name, role.surname)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        roles := []Role{
+                Role{"Eliška", "Najbrtová"},
+                Role{"Jenny", "Suk"},
+                Role{"Anička", "Šafářová"},
+                Role{"Sváťa", "Pulec"},
+                Role{"Blažej", "Motyčka"},
+                Role{"Eda", "Wasserfall"},
+                Role{"Přemysl", "Hájek"},
+        }
+&nbsp;
+        fmt.Println("Unsorted:")
+        printRoles(roles)
+        fmt.Println("--------------------")
+&nbsp;
+        sort.Slice(roles, func(i, j int) bool { return roles[i].name &lt; roles[j].name })
+&nbsp;
+        fmt.Println("Sorted by name:")
+        printRoles(roles)
+        fmt.Println("--------------------")
+&nbsp;
+        sort.Slice(roles, func(i, j int) bool { return roles[i].surname &lt; roles[j].surname })
+&nbsp;
+        fmt.Println("Sorted by surname:")
+        printRoles(roles)
+        fmt.Println("--------------------")
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+Unsorted:
+#0: Eliška Najbrtová
+#1: Jenny Suk
+#2: Anička Šafářová
+#3: Sváťa Pulec
+#4: Blažej Motyčka
+#5: Eda Wasserfall
+#6: Přemysl Hájek
+--------------------
+Sorted by name:
+#0: Anička Šafářová
+#1: Blažej Motyčka
+#2: Eda Wasserfall
+#3: Eliška Najbrtová
+#4: Jenny Suk
+#5: Přemysl Hájek
+#6: Sváťa Pulec
+--------------------
+Sorted by surname:
+#0: Přemysl Hájek
+#1: Blažej Motyčka
+#2: Eliška Najbrtová
+#3: Sváťa Pulec
+#4: Jenny Suk
+#5: Eda Wasserfall
+#6: Anička Šafářová
+--------------------
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Rozhraní <strong>Heap</strong> a jeho význam v&nbsp;praxi</h2>
+
+<p>V&nbsp;balíčku <strong>container</strong> nalezneme i definici rozhraní
+<strong>Heap</strong>, které předepisuje chování datové struktury typu
+<i>halda</i> (<i>heap</i>), viz též podrobnější popis na Wikipedii &ndash; <a
+href="https://en.wikipedia.org/wiki/Heap_%28data_structure%29">https://en.wikipedia.org/wiki/Heap_%28data_structure%29</a>.</p>
+
+<p>Aby byla halda implementována korektně, musíme pro datový typ, který ji
+implementuje (zde například <strong>StringHeap</strong>) implementovat i metody
+<strong>Len</strong>, <strong>Less</strong>, <strong>Swap</strong>,
+<strong>Push</strong> a <strong>Pop</strong>, například tak, jak je to ukázáno
+v&nbsp;dalším příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/heap"
+        "fmt"
+)
+&nbsp;
+type <strong>StringHeap</strong> []string
+&nbsp;
+func (h StringHeap) <strong>Len</strong>() int {
+        return len(h)
+}
+&nbsp;
+func (h StringHeap) <strong>Less</strong>(i, j int) bool {
+        return h[i] &lt; h[j]
+}
+&nbsp;
+func (h StringHeap) <strong>Swap</strong>(i, j int) {
+        h[i], h[j] = h[j], h[i]
+}
+&nbsp;
+func (h *StringHeap) <strong>Push</strong>(x interface{}) {
+        *h = append(*h, x.(string))
+}
+&nbsp;
+func (h *StringHeap) <strong>Pop</strong>() interface{} {
+        old := *h
+        n := len(old)
+        x := old[n-1]
+        *h = old[0 : n-1]
+        return x
+}
+&nbsp;
+func <strong>main</strong>() {
+        h := &amp;StringHeap{"foo", "bar", "baz", "zzz", "aaa"}
+        heap.Init(h)
+        heap.Push(h, "ZZZ")
+        heap.Push(h, "AAA")
+        fmt.Printf("First item: %s\n", (*h)[0])
+        i := 0
+        for h.Len() &gt; 0 {
+                i++
+                fmt.Printf("item #%d = %s\n", i, heap.Pop(h))
+        }
+}
+</pre>
+
+<p>Při čtení prvků z&nbsp;haldy zjistíme, že prvky jsou automaticky
+seřazeny:</p>
+
+<pre>
+First item: AAA
+item #1 = AAA
+item #2 = ZZZ
+item #3 = aaa
+item #4 = bar
+item #5 = baz
+item #6 = foo
+item #7 = zzz
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Interní změna pozice prvků při práci s&nbsp;haldou</h2>
+
+<p>Pokud budeme chtít prozkoumat, jak a na základě jakých kritérií se mění
+pozice prvků v&nbsp;haldě, můžeme si předchozí příklad nepatrně upravit &ndash;
+přidat do něj trasovací příkazy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "container/heap"
+        "fmt"
+)
+&nbsp;
+type StringHeap []string
+&nbsp;
+func (h StringHeap) <strong>Len</strong>() int {
+        return len(h)
+}
+&nbsp;
+func (h StringHeap) <strong>Less</strong>(i, j int) bool {
+        fmt.Printf("compare %s &lt; %s\n", h[i], h[j])
+        return h[i] &lt; h[j]
+}
+&nbsp;
+func (h StringHeap) <strong>Swap</strong>(i, j int) {
+        fmt.Printf("swap    %s &lt;-&gt; %s\n", h[i], h[j])
+        h[i], h[j] = h[j], h[i]
+}
+&nbsp;
+func (h *StringHeap) <strong>Push</strong>(x interface{}) {
+        *h = append(*h, x.(string))
+}
+&nbsp;
+func (h *StringHeap) <strong>Pop</strong>() interface{} {
+        old := *h
+        n := len(old)
+        x := old[n-1]
+        *h = old[0 : n-1]
+        return x
+}
+&nbsp;
+func <strong>main</strong>() {
+        h := &amp;StringHeap{}
+&nbsp;
+        heap.Init(h)
+        heap.Push(h, "a")
+        heap.Push(h, "z")
+        heap.Push(h, "c")
+        heap.Push(h, "b")
+        heap.Push(h, "d")
+        heap.Push(h, "x")
+&nbsp;
+        fmt.Println("\n-----------------------------")
+        fmt.Printf("First item: %s\n", (*h)[0])
+        i := 0
+        for h.Len() &gt; 0 {
+                i++
+                fmt.Printf("item #%d = %s\n", i, heap.Pop(h))
+        }
+}
+</pre>
+
+<p>Při zápisu a čtení prvků bude docházet k&nbsp;jejich reorganizaci na základě
+jejich vzájemného porovnání:</p>
+
+<pre>
+compare z &lt; a
+compare c &lt; a
+compare b &lt; z
+swap    z &lt;-&gt; b
+compare b &lt; a
+compare d &lt; b
+compare x &lt; c
+&nbsp;
+-----------------------------
+First item: a
+swap    a &lt;-&gt; x
+compare c &lt; b
+compare b &lt; x
+swap    x &lt;-&gt; b
+compare d &lt; z
+compare d &lt; x
+swap    x &lt;-&gt; d
+item #1 = a
+swap    b &lt;-&gt; x
+compare c &lt; d
+compare c &lt; x
+swap    x &lt;-&gt; c
+item #2 = b
+swap    c &lt;-&gt; z
+compare x &lt; d
+compare d &lt; z
+swap    z &lt;-&gt; d
+item #3 = c
+swap    d &lt;-&gt; x
+compare z &lt; x
+item #4 = d
+swap    x &lt;-&gt; z
+item #5 = x
+swap    z &lt;-&gt; z
+item #6 = z
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: k&nbsp;této datové struktuře se ještě
+vrátíme při popisu prioritních front.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_server.go</td><td>jednoduchý HTTP server posílající dynamicky generovaný obsah</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/01_server.go">https://github.com/tisnik/go-root/blob/master/article_24/01_server.go</a></td></tr>
+<tr><td> 2</td><td>02_slow_server.go</td><td>zpomalení generování jednotlivých bloků generovaného obsahu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/02_slow_server.go">https://github.com/tisnik/go-root/blob/master/article_24/02_slow_server.go</a></td></tr>
+<tr><td> 3</td><td>03_flushing_server.go</td><td>využití metody <strong>Flush</strong> z&nbsp;rozhraní <strong>Flusher</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go">https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go</a></td></tr>
+<tr><td> 4</td><td>04_close_detector.go</td><td>test, zda klient neukončil spojení</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go">https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go</a></td></tr>
+<tr><td> 5</td><td>05_list.go</td><td>operace nad seznamem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/05_list.go">https://github.com/tisnik/go-root/blob/master/article_24/05_list.go</a></td></tr>
+<tr><td> 6</td><td>06_list_as_stack.go</td><td>použití seznamu ve funkci zásobníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/06_list_as_stack.go">https://github.com/tisnik/go-root/blob/master/article_24/06_list_as_stack.go</a></td></tr>
+<tr><td> 7</td><td>07_print_stack_content.go</td><td>vylepšení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/07_print_stack_content.go">https://github.com/tisnik/go-root/blob/master/article_24/07_print_stack_content.go</a></td></tr>
+<tr><td> 8</td><td>08_empty_ring.go</td><td>prázdná cyklická fronta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/08_empty_ring.go">https://github.com/tisnik/go-root/blob/master/article_24/08_empty_ring.go</a></td></tr>
+<tr><td> 9</td><td>09_filled_ring.go</td><td>cyklická fronta s&nbsp;naplněnými prvky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/09_filled_ring.go">https://github.com/tisnik/go-root/blob/master/article_24/09_filled_ring.go</a></td></tr>
+<tr><td>10</td><td>10_ring_empty_items.go</td><td>cyklická fronta s&nbsp;některými prázdnými prvky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/10_ring_empty_items.go">https://github.com/tisnik/go-root/blob/master/article_24/10_ring_empty_items.go</a></td></tr>
+<tr><td>11</td><td>11_ring_do_iterator.go</td><td>iterace nad prvky cyklické fronty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/11_ring_do_iterator.go">https://github.com/tisnik/go-root/blob/master/article_24/11_ring_do_iterator.go</a></td></tr>
+<tr><td>12</td><td>12_ring_do_closure.go</td><td>vylepšená iterace nad prvky cyklické fronty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/12_ring_do_closure.go">https://github.com/tisnik/go-root/blob/master/article_24/12_ring_do_closure.go</a></td></tr>
+<tr><td>13</td><td>13_integer_sort.go</td><td>seřazení sekvence celých čísel</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/13_integer_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/13_integer_sort.go</a></td></tr>
+<tr><td>14</td><td>14_float_sort.go</td><td>seřazení sekvence čísel s&nbsp;plovoucí řádovou čárkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/14_float_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/14_float_sort.go</a></td></tr>
+<tr><td>15</td><td>15_string_sort.go</td><td>načtení textového souboru s&nbsp;jeho rozdělením na slova a seřazením</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/15_string_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/15_string_sort.go</a></td></tr>
+<tr><td>16</td><td>16_reverse_sort.go</td><td>opačně seřazení sekvence/řezu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/16_reverse_sort.go">https://github.com/tisnik/go-root/blob/master/article_24/16_reverse_sort.go</a></td></tr>
+<tr><td>17</td><td>17_int_slice.go</td><td>použití datového typu <strong>IntSlice</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/17_int_slice.go">https://github.com/tisnik/go-root/blob/master/article_24/17_int_slice.go</a></td></tr>
+<tr><td>18</td><td>18_sort_by.go</td><td>seřazení sekvence uživatelských datových struktur</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/18_sort_by.go">https://github.com/tisnik/go-root/blob/master/article_24/18_sort_by.go</a></td></tr>
+<tr><td>19</td><td>19_heap.go</td><td>základní způsob využití datového typu <i>halda</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/19_heap.go">https://github.com/tisnik/go-root/blob/master/article_24/19_heap.go</a></td></tr>
+<tr><td>20</td><td>20_heap_trace.go</td><td>úprava předchozího příkladu, aby zobrazoval prováděné operace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/20_heap_trace.go">https://github.com/tisnik/go-root/blob/master/article_24/20_heap_trace.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
