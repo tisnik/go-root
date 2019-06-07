@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá třetí část
+//
+// Demonstrační příklad číslo 11:
+//     Souběžný zápis do více souborů.
+
 package main
 
 import (
