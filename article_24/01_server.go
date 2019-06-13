@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 1:
+//     	Jednoduchý HTTP server posílající dynamicky generovaný obsah
+
 package main
 
 import (
