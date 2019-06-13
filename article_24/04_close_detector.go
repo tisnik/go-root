@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 4:
+//     	Test, zda klient neukončil spojení
+
 package main
 
 import (
