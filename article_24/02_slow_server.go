@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 2:
+//     	Zpomalení generování jednotlivých bloků generovaného obsahu
+
 package main
 
 import (
