@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 20:
+//     	Úprava předchozího příkladu, aby zobrazoval prováděné operace
+
 package main
 
 import (
