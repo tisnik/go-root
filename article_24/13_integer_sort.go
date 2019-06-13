@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 13:
+//     	Seřazení sekvence celých čísel
+
 package main
 
 import (
