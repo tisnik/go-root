@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 18:
+//     	Seřazení sekvence uživatelských datových struktur
+
 package main
 
 import (
