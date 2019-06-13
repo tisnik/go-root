@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 19:
+//     	Základní způsob využití datového typu halda
+
 package main
 
 import (
