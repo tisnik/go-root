@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 6:
+//     	Použití seznamu ve funkci zásobníku
+
 package main
 
 import (
