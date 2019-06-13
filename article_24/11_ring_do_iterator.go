@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 11:
+//     	Iterace nad prvky cyklické fronty
+
 package main
 
 import (
