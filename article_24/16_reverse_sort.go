@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 16:
+//     	Opačně seřazení sekvence/řezu
+
 package main
 
 import (
