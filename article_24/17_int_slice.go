@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 17:
+//     	Použití datového typu IntSlice
+
 package main
 
 import (
