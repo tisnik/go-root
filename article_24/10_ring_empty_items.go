@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 10:
+//     	Cyklická fronta s některými prázdnými prvky
+
 package main
 
 import (
