@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 3:
+//     	Využití metody Flush z rozhraní Flusher
+
 package main
 
 import (
