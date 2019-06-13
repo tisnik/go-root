@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 15:
+//     	Načtení textového souboru s jeho rozdělením na slova a seřazením
+
 package main
 
 import (
