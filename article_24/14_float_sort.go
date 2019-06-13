@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 14:
+//     	Seřazení sekvence čísel s plovoucí řádovou čárkou
+
 package main
 
 import (
