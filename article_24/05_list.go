@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá čtvrtá část
+//
+// Demonstrační příklad číslo 5:
+//     	Operace nad seznamem
+
 package main
 
 import (
