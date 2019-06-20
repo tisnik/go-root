@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 4:
+//     	Rekurzivní výpočet faktoriálu
+
 package main
 
 import "fmt"
