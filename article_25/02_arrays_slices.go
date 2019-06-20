@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 2:
+//     	Základní operace s poli a s řezy
+
 package main
 
 import "fmt"
