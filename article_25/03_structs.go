@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 3:
+//     	Práce se strukturami (záznamy)
+
 package main
 
 import "fmt"
