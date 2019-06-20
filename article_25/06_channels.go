@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 6:
+//     	Gorutiny a kanály
+
 package main
 
 import "fmt"
