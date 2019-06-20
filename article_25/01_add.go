@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 1:
+//     	Jednoduchý program, který sečte dvojici celočíselných hodnot
+
 package main
 
 import "fmt"
