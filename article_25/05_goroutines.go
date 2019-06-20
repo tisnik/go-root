@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá pátá část
+//
+// Demonstrační příklad číslo 5:
+//     	Spuštění dvou gorutin
+
 package main
 
 import (
