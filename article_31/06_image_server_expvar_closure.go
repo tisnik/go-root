@@ -27,7 +27,7 @@ func calculateColor() color.RGBA {
 		uint8(rand.Intn(255)), 255}
 }
 
-func imageHandler(writer http.ResponseWriter, request *http.Request) {
+func imageHandler(writer http.ResponseWriter, request *http.Request, counter *expvar.Int) {
 	const ImageWidth = 256
 	const ImageHeight = 256
 	outputimage := image.NewRGBA(image.Rectangle{image.Point{0, 0},
