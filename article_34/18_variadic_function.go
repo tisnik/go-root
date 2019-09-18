@@ -14,7 +14,7 @@ func f2(parts ...string) {
 }
 
 func f3(prefix string, parts ...string) {
-	fmt.Println(prefix)
+	fmt.Printf("%s ", prefix)
 	for _, val := range parts {
 		fmt.Printf("%s ", val)
 	}
