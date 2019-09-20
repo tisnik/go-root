@@ -1,0 +1,2516 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Trasování a profilování aplikací naprogramovaných v Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Trasování a profilování aplikací naprogramovaných v Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Ve dvacáté deváté části seriálu o programovacím jazyku Go si ukážeme základní způsoby trasování a profilování aplikací, pochopitelně i s vyhodnocením naměřených výsledků. Použijeme přitom i ty nástroje, které jsou již součástí standardní instalace programovacího jazyka Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Trasování a profilování aplikací naprogramovaných v&nbsp;Go</a></p>
+<p><a href="#k02">2. Standardní nástroje, které nejsou specifické pouze pro jazyk Go</a></p>
+<p><a href="#k03">3. Utilita <strong>ltrace</strong> &ndash; výpis informací o volaných knihovních funkcích</a></p>
+<p><a href="#k04">4. Příklad použití utility <strong>ltrace</strong> i pro aplikace psané v&nbsp;Go</a></p>
+<p><a href="#k05">5. Další užitečné možnosti nabízené nástrojem <strong>ltrace</strong></a></p>
+<p><a href="#k06">6. Utilita <strong>strace</strong> &ndash; výpis informací o volaných systémových funkcích</a></p>
+<p><a href="#k07">7. Příklad použití utility <strong>strace</strong> pro aplikaci kopírující souboru</a></p>
+<p><a href="#k08">8. Profiler určený pro ekosystém jazyka Go</a></p>
+<p><a href="#k09">9. Demonstrační příklad pro otestování paměťovéh i CPU profileru</a></p>
+<p><a href="#k10">10. Spuštění CPU profileru a základní analýza výsledků</a></p>
+<p><a href="#k11">11. Spuštění paměťového profileru a základní analýza výsledků</a></p>
+<p><a href="#k12">12. Úprava demonstračního příkladu: paměťově náročnější operace</a></p>
+<p><a href="#k13">13. Analýza výsledků získaných profilery</a></p>
+<p><a href="#k14">14. Podrobnější výsledky získané CPU profilerem</a></p>
+<p><a href="#k15">15. Demonstrační příklad využívající gorutiny</a></p>
+<p><a href="#k16">16. Výsledky měření CPU profileru</a></p>
+<p><a href="#k17">17. Spuštění profileru přímo z&nbsp;vyvíjené aplikace</a></p>
+<p><a href="#k18">18. Podrobnější výsledky CPU profileru</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Trasování a profilování aplikací naprogramovaných v&nbsp;Go</h2>
+
+<p>Při tvorbě a především při ladění a optimalizacích aplikací se kromě
+debuggeru (a pochopitelně i logování) mnohdy používají i další pomocné
+nástroje. Typicky se jedná o profiler a někdy též o nástroj umožňující
+trasování kódu. Tyto nástroje (především profiler) jsou pochopitelně dostupné i
+vývojářům používajícím programovací jazyk Go; dokonce oba zmíněné nástroje
+nalezneme v&nbsp;sadě základních nástrojů dodávaných přímo s&nbsp;tímto
+programovacím jazykem.</p>
+
+<p>Pokud se na celý problém podíváme obecněji, používají vývojáři minimálně
+šest typů diagnostických nástrojů:</p>
+
+<ol>
+
+<li>Některý z&nbsp;dostupných <i>debuggerů</i>, které umožňují mj.&nbsp;i
+pozastavení běhu programu a zjištění jeho aktuálního stavu (globální a lokální
+proměnné, gorutiny, zásobníkové rámce, mutexy atd.), krokování programu,
+definování breakpointů a watchpointů atd. V&nbsp;případě ekosystému
+programovacího jazyka Go se používají především dva debuggery. Prvním
+z&nbsp;nich je <a
+href="https://www.root.cz/clanky/ladeni-aplikaci-v-go-s-vyuzitim-gnu-debuggeru-a-debuggeru-delve/#k02">GNU
+Debugger</a>, druhým pak debugger nazvaný <a
+href="https://www.root.cz/clanky/ladeni-aplikaci-v-go-s-vyuzitim-gnu-debuggeru-a-debuggeru-delve/#k11">Delve</a>.</li>
+
+<li>Dalším typem diagnostického nástroje je již výše zmíněný <i>profiler</i>,
+který nám umožňuje zjistit frekvenci volaných funkcí, kolik strojového a
+reálného času se stráví ve volaných funkcích (včetně kumulativního času),
+informace o spotřebě paměti apod. V&nbsp;případě programovacího jazyka Go se
+používá profiler, který je přímo součástí základních nástrojů poskytovaných
+k&nbsp;tomuto jazyku.</li>
+
+<li>Třetím typem diagnostického nástroje je <i>tracer</i>, jenž slouží pro
+přesnější analýzu toku programu, měření propustnosti i zpoždění
+v&nbsp;jednotlivých částech apod. V&nbsp;případě programovacího jazyka Go je
+opět možné použít nástroj, který je standardní součástí instalace.</li>
+
+<li>Dalšími typy diagnostických nástrojů jsou nástroje sledující různé
+události, které vznikají při běhu aplikace. V&nbsp;programovacím jazyku Go se
+systémem automatické správy paměti se jedná především o události související
+s&nbsp;alokací paměti, spuštěním garbage collectoru, události souvisejícími
+s&nbsp;gorutinami atd.</li>
+
+<li>Mnohdy je taktéž velmi užitečné sledovat, jaké systémové funkce sledovaná
+aplikace volá. Pro tento účel se používá standardní nástroj nazvaný
+<strong>strace</strong>, který je pochopitelně použitelný i pro aplikace
+naprogramované v&nbsp;jazyku Go. S&nbsp;možnostmi nabízenými tímto nástrojem se
+seznámíme v&nbsp;dalších kapitolách.</li>
+
+<li>A konečně nesmíme zapomenout na nástroj <strong>ltrace</strong> určený pro
+zjištění volání funkcí z&nbsp;dynamicky linkovaných knihoven (.so, .dll). Na
+jednu stranu je možné říci, že pro jazyk Go má tento nástroj spíše menší
+význam, protože Go aplikace je většinou slinkovaná staticky, ovšem
+v&nbsp;případě, že je skutečně zapotřebí z&nbsp;jazyka Go volat nativní funkce
+z&nbsp;dynamicky linkované knihovny (například SDL2), může být nástroj
+<strong>ltrace</strong> velmi užitečný pro hledání případných problémů, které
+nemusí být vždy odhaleny samotným překladačem Go.</li>
+
+</ol>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Standardní nástroje, které nejsou specifické pouze pro jazyk Go</h2>
+
+<p>Na začátek si připomeňme, že v&nbsp;současnosti existují (dnes de facto již
+standardní) nástroje využívané pro ladění jádra popř.&nbsp;pro ladění a/nebo
+sledování použití základních knihoven, dynamicky linkovaných knihoven atd. Jak
+může vypadat použití jednotlivých nástrojů na celém aplikačním
+&bdquo;stacku&ldquo;, tj.&nbsp;od trasování/ladění samotné uživatelské aplikace
+až přes řešení problémů přímo v&nbsp;jádře operačního systému, je naznačeno na
+následujícím schématu, s&nbsp;nímž jsme se již na Rootu seznámili
+v&nbsp;souvislosti s&nbsp;popisem debuggerů:</p>
+
+<pre>
++----------+
+|          |..... gdb
+| aplikace |
+|          |..... SystemTap
++----------+
+     |
+     |
+     |...... ltrace
+     |
+     v
++----------+
+|          |..... gdb
+|  glibc   |
+|          |..... SystemTap
++----------+
+     |
+     |
+     |...... strace
+     |
+     v
++----------+
+|          |..... SystemTap
+|  jádro   |
+|          |..... KGDB
++----------+
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Utilita <strong>ltrace</strong> &ndash; výpis informací o volaných knihovních funkcích</h2>
+
+<p>Prvním nástrojem, s&nbsp;nímž se v&nbsp;dnešním článku ve stručnosti
+seznámíme, je již výše zmíněná utilitka nazvaná jednoduše
+<strong>ltrace</strong>. Tento nástroj je možné použít ve chvíli, kdy
+potřebujeme zjistit, které knihovní funkce z&nbsp;dynamicky linkovaných
+knihoven (.so, .dll) se volají popř.&nbsp;jak často se tyto funkce volají a
+kolik času v&nbsp;nich některá aplikace tráví. Takto zjištěné statistické
+informace lze později použít různým způsobem, například pro vyhledání
+problémových či pomalých částí kódu, zjištění, ve kterých místech dochází
+k&nbsp;chybě, zjištění způsobů alokace a dealokace paměti (funkce
+<strong>malloc</strong>, <strong>free</strong> a příbuzné),
+popř.&nbsp;k&nbsp;jednoduchému trasování (což je asi nejběžnější).</p>
+
+<p>Tato utilitka může mít v&nbsp;případě programovacího jazyka Go relativně
+malé možnosti využití, a to z&nbsp;toho důvodu, že aplikace psané v&nbsp;Go
+jsou typicky staticky linkované a mnohdy žádné další funkce z&nbsp;dynamicky
+linkovaných knihoven nepoužívají, což si ostatně můžete snadno ověřit na nějaké
+přeložené aplikaci dalším nástrojem <strong>ldd</strong>:</p>
+
+<pre>
+$ <strong>go build chessboard.go</strong>
+&nbsp;
+$ <strong>ldd chessboard</strong>
+&nbsp;
+        not a dynamic executable
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pokud ovšem použijete například balíček
+<strong>net/http</strong>, bude se linkovat minimálně standardní céčková
+knihovna (opět si to můžete velmi snadno ověřit).</div></p>
+
+<p>Ovšem pro otestování, jak nástroj <strong>ltrace</strong> pracuje, si
+ukážeme jednoduchý program vyvinutý v&nbsp;jazyce Go, který volá céčkovou
+knihovní funkci nazvanou <strong>random</strong> a taktéž funkci
+<strong>srand</strong> (<a
+href="https://en.wikibooks.org/wiki/C_Programming/stdlib.h">stdlib.h</a>).
+Tento program používá poměrně obskurní způsob zajišťující základní
+interoperabilitu mezi jazykem Go a nativními (typicky céčkovými)
+knihovnami:</p>
+
+<pre>
+package main
+&nbsp;
+// #include &lt;stdlib.h&gt;
+import "C"
+&nbsp;
+func main() {
+        C.srand(C.uint(42))
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                x := C.random()
+                println(x)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si komentáře zapsaného nad
+příkazem <strong>import "C"</strong>. Tento komentář je rozeznáván nástrojem
+<strong>cgo</strong> [<a href="https://golang.org/cmd/cgo/">1</a>] a použije se
+při transpilaci našeho zdrojového kódu do jazyka C (celý překlad přes
+<strong>cgo</strong> je relativně komplikovaný a jeho podrobnější popis vydá na
+samostatný článek). Dále stojí za zmínku i vlastní import <strong>import
+"C"</strong>, protože žádný balíček nazvaný &bdquo;C&ldquo; ve skutečnosti
+neexistuje. Jedná se totiž o takzvaný pseudobalíček, který je opět zpracováván
+překladačem <strong>cgo</strong>. Všechny céčkovské funkce z&nbsp;nativní
+knihovny se v&nbsp;tomto případě volají s&nbsp;uvedením jména
+pseudobalíčku (zde se již volání nijak neliší od funkcí a metod z&nbsp;běžných
+balíčků jazyka Go).</div></p>
+
+<p>Samotný překlad aplikace zajistí (alespoň v&nbsp;tomto velmi jednoduchém
+případě) známý příkaz:</p>
+
+<pre>
+$ <strong>go build clibs.go</strong>
+</pre>
+
+<p>Interně se ovšem v&nbsp;tomto případě bude volat výše zmíněný nástroj
+<strong>cgo</strong>.</p>
+
+<p><div class="rs-tip-major">Poznámka: bližší informace o překladu aplikací
+získáte příkazem:</div></p>
+
+<pre>
+$ <strong>go help build</strong>
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Příklad použití utility <strong>ltrace</strong> i pro aplikace psané v&nbsp;Go</h2>
+
+<p>Nejprve si ověřme, že překladem výše vypsaného programu
+<strong>clibs.go</strong> skutečně vznikl spustitelný binární soubor, který
+používá dynamicky linkované knihovny. Opět se spolehneme na nástroj
+<strong>ldd</strong>:</p>
+
+<pre>
+$ <strong>ldd --verbose clibs</strong>
+&nbsp;
+        linux-vdso.so.1 =&gt;  (0x00007ffc7bf0d000)
+        libpthread.so.0 =&gt; /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007f6b31bbf000)
+        libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f6b317f6000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f6b31ddd000)
+&nbsp;
+        Version information:
+        ./clibs:
+                libpthread.so.0 (GLIBC_2.3.2) =&gt; /lib/x86_64-linux-gnu/libpthread.so.0
+                libpthread.so.0 (GLIBC_2.2.5) =&gt; /lib/x86_64-linux-gnu/libpthread.so.0
+                <strong>libc.so.6</strong> (GLIBC_2.2.5) =&gt; /lib/x86_64-linux-gnu/libc.so.6
+        /lib/x86_64-linux-gnu/libpthread.so.0:
+                ld-linux-x86-64.so.2 (GLIBC_2.2.5) =&gt; /lib64/ld-linux-x86-64.so.2
+                ld-linux-x86-64.so.2 (GLIBC_2.3) =&gt; /lib64/ld-linux-x86-64.so.2
+                ld-linux-x86-64.so.2 (GLIBC_PRIVATE) =&gt; /lib64/ld-linux-x86-64.so.2
+                libc.so.6 (GLIBC_2.14) =&gt; /lib/x86_64-linux-gnu/libc.so.6
+                libc.so.6 (GLIBC_2.3.2) =&gt; /lib/x86_64-linux-gnu/libc.so.6
+                libc.so.6 (GLIBC_PRIVATE) =&gt; /lib/x86_64-linux-gnu/libc.so.6
+                libc.so.6 (GLIBC_2.2.5) =&gt; /lib/x86_64-linux-gnu/libc.so.6
+        /lib/x86_64-linux-gnu/libc.so.6:
+                ld-linux-x86-64.so.2 (GLIBC_2.3) =&gt; /lib64/ld-linux-x86-64.so.2
+                ld-linux-x86-64.so.2 (GLIBC_PRIVATE) =&gt; /lib64/ld-linux-x86-64.so.2
+</pre>
+
+<p>Vidíme, že se skutečně používají některé nativní knihovny, především pak
+knihovna <strong>libc.so</strong> (ta je na výpisu zvýrazněna).</p>
+
+<p>Nyní tedy můžeme použít příkaz <strong>ltrace</strong> a spustit přes něj
+binární spustitelnou aplikace <strong>clibs:</strong></p>
+
+<pre>
+$ <strong>ltrace ./clibs</strong>
+</pre>
+
+<p>První řádky výpisu jsou pro nás prozatím nezajímavé:</p>
+
+<pre>
+__libc_start_main(0x447ac0, 1, 0x7ffd7174df58, 0x4511b0 &lt;unfinished ...&gt;
+malloc(56)                                                       = 0xd88010
+pthread_attr_init(0xd88010, 0xd88040, 0xd88010, 0x7f8fb562b760)  = 0
+pthread_attr_getstacksize(0xd88010, 0x7ffd7174de28, 0xd88010, 0) = 0
+pthread_attr_destroy(0xd88010, 1, 0x800000, 0)                   = 0
+free(0xd88010)                                                   = &lt;void&gt;
+mmap(0, 0x40000, 3, 34)                                          = 0x7f8fb5a0d000
+mmap(0xc000000000, 0x4000000, 0, 34)                             = 0xc000000000
+mmap(0xc000000000, 0x4000000, 3, 50)                             = 0xc000000000
+mmap(0, 0x2000000, 3, 34)                                        = 0x7f8fb3269000
+mmap(0, 0x210000, 3, 34)                                         = 0x7f8fb3059000
+mmap(0, 0x10000, 3, 34)                                          = 0x7f8fb5a62000
+mmap(0, 0x10000, 3, 34)                                          = 0x7f8fb5a52000
+sigaction(SIGHUP, nil, { 0, &lt;&gt;, 0x1, 0 })                        = 0
+sigismember(&lt;&gt;, SIGHUP)                                          = 0
+...
+...
+...
+</pre>
+
+<p>Nejzajímavější informace nalezneme až na konci výpisu. Jsou zde uvedeny
+informace o volání funkce <strong>srand()</strong> a dále informace o tom, že
+se desetkrát zavolala funkce <strong>random()</strong>, společně
+s&nbsp;výslednou (návratovou) hodnotou této funkce. Tyto informace jsou
+proloženy zprávami vypisovanými přímo z&nbsp;Go kódu funkcí
+<strong>println()</strong>, takže si můžete snadno ověřit, že nám
+<strong>ltrace</strong> skutečně poskytuje relevantní informace:</p>
+
+<pre>
+srand(42, 0x6c08a0, 0xc0000386f8, 0xc000038770)                  = 0
+random()                                                         = 71876166
+71876166
+random()                                                         = 708592740
+708592740
+random()                                                         = 1483128881
+1483128881
+random()                                                         = 907283241
+907283241
+random()                                                         = 442951012
+442951012
+random()                                                         = 537146758
+537146758
+random()                                                         = 1366999021
+1366999021
+random()                                                         = 1854614940
+1854614940
+random()                                                         = 647800535
+647800535
+random()                                                         = 53523743
+53523743
++++ exited (status 0) +++
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nenechte se zmást tím, že
+<strong>ltrace</strong> zobrazuje čtyři parametry funkce
+<strong>srand()</strong>. Nástroj <strong>ltrace</strong> totiž musí znát počet
+parametrů funkcí (potom je zobrazuje korektně i se správným typem); pokud tuto
+informaci z&nbsp;nějakého důvodu nemá k&nbsp;dispozici, zobrazí buď část
+zásobníkového rámce, nebo obsah registrů používaných pro přenos parametrů do
+volaných funkcí (podle použité ABI, na x86-64 se konkrétně jedná o
+registry).</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Další užitečné možnosti nabízené nástrojem <strong>ltrace</strong></h2>
+
+<p>V&nbsp;případě, že budeme potřebovat zjistit čas volání nějaké funkce, je
+možné použít přepínač <strong>-t</strong>. Výsledek pak může vypadat takto:</p>
+
+<pre>
+$ <strong>ltrace -t ./clibs</strong>
+&nbsp;
+21:51:25 __libc_start_main(0x447ac0, 1, 0x7ffd0cdf0f48, 0x4511b0 <unfinished ...>
+21:51:25 malloc(56)                                              = 0x1c40010
+21:51:25 pthread_attr_init(0x1c40010, 0x1c40040, 0x1c40010, 0x7ffa14c34760) = 0
+21:51:25 pthread_attr_getstacksize(0x1c40010, 0x7ffd0cdf0e18, 0x1c40010, 0) = 0
+21:51:25 pthread_attr_destroy(0x1c40010, 1, 0x800000, 0)         = 0
+21:51:25 free(0x1c40010)                                         = <void>
+...
+...
+...
+21:51:28 srand(42, 0x6c08a0, 0xc0000386f8, 0xc000038770)         = 0
+21:51:28 random()                                                = 71876166
+21:51:28 random()                                                = 708592740
+21:51:28 random()                                                = 1483128881
+21:51:28 random()                                                = 907283241
+21:51:28 random()                                                = 442951012
+21:51:28 random()                                                = 537146758
+21:51:28 random()                                                = 1366999021
+21:51:28 random()                                                = 1854614940
+21:51:28 random()                                                = 647800535
+21:51:28 random()                                                = 53523743
+21:51:28 +++ exited (status 0) +++
+</pre>
+
+<p>Ve chvíli, kdy se namísto přepínače <strong>-t</strong> použije přepínač
+<strong>-tt</strong> (dvojité té), zvětší se přesnost změřeného a vypsaného
+času na milisekundy:</p>
+
+<pre>
+$ <strong>ltrace -tt ./clibs</strong>
+&nbsp;
+21:52:49.436090 __libc_start_main(0x447ac0, 1, 0x7ffd884b8778, 0x4511b0 <unfinished ...>
+21:52:49.436595 malloc(56)                                       = 0xd1b010
+...
+...
+...
+21:52:52.536276 srand(42, 0x6c08a0, 0xc0000386f8, 0xc000038770)  = 0
+21:52:52.537378 random()                                         = 71876166
+21:52:52.539556 random()                                         = 708592740
+21:52:52.541733 random()                                         = 1483128881
+21:52:52.543911 random()                                         = 907283241
+21:52:52.546049 random()                                         = 442951012
+21:52:52.547190 random()                                         = 537146758
+21:52:52.548342 random()                                         = 1366999021
+21:52:52.549460 random()                                         = 1854614940
+21:52:52.550605 random()                                         = 647800535
+21:52:52.551741 random()                                         = 53523743
+21:52:52.553253 +++ exited (status 0) +++
+</pre>
+
+<p>Samozřejmě je možné zjistit nejenom okamžik, kdy se do funkce vstupuje, ale
+i dobu trvání knihovních funkcí, a to díky přepínači <strong>-r</strong>:</p>
+
+<pre>
+$ <strong>ltrace -r ./clibs</strong>
+&nbsp;
+  0.000000 __libc_start_main(0x447ac0, 1, 0x7fff4a807468, 0x4511b0 <unfinished ...>
+  ...
+  ...
+  ...
+  0.001263 srand(42, 0x6c08a0, 0xc0000386f8, 0xc000038770)       = 0
+  0.001114 random()                                              = 71876166
+  0.001211 random()                                              = 708592740
+  0.001210 random()                                              = 1483128881
+  0.001204 random()                                              = 907283241
+  0.001181 random()                                              = 442951012
+  0.001154 random()                                              = 537146758
+  0.001228 random()                                              = 1366999021
+  0.001198 random()                                              = 1854614940
+  0.001218 random()                                              = 647800535
+  0.001203 random()                                              = 53523743
+  0.001549 +++ exited (status 0) +++
+</pre>
+
+<p>Mnohdy nepotřebujeme zjistit všechny volané knihovní funkce, ale pouze
+vypranou podmnožinu z&nbsp;nich. Zde přichází ke slovu přepínač
+<strong>-e</strong>, kterému můžeme předat seznam funkcí, které nás zajímají.
+Funkce se zapisují ve formě jednoduchého jazyka, což například znamená, že pro
+filtraci těch funkcí, jejichž volání nás zajímá, se vkládají znaky +:</p>
+
+<pre>
+$ <strong>ltrace -e srand+random ./clibs</strong>
+&nbsp;
+clibs-&rarr;srand(42, 0x6c08a0, 0xc0000386f8, 0xc000038770)           = 0
+clibs-&rarr;random()                                                  = 71876166
+clibs-&rarr;random()                                                  = 708592740
+clibs-&rarr;random()                                                  = 1483128881
+clibs-&rarr;random()                                                  = 907283241
+clibs-&rarr;random()                                                  = 442951012
+clibs-&rarr;random()                                                  = 537146758
+clibs-&rarr;random()                                                  = 1366999021
+clibs-&rarr;random()                                                  = 1854614940
+clibs-&rarr;random()                                                  = 647800535
+clibs-&rarr;random()                                                  = 53523743
++++ exited (status 0) +++
+</pre>
+
+<p>Velmi užitečná je volba <strong>-c</strong>, po jejímž zadání nástroj
+<strong>ltrace</strong> zobrazí statistiku volání jednotlivých funkcí
+s&nbsp;celkovým i s&nbsp;průměrným časem, který program v&nbsp;dané funkci
+strávil.  Opět si uveďme příklady:</p>
+
+<pre>
+$ <strong>ltrace -c ./clibs </strong>
+&nbsp;
+% time     seconds  usecs/call     calls      function
+------ ----------- ----------- --------- --------------------
+ 47.35    0.682426         190      3584 sigismember
+ 47.29    0.681610         190      3584 sigaddset
+  1.90    0.027409         232       118 sigaction
+  0.76    0.010957         188        58 sigemptyset
+  0.63    0.009018         901        10 <strong>random</strong>
+  0.50    0.007277        1819         4 pthread_create
+  0.32    0.004574         571         8 pthread_sigmask
+  0.16    0.002357         589         4 pthread_detach
+  0.16    0.002312         462         5 pthread_attr_init
+  0.16    0.002285         457         5 pthread_attr_getstacksize
+  0.15    0.002138         427         5 malloc
+  0.15    0.002098         524         4 sigfillset
+  0.13    0.001817         259         7 mmap
+  0.07    0.001060         176         6 __errno_location
+  0.06    0.000880         880         1 <strong>srand</strong>
+  0.06    0.000872         872         1 pthread_cond_broadcast
+  0.06    0.000870         870         1 pthread_mutex_unlock
+  0.06    0.000866         866         1 pthread_mutex_lock
+  0.02    0.000240         240         1 free
+  0.01    0.000206         206         1 pthread_attr_destroy
+------ ----------- ----------- --------- --------------------
+100.00    1.441272                  7408 total
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tabulce jsem zvýraznil obě přímo
+volané funkce. Z&nbsp;výpisu je patrné, že ani jedna z&nbsp;těchto funkcí
+nepředstavuje úzké místo programu.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Utilita <strong>strace</strong> &ndash; výpis informací o volaných systémových funkcích</h2>
+
+<p>Druhým nástrojem, s&nbsp;nímž se dnes alespoň ve stručnosti seznámíme, je
+utilita nazvaná příhodně <strong>strace</strong>. Zatímco výše popsaná
+<strong>ltrace</strong> sloužila k&nbsp;výpisu volaných knihovních funkcí
+(pocházejících například z&nbsp;knihovny <strong>glibc</strong>), je utilita
+<strong>strace</strong> určena ke zjištění systémových volání
+(<i>syscalls</i>), a to nezávisle na tom, kde toto volání vzniklo (většinou se
+jedná opět o knihovnu <strong>glibc</strong>, ovšem nemusí tomu tak být
+vždycky. Podobně jako v&nbsp;případě <strong>ltrace</strong> je možné nástroj
+<strong>strace</strong> použít buď pro spuštění laděné/trasované aplikace, nebo
+je možné se přes přepínač <strong>-p{pid})</strong> připojit k&nbsp;již běžící
+aplikaci (to je velmi užitečné například při sledování běhu
+&bdquo;živých&ldquo; dlouhoběžících serverových aplikací apod.). Význam
+některých přepínačů je u <strong>strace</strong> i <strong>ltrace</strong>
+shodný, což je samozřejmě výhodné.</p>
+
+<pre>
+$ <strong>strace -help</strong>
+&nbsp;
+usage: strace [-CdffhiqrtttTvVxxy] [-I n] [-e expr]...
+              [-a column] [-o file] [-s strsize] [-P path]...
+              -p pid... / [-D] [-E var=val]... [-u username] PROG [ARGS]
+   or: strace -c[df] [-I n] [-e expr]... [-O overhead] [-S sortby]
+              -p pid... / [-D] [-E var=val]... [-u username] PROG [ARGS]
+              ...
+              ...
+              ...
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Příklad použití utility <strong>strace</strong> pro aplikaci kopírující souboru</h2>
+
+<p>Podívejme se nyní na základní způsob použití nástroje
+<strong>strace</strong>. Pro jednoduchost tento nástroj vyzkoušíme na aplikaci
+pro kopii souboru:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io"
+        "os"
+)
+&nbsp;
+func <strong>closeFile</strong>(file *os.File) {
+        fmt.Printf("Closing file '%s'\n", file.Name())
+        file.Close()
+}
+&nbsp;
+func <strong>copyFile</strong>(srcName, dstName string) (written int64, err error) {
+        src, err := os.Open(srcName)
+        if err != nil {
+                panic(err)
+        }
+        defer closeFile(src)
+&nbsp;
+        dst, err := os.Create(dstName)
+        if err != nil {
+                panic(err)
+        }
+        defer closeFile(dst)
+&nbsp;
+        buffer := make([]byte, 16)
+        copied := int64(0)
+&nbsp;
+        for {
+                read, err := src.Read(buffer)
+&nbsp;
+                if read &gt; 0 {
+                        fmt.Printf("read %d bytes\n", read)
+                        written, err := dst.Write(buffer[:read])
+                        if written &gt; 0 {
+                                fmt.Printf("written %d bytes\n", written)
+                        }
+                        if err != nil {
+                                fmt.Printf("write error %v\n", err)
+                                return copied, err
+                        }
+                        copied += int64(written)
+                }
+&nbsp;
+                if err == io.EOF {
+                        fmt.Println("reached end of file")
+                        break
+                }
+&nbsp;
+                if err != nil {
+                        fmt.Printf("other error %v\n", err)
+                        return copied, err
+                }
+        }
+        return copied, nil
+}
+&nbsp;
+func <strong>testCopyFile</strong>(srcName, dstName string) {
+        copied, err := copyFile(srcName, dstName)
+        if err != nil {
+                fmt.Printf("copyFile('%s', '%s') failed!!!\n", srcName, dstName)
+        } else {
+                fmt.Printf("Copied %d bytes\n", copied)
+        }
+        fmt.Println()
+}
+&nbsp;
+func <strong>main</strong>() {
+        testCopyFile("test_input.txt", "output.txt")
+}
+</pre>
+
+<p>Logika programu je pravděpodobně zřejmá &ndash; otevře první soubor pro
+čtení, druhý pro zápis a posléze provádí kopii dat po blocích o velikosti
+šestnácti bajtů. Ovšem z&nbsp;pohledu systémových volání je tento program
+mnohem složitější, o čemž se lze velmi snadno přesvědčit.</p>
+
+<p>Nejprve program přeložíme:</p>
+
+<pre>
+$ <strong>go build file_block_copy.go</strong>
+</pre>
+
+<p>A spustíme přes <strong>strace</strong>:</p>
+
+<pre>
+$ <strong>strace ./file_block_copy</strong>
+</pre>
+
+<p>S&nbsp;těmito výsledky:</p>
+
+<pre>
+execve("./file_block_copy", ["./file_block_copy"], [/* 53 vars */]) = 0
+arch_prctl(ARCH_SET_FS, 0x5526b0)       = 0
+sched_getaffinity(0, 8192, {f, 0, 0, 0}) = 32
+mmap(NULL, 262144, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0985000000
+mmap(0xc000000000, 67108864, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xc000000000
+...
+...
+...
+openat(AT_FDCWD, "test_input.txt", O_RDONLY|O_CLOEXEC) = 3
+epoll_create1(EPOLL_CLOEXEC)            = 4
+epoll_ctl(4, EPOLL_CTL_ADD, 3, {EPOLLIN|EPOLLOUT|EPOLLRDHUP|EPOLLET, {u32=2195279520, u64=139678826712736}}) = -1 EPERM (Operation not permitted)
+epoll_ctl(4, EPOLL_CTL_DEL, 3, {0, {u32=0, u64=0}}) = -1 EPERM (Operation not permitted)
+openat(AT_FDCWD, "output.txt", O_RDWR|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 5
+epoll_ctl(4, EPOLL_CTL_ADD, 5, {EPOLLIN|EPOLLOUT|EPOLLRDHUP|EPOLLET, {u32=2195279520, u64=139678826712736}}) = -1 EPERM (Operation not permitted)
+epoll_ctl(4, EPOLL_CTL_DEL, 5, {0, {u32=0, u64=0}}) = -1 EPERM (Operation not permitted)
+read(3, "line #1\nline #2\n", 16)       = 16
+write(1, "read 16 bytes\n", 14)         = 14
+write(5, "line #1\nline #2\n", 16)      = 16
+write(1, "written 16 bytes\n", 17)      = 17
+read(3, "line #3\nline #4\n", 16)       = 16
+write(1, "read 16 bytes\n", 14)         = 14
+write(5, "line #3\nline #4\n", 16)      = 16
+write(1, "written 16 bytes\n", 17)      = 17
+read(3, "line #5\n", 16)                = 8
+write(1, "read 8 bytes\n", 13)          = 13
+write(5, "line #5\n", 8)                = 8
+write(1, "written 8 bytes\n", 16)       = 16
+read(3, "", 16)                         = 0
+write(1, "reached end of file\n", 20)   = 20
+write(1, "Closing file 'output.txt'\n", 26) = 26
+close(5)                                = 0
+write(1, "Closing file 'test_input.txt'\n", 30) = 30
+close(3)                                = 0
+write(1, "Copied 40 bytes\n", 16)       = 16
+write(1, "\n", 1)                       = 1
+exit_group(0)                           = ?
++++ exited with 0 +++
+</pre>
+
+<p>Povšimněte si způsobu výpisu &ndash; u každého systémového volání jsou
+uvedeny parametry, a to v&nbsp;některých případech inteligentně &ndash; namísto
+číselné konstanty se používá symbolická konstanta <strong>PROT_READ</strong>
+atd. Taktéž se vypisuje návratová hodnota volání, a to opět (pokud je to ovšem
+možné) formou symbolické konstanty (<strong>ENOENT</strong>) popř.&nbsp;zprávy
+(&bdquo;No such file or directory&ldquo;, &bdquo;Operation not
+permitted&ldquo;). Na konci můžeme vidět, že volání funkce
+<strong>fmt.Printf()</strong> se (po naformátování výstupního řetězce) provede
+formou <strong>write</strong> na standardní výstup (vrátí se přitom počet
+zapsaných/vytištěných bajtů).</p>
+
+<p>Program používá tyto soubory:</p>
+
+<table>
+<tr><th>Soubor #</th><th>Význam</th></tr>
+<tr><td>1</td><td>standardní výstup</td></tr>
+<tr><td>3</td><td>vstupní soubor otevřený pro čtení</td></tr>
+<tr><td>5</td><td>výstupní soubor otevřený pro zápis</td></tr>
+</table>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Profiler určený pro ekosystém jazyka Go</h2>
+
+<p>Po popisu nástrojů <strong>ltrace</strong> a <strong>strace</strong>, které
+lze použít pro sledování činnosti prakticky jakékoli nativní aplikace, bez
+ohledu na to, v&nbsp;jakém programovacím jazyce byla původně vytvořena, se
+začneme zabývat technologiemi a nástroji určenými přímo pro programovací jazyk
+Go a ekosystém postavený okolo tohoto jazyka. V&nbsp;první řadě se jedná o
+takzvaný <i>profiler</i>, který je součástí standardní instalace Go a může ho
+tedy bez problémů využít jakýkoli vývojář. Profiler je možné spustit několika
+různými způsoby, ovšem nejjednodušší je jeho spuštění společně
+s&nbsp;(jednotkovými) testy, tj.&nbsp;při použití příkazu <strong>go
+test</strong>. Podrobnější informace o tom, jakým způsobem se spouští testy
+společně s&nbsp;profilerem, a jak se vybírá typ profileru, získáme
+příkazem:</p>
+
+<pre>
+$ <strong>go test --help</strong>
+</pre>
+
+<p>Z&nbsp;několikastránkové nápovědy lze zjistit, že existuje hned několik typů
+profilerů, a to konkrétně profiler pro zjištění pokrytí zdrojového kódu testy,
+klasický profiler zjišťující využití strojového času mikroprocesoru, další
+klasický profiler se zjištěním způsobu využití paměti a taktéž profiler
+s&nbsp;metrikami, které se týkají mutexů:</p>
+
+<pre>
+-<strong>coverprofile cover.out</strong>
+    Write a coverage profile to the file after all tests have passed.
+    Sets -cover.
+&nbsp;
+-<strong>cpuprofile cpu.out</strong>
+    Write a CPU profile to the specified file before exiting.
+    Writes test binary as -c would.
+&nbsp;
+-<strong>memprofile mem.out</strong>
+    Write an allocation profile to the file after all tests have passed.
+    Writes test binary as -c would.
+&nbsp;
+-<strong>memprofilerate n</strong>
+    Enable more precise (and expensive) memory allocation profiles by
+    setting runtime.MemProfileRate. See 'go doc runtime.MemProfileRate'.
+    To profile all memory allocations, use -test.memprofilerate=1.
+&nbsp;
+-<strong>mutexprofile mutex.out</strong>
+    Write a mutex contention profile to the specified file
+    when all tests are complete.
+    Writes test binary as -c would.
+</pre>
+
+<p>Povšimněte si, že se při zapnutí (povolení) každého profileru navíc určuje
+jméno zdrojového kódu, do kterého profiler zapisuje zjištěné informace a
+metriky. Pokud totiž spustíme testy s&nbsp;nějakým profilerem, bude výstup
+příkazu <strong>go test ...</strong> stále stejný (žádné další informace se
+implicitně nezobrazí), ovšem všechna profilerem zjištěná data budou uložena do
+specifikovaného souboru, jehož obsah bude nutné zpracovat dalšími nástroji
+&ndash; ty jsou ovšem taktéž součástí standardní distribuce programovacího
+jazyka Go. Jinými slovy &ndash; soubory, které jsou výsledkem práce profilerů,
+se většinou nečtou přímo, ale je je nutné nějakým způsobem interpretovat.</p>
+
+<p><div class="rs-tip-major">Poznámka: seznam dalších nástrojů, které máme jako
+vývojáři používající programovací jazyk Go k&nbsp;dispozici, se ve skutečnosti
+získá velmi snadno:</div></p>
+
+<pre>
+$ <strong>go tool</strong>
+&nbsp;
+addr2line
+asm
+buildid
+cgo
+compile
+cover
+dist
+doc
+fix
+link
+nm
+objdump
+pack
+pprof
+test2json
+tour
+trace
+vet
+</pre>
+
+<p>Z&nbsp;těchto nástrojů nás dnes budou zajímat dva &ndash;
+<strong>pprof</strong> a <strong>trace</strong>. I pro tyto nástroje je
+pochopitelně možné zobrazit nápovědu:</p>
+
+<pre>
+$ <strong>go tool pprof --help</strong>
+&nbsp;
+usage:
+&nbsp;
+Produce output in the specified format.
+&nbsp;
+   pprof <format> [options] [binary] <source> ...
+&nbsp;
+Omit the format to get an interactive shell whose commands can be used
+to generate various views of a profile
+&nbsp;
+   pprof [options] [binary] <source> ...
+&nbsp;
+Omit the format and provide the "-http" flag to get an interactive web
+interface at the specified host:port that can be used to navigate through
+various views of a profile.
+&nbsp;
+   pprof -http [host]:[port] [options] [binary] <source> ...
+...
+...
+...
+</pre>
+
+<p>a:</p>
+
+<pre>
+$ <strong>go tool trace</strong>
+&nbsp;
+Usage of 'go tool trace':
+Given a trace file produced by 'go test':
+        go test -trace=trace.out pkg
+&nbsp;
+Open a web browser displaying trace:
+        go tool trace [flags] [pkg.test] trace.out
+&nbsp;
+Generate a pprof-like profile from the trace:
+    go tool trace -pprof=TYPE [pkg.test] trace.out
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Demonstrační příklad pro otestování paměťového i CPU profileru</h2>
+
+<p>Příklad, na němž budeme sledovat činnost profilerů, bude velmi jednoduchý.
+Jedná se o projekt složený z&nbsp;několika modulů:</p>
+
+<pre>
+├── main.go
+├── slices
+│   └── slices.go
+└── slices_test.go
+</pre>
+
+<p>Hlavní modul pouze volá funkci <strong>Slices()</strong> z&nbsp;balíčku
+<strong>slices</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "slices/slices"
+&nbsp;
+func <strong>main</strong>() {
+        slices.Slices()
+}
+</pre>
+
+<p>V&nbsp;testu (přes něj budeme profiler spouštět) se opět volá stejná funkce,
+tentokrát jako součást testovacího scénáře:</p>
+
+<pre>
+package <strong>slices_test</strong>
+&nbsp;
+import (
+        "slices/slices"
+        "testing"
+)
+&nbsp;
+func <strong>TestSlices</strong>(t *testing.T) {
+        slices.Slices()
+}
+</pre>
+
+<p>A nakonec se samozřejmě musíme podívat na implementaci funkce nazvané
+<strong>Slices</strong>. V&nbsp;ní je vytvořen řez nad prázdným polem a posléze
+se v&nbsp;programové smyčce do řezu přidávají další prvky (takže se interně
+provádí realokace pole, nad nímž je řez vytvořen):</p>
+
+<pre>
+package <strong>slices</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>Slices</strong>() {
+        var a [0]int
+        s := a[:]
+&nbsp;
+        fmt.Println(s)
+&nbsp;
+        for i := 1; i &lt;= 100000; i++ {
+                s = append(s, i)
+        }
+&nbsp;
+        fmt.Println(s)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotný výsledek běhu programu nás
+vlastně nemusí prozatím zajímat.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Spuštění CPU profileru a základní analýza výsledků</h2>
+
+<p>CPU profiler je možné spustit současně s&nbsp;testy (v&nbsp;našem případě
+jediným testem), a to následujícím způsobem:</p>
+
+<pre>
+$ <strong>go test slices_test.go -cpuprofile=cprof</strong>
+</pre>
+
+<p>Po dokončení testu by se měl v&nbsp;pracovním adresáři objevit mj.&nbsp;i
+soubor &bdquo;cprof&ldquo; obsahující měření získaná CPU profilerem. Výsledky
+si můžeme snadno zobrazit v&nbsp;textovém formátu:</p>
+
+<pre>
+$ <strong>go tool pprof -text cprof</strong>
+</pre>
+
+<p>Příklad výstupu:</p>
+
+<pre>
+File: slices.test
+Type: cpu
+Time: Jun 7, 2019 at 9:29pm (CEST)
+Duration: 201.39ms, Total samples = 50ms (24.83%)
+Showing nodes accounting for 50ms, 100% of 50ms total
+      flat  flat%   sum%        cum   cum%
+      20ms 40.00% 40.00%       40ms 80.00%  fmt.(*pp).handleMethods
+      10ms 20.00% 60.00%       10ms 20.00%  runtime.(*itabTableType).find
+      10ms 20.00% 80.00%       20ms 40.00%  runtime.getitab
+      10ms 20.00%   100%       10ms 20.00%  runtime.memclrNoHeapPointers
+         0     0%   100%       50ms   100%  command-line-arguments_test.TestSlices
+         0     0%   100%       40ms 80.00%  fmt.(*pp).doPrintln
+         0     0%   100%       10ms 20.00%  fmt.(*pp).free
+         0     0%   100%       40ms 80.00%  fmt.(*pp).printArg
+         0     0%   100%       40ms 80.00%  fmt.(*pp).printValue
+         0     0%   100%       50ms   100%  fmt.Fprintln
+         0     0%   100%       50ms   100%  fmt.Println
+         0     0%   100%       10ms 20.00%  runtime.(*mcache).nextFree
+         0     0%   100%       10ms 20.00%  runtime.(*mcache).nextFree.func1
+         0     0%   100%       10ms 20.00%  runtime.(*mcache).refill
+         0     0%   100%       10ms 20.00%  runtime.(*mcentral).cacheSpan
+         0     0%   100%       10ms 20.00%  runtime.(*mcentral).grow
+         0     0%   100%       20ms 40.00%  runtime.assertE2I2
+         0     0%   100%       10ms 20.00%  runtime.heapBits.initSpan
+         0     0%   100%       10ms 20.00%  runtime.makeslice
+         0     0%   100%       10ms 20.00%  runtime.mallocgc
+         0     0%   100%       10ms 20.00%  runtime.newArenaMayUnlock
+         0     0%   100%       10ms 20.00%  runtime.newMarkBits
+         0     0%   100%       10ms 20.00%  runtime.systemstack
+         0     0%   100%       50ms   100%  slices/slices.Slices
+         0     0%   100%       10ms 20.00%  sync.(*Pool).Put
+         0     0%   100%       10ms 20.00%  sync.(*Pool).pin
+         0     0%   100%       10ms 20.00%  sync.(*Pool).pinSlow
+         0     0%   100%       50ms   100%  testing.tRunner
+</pre>
+
+<p>Vytvořit si můžeme i obrázek s&nbsp;výsledkem měření provedeného
+profilerem:</p>
+
+<pre>
+$ <strong>go tool pprof -png cprof</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/363153/"><img src="https://i.iinfo.cz/images/226/go29-1-prev.png" class="image-363153" alt="&#160;" width="129" height="270" /></a>
+<p><i>Obrázek 1: Výsledek měření provedeného CPU profilerem.</i></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Spuštění paměťového profileru a základní analýza výsledků</h2>
+
+<p>Druhým typem profileru je paměťový profiler. I ten můžeme spustit společně
+s&nbsp;testy; postačuje pouze uvést jméno souboru, do kterého má profiler
+uložit naměřené informace:</p>
+
+<pre>
+$ <strong>go test slices_test.go -memprofile=mprof</strong>
+</pre>
+
+<p>Po dokončení běhu testů si můžeme zobrazit výsledek paměťového profileru, a
+to opět v&nbsp;čistě textové podobě:</p>
+
+<pre>
+$ <strong>go tool pprof -text mprof</strong>
+</pre>
+
+<p>Příklad výstupu, nyní s&nbsp;uvedením spotřeby operační paměti jednotlivými
+komponentami aplikace:</p>
+
+<pre>
+File: slices.test
+Type: alloc_space
+Time: Jun 7, 2019 at 9:31pm (CEST)
+Showing nodes accounting for 7715.48kB, 100% of 7715.48kB total
+      flat  flat%   sum%        cum   cum%
+ 4484.36kB 58.12% 58.12%  7715.48kB   100%  slices/slices.Slices
+ 1658.26kB 21.49% 79.61%  1658.26kB 21.49%  fmt.(*buffer).WriteByte (inline)
+ 1024.02kB 13.27% 92.89%  1024.02kB 13.27%  reflect.packEface
+  548.84kB  7.11%   100%   548.84kB  7.11%  fmt.(*buffer).Write (inline)
+         0     0%   100%  7715.48kB   100%  command-line-arguments_test.TestSlices
+         0     0%   100%   548.84kB  7.11%  fmt.(*fmt).fmtInteger
+         0     0%   100%   548.84kB  7.11%  fmt.(*fmt).pad
+         0     0%   100%  3231.12kB 41.88%  fmt.(*pp).doPrintln
+         0     0%   100%   548.84kB  7.11%  fmt.(*pp).fmtInteger
+         0     0%   100%  3231.12kB 41.88%  fmt.(*pp).printArg
+         0     0%   100%  3231.12kB 41.88%  fmt.(*pp).printValue
+         0     0%   100%  3231.12kB 41.88%  fmt.Fprintln
+         0     0%   100%  3231.12kB 41.88%  fmt.Println
+         0     0%   100%  1024.02kB 13.27%  reflect.Value.Interface
+         0     0%   100%  1024.02kB 13.27%  reflect.valueInterface
+         0     0%   100%  7715.48kB   100%  testing.tRunner
+</pre>
+
+<p>I zde je možné vygenerovat výstup ve formě obrázku:</p>
+
+<pre>
+$ <strong>go tool pprof -png cprof</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/363154/"><img src="https://i.iinfo.cz/images/226/go29-2-prev.png" class="image-363154" alt="&#160;" width="164" height="270" /></a>
+<p><i>Obrázek 2: Výsledek měření provedeného CPU profilerem.</i></p>
+
+<p>Spustit můžeme i HTTP server, který nám zobrazí výsledky práce profileru:</p>
+
+<pre>
+$ <strong>go tool pprof -http localhost:8080 mprof</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/363155/"><img src="https://i.iinfo.cz/images/226/go29-3-prev.png" class="image-363155" alt="&#160;" width="370" height="112" /></a>
+<p><i>Obrázek 3: Takzvaný &bdquo;flame graph&ldquo; zobrazený ve webovém
+prohlížeči.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Úprava demonstračního příkladu: paměťově náročnější operace</h2>
+
+<p>Aby bylo možné lépe sledovat činnost správce operační paměti
+implementovaného v&nbsp;programovacím jazyce Go, předchozí demonstrační příklad
+nepatrně pozměníme &ndash; zvětšíme počet iterací smyčky, v&nbsp;níž se volá
+funkce <strong>append()</strong> na jeden milion iterací:</p>
+
+<pre>
+package <strong>slices2</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>Slices</strong>() {
+        var a [0]int
+        s := a[:]
+&nbsp;
+        for i := 1; i &lt;= <strong>1000000</strong>; i++ {
+                s = append(s, i)
+        }
+&nbsp;
+        fmt.Printf("Length: %d\n", len(s))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ostatní části projektu zůstanou
+zachovány, tj.&nbsp;jak hlavní modul, tak i modul s&nbsp;testy se nijak
+nezmění.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Analýza výsledků získaných profilery</h2>
+
+<p>Nyní již budou výsledky získané profilery vypadat zcela jinak. Pochopitelně
+se zvýší spotřeba operační paměti, a to na necelých 42 MB:</p>
+
+<pre>
+$ <strong>go tool pprof -text mprof</strong>
+&nbsp;
+File: slices2.test
+Type: alloc_space
+Time: Jun 7, 2019 at 9:35pm (CEST)
+Showing nodes accounting for 41.85MB, 100% of 41.85MB total
+      flat  flat%   sum%        cum   cum%
+   41.85MB   100%   100%    41.85MB   100%  slices2/slices2.Slices
+         0     0%   100%    41.85MB   100%  command-line-arguments_test.TestSlices
+         0     0%   100%    41.85MB   100%  testing.tRunner
+</pre>
+
+<p>Profiler měřící strojový čas strávený v&nbsp;jednotlivých funkcích ukáže
+zajímavou a vlastně i očekávanou věc &ndash; hodně času se stráví ve funkci pro
+přenos bloků paměti (<strong>runtime.memmove</strong>) při realokaci pole.
+Ovšem současně se zde objevují i další funkce, které jsme předtím neviděli
+&ndash; tyto funkce souvisejí s&nbsp;prací správce paměti a jeho části pro
+uvolňování paměti (<i>garbage collector</i>):</p>
+
+<pre>
+$ <strong>go tool pprof -text cprof</strong>
+&nbsp;
+File: slices2.test
+Type: cpu
+Time: Jun 7, 2019 at 9:35pm (CEST)
+Duration: 201.41ms, Total samples = 30ms (14.89%)
+Showing nodes accounting for 30ms, 100% of 30ms total
+      flat  flat%   sum%        cum   cum%
+      10ms 33.33% 33.33%       10ms 33.33%  runtime.memmove
+      10ms 33.33% 66.67%       10ms 33.33%  runtime.procyield
+      10ms 33.33%   100%       20ms 66.67%  slices2/slices2.Slices
+         0     0%   100%       20ms 66.67%  command-line-arguments_test.TestSlices
+         0     0%   100%       10ms 33.33%  runtime.gcBgMarkWorker
+         0     0%   100%       10ms 33.33%  runtime.gcBgMarkWorker.func2
+         0     0%   100%       10ms 33.33%  runtime.gcDrain
+         0     0%   100%       10ms 33.33%  runtime.growslice
+         0     0%   100%       10ms 33.33%  runtime.markroot
+         0     0%   100%       10ms 33.33%  runtime.markroot.func1
+         0     0%   100%       10ms 33.33%  runtime.scang
+         0     0%   100%       10ms 33.33%  runtime.systemstack
+         0     0%   100%       20ms 66.67%  testing.tRunner
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Podrobnější výsledky získané CPU profilerem</h2>
+
+<p>Podrobnější informace o využití CPU je možné získat různými způsoby. Použít
+můžeme například přepínač <strong>-traces</strong> s&nbsp;následujícím
+výsledkem:</p>
+
+<pre>
+$ <strong>go tool pprof -traces cprof</strong>
+&nbsp;
+File: slices2.test
+Type: cpu
+Time: Jun 7, 2019 at 9:35pm (CEST)
+Duration: 201.41ms, Total samples = 30ms (14.89%)
+-----------+-------------------------------------------------------
+      10ms   slices2/slices2.Slices
+             command-line-arguments_test.TestSlices
+             testing.tRunner
+-----------+-------------------------------------------------------
+      10ms   runtime.memmove
+             runtime.growslice
+             slices2/slices2.Slices
+             command-line-arguments_test.TestSlices
+             testing.tRunner
+-----------+-------------------------------------------------------
+      10ms   runtime.procyield
+             runtime.scang
+             runtime.markroot.func1
+             runtime.markroot
+             runtime.gcDrain
+             runtime.gcBgMarkWorker.func2
+             runtime.systemstack
+             runtime.gcBgMarkWorker
+-----------+-------------------------------------------------------
+</pre>
+
+<p>Ovšem neméně zajímavé je zjištění, že nyní v&nbsp;samostatné gorutině běžel
+i garbage collector, což je názorněji vidět z&nbsp;obrázku:</p>
+
+<a href="https://www.root.cz/obrazek/363156/"><img src="https://i.iinfo.cz/images/226/go29-4-prev.png" class="image-363156" alt="&#160;" width="206" height="270" /></a>
+<p><i>Obrázek 4: Paralelně běžící garbage collector (pravý sloupec).</i></p>
+
+<p>Podobně si můžeme (v&nbsp;prohlížeči) zobrazit i flame graf:</p>
+
+<p><a href="https://www.root.cz/obrazek/363161/"><img src="https://i.iinfo.cz/images/437/go29-5-1-prev.png" class="image-363161" alt="&#160;" width="370" height="57" /></a></p>
+<p><i>Obrázek 5: Takzvaný &bdquo;flame graph&ldquo; zobrazený ve webovém
+prohlížeči, nyní ve chvíli, kdy běžel garbage collector.</i></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Demonstrační příklad využívající gorutiny</h2>
+
+<p>Další demonstrační příklad, na kterém si ověříme činnost profilerů, jsme již
+v&nbsp;tomto seriálu viděli. Jedná se o aplikaci, která po svém spuštění
+vypočítá a vykreslí Mandelbrotovu množinu, a to tak, že se každý obrazový řádek
+vypočítá v&nbsp;samostatné gorutině.</p>
+
+<p>Struktura tohoto programu je následující (opět musíme mít k&nbsp;dispozici
+testy):</p>
+
+<pre>
+mandelbrot
+├── mandelbrot.go
+├── mandelbrot_test.go
+└── renderer
+    ├── mandelbrot.go
+    └── palettes.go
+</pre>
+
+<p>Hlavní modul, který výpočet spustí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "mandelbrot/renderer"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        renderer.Start(width, height, maxiter)
+}
+</pre>
+
+<p>Modul obsahující pouze test, v&nbsp;němž se vykreslí Mandelbrotova množina
+v&nbsp;rozlišení 256&times;256 pixelů:</p>
+
+<pre>
+package <strong>renderer_test</strong>
+&nbsp;
+import (
+        "mandelbrot/renderer"
+        "testing"
+)
+&nbsp;
+func <strong>TestRenderer</strong>(t *testing.T) {
+        renderer.Start(256, 256, 255)
+}
+</pre>
+
+<p>Samotná realizace výpočtu:</p>
+
+<pre>
+package <strong>renderer</strong>
+&nbsp;
+import (
+        "image"
+        "image/png"
+        "log"
+        "os"
+)
+&nbsp;
+func <strong>writeImage</strong>(width uint, height uint, pixels []byte) {
+        img := image.NewNRGBA(image.Rect(0, 0, int(width), int(height)))
+        pixel := 0
+&nbsp;
+        for y := 0; y &lt; int(height); y++ {
+                offset := img.PixOffset(0, y)
+                for x := uint(0); x &lt; width; x++ {
+                        img.Pix[offset] = pixels[pixel]
+                        img.Pix[offset+1] = pixels[pixel+1]
+                        img.Pix[offset+2] = pixels[pixel+2]
+                        img.Pix[offset+3] = 0xff
+                        pixel += 3
+                        offset += 4
+                }
+        }
+&nbsp;
+        outputFile, err := os.Create("mandelbrot.png")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer outputFile.Close()
+&nbsp;
+        png.Encode(outputFile, img)
+}
+&nbsp;
+func <strong>iterCount</strong>(cx float64, cy float64, maxiter uint) uint {
+        var zx float64 = 0.0
+        var zy float64 = 0.0
+        var i uint = 0
+        for i &lt; maxiter {
+                zx2 := zx * zx
+                zy2 := zy * zy
+                if zx2+zy2 &gt; 4.0 {
+                        break
+                }
+                zy = 2.0*zx*zy + cy
+                zx = zx2 - zy2 + cx
+                i++
+        }
+        return i
+}
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64, done chan bool) {
+        var cx float64 = -2.0
+        for x := uint(0); x &lt; width; x++ {
+                i := iterCount(cx, cy, maxiter)
+                color := palette[i]
+                image[3*x] = color[0]
+                image[3*x+1] = color[1]
+                image[3*x+2] = color[2]
+                cx += 3.0 / float64(width)
+        }
+        done &lt;- true
+}
+&nbsp;
+func <strong>Start</strong>(width int, height int, maxiter int) {
+        done := make(chan bool, height)
+&nbsp;
+        pixels := make([]byte, width*height*3)
+        offset := 0
+        delta := width * 3
+&nbsp;
+        var cy float64 = -1.5
+        for y := 0; y &lt; height; y++ {
+                go calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], pixels[offset:offset+delta], cy, done)
+                offset += delta
+                cy += 3.0 / float64(height)
+        }
+        for i := 0; i &lt; height; i++ {
+                &lt;-done
+        }
+        writeImage(uint(width), uint(height), pixels)
+}
+</pre>
+
+<p>Modul s&nbsp;barvovou paletou (nemá význam pro měření, ale pro hezčí
+obrázky):</p>
+
+<pre>
+package <strong>renderer</strong>
+
+/* taken from Fractint */
+
+var mandmap = [...][3]byte{
+        {255, 255, 255}, {224, 224, 224}, {216, 216, 216}, {208, 208, 208},
+        {200, 200, 200}, {192, 192, 192}, {184, 184, 184}, {176, 176, 176},
+        {168, 168, 168}, {160, 160, 160}, {152, 152, 152}, {144, 144, 144},
+        ...
+        ...
+        ...
+        {240, 240, 140}, {244, 244, 152}, {244, 244, 168}, {244, 244, 180},
+        {244, 244, 196}, {248, 248, 208}, {248, 248, 224}, {248, 248, 236},
+        {252, 252, 252}, {248, 248, 248}, {240, 240, 240}, {232, 232, 232}}
+</pre>
+
+<a href="https://www.root.cz/obrazek/363158/"><img src="https://i.iinfo.cz/images/226/go29-6.png" class="image-363158" alt="&#160;" width="256" height="256" /></a>
+<p><i>Obrázek 6: Výsledek činnosti výpočtu.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výsledky měření CPU profileru</h2>
+
+<p>Nejprve spustíme CPU profiler společně s&nbsp;testy. Nejedná se o nic
+nového:</p>
+
+<pre>
+$ <strong>go test mandelbrot_test.go -cpuprofile=cprof</strong>
+</pre>
+
+<p>Zobrazení výsledků profileru:</p>
+
+<pre>
+$ <strong>go tool pprof -text cprof</strong>
+</pre>
+
+<p>Výstup:</p>
+
+<pre>
+File: renderer.test
+Type: cpu
+Time: Jun 7, 2019 at 9:14pm (CEST)
+Duration: 201.36ms, Total samples = 60ms (29.80%)
+Showing nodes accounting for 60ms, 100% of 60ms total
+      flat  flat%   sum%        cum   cum%
+      40ms 66.67% 66.67%       40ms 66.67%  mandelbrot/renderer.iterCount
+      10ms 16.67% 83.33%       10ms 16.67%  compress/flate.(*compressor).findMatch
+      10ms 16.67%   100%       10ms 16.67%  image/png.abs (inline)
+         0     0%   100%       20ms 33.33%  command-line-arguments_test.TestRenderer
+         0     0%   100%       10ms 16.67%  compress/flate.(*Writer).Write
+         0     0%   100%       10ms 16.67%  compress/flate.(*compressor).deflate
+         0     0%   100%       10ms 16.67%  compress/flate.(*compressor).write
+         0     0%   100%       10ms 16.67%  compress/zlib.(*Writer).Write
+         0     0%   100%       20ms 33.33%  image/png.(*Encoder).Encode
+         0     0%   100%       20ms 33.33%  image/png.(*encoder).writeIDATs
+         0     0%   100%       20ms 33.33%  image/png.(*encoder).writeImage
+         0     0%   100%       20ms 33.33%  image/png.Encode
+         0     0%   100%       10ms 16.67%  image/png.filter
+         0     0%   100%       10ms 16.67%  image/png.paeth
+         0     0%   100%       20ms 33.33%  mandelbrot/renderer.Start
+         0     0%   100%       40ms 66.67%  mandelbrot/renderer.calcMandelbrot
+         0     0%   100%       20ms 33.33%  mandelbrot/renderer.writeImage
+         0     0%   100%       20ms 33.33%  testing.tRunner
+</pre>
+
+<p>Pravděpodobně nejzajímavější bude ale analýza funkce, kde program strávil
+nejvíce času. Jedná se o funkci <strong>mandelbrot/renderer.iterCount</strong>,
+takže si (ve webovém prohlížeči) zobrazme podrobněji, které výpočty byly
+nejsložitější:</p>
+
+<a href="https://www.root.cz/obrazek/363159/"><img src="https://i.iinfo.cz/images/226/go29-7-prev.png" class="image-363159" alt="&#160;" width="370" height="211" /></a>
+<p><i>Obrázek 7: Nejvíce času se strávilo ve vnitřní smyčce funkce
+<strong>mandelbrot/renderer.iterCount</strong>. To, o které řádky se jedná,
+nemusí být zcela přesné; záleží na optimalizacích atd.</i></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Spuštění profileru přímo z&nbsp;vyvíjené aplikace</h2>
+
+<p>Prozatím jsme profiler spouštěli nepřímo přes testy, ovšem ve skutečnosti je
+možné profiler spustit přímo z&nbsp;vyvíjené aplikace. Vyžaduje to však úpravu
+zdrojového kódu, aby se otevřel soubor, do něhož bude profiler zapisovat
+výsledky a taktéž musíme profiler spustit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "mandelbrot/renderer"
+        "os"
+        "runtime/pprof"
+        "strconv"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Create("mandelbrot2.prof")
+        if err != nil {
+                log.Fatalf("failed to create profiler output file: %v", err)
+        }
+        defer func() {
+                if err := f.Close(); err != nil {
+                        log.Fatalf("failed to close profiler file: %v", err)
+                }
+        }()
+&nbsp;
+        if err := <strong>pprof.StartCPUProfile</strong>(f); err != nil {
+                log.Fatalf("failed to start profle: %v", err)
+        }
+        defer <strong>pprof.StopCPUProfile</strong>()
+&nbsp;
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        renderer.Start(width, height, maxiter)
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18.Podrobnější výsledky CPU profileru </h2>
+
+<p>Po spuštění předchozího upraveného příkladu se vytvoří soubor
+s&nbsp;výsledky měření profileru. Ty si zobrazíme nám již známým způsobem:</p>
+
+<pre>
+$ <strong>go tool pprof -traces mandelbrot2.prof</strong>
+&nbsp;
+File: mandelbrot
+Type: cpu
+Time: Jun 10, 2019 at 10:27pm (CEST)
+Duration: 201.45ms, Total samples = 60ms (29.78%)
+-----------+-------------------------------------------------------
+      10ms   mandelbrot/renderer.iterCount
+             mandelbrot/renderer.calcMandelbrot
+-----------+-------------------------------------------------------
+      10ms   mandelbrot/renderer.iterCount
+             mandelbrot/renderer.calcMandelbrot
+-----------+-------------------------------------------------------
+      20ms   mandelbrot/renderer.iterCount
+             mandelbrot/renderer.calcMandelbrot
+-----------+-------------------------------------------------------
+      10ms   compress/flate.(*compressor).deflate
+             compress/flate.(*compressor).write
+             compress/flate.(*Writer).Write
+             compress/zlib.(*Writer).Write
+             image/png.(*encoder).writeImage
+             image/png.(*encoder).writeIDATs
+             image/png.(*Encoder).Encode
+             image/png.Encode
+             mandelbrot/renderer.writeImage
+             mandelbrot/renderer.Start
+             command-line-arguments_test.TestRenderer
+             testing.tRunner
+-----------+-------------------------------------------------------
+      10ms   image/png.filter
+             image/png.(*encoder).writeImage
+             image/png.(*encoder).writeIDATs
+             image/png.(*Encoder).Encode
+             image/png.Encode
+             mandelbrot/renderer.writeImage
+             mandelbrot/renderer.Start
+             command-line-arguments_test.TestRenderer
+             testing.tRunner
+-----------+-------------------------------------------------------
+</pre>
+
+<a href="https://www.root.cz/obrazek/363160/"><img src="https://i.iinfo.cz/images/226/go29-8-prev.png" class="image-363160" alt="&#160;" width="193" height="270" /></a>
+<p><i>Obrázek 8: Grafické znázornění, ve kterých částech programu se strávilo
+nejvíce času.</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně dva megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Projekt</th><th>Popis projektu</th><th>Cesta</th></tr>
+<tr><td>1</td><td>clibs.go</td><td>volání céčkových funkcí <strong>srand</strong> a <strong>rand</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/clibs.go">https://github.com/tisnik/go-root/blob/master/article_29/clibs.go</a></td></tr>
+<tr><td>2</td><td>file_block_copy</td><td>kopie obsahu souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/file_block_copy">https://github.com/tisnik/go-root/blob/master/article_29/file_block_copy</a></td></tr>
+<tr><td>3</td><td>slices</td><td>použití funkce <strong>append</strong> pro přidávání prvků do řezu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/slices">https://github.com/tisnik/go-root/blob/master/article_29/slices</a></td></tr>
+<tr><td>4</td><td>slices2</td><td>použití funkce <strong>append</strong> pro přidávání prvků do řezu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/slices2">https://github.com/tisnik/go-root/blob/master/article_29/slices2</a></td></tr>
+<tr><td>5</td><td>mandelbrot</td><td>program pro vykreslení Mandelbrotovy množiny</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/mandelbrot/">https://github.com/tisnik/go-root/blob/master/article_29/mandelbrot/</a></td></tr>
+<tr><td>6</td><td>mandelbrot2</td><td>program pro vykreslení Mandelbrotovy množiny se spuštěním profileru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_29/mandelbrot2/">https://github.com/tisnik/go-root/blob/master/article_29/mandelbrot2/</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
