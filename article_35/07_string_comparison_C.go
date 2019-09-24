@@ -5,7 +5,7 @@ import "golang.org/x/text/language"
 import "fmt"
 
 func main() {
-        cl := collate.New(language.Czech)
+	cl := collate.New(language.Czech)
 	fmt.Println(cl.CompareString("aa", "ab"))
 	fmt.Println(cl.CompareString("aa", "aa"))
 
