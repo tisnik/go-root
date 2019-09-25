@@ -24,6 +24,8 @@ func main() {
 		if read > 0 {
 			fmt.Printf("byte from file\n")
 			fmt.Println(buffer[0])
+		} else {
+			fmt.Println("empty block (end of file?)")
 		}
 
 		if err == io.EOF {
