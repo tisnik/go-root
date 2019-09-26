@@ -4,7 +4,7 @@
 
 int main(void) {
     const char *s1 = "Hello world!";
-    char *s2 = (char*)calloc(4 + 2, sizeof(char*));
+    char *s2 = (char*)calloc(4 + 2, sizeof(char));
 
     strncpy(s2, s1 + 0, 4);
 

@@ -7,7 +7,7 @@ int main(void) {
     const char *s2 = "world!";
 
     size_t length = strlen(s1) + strlen(s2) + 1;
-    char *s3 = (char *)calloc(length, sizeof(char*));
+    char *s3 = (char *)calloc(length, sizeof(char));
 
     if (s3) {
         strcpy(s3, s1);
