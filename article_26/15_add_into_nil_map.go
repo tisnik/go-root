@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 15:
+//    Přidání prvků do nulové mapy
+
 package main
 
 import "fmt"
