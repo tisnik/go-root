@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 11:
+//    Ukazatel na celé číslo
+
 package main
 
 import "fmt"
