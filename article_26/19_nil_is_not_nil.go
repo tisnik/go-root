@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 19:
+//    nil se někdy nerovná nil
+
 package main
 
 import "fmt"
