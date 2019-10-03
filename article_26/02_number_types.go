@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 2:
+//    Numerické datové typy
+
 package main
 
 func main() {
