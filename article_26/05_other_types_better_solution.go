@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 5:
+//    Ostatní datové typy, lepší přístup
+
 package main
 
 import "fmt"
