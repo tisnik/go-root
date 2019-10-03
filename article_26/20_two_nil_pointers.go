@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 20:
+//    Dva ukazatele s nulovou hodnotou
+
 package main
 
 import "fmt"
