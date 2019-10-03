@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 18:
+//    Prázdné rozhraní a rozhraní s jednou metodou
+
 package main
 
 import "fmt"
