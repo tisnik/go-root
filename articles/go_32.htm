@@ -1,0 +1,2349 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Užitečné nástroje pro Go: automatické doplňování kódu, plnohodnotná smyčka REPL a integrace s Vimem</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Užitečné nástroje pro Go: automatické doplňování kódu, plnohodnotná smyčka REPL a integrace s&nbsp;Vimem</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Ve třicáté druhé části seriálu o programovacím jazyku Go se nejprve seznámíme s nástroji gocode a gopls, které umožňují provádět automatické doplňování kódu. Tyto nástroje lze využít jak ve Vimu (vim-gocode), tak i v&nbsp;plnohodnotné interaktivní smyčce REPL, které byla (kupodivu) vyvinuta i pro Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Užitečné nástroje pro Go: automatické doplňování kódu, plnohodnotná smyčka REPL a integrace s&nbsp;Vimem</a></p>
+<p><a href="#k02">2. Nastavení proměnných prostředí <strong>PATH</strong> a <strong>GOPATH</strong></a></p>
+<p><a href="#k03">3. Instalace nástroje <strong>gocode</strong></a></p>
+<p><a href="#k04">4. Otestování nástroje <strong>gocode</strong> z&nbsp;příkazové řádky</a></p>
+<p><a href="#k05">5. Ladicí informace vypisované serverem</a></p>
+<p><a href="#k06">6. Výstupní formáty nástroje <strong>gocode</strong></a></p>
+<p><a href="#k07">7. Doplňování kódu v&nbsp;textovém editoru Vim</a></p>
+<p><a href="#k08">8. Technologie <i>omnicompletion</i></a></p>
+<p><a href="#k09">9. Instalace pluginu <strong>vim-gocode</strong> do Vimu</a></p>
+<p><a href="#k10">10. Otestování základních vlastností poskytovaných pluginem <strong>vim-gocode</strong></a></p>
+<p><a href="#k11">11. Konfigurace klávesové zkratky pro vyvolání omni completion</i></a></p>
+<p><a href="#k12">12. Interaktivní smyčka REPL pro kompilovaný programovací jazyk Go?</a></p>
+<p><a href="#k13">13. Interaktivní smyčka REPL v&nbsp;různých jazycích a nástrojích</a></p>
+<p><a href="#k14">14. Projekt <strong>Gore</strong></a></p>
+<p><a href="#k15">15. Instalace projektu <strong>Gore</strong> a spuštění interaktivní smyčky REPL</a></p>
+<p><a href="#k16">16. Speciální pseudopříkazy používané v&nbsp;REPL projektu Gore</a></p>
+<p><a href="#k17">17. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Užitečné nástroje pro Go: automatické doplňování kódu, plnohodnotná smyčka REPL a integrace s&nbsp;Vimem</h2>
+
+<p>V&nbsp;dnešním pokračování <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a> se seznámíme s&nbsp;některými užitečnými nástroji,
+které mohou dobře posloužit především vývojářům při tvorbě a úpravách
+zdrojových kódů psaných v&nbsp;Go. <a href="#k02">V&nbsp;úvodní části
+článku</a> se budeme věnovat především nástroji pojmenovaném
+<strong>gocode</strong>, který umožňuje integraci funkce pro automatické
+doplňování kódu do textových editorů a samozřejmě i do integrovaných vývojových
+prostředí. Tato technologie, která se nazývá <i>omni completion</i>,
+<i>IntelliSense</i> apod. je samozřejmě vývojáři vyhledávaná a prakticky
+dennodenně používaná, protože mnohdy značným způsobem urychluje jejich práci,
+redukuje nutnost častého studia dokumentace méně často volaných funkcí a metod,
+zmenšuje množství triviálních chyb typu chybějící parametr volané
+funkce/metody, nekompatibilní typ předávaného parametru atd.</p>
+
+<p><div class="rs-tip-major">Poznámka: možnosti a především přesnost
+automatického doplňování kódu jsou do značné míry závislé na vlastnostech
+daného programovacího jazyka. Obecně lze říci, že čím více dynamických prvků
+(zjišťovaných až v&nbsp;době běhu aplikace, tedy nikoli už při překladu) jazyk
+obsahuje, tím bude implementace automatického doplňování složitější a mnohdy i
+méně přesná. Tento problém se v&nbsp;posledních několika letech snaží autoři
+IDE či LSP pluginů řešit s&nbsp;využitím technologií založených na strojovém
+učení. Příkladem může být <i>intellicode</i>.</div></p>
+
+<p><a href="#k07">Ve druhé části dnešního článku</a> si ukážeme, jakým způsobem
+se výše zmíněný projekt <strong>gocode</strong> používá v&nbsp;textovém editoru
+<a href="https://www.root.cz/serialy/textovy-editor-vim-jako-ide/">Vim</a>.
+Uvidíme, že integrace Vim+gocode je z&nbsp;pohledu uživatelů jednoduchá a
+přitom uspokojivě funkční. <a href="#k12">Třetí část</a> dnešního článku je
+věnována možná poněkud neočekávanému tématu &ndash; popisem projektu
+<strong>Gore</strong>, který do programovacího jazyka Go implementuje
+plnohodnotnou interaktivní smyčku <i>REPL (Read-Eval-Print-Loop)</i>, což je
+pro kompilovaný programovací jazyk možná poněkud neobvyklé, ale o to
+zajímavější řešení. Smyčka REPL totiž mj.&nbsp;umožňuje odlišný způsob vývoje,
+než jaký známe z&nbsp;klasických vývojových prostředí: namísto neustálých
+opakování cyklů editace&rarr;překlad&rarr;spuštění&rarr;kontrola chyb je totiž
+možné interaktivně, tj.&nbsp;doslova příkaz po příkazu, zadávat a sledovat
+chování programu. To je výhodné například při testování možností cizích
+knihoven, přípravě jednotkových testů, zkoumání různých parametrů použitých
+algoritmů atd.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Nastavení proměnných prostředí <strong>PATH</strong> a <strong>GOPATH</strong></h2>
+
+<p>Jak jsme si již řekli <a href="#k01">v&nbsp;úvodní kapitole</a>, budeme se
+v&nbsp;první části dnešního článku zabývat popisem nástroje
+<strong>gocode</strong>. Ještě předtím, než budeme moci tento nástroj
+nainstalovat a plnohodnotně použít, je však nutné správně nastavit proměnné
+prostředí (<i>environment variables</i>) nazvané <strong>PATH</strong> a
+<strong>GOPATH</strong>. I v&nbsp;případě, že tyto proměnné nejsou nastaveny
+korektně, je totiž možné jazyk Go (překladač atd.) relativně bez problémů
+používat, ovšem nástroj <strong>gocode</strong> by bez nastavení těchto
+proměnných ve velkém množství případů neposkytoval žádné rozumné výsledky.</p>
+
+<p>Proměnná <strong>GOPATH</strong> by měla obsahovat cestu či cesty
+k&nbsp;adresářové struktuře, ve které se nachází zdrojové kódy, balíčky a
+spustitelné aplikace/nástroje jazyka Go, které ovšem leží mimo ten adresář, do
+kterého je nainstalován jazyk Go (tento adresář je obsažen v&nbsp;proměnné
+prostředí <strong>GOROOT</strong>). Proměnná <strong>GOPATH</strong> je použita
+několika nástroji, mj.&nbsp;i nástrojem <strong>gocode</strong> při hledání
+kódu pro automatické doplnění.</p>
+
+<p>Proměnná <strong>PATH</strong> obsahuje cestu či (mnohem častěji) větší
+množství cest k&nbsp;adresářům se spustitelnými soubory. Do této proměnné je
+vhodné přidat mj.&nbsp;i podadresář <strong>bin</strong> obsahující nativní
+nástroje programovacího jazyka Go a taktéž podadresář, do kterého se ukládají
+lokálně zkompilované nástroje instalované příkazem <strong>go get</strong>.</p>
+
+<p>Podívejme se nyní na typické nastavení proměnných <strong>GOPATH</strong> a
+<strong>PATH</strong>. Proměnná <strong>GOPATH</strong> bude ukazovat na
+adresář <strong>~/go/</strong>, tj.&nbsp;na adresář vytvořený v&nbsp;domácím
+adresáři aktivně přihlášeného uživatele, v&nbsp;němž je vytvořena následující
+struktura:</p>
+
+<pre>
+├── bin
+├── pkg
+│   └── linux_amd64
+└── src
+    ├── github.com
+        └── golang.org
+    ...
+    ...
+    ...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti postačuje, aby zde
+existovaly tři prázdné podadresáře <strong>bin</strong>, <strong>pkg</strong> a
+<strong>src</strong>.</div></p>
+
+<p>Do proměnné <strong>PATH</strong> přidáme dva adresáře. Prvním z&nbsp;nich
+je adresář s&nbsp;cestou <strong>/opt/go/bin</strong>, protože právě do
+<strong>/opt/go</strong> byl nainstalován jazyk Go se všemi standardními
+knihovnami a nástroji. Druhým adresářem je <strong>~/go/bin</strong>, jelikož
+právě do tohoto adresáře se instalují spustitelné soubory instalované příkazem
+<strong>go get</strong> (mezi tyto soubory patří i dále popsaný nástroj
+<strong>gocode</strong>).</p>
+
+<p>Následuje ukázka nastavení obou proměnných prostředí provedených například
+v&nbsp;souboru <strong>.bashrc</strong> či <strong>.profile</strong>:</p>
+
+<pre>
+export <strong>GOPATH=~/go/</strong>
+export PATH=$PATH:~/bin:~/.local/bin/:<strong>/opt/go/bin</strong>:<strong>~/go/bin</strong>
+</pre>
+
+<p>Po nastavení těchto proměnných prostředí se můžeme příkazem <strong>go
+env</strong> přesvědčit, jaká je aktuální konfigurace jazyka Go, přesněji
+řečeno, jak proměnné interpretují standardní nástroje Go (dochází zde
+k&nbsp;expanzi ~ atd. atd.):</p>
+
+<pre>
+$ <strong>go env</strong>
+&nbsp;
+GOARCH="amd64"
+GOBIN=""
+GOCACHE="/home/tester/.cache/go-build"
+GOEXE=""
+GOFLAGS=""
+GOHOSTARCH="amd64"
+GOHOSTOS="linux"
+GOOS="linux"
+<strong>GOPATH="/home/tester/go/bin"</strong>
+GOPROXY=""
+GORACE=""
+GOROOT="/opt/go"
+GOTMPDIR=""
+GOTOOLDIR="/opt/go/pkg/tool/linux_amd64"
+GCCGO="gccgo"
+CC="gcc"
+CXX="g++"
+CGO_ENABLED="1"
+GOMOD=""
+CGO_CFLAGS="-g -O2"
+CGO_CPPFLAGS=""
+CGO_CXXFLAGS="-g -O2"
+CGO_FFLAGS="-g -O2"
+CGO_LDFLAGS="-g -O2"
+PKG_CONFIG="pkg-config"
+GOGCCFLAGS="-fPIC -m64 -pthread -fmessage-length=0 -fdebug-prefix-map=/tmp/go-build015606214=/tmp/go-build -gno-record-gcc-switches"
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se proměnná
+<strong>GOPATH</strong> skutečně interpretovala správně, protože nastavení bylo
+provedeno pro uživatele <strong>tester</strong>, jehož domácí adresář
+<strong>~/</strong> je expandován na <strong>/home/tester</strong>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Instalace nástroje <strong>gocode</strong></h2>
+
+<p>Po nastavení konfigurace programovacího jazyka Go se již můžeme zabývat
+prvním nástrojem, o němž jsme se ve stručnosti zmínili <a
+href="#k01">v&nbsp;úvodní kapitole dnešního článku</a>. Tento nástroj se
+jmenuje <strong>gocode</strong> a instaluje se naprosto stejným způsobem, jako
+většina ostatních knihoven, nástrojů a pomocných modulů programovacího jazyka
+Go &ndash; příkazem <strong>go get</strong>:</p>
+
+<pre>
+$ <strong>go get github.com/mdempsky/gocode</strong>
+</pre>
+
+<p>Po zadání tohoto příkazu se naklonuje repositář se zdrojovými kódy nástroje
+<strong>gocode</strong>, naklonují se i repositáře závislých projektů a
+následně se provede překlad všech potřebných knihoven i slinkování výsledného
+spustitelného nativního souboru. Výsledkem překladu a slinkování bude soubor
+<strong>gocode</strong> uložený v&nbsp;adresáři
+<strong>~/$GOPATH/bin/</strong>:</p>
+
+<pre>
+$ <strong>ls -l $GOPATH/bin</strong>
+&nbsp;
+total 19872
+-rwxr-xr-x 1 tester tester 11995863 čen 26 21:47 gocode
+-rwxr-xr-x 1 tester tester  8347658 čen 26 14:38 gore
+</pre>
+
+<p>O tom, že byl nástroj <strong>gocode</strong> přeložen korektně (pro danou
+architekturu) se prozatím můžeme přesvědčit alespoň pokusem o zobrazení jeho
+nápovědy:</p>
+
+<pre>
+$ <strong>gocode --help</strong>
+&nbsp;
+Usage: gocode [-s] [-f=&lt;format&gt;] [-in=&lt;path&gt;] [-sock=&lt;type&gt;] [-addr=&lt;addr&gt;]
+       &lt;command&gt; [&lt;args&gt;]
+&nbsp;
+Flags:
+  -addr string
+        address for tcp socket (default "127.0.0.1:37373")
+  ...
+  ...
+  ...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pokud pouze spustíte soubor
+<strong>gocode</strong> bez dalších parametrů, spustí se na pozadí
+v&nbsp;režimu serveru.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Otestování nástroje <strong>gocode</strong> z&nbsp;příkazové řádky</h2>
+
+<p>Nyní si již můžeme ukázat základní funkce nabízené nástrojem
+<strong>gocode</strong>. Nejdříve tento nástroj spustíme v&nbsp;režimu serveru
+a přesvědčíme se, že byl skutečně spuštěn na pozadí:</p>
+
+<pre>
+$ <strong>gocode</strong>
+&nbsp;
+$ <strong>ps ax |grep gocode</strong>
+ 1897 pts/6    Sl     0:00 gocode -s -sock unix -addr 127.0.0.1:37373
+</pre>
+
+<p>Následně vytvoříme následující zdrojový soubor nazvaný
+<strong>01_counter.go</strong>, který ovšem není, jak jste si mohli povšimnout,
+úplný, takže by ho nebylo možné přeložit. Šipka na šestnáctém řádku není
+součástí zdrojového kódu, ale pouze ukazuje pozici kurzoru v&nbsp;textovém
+editoru. Právě na tomto místě budeme požadovat, aby nám nástroj
+<strong>gocode</strong> nabídl všechny možné identifikátory, které je možné
+v&nbsp;daném kontextu doplnit:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func main() {
+        var cnt int = 0
+&nbsp;
+        for i := 0; i &lt; 1000; i++ {
+                go func() {
+                        cnt++
+                }()
+        }
+        time.Sleep(1000 * time.M<strong>&rarr;</strong>
+        fmt.Printf("%d\n", cnt)
+}
+</pre>
+
+<a href="https://www.root.cz/obrazek/365018/"><img src="https://i.iinfo.cz/images/633/go32-1-prev.png" class="image-365018" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 1: S&nbsp;využitím klávesové zkratky <strong>G Ctrl+G</strong>
+lze získat přesné informace o pozici kurzoru (ten je zde naznačen modrým
+obdélníkem, i když skutečný kurzor přeskočil na příkazovou a stavovou
+řádku).</i></p>
+
+<p>Pozice naznačená šipkou je od počátku souboru vzdálena o 159 bajtů (a
+v&nbsp;tomto případě i znaků, protože pro jednoduchost používáme čisté ASCII a
+nikoli plné Unicode), takže pro zobrazení všech možných identifikátorů, které
+lze na pozici 159 doplnit použijeme příkaz:</p>
+
+<pre>
+$ <strong>gocode -f=json --in 01_counter.go autocomplete 159</strong>
+</pre>
+
+<p>Povšimněte si, že je nutné specifikovat výstupní formát, jméno souboru,
+který se pošle nástroji <strong>gocode</strong> (přes socket), příkaz pro
+<strong>gocode</strong> (<i>autocomplete</i>) a taktéž i pozici kurzoru, na
+které očekáváme seznam pro doplnění.</p>
+
+<p><div class="rs-tip-major">Poznámka: žádné další příkazy kromě
+<i>autocomplete</i> a <i>exit</i> prozatím nejsou nástrojem
+<strong>gocode</strong> podporovány.</div></p>
+
+<p>Nástroj <strong>gocode</strong> by měl vrátit JSON obsahující přesné
+informace o identifikátorech, které je možné na daném místě doplnit:</p>
+
+<pre>
+[1,[{"class":"const","package":"time","name":"March","type":"time.Month"},
+{"class":"const","package":"time","name":"May","type":"time.Month"},
+{"class":"const","package":"time","name":"Microsecond","type":"time.Duration"},
+{"class":"const","package":"time","name":"Millisecond","type":"time.Duration"},
+{"class":"const","package":"time","name":"Minute","type":"time.Duration"},
+{"class":"const","package":"time","name":"Monday","type":"time.Weekday"},
+{"class":"type","package":"time","name":"Month","type":"int"}]]
+</pre>
+
+<p>Můžeme vidět, že se skutečně nabídly pouze ty identifikátory z&nbsp;balíčku
+<strong>time</strong>, které začínají znakem &bdquo;M&ldquo;. Zajímavé ovšem
+je, že identifikátory konstant mají rozdílné typy.</p>
+
+<p>V&nbsp;dalším příkladu vyzkoušíme, zda nástroj <strong>gocode</strong>
+dokáže doplnit všechny funkce, konstanty a proměnné balíčku
+<strong>fmt</strong>. Opět se podívejte, na kterém místě se nyní nachází šipka
+kurzoru:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func main() {
+        var cnt int = 0
+&nbsp;
+        for i := 0; i &lt; 1000; i++ {
+                go func() {
+                        cnt++
+                }()
+        }
+        time.Sleep(1000 * time.Microsecond)
+        fmt.<strong>&rarr;</strong>
+}
+</pre>
+
+<p>Nyní se kurzor nachází na offsetu 176, takže si vyžádáme všechny možnosti
+automatického doplnění na této pozici:</p>
+
+<pre>
+$ <strong>gocode -f=json --in 02_counter.go autocomplete 176</strong>
+</pre>
+
+<p>Výsledek (ve formátu JSON) pro větší přehlednost upravíme do čitelnější
+podoby:</p>
+
+<pre>
+[
+  0,
+  [
+    {
+      "class": "func",
+      "package": "fmt",
+      "name": "Errorf",
+      "type": "func(format string, a ...interface{}) error"
+    },
+    {
+      "class": "func",
+      "package": "fmt",
+      "name": "Fprint",
+      "type": "func(w io.Writer, a ...interface{}) (n int, err error)"
+    },
+    {
+      "class": "func",
+      "package": "fmt",
+      "name": "Fprintf",
+      "type": "func(w io.Writer, format string, a ...interface{}) (n int, err error)"
+    },
+    {
+      "class": "func",
+      "package": "fmt",
+      "name": "Fprintln",
+      "type": "func(w io.Writer, a ...interface{}) (n int, err error)"
+    },
+    ...
+    ...
+    ...
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Ladicí informace vypisované serverem</h2>
+
+<p>Server <strong>gocode</strong> je možné nastavit i takovým způsobem, aby
+vypisoval ladicí informace o zdrojových kódech, které mu byly předloženy a o
+nabídkách automatického doplnění, které provedl. Původní instanci serveru je
+nejdříve nutné vypnout:</p>
+
+<pre>
+$ <strong>gocode exit</strong>
+</pre>
+
+<p>A následně znovu nastartovat, tentokrát ovšem s&nbsp;uvedením přepínačů
+<strong>-debug</strong> (výpis ladicích informací) a <strong>-s</strong>
+(vynucení režimu serveru, nikoli klienta):</p>
+
+<pre>
+$ <strong>gocode -debug -s</strong>
+</pre>
+
+<p>Nyní serveru znovu předložíme první testovací příklad a budeme požadovat
+nabídky pro automatické doplnění na offsetu 159:</p>
+
+<pre>
+$ <strong>gocode -f=json --in 01_counter.go autocomplete 159</strong>
+</pre>
+
+<p>Server vrátí požadovanou informaci, ovšem kromě toho na svůj terminál vypíše
+i ladicí informace v&nbsp;tomto tvaru:</p>
+
+<pre>
+2019/06/27 20:51:15 Got autocompletion request for '/home/tester/go-root/article_32/01_counter.go'
+2019/06/27 20:51:15 Cursor at: 159
+2019/06/27 20:51:15 -------------------------------------------------------
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func main() {
+        var cnt int = 0
+&nbsp;
+        for i := 0; i &lt; 1000; i++ {
+                go func() {
+                        cnt++
+                }()
+        }
+        time.Sleep(1000 * time.
+#       fmt.Printf("%d\n", cnt)
+}
+2019/06/27 20:51:15 -------------------------------------------------------
+2019/06/27 20:51:15 Error parsing input file (outer block):
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:17:1: expected selector or type assertion, found ';'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:17:3: missing ',' in argument list
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:17:6: expected operand, found '.'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:18:3: expected ')', found 'EOF'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:18:3: expected ';', found 'EOF'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:18:3: expected ';', found 'EOF'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:18:3: expected '}', found 'EOF'
+2019/06/27 20:51:15  /home/tester/go-root/article_32/01_counter.go:18:3: missing ',' in argument list
+2019/06/27 20:51:15 Error parsing "/home/tester/go-root/article_32/02_counter.go":
+2019/06/27 20:51:15  /home/tester/go-root/article_32/02_counter.go:18:1: expected selector or type assertion, found '}'
+2019/06/27 20:51:15 Elapsed duration: 8.815436ms
+2019/06/27 20:51:15 Offset: 0
+2019/06/27 20:51:15 Number of candidates found: 67
+2019/06/27 20:51:15 Candidates are:
+2019/06/27 20:51:15   const ANSIC untyped string
+2019/06/27 20:51:15   const April time.Month
+2019/06/27 20:51:15   const August time.Month
+2019/06/27 20:51:15   const December time.Month
+2019/06/27 20:51:15   const February time.Month
+...
+...
+...
+2019/06/27 20:51:15   const Wednesday time.Weekday
+2019/06/27 20:51:15   func After(d time.Duration) &lt;-chan time.Time
+2019/06/27 20:51:15   func AfterFunc(d time.Duration, f func()) *time.Timer
+2019/06/27 20:51:15   func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) time.Time
+...
+...
+...
+2019/06/27 20:51:15   type Time struct
+2019/06/27 20:51:15   type Timer struct
+2019/06/27 20:51:15   type Weekday int
+2019/06/27 20:51:15   var Local *time.Location
+2019/06/27 20:51:15   var UTC *time.Location
+2019/06/27 20:51:15 =======================================================
+</pre>
+
+<p>Podobně je tomu ve druhém příkladu:</p>
+
+<pre>
+$ <strong>gocode -f=json --in 02_counter.go autocomplete 176</strong>
+</pre>
+
+<p>S&nbsp;ladicími informacemi:</p>
+
+<pre>
+2019/06/27 20:49:01 Got autocompletion request for '/home/tester/go-root/article_32/02_counter.go'
+2019/06/27 20:49:01 Cursor at: 176
+2019/06/27 20:49:01 -------------------------------------------------------
+package main
+&nbsp;
+import (
+        "fmt"
+        "time"
+)
+&nbsp;
+func main() {
+        var cnt int = 0
+&nbsp;
+        for i := 0; i &lt; 1000; i++ {
+                go func() {
+                        cnt++
+                }()
+        }
+        time.Sleep(1000 * time.Microsecond)
+        fmt.#
+}
+2019/06/27 20:49:01 -------------------------------------------------------
+2019/06/27 20:49:01 Error parsing input file (outer block):
+2019/06/27 20:49:01  /home/tester/go-root/article_32/02_counter.go:17:6: expected selector or type assertion, found ';'
+2019/06/27 20:49:01 Error parsing "/home/tester/go-root/article_32/01_counter.go":
+2019/06/27 20:49:01  /home/tester/go-root/article_32/01_counter.go:17:25: missing ',' before newline in argument list
+2019/06/27 20:49:01  /home/tester/go-root/article_32/01_counter.go:18:1: expected operand, found '}'
+2019/06/27 20:49:01 Elapsed duration: 8.312908ms
+2019/06/27 20:49:01 Offset: 0
+2019/06/27 20:49:01 Number of candidates found: 25
+2019/06/27 20:49:01 Candidates are:
+2019/06/27 20:49:01   func Errorf(format string, a ...interface{}) error
+2019/06/27 20:49:01   func Fprint(w io.Writer, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Fprintln(w io.Writer, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Fscan(r io.Reader, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Fscanf(r io.Reader, format string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Fscanln(r io.Reader, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Print(a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Printf(format string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Println(a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Scan(a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Scanf(format string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Scanln(a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Sprint(a ...interface{}) string
+2019/06/27 20:49:01   func Sprintf(format string, a ...interface{}) string
+2019/06/27 20:49:01   func Sprintln(a ...interface{}) string
+2019/06/27 20:49:01   func Sscan(str string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Sscanf(str string, format string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   func Sscanln(str string, a ...interface{}) (n int, err error)
+2019/06/27 20:49:01   type Formatter interface
+2019/06/27 20:49:01   type GoStringer interface
+2019/06/27 20:49:01   type ScanState interface
+2019/06/27 20:49:01   type Scanner interface
+2019/06/27 20:49:01   type State interface
+2019/06/27 20:49:01   type Stringer interface
+2019/06/27 20:49:01 =======================================================
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: informace o tom, že zdrojové kódy nelze
+parsovat, je správná, protože nejsou zcela dokončeny (chybí uzavírací závorky
+atd.).</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Výstupní formáty nástroje <strong>gocode</strong></h2>
+
+<p>Nástroj <strong>gocode</strong> poskytuje informace o kódu, který je možné
+v&nbsp;daném místě doplnit, v&nbsp;několika různých formátech. S&nbsp;formátem
+JSON jsme se již setkali v&nbsp;předchozích kapitolách, takže se zde zmiňme o
+dalších podporovaných formátech:</p>
+
+<ol>
+<li>CSV</li>
+<li>Formát pro Vim</li>
+<li>Formát pro Emacs</li>
+<li>Takzvaný &bdquo;nice&ldquo; formát</li>
+</ol>
+
+<p>Formát CSV poskytuje informace ve formě jednoduché tabulky zpracovatelné
+libovolnou knihovnou, která s&nbsp;CSV dokáže pracovat (taková knihovna dnes
+existuje pro prakticky každý programovací jazyk):</p>
+
+<pre>
+$ <strong>gocode -f=csv --in 01_counter.go autocomplete 159</strong>
+&nbsp;
+const,,ANSIC,,untyped string,,time
+const,,April,,time.Month,,time
+const,,August,,time.Month,,time
+const,,December,,time.Month,,time
+const,,February,,time.Month,,time
+const,,Friday,,time.Weekday,,time
+const,,Hour,,time.Duration,,time
+const,,January,,time.Month,,time
+const,,July,,time.Month,,time
+...
+...
+...
+</pre>
+
+<p>Formát pro Vim odpovídá datovým typům <i>Vim Scriptu</i>, takže je snadno
+zpracovatelný přímo ve Vimu:</p>
+
+<pre>
+$ <strong>gocode -f=vim --in 01_counter.go autocomplete 159</strong>
+&nbsp;
+[0, [
+    {'word': 'ANSIC', 'abbr': 'const ANSIC untyped string', 'info': 'const ANSIC untyped string'},
+    {'word': 'April', 'abbr': 'const April time.Month', 'info': 'const April time.Month'},
+    {'word': 'August', 'abbr': 'const August time.Month', 'info': 'const August time.Month'},
+    {'word': 'December', 'abbr': 'const December time.Month', 'info': 'const Decembe
+    ...
+    ...
+    ...
+</pre>
+
+<p>Formát určený pro Emacs má následující strukturu podobnou struktuře CSV:</p>
+
+<pre>
+$ <strong>gocode -f=emacs --in 01_counter.go autocomplete 159</strong>
+&nbsp;
+ANSIC,,const untyped string
+April,,const time.Month
+August,,const time.Month
+December,,const time.Month
+...
+...
+...
+</pre>
+
+<p>A konečně &bdquo;pěkný&ldquo; (nice) formát je určen spíše pro čtení
+uživateli než pro přímé zpracování:</p>
+
+<pre>
+$ <strong>gocode -f=nice --in 01_counter.go autocomplete 159</strong>
+&nbsp;
+Found 67 candidates:
+  const ANSIC untyped string
+  const April time.Month
+  const August time.Month
+  const December time.Month
+  const February time.Month
+  const Friday time.Weekday
+  const Hour time.Duration
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Doplňování kódu v&nbsp;textovém editoru Vim</h2>
+
+<p>Ve druhé části článku si ukážeme zkombinování textového editoru Vim a
+nástroje <strong>gocode</strong>.</p>
+
+<p>Velmi užitečnou vlastností textového editoru <i>Vim</i>, kterou se dnes
+budeme v&nbsp;souvislosti s&nbsp;pluginem <strong>vim-gocode</strong> alespoň
+ve stručnosti zabývat, je technologie nazvaná &bdquo;omni completion&ldquo;
+(někdy se setkáme i s&nbsp;jednoslovným zápisem &bdquo;omnicompletion&ldquo;).
+Tato technologie, která se ve Vimu objevila až <a
+href="http://vimdoc.sourceforge.net/htmldoc/version7.html#new-omni-completion">v&nbsp;jeho
+sedmé verzi</a>, rozšiřuje možnosti automatického doplňování kódu (či obecně
+textu) o externí nástroje. Připomeňme si, že Vim nabízí ve vkládacím a
+přepisovacím režimu klávesovou zkratku <strong>Ctrl+P</strong>
+(<i>previous</i>) pro nalezení a doplnění slova nacházejícího se před kurzorem
+a taktéž zkratku <strong>Ctrl+N</strong> (<i>next</i>), která slouží ke
+stejnému účelu, ovšem hledá slovo pro doplnění v&nbsp;textu za kurzorem (pokud
+je k&nbsp;dispozici více možností, zobrazí se všechny nalezené možnosti
+v&nbsp;kontextovém menu).  V&nbsp;praxi tedy postačuje napsat jen začátek slova
+a stlačit <strong>Ctrl+P</strong> nebo <strong>Ctrl+N</strong>. Rozsah
+vyhledávání se specifikuje volbou <strong>complete</strong> popsanou <a
+href="http://vimdoc.sourceforge.net/htmldoc/options.html#'complete'">zde</a> a
+samozřejmě i ve vestavěné nápovědě.</p>
+
+<a href="http://i.iinfo.cz/images/257/vim03-10.png"><img src="http://i.iinfo.cz/images/257/vim03-10-prev.png" width="370" height="232" alt=" " /></a>
+<p><i>Obrázek 2: Doplňování kódu nebo libovolného textu s&nbsp;využitím příkazů
+CTRL+P a CTRL+N zavolaných v&nbsp;režimu zápisu (insert mode).</i></p>
+
+<p>Ovšem možnosti automatického doplňování kódu jsou ve skutečnosti daleko
+větší a textový editor <i>Vim</i> pro ně dokonce nabízí samostatný režim
+vyvolávaný z&nbsp;vkládacího či přepisovacího režimu klávesovou zkratkou
+<strong>Ctrl+X</strong> (právě z&nbsp;tohoto důvodu se tento režim nazývá
+<i>^X-mode</i> nebo též <i>CTRL-X</i> mode). Po stlačení této klávesové zkratky
+se v&nbsp;příkazové řádce editoru objeví jednoduché jednořádkové menu
+s&nbsp;příkazy platnými pro režim doplňování:</p>
+
+<p>Všechny dostupné příkazy jsou vypsány v&nbsp;tabulce níže:</p>
+
+<table>
+<tr><th> #</th><th>Příkaz</th><th>Význam</th></tr>
+<tr><td> 1</td><td>Ctrl+X Ctrl+L</td><td>nalezení a doplnění celého (shodného) řádku, užitečné především v&nbsp;případě editace některých typů konfiguračních souborů</td></tr>
+<tr><td> 2</td><td>Ctrl+X Ctrl+N</td><td>doplnění slova, které se nalézá v&nbsp;aktuálně editovaném souboru</td></tr>
+<tr><td> 3</td><td>Ctrl+X Ctrl+K</td><td>podobné Ctrl+N, ovšem slova se hledají v&nbsp;souborech specifikovaných pomocí konfiguračního parametru <strong>dictionary</strong> (jedná se o běžný textový soubor se seznamem slov)</td></tr>
+<tr><td> 4</td><td>Ctrl+X Ctrl+T</td><td>podobné Ctrl+T, ovšem slova se hledají v&nbsp;souborech specifikovaných pomocí konfiguračního parametru <strong>thesaurus</strong></td></tr>
+<tr><td> 5</td><td>Ctrl+X Ctrl+I</td><td>podobné Ctrl+N, ovšem prohledávají se i všechny vkládané (included) soubory</td></tr>
+<tr><td> 6</td><td>Ctrl+X Ctrl+]</td><td>vyhledávání v&nbsp;seznamu značek</td></tr>
+<tr><td> 7</td><td>Ctrl+X Ctrl+F</td><td>doplnění názvu souboru a/nebo cesty, postačuje například zadat text ~/ za nímž následuje klávesová zkratka Ctrl+X Ctrl+F a zobrazí se výpis souborů v&nbsp;domácím adresáři</td></tr>
+<tr><td> 8</td><td>Ctrl+X Ctrl+D</td><td>vyhledání definice makra a doplnění jména tohoto makra</td></tr>
+<tr><td> 9</td><td>Ctrl+X Ctrl+U</td><td>zavolání funkce zadané v&nbsp;konfiguračním parametru <strong>completefunc</strong>, které se předá právě editovaný text</td></tr>
+<tr><td>10</td><td>Ctrl+X Ctrl+O</td><td>vyvolání funkce <i>omni completion</i> popsané <a href="">v&nbsp;následující kapitole</a> (dostupné od Vimu 7)</td></tr>
+</table>
+
+<a href="http://i.iinfo.cz/images/257/vim03-11.png"><img src="http://i.iinfo.cz/images/257/vim03-11-prev.png" width="370" height="232" alt=" " /></a>
+<p><i>Obrázek 3: Doplnění názvu souboru v&nbsp;pracovním adresáři pomocí
+příkazu <strong>CTRL+X</strong> <strong>CTRL+F</strong>.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Technologie <i>omnicompletion</i></h2>
+
+<p><a href="#k07">V&nbsp;předchozí kapitole</a> jsme si řekli, že
+s&nbsp;využitím klávesové zkratky <strong>Ctrl+X Ctrl+O</strong> lze ve
+vkládacím a přepisovacím režimu zavolat technologii &bdquo;omni
+completion&ldquo;. Tuto technologii lze využít pro (pseudo)inteligentní
+doplňování textů založeném na analýze zdrojových kódů. Podobnou funkci můžeme
+najít v&nbsp;nejrůznějších integrovaných vývojových prostředích (Eclipse,
+Netbeans, Visual Studio, Visual Studio Code, nověji například i v&nbsp;Atomu),
+v&nbsp;nichž lze doplňovat například jména funkcí a metod, názvy prvků ve
+strukturách či uniích, atributů objektů, metod objektů či tříd, jmen balíčků
+atd.</p>
+
+<p>Implicitně tato funkce není specifikována vůbec, o čemž se můžete velmi
+snadno přesvědčit při spuštění &bdquo;prázdného&ldquo; Vimu:</p>
+
+<pre>
+:set omnifunc?
+   omnifunc=
+</pre>
+
+<p>Naopak při editaci tohoto článku (v&nbsp;HTML) je funkce nastavena, a to
+konkrétně standardním filetype pluginem <strong>html.vim</strong>:</p>
+
+<pre>
+:set omnifunc?
+   omnifunc=htmlcomplete#CompleteTags
+</pre>
+
+<p>V&nbsp;případě, že chceme použít možnosti nabízené například pluginem
+<i>vim-lsp</i>, můžeme <strong>omnifunc</strong> nastavit globálně (pro celý
+Vim). To se provede jednoduše příkazem:</p>
+
+<pre>
+:set omnifunc=lsp#complete
+</pre>
+
+<p>Popř.&nbsp;lze stejnou funkci nastavit pouze lokálně pro právě aktivní
+buffer:</p>
+
+<pre>
+:setlocal omnifunc=lsp#complete
+</pre>
+
+<p>Samozřejmě nemusíme toto nastavení stále provádět ručně po otevření každého
+zdrojového souboru, ale můžeme do konfiguračního souboru
+<strong>.vimrc</strong> přidat příkaz, který se automaticky zavolá při otevření
+souboru s&nbsp;koncovkou *.py (Python):</p>
+
+<pre>
+augroup __python__
+  au!
+  au BufRead,BufNewFile *.py setlocal omnifunc=lsp#complete
+augroup END
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Instalace pluginu <strong>vim-gocode</strong> do Vimu</h2>
+
+<p>Pro zkombinování možností textového editoru Vim a výše popsaného nástroje
+<strong>gocode</strong> slouží plugin (přídavný modul) nazvaný jednoduše a
+přímočaře <strong>vim-gocode</strong>. Zdrojové kódy tohoto modulu nalezneme
+v&nbsp;repositáři dostupném na adrese <a
+href="https://github.com/volgar1x/vim-gocode">https://github.com/volgar1x/vim-gocode</a>.</p>
+
+<p>Instalaci modulu <strong>vim-gocode</strong> je možné provést různými
+způsoby (například využít různé správce balíčků), ovšem lze zůstat i u
+konzervativní metody a rozbalit všechny soubory přímo do adresáře
+<strong>~./vim</strong>. V&nbsp;mém případě používám správce balíčků nazvaný
+<strong>Pathogen</strong> (viz též <a
+href="http://www.root.cz/clanky/uzitecne-skripty-a-pluginy-pro-textovy-editor-vim/">Užitečné
+skripty a pluginy pro textový editor Vim</a>), takže instalace bude ještě
+jednodušší &ndash; celý repositář se jednoduše naklonuje do adresáře
+<strong>~/.vim/bundle</strong>.</p>
+
+<p>V&nbsp;podadresáři <strong>~/.vim</strong> by měla být vytvořena následující
+adresářová struktura (samozřejmě zde můžeme mít uloženy další pluginy, ostatně
+i já zde mám nainstalovány například slovníky):</p>
+
+<pre>
+.
+├── autoload
+├── bundle
+│   ├── calendar-vim
+│   │   ...
+│   │   ...
+│   │   ...
+│   ├── rainbow_parentheses.vim
+│   │   ...
+│   │   ...
+│   │   ...
+│   ├── todo.txt-vim
+│   │   ...
+│   │   ...
+│   │   ...
+│   ├── vim-fugitive
+│   │   ...
+│   │   ...
+│   │   ...
+│   ├── vim-gocode
+│   │   ├── autoload
+│   │   │   └── go
+│   │   ├── compiler
+│   │   ├── doc
+│   │   ├── ftdetect
+│   │   ├── ftplugin
+│   │   │   └── go
+│   │   ├── indent
+│   │   ├── plugin
+│   │   └── syntax
+│   ├── vim-slime
+│   │   ...
+│   │   ...
+│   │   ...
+│   └── vim-table-mode
+│       ...
+│       ...
+│       ...
+├── doc
+├── ftdetect
+├── plugin
+├── spell
+└── syntax
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Otestování základních vlastností poskytovaných pluginem <strong>vim-gocode</strong></h2>
+
+<p>Plugin <strong>vim-gocode</strong> nabízí uživatelům větší množství
+důležitých funkcí, které naleznete v&nbsp;integrované nápovědě po zadání
+příkazu:</p>
+
+<pre>
+:help vim-gocode
+</pre>
+
+<p>Mezi užitečné funkce patří především použití klávesy <strong>Tab</strong>
+s&nbsp;automatickým zarovnáváním bloků a s&nbsp;převodem mezer na znaky Tab
+(což je současnou verzí jazyka Go striktně vyžadováno). Důležitější je ovšem
+funkce <i>omni completion</i>, která je dostupná pod standardní klávesovou
+zkratkou <strong>Ctrl+X Ctrl+O</strong>. Podívejme se nyní na použití této
+klávesové zkratky na obou demonstračních příkladech, které jsme již viděli
+v&nbsp;předchozích kapitolách:</p>
+
+<a href="https://www.root.cz/obrazek/365019/"><img src="https://i.iinfo.cz/images/633/go32-2-prev.png" class="image-365019" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 4: Nabídka s&nbsp;automaticky nalezenými funkcemi a konstantami.
+Povšimněte si, že v&nbsp;automaticky vytvořeném okně (nahoře) se zobrazují
+přesnější informace o doplňovaném symbolu.</i></p>
+
+<a href="https://www.root.cz/obrazek/365020/"><img src="https://i.iinfo.cz/images/633/go32-3-prev.png" class="image-365020" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 5: Nabídka s&nbsp;automaticky nalezenými funkcemi v&nbsp;balíčku
+<strong>fmt</strong>.</i></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Konfigurace klávesové zkratky pro vyvolání omni completion</h2>
+
+<p>Výše uvedená konfigurace sice teoreticky postačuje po prakticky plnohodnotné
+využití možností pluginu <i>vim-gocode</i>, ovšem skalní uživatelé Vimu
+pravděpodobně očekávají nějaká vylepšení, která by Vim přiblížila
+k&nbsp;moderním IDE. Týká se to mj.&nbsp;i klávesové zkratky použité pro
+vyvolání funkce <i>omni completion</i>, protože <strong>Ctrl+X</strong>
+<strong>Ctrl+O</strong> je spíše &bdquo;emacsovina&ldquo; :-) Řešení samozřejmě
+existuje několik. Můžeme například použít klávesovou zkratku
+<strong>Ctrl+Tab</strong>, pokud se nepoužívá ve správci oken:</p>
+
+<pre>
+:imap &lt;C-Tab&gt; &lt;C-X&gt;&lt;C-O&gt;
+</pre>
+
+<p>Alternativně je možné napsat funkci, která bude na začátku řádku klávesu Tab
+používat pro vkládání mezer a naopak po stisku Tab za písmenem pro zavolání
+<i>omni completion</i>. Podobné řešení bylo použito v&nbsp;pluginu <a
+href="https://github.com/vim-scripts/IndentTab/blob/master/autoload/IndentTab.vim">IndentTab</a>
+popř.&nbsp;pluginu <a
+href="https://github.com/vim-scripts/Smart-Tabs">Smart-Tabs</a>. Další ideu
+naleznete například na stránce <a
+href="http://vim.wikia.com/wiki/Smart_mapping_for_tab_completion">Smart mapping
+for tab completion</a></div></p>
+
+<p>V&nbsp;případě, že používáte GVim nebo KVim, je možné namísto klávesy
+<strong>Tab</strong> použít například i klávesovou zkratku
+<strong>Ctrl+Space</strong>:</p>
+
+<pre>
+:imap &lt;C-Space&gt; &lt;C-X&gt;&lt;C-O&gt;
+</pre>
+
+<p>Na terminálech sice většinou není klávesová zkratka
+<strong>Ctrl+Space</strong> korektně rozpoznána, ale můžete se pokusit zjistit,
+zda terminál namísto <strong>Ctrl+Space</strong> nerozpozná alespoň
+<strong>Ctrl+@</strong>, tj.&nbsp;přesněji řečeno, zda obě klávesové zkratky
+nejsou rozpoznány jako shodný kód. Pokud tomu tak je, můžete mapování změnit
+na:</p>
+
+<pre>
+:imap &lt;C-@&gt; &lt;C-X&gt;&lt;C-O&gt;
+</pre>
+
+<p>a používat <strong>Ctrl+Space</strong> i v&nbsp;terminálu.</p>
+
+<p><div class="rs-tip-major">Poznámka: technicky se klávesovou zkratkou
+<strong>Ctrl+@</strong> zadává ASCII kód NUL, tj.&nbsp;první znak v&nbsp;ASCII
+tabulce, protože znak @ má ASCII kód 64 a stiskem modifikátoru
+<strong>Ctrl</strong> snižujeme ASCII kód právě o hodnotu 64. To je také důvod,
+proč stisk <strong>Ctrl+I</strong> odpovídá znaku HT (<i>Horizontal Tab</i>),
+<strong>Ctrl+H</strong> znaku BS (<i>Backspace</i>), <strong>Ctrl+[</strong>
+řídicímu znaku ESC, <strong>Ctrl+M</strong> konci řádku (CR) atd. Vše osvětlí
+pohled na <a href="https://en.wikipedia.org/wiki/ASCII#Character_set">ASCII
+tabulku</a>.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Interaktivní smyčka REPL pro kompilovaný programovací jazyk Go?</h2>
+
+<p>Mnozí programátoři, popř.&nbsp;ti uživatelé, kteří programovací jazyk musí
+používat pro řešení problémů ve své profesi (ovšem vývoj aplikací naopak není
+jejich hlavní pracovní náplní), mnohdy namísto klasických integrovaných
+vývojových prostředí preferují dosti odlišný způsob práce, který je
+v&nbsp;mnohem větší míře založen na přímočaré a prakticky neustálé interakci
+mezi vývojářem a systémem nebo vznikající (mini)aplikací, jež je mnohdy vysoce
+jednoúčelová. V&nbsp;takových případech ustupuje správa projektů poněkud do
+pozadí a naopak se začíná využívat dosti odlišný druh vývojového prostředí
+založený buď na interaktivní smyčce REPL (<i>Read-Eval-Print-Loop</i>) nebo na
+konceptu takzvaných diářů (<i>notebooks</i>), které jsou už poměrně dlouho
+velmi populární především v&nbsp;systémech pro numerickou matematiku, analýzy,
+statistické výpočty, symbolickou matematiku (manipulace se symboly a výrazy,
+integrace, derivace, zjednodušování výrazů atd.) a dnes taktéž pro machine
+learning (ML).</p>
+
+<img src="https://i.iinfo.cz/images/143/python-interpreters-1-5.png" class="image-359592" alt="&#160;" width="336" height="240" />
+<p><i>Obrázek 6: Za zjednodušenou formu interaktivní smyčky REPL je možné
+považovat i takzvaný přímý mód (direct mode) použitý například v&nbsp;klasickém
+BASICu. Na tomto screenshotu je v&nbsp;přímém módu zapsán příkaz
+<strong>LIST</strong>.</i></p>
+
+<p>Poměrně velkou předností těchto systémů oproti klasickým integrovaným
+vývojovým prostředím je zejména okamžitá zpětná vazba systému na zadávané
+definice, deklarace, makra a příkazy. To uživatelům umožňuje se snadněji a
+taktéž většinou i mnohem rychleji seznámit jak s&nbsp;vlastním programovacím
+jazykem (nalezení chyby na jediném programovém řádku je určitě snazší, než
+analýza mnohdy několikastránkového výpisu vytvořeného překladačem), tak i
+s&nbsp;použitými knihovnami. To je dnes vlastně ještě důležitější, protože
+mnohdy vývoj spočívá v&nbsp;&bdquo;lepení&ldquo; již existujících komponent či
+knihoven (se všemi z&nbsp;toho plynoucími důsledky). Aplikace vytvářené
+v&nbsp;takto koncipovaných prostředích většinou vznikají systémem zdola-nahoru
+(to se někdy označuje termínem <i>bottom-up programming</i>), tj.&nbsp;postupně
+se skládají z&nbsp;funkcí a tříd, které mohou být ihned po své deklaraci
+interaktivně otestovány.</p>
+
+<img src="https://i.iinfo.cz/images/143/python-interpreters-1-6.png" class="image-359593" alt="&#160;" width="660" height="411" />
+<p><i>Obrázek 7: Koncept diáře je použit například v&nbsp;nástroji Gorilla
+REPL, který mohou využít programátoři pracující s&nbsp;jazykem Clojure.</i></p>
+
+<p>REPL si sice většinou spojujeme s&nbsp;interpretovanými programovacími
+jazyky, ovšem ve skutečnosti je možné smyčku REPL do určité míry používat i u
+jazyků kompilovaných či překládaných do bajtkódu (příkladem je programovací
+jazyk <i>Clojure</i>). Je tomu tak i v&nbsp;případě jazyka Go, který je
+kompilovaný a REPL pro něj skutečně vznikl. U jazyka Go je to umožněno zejména
+díky tomu, že překladač Go je velmi rychlý, takže se v&nbsp;REPL může relativně
+bez problémů používat překlad každé definice či příkazu, a to i na pomalejších
+počítačích.</p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Interaktivní smyčka REPL v&nbsp;různých jazycích a nástrojích</h2>
+
+<p>S&nbsp;principem a použitím interaktivní smyčky REPL jsme se již na
+stránkách Rootu setkali, a to dokonce mnohokrát. Kromě článků, které se
+věnovaly klasickým Unixovým shellům typu <a
+href="https://www.root.cz/clanky/programovani-v-bash-shellu/">BASH</a>, <a
+href="https://www.root.cz/clanky/prikazovy-radek-pritel-nejvernejsi-2/">tcsh</a>
+či <a href="https://www.root.cz/clanky/zuzo-shell/">zsh</a> (a rozhraní shellů
+není nic jiného, než interaktivní REPL), jsme smyčku REPL použili například při
+popisu <a
+href="https://www.root.cz/serialy/programovaci-jazyk-julia/">programovacího
+jazyka Julia</a> či <a
+href="https://www.root.cz/vyhledavani/?qs=clojure">jazyka Clojure</a>. Historií
+vzniku REPL jsme se zabývali i <a
+href="https://www.root.cz/clanky/programovaci-jazyky-pouzivane-nejen-v-nbsp-sssr-cast-3-ndash-lisp#k02">zde</a>.</p>
+
+<p>Některé smyčky REPL jsou pojaty přísně minimalisticky, což je případ dnes
+již spíše minimálně používaného <a
+href="https://www.root.cz/serialy/programovaci-jazyk-tcl/">jazyka TCL</a>. Tato
+interaktivní REPL dokonce ani neobsahuje historii příkazů či podporu pro pohyb
+kurzoru na příkazovém řádku:</p>
+
+<pre>
+% 
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se liší i znak výzvy
+(<i>prompt</i>), protože se namísto obvyklého &gt; používá znak procenta; to je
+ovšem pouze marginální změna.</div></p>
+
+<p>Další interaktivní REPL alespoň uživatele informují, v&nbsp;jakém prostředí
+se nachází. To je případ REPL (opět velmi jednoduše pojaté) programovacího
+jazyka Lua:</p>
+
+<pre>
+Lua 5.2.3  Copyright (C) 1994-2013 Lua.org, PUC-Rio
+&gt;
+</pre>
+
+<p>REPL projektu <a
+href="https://www.root.cz/clanky/luajit-just-in-time-prekladac-pro-programovaci-jazyk-lua/">LuaJIT</a>
+vypadá nepatrně odlišně:</p>
+
+<pre>
+LuaJIT 2.1.0-beta3 -- Copyright (C) 2005-2017 Mike Pall. http://luajit.org/
+JIT: ON SSE2 SSE3 SSE4.1 BMI2 fold cse dce fwd dse narrow loop abc sink fuse
+&gt;
+</pre>
+
+<p>Nově se plnohodnotný REPL objevil i v&nbsp;jazyku Clojure;
+v&nbsp;předchozích verzích se používal dále zmíněný alternativní nREPL:</p>
+
+<pre>
+Clojure 1.9.0
+user=&gt;
+</pre>
+
+<p>Podobně vypadá REPL <a
+href="https://www.root.cz/clanky/pixie-lehky-skriptovaci-jazyk-s-kouzelnymi-schopnostmi/">programovacího
+jazyka Pixie</a> (to vlastně není nijak překvapivé, protože se opět jedná o
+jednu z&nbsp;v:</p>
+
+<pre>
+user =&gt;
+</pre>
+
+<p>Interaktivní rozhraní projektu GNU Guile, což je jedna z&nbsp;variant
+programovacího jazyka Scheme:</p>
+
+<pre>
+GNU Guile 2.0.14
+Copyright (C) 1995-2016 Free Software Foundation, Inc.
+&nbsp;
+Guile comes with ABSOLUTELY NO WARRANTY; for details type `,show w'.
+This program is free software, and you are welcome to redistribute it
+under certain conditions; type `,show c' for details.
+&nbsp;
+Enter `,help' for help.
+scheme@(guile-user)&gt; 
+</pre>
+
+<p>Plnohodnotnou smyčku REPL se všemi vymoženostmi nabízí zejména <a
+href="https://www.root.cz/serialy/programovaci-jazyk-julia/">programovací jazyk
+Julia</a>, což ostatně není překvapivé, protože se tento jazyk používá právě
+pro postupnou inkrementální tvorbu aplikací v&nbsp;interaktivním prostředí:</p>
+
+<pre>
+               _
+   _       _ _(_)_     |  Documentation: https://docs.julialang.org
+  (_)     | (_) (_)    |
+   _ _   _| |_  __ _   |  Type "?" for help, "]?" for Pkg help.
+  | | | | | | |/ _` |  |
+  | | |_| | | | (_| |  |  Version 1.0.0 (2018-08-08)
+ _/ |\__'_|_|_|\__'_|  |  Official https://julialang.org/ release
+|__/                   |
+&nbsp; 
+julia&gt;
+</pre>
+
+<p>Podobně je tomu v&nbsp;případě programovacího jazyka Clojure doplněného o
+<i>nREPL</i> (ten lze spustit například příkazem <strong>lein
+repl</strong>):</p>
+
+<pre>
+nREPL server started on port 42733 on host 127.0.0.1 - nrepl://127.0.0.1:42733
+REPL-y 0.3.7, nREPL 0.2.12
+Clojure 1.8.0
+OpenJDK 64-Bit Server VM 1.8.0_171-b10
+    Docs: (doc function-name-here)
+          (find-doc "part-of-name-here")
+  Source: (source function-name-here)
+ Javadoc: (javadoc java-object-or-class-here)
+    Exit: Control+D or (exit) or (quit)
+ Results: Stored in vars *1, *2, *3, an exception in *e
+&nbsp;
+user=&gt; 
+</pre>
+
+<p>Samozřejmě nesmíme zapomenout ani na REPL doménově specifického jazyka R:</p>
+
+<pre>
+R version 3.5.3 (2019-03-11) -- "Great Truth"
+Copyright (C) 2019 The R Foundation for Statistical Computing
+Platform: x86_64-redhat-linux-gnu (64-bit)
+&nbsp;
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+&nbsp;
+  Natural language support but running in an English locale
+&nbsp;
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+&nbsp;
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+&nbsp;
+During startup - Warning messages:
+1: Setting LC_TIME failed, using "C" 
+2: Setting LC_MONETARY failed, using "C" 
+3: Setting LC_PAPER failed, using "C" 
+4: Setting LC_MEASUREMENT failed, using "C" 
+gt;
+</pre>
+
+<a href="https://www.root.cz/obrazek/359743/"><img src="https://i.iinfo.cz/images/553/bpython-1-prev.png" class="image-359743" alt="&#160;" width="370" height="242" /></a>
+<p><i>Obrázek 8: Jedna z&nbsp;alternativních REPL určených pro programovací jazyk Python.</i></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Projekt <strong>Gore</strong></h2>
+
+<p>Jak jsme se již zmínili v&nbsp;předchozích kapitolách, implementace
+interaktivní smyčky REPL vznikla i pro programovací jazyk Go. Jedná se o
+projekt nazvaný <strong>Gore</strong>, jehož zdrojové kódy nalezneme na adrese
+<a
+href="https://github.com/motemen/gore/cmd/gore">https://github.com/motemen/gore/cmd/gore</a>
+(existuje i několik forků tohoto projektu). O tomto projektu se v&nbsp;dnešním
+článku zmiňujeme mj.&nbsp;i proto, že díky kooperaci s&nbsp;projektem
+<strong>gocode</strong> nabízí uživatelům i možnost automatického doplňování
+příkazů, což je velmi užitečné (a mnozí uživatelé si plnohodnotný REPL bez
+funkce <i>autocomplete</i> ani nedokážou představit).</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Instalace projektu <strong>Gore</strong> a spuštění interaktivní smyčky REPL</h2>
+
+<p>Instalace projektu <strong>Gore</strong> se nijak neliší od instalace
+jakéhokoli jiného balíčku programovacího jazyka Go:</p>
+
+<pre>
+$ <strong>go get -u github.com/motemen/gore/cmd/gore</strong>
+</pre>
+
+<p>Po (doufejme že úspěšné) instalaci by se měl na PATH objevit i příkaz
+<strong>gore</strong> (viz též <a href="#k02">druhou kapitolu</a>
+s&nbsp;popisem nastavení cesty).</p>
+
+<p>Samotnou interaktivní smyčku REPL spustíme právě příkazem
+<strong>gore</strong>:</p>
+
+<pre>
+$ <strong>gore</strong>
+</pre>
+
+<p>Následně by se měly objevit základní informace o REPL, verze projektu i
+takzvaná <i>výzva</i> (<i>prompt</i>):</p>
+
+<pre>
+gore version 0.4.1  :help for help
+gore&gt;
+</pre>
+
+<p>V&nbsp;tomto okamžiku REPL očekává příkazy, které budou ihned vykonány.
+Můžeme zadávat i pseudopříkazy, které začínají dvojtečkou. Asi nejlepším
+příkladem takového pseudopříkazu je nápověda vyvolaná pomocí
+<strong>:help</strong>:</p>
+
+<pre>
+gore&gt; <strong>:help</strong>
+&nbsp;
+    :import &lt;package&gt;     import a package
+    :type &lt;expr&gt;          print the type of expression
+    :print                print current source
+    :write [&lt;file&gt;]       write out current source
+    :clear                clear the codes
+    :doc &lt;expr or pkg&gt;    show documentation
+    :help                 show this help
+    :quit                 quit the session
+</pre>
+
+<p>Do interaktivní smyčky REPL ovšem můžete zadávat i běžné programové
+konstrukce programovacího jazyka Go. Příkladem může být deklarace proměnné:</p>
+
+<pre>
+gore&gt; <strong>i := 42</strong>
+(int)42
+&nbsp;
+gore&gt; <strong>x := "Hello"</strong>
+(string)Hello
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde využijeme možnost použití deklarace
+s&nbsp;automatickým odvozením typu proměnné.</div></p>
+
+<p>Dále si můžeme vyzkoušet vytvořit si programovou smyčku. Povšimněte si, že
+REPL správně zjistí, kde se používají programové bloky a nevyžaduje stisk
+Tabu:</p>
+
+<pre>
+gore&gt; <strong>for j := 1; j &lt;= 10; j++ {</strong>
+.....     <strong>println(j)</strong>
+..... <strong>}</strong>
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre>
+
+<p>V&nbsp;REPL lze vytvářet i funkce:</p>
+
+<pre>
+gore&gt; <strong>func Hello() {</strong>
+.....     <strong>println("Hello world!")</strong>
+..... <strong>}</strong>
+&nbsp;
+gore&gt; <strong>Hello()</strong>
+Hello world!
+&nbsp;
+gore&gt; <strong>Hello</strong>
+(func())0x4a9350
+</pre>
+
+<p><div class="rs-tip-major">Nedílnou součástí moderních REPL je i historie
+příkazů. Ta je v&nbsp;případě projektu <strong>gore</strong> ukládána do
+souboru, takže je historie dostupná i mezi restarty REPLu.</div></p>
+
+<p>Jedna důležitá vlastnost zde ovšem chybí &ndash; barevné odlišení příkazů,
+parametrů, konstant, proměnných a pseudopříkazů.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Speciální pseudopříkazy používané v&nbsp;REPL projektu Gore</h2>
+
+<p>S&nbsp;takzvanými pseudopříkazy jsme se již setkali v&nbsp;předchozí
+kapitole. Tyto pseudopříkazy začínají znakem dvojtečky a můžeme je použít
+například pro získání dokumentace. Následující pseudopříkaz vypíše dokumentaci
+k&nbsp;zabudované funkci <strong>println</strong>:</p>
+
+<pre>
+gore&gt; <strong>:doc println</strong>
+&nbsp;
+func println(args ...Type)
+    The println built-in function formats its arguments in an
+    implementation-specific way and writes the result to standard error. Spaces
+    are always added between arguments and a newline is appended. Println is
+    useful for bootstrapping and debugging; it is not guaranteed to stay in the
+    language.
+</pre>
+
+<p>Dalším pseudopříkazem je příkaz <strong>:import</strong>, který je možné
+použít kdykoli, nikoli jen na začátku balíčku (pojem balíček je ovšem
+v&nbsp;rámci REPLu poněkud mlhavý):</p>
+
+<pre>
+gore&gt; <strong>:import fmt</strong>
+</pre>
+
+<p>Ihned po importu balíčku je možné získat nápovědu k&nbsp;jeho funkcím,
+konstantám, typům a metodám:</p>
+
+<pre>
+gore&gt; <strong>:doc fmt.Println</strong>
+&nbsp;
+func Println(a ...interface{}) (n int, err error)
+    Println formats using the default formats for its operands and writes to
+    standard output. Spaces are always added between operands and a newline is
+    appended. It returns the number of bytes written and any write error
+    encountered.
+</pre>
+
+<p>Dtto pro balíček <strong>time</strong> a jeho funkci
+<strong>Sleep</strong>:</p>
+
+<pre>
+gore&gt; :import time
+gore&gt; :doc time.Sleep
+func Sleep(d Duration)
+    Sleep pauses the current goroutine for at least the duration d. A negative
+    or zero duration causes Sleep to return immediately.
+</pre>
+
+<p>Velmi užitečný je i pseudopříkaz <strong>:write jméno_souboru</strong>,
+který zapíše zapsané definice do specifikovaného souboru, který by měl být
+později přeložitelný překladačem jazyka Go.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
