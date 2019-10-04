@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 12B:
+//    Nulový řez a funkce append
+
 package main
 
 import "fmt"
