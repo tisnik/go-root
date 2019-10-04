@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 27:
+//    Tři nulová rozhraní
+
 package main
 
 import "fmt"
