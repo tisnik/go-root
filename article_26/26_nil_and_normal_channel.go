@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 26:
+//    Nulové i normální kanály
+
 package main
 
 import "fmt"
