@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá šestá část
+//
+// Demonstrační příklad číslo 21:
+//    Porovnání dvou ukazatelů
+
 package main
 
 import "fmt"
