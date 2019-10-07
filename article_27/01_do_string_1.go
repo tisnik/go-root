@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 1:
+//    Vytvoření virtuálního stroje jazyka Lua, poslání skriptu v řetězci.
+
 package main
 
 import (
