@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 5:
+//    Spuštění dvou Lua VM, každé v jedné gorutině.
+
 package main
 
 import (
