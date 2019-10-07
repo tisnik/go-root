@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 4:
+//    Vytvoření dvou samostatných Lua VM.
+
 package main
 
 import (
