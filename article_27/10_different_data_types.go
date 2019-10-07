@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 10:
+//    Použití datových typů jazyka Lua.
+
 package main
 
 import (
