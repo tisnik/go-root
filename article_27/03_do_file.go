@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 3:
+//    Načtení externího skriptu do Lua VM.
+
 package main
 
 import (
