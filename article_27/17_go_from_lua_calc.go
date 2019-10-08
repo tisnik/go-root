@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 17:
+//    Zjištění návratové hodnoty a jejího typu.
+
 package main
 
 import (
