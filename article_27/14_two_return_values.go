@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 14:
+//    Funkce vracející dvě hodnoty.
+
 package main
 
 import (
