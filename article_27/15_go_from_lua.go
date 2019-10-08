@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 15:
+//    Volání Go funkcí z Lua.
+
 package main
 
 import (
