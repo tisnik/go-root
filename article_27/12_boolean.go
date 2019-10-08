@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá sedmá část
+//
+// Demonstrační příklad číslo 12:
+//    Pravdivostní hodnoty.
+
 package main
 
 import (
