@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 7:
+//    Metoda Contains().
+
 package main
 
 import (
