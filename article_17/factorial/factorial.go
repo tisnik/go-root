@@ -1,3 +1,7 @@
+// Seriál "Programovací jazyk Go"
+//
+// Balíček s funkcí pro výpočet faktoriálu
+
 package factorial
 
 func Factorial(n int64) int64 {
