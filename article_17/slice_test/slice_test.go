@@ -1,3 +1,7 @@
+// Seriál "Programovací jazyk Go"
+//
+// Test práce s řezy (slices).
+
 package slices
 
 import (
