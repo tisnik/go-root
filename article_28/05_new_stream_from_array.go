@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 5:
+//    Nový stream vytvořený z pole.
+
 package main
 
 import (
