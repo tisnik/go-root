@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 9:
+//    Uživatelské struktury a streamy.
+
 package main
 
 import (
