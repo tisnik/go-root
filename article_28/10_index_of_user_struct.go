@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 10:
+//    Metoda IndexOf() a stream se strukturami.
+
 package main
 
 import (
