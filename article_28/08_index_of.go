@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 8:
+//    Metoda IndexOf().
+
 package main
 
 import (
