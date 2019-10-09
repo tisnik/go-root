@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 2:
+//    Konverze polí a řezů do streamů.
+
 package main
 
 import (
