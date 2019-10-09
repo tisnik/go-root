@@ -3,7 +3,7 @@
 // Dvacátá osmá část
 //
 // Demonstrační příklad číslo 1:
-//    
+//    Vytvoření několika streamů.
 
 package main
 
