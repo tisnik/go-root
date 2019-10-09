@@ -1,3 +1,7 @@
+// Seriál "Programovací jazyk Go"
+//
+// Přístup k tabulce kurzů a použití kurzů při výpočtu převodu měn.
+
 package main
 
 import (
