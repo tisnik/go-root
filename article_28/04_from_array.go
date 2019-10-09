@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//
+// Demonstrační příklad číslo 4:
+//    Vytvoření streamů z polí struktur.
+
 package main
 
 import (
