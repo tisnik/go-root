@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 7:
+//    Hierarchie regionů v souboru s trasovacími informacemi.
+
 package main
 
 import (
