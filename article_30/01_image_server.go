@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 1:
+//    HTTP server, který generuje rastrové obrázky.
+
 package main
 
 import (
