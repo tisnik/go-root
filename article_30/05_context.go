@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 5:
+//    Zpracování kontextu v trasovacích informacích.
+
 package main
 
 import (
