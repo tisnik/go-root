@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 2:
+//     HTTP server nabízející i pprof metriky.
+
 package main
 
 import (
