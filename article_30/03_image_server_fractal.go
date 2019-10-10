@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 3:
+//    HTTP server generující rastrový obrázek s fraktálem.
+
 package main
 
 import (
