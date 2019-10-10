@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá část
+//
+// Demonstrační příklad číslo 6:
+//    Transakce a regiony v trasovacím souboru.
+
 package main
 
 import (
