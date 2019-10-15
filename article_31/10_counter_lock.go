@@ -1,3 +1,11 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 10:
+//    Čítač zvyšovaný ve více vláknech se synchronizací (v mutextu).
+//
+
 package main
 
 import (
