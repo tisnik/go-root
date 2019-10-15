@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 3:
+//    Čítač měněný v mutexu.
+
 package main
 
 import (
