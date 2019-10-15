@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 4:
+//    Atomická změna čítače.
+
 package main
 
 import (
