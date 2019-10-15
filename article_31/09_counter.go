@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 9:
+//    Čítač zvyšovaný ve více vláknech bez synchronizace.
+
 package main
 
 import (
