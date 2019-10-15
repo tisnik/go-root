@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 7:
+//    Použití pprof (profilovací a další metriky)
+
 package main
 
 import (
