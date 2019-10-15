@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 6:
+//    Úprava předchozího příkladu používajícího uzávěry.
+
 package main
 
 import (
