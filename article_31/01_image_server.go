@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 1:
+//    HTTP server, který vrací HTML stránku s generovaným obrázkem.
+
 package main
 
 import (
