@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 11:
+//    Čítač atomicky zvyšovaný ve více vláknech.
+
 package main
 
 import (
