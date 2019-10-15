@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 8:
+//    Další tři sledované metriky: čas výpočtu, počet vypočtených pixelů, čas v tisknutelné podobě.
+
 package main
 
 import (
