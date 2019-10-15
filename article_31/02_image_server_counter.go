@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 2:
+//    Přidání jednoduchého čítače do HTTP serveru.
+
 package main
 
 import (
