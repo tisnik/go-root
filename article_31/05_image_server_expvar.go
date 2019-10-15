@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá první část
+//
+// Demonstrační příklad číslo 5:
+//    Exportované proměnné - čítač.
+
 package main
 
 import (
