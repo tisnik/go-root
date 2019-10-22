@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 3:
+//    Zjištění velikostí základních datových typů jazyka Go.
+
 package main
 
 import (
