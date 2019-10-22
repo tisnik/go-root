@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 5:
+//     Podmínka typu "if-then-else" v jazyce Go.
+
 package main
 
 import "fmt"
