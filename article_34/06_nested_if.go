@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 6:
+//    Vnořené podmínky typu "if".
+
 package main
 
 import "fmt"
