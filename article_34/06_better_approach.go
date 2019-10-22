@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 6:
+//     Rozvětvení s využitím switch namísto podmínky typu "if-then-else".
+
 package main
 
 import "fmt"
