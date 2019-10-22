@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 9:
+//    Implementace programové smyčky typu "do-while" v jazyce Go.
+
 package main
 
 import "fmt"
