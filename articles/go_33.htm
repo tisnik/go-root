@@ -2,7 +2,7 @@
         "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html>
 <head>
-<title></title>
+<title>Systém modulů v programovacím jazyce Go</title>
 <meta name="Author" content="Pavel Tisnovsky" />
 <meta name="Generator" content="vim" />
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -23,7 +23,7 @@
 
 <body>
 
-<h1></h1>
+<h1>Systém modulů v programovacím jazyce Go</h1>
 
 <h3>Pavel Tišnovský</h3>
 
@@ -31,127 +31,1092 @@
 
 <h1>Úvodník</h1>
 
-<p></p>
+<p>Jedním z problematických rysů programovacího jazyka Go byl neexistující systém pro práci s balíčky. Pochopitelně vzniklo několik externích nástrojů, které správu balíčků realizují, ovšem z dlouhodobého hlediska je výhodnější používat takzvané moduly poprvé zavedené ve verzi 1.11.</p>
 
 
 
 <h2>Obsah</h2>
 
-<p><a href="#k01">*** 1. </a></p>
-<p><a href="#k02">*** 2. </a></p>
-<p><a href="#k03">*** 3. </a></p>
-<p><a href="#k04">*** 4. </a></p>
-<p><a href="#k05">*** 5. </a></p>
-<p><a href="#k06">*** 6. </a></p>
-<p><a href="#k07">*** 7. </a></p>
-<p><a href="#k08">*** 8. </a></p>
-<p><a href="#k09">*** 9. </a></p>
-<p><a href="#k10">*** 10. </a></p>
-<p><a href="#k11">*** 11. </a></p>
-<p><a href="#k12">*** 12. </a></p>
-<p><a href="#k13">*** 13. </a></p>
-<p><a href="#k14">*** 14. </a></p>
-<p><a href="#k15">*** 15. </a></p>
-<p><a href="#k16">*** 16. </a></p>
-<p><a href="#k17">*** 17. </a></p>
-<p><a href="#k18">*** 18. </a></p>
-<p><a href="#k19">*** 19. Repositář s&nbsp;demonstračními příklady</a></p>
-<p><a href="#k20">*** 20. Odkazy na Internetu</a></p>
+<p><a href="#k01">1. Systém modulů v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k02">2. Původní koncept jazyka Go</a></p>
+<p><a href="#k03">3. Největší nevýhody původního konceptu</a></p>
+<p><a href="#k04">4. Instalace Go verze 1.13</a></p>
+<p><a href="#k05">5. Balíčky, moduly a repositáře</a></p>
+<p><a href="#k06">6. Vytvoření prvního jednoduchého modulu</a></p>
+<p><a href="#k07">7. Zdrojový kód modulu, překlad a spuštění modulu</a></p>
+<p><a href="#k08">8. Přidání balíčku, na němž modul závisí</a></p>
+<p><a href="#k09">9. Soubor <strong>go.sum</strong></a></p>
+<p><a href="#k10">10. Struktura adresáře <strong>$GOPATH</strong> po stažení balíčku</a></p>
+<p><a href="#k11">11. Verzování balíčků</a></p>
+<p><a href="#k12">12. Problematika potencionálního rozbití API</a></p>
+<p><a href="#k13">13. Změna minoritní verze modulu</a></p>
+<p><a href="#k14">14. Změna majoritní verze modulu</a></p>
+<p><a href="#k15">15. Vytvoření externí knihovny s&nbsp;několika majoritními verzemi a jednou verzí minoritní</a></p>
+<p><a href="#k16">16. Použití externí knihovny s&nbsp;více majoritními verzemi v&nbsp;demonstračním projektu</a></p>
+<p><a href="#k17">17. Sémantické importy</a></p>
+<p><a href="#k18">18. Změna demonstračního příkladu &ndash; využití sémantického importu</a></p>
+<p><a href="#k19">19. Repositáře s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
 
 
 
 <p><a name="k01"></a></p>
-<h2 id="k01">1. </h2>
+<h2 id="k01">1. Systém modulů v&nbsp;programovacím jazyce Go</h2>
+
+<p>V&nbsp;dnešní části <a
+href="http://www.root.cz/serialy/programovaci-jazyk-go">seriálu o programovacím
+jazyce Go</a> se seznámíme se základními vlastnostmi oficiálního systému
+modulů, na který mnozí vývojáři poměrně dlouho čekali. V&nbsp;původních verzích
+jazyka Go se totiž nepočítalo s&nbsp;tím, že by vyvíjené aplikace mohly
+vyžadovat konkrétní verze balíčků (třetích stran) a už vůbec ne s&nbsp;tím, že
+se při vývoji jednotlivých balíčků (typicky knihoven) může měnit jejich API.
+Oficiální, ovšem v&nbsp;reálném světě těžko zajistitelnou doktrínou bylo, že
+balíček (<i>package</i>) určitého jména nikdy nezmění své API a pokud by ke
+změně mělo dojít, měl by se balíček přejmenovat. Jednalo se o dosti
+problematický rys celého ekosystému jazyka Go, který byl jen do určité míry
+řešen externími nástroji, jichž za relativně krátkou dobu existence Go vzniklo
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">prakticky
+nepřeberné množství</a>. Tento stav však začal být neúnosný a možná podstatným
+způsobem zbrzdil rozšíření programovacího jazyka Go (už jen z&nbsp;toho důvodu,
+že mnohé ostatní ekosystémy do značné míry tento problém mají vyřešený: Maven,
+npm, pip, Cargo atd.):</p>
+
+<p><i>dep was the "official experiment." The Go toolchain, as of 1.11, has
+adopted an approach that sharply diverges from dep. As a result, we are
+continuing development of dep, but gearing work primarily towards the
+development of an alternative prototype for versioning behavior in the
+toolchain.</i></p>
+
+<p>Jak je z&nbsp;předchozí citace zřejmé, objevil se v&nbsp;toolchainu
+programovacího jazyka Go verze 1.11 (i když jen
+v&nbsp;&bdquo;preliminary&ldquo; variantě) oficiální systém pro práci
+s&nbsp;takzvanými <i>moduly</i>. Tento systém je postupně stabilizován, takže
+si v&nbsp;dnešním článku ukážeme jeho použití s&nbsp;prozatím nejnovějším
+oficiálním vydáním programovacího jazyka Go &ndash; <a
+href="https://golang.org/doc/go1.13">Go verze 1.13</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: právě z&nbsp;toho důvodu, že dnes již
+existuje de facto oficiální správce modulů v&nbsp;toolchainu Go, jsme se
+v&nbsp;tomto seriálu nezabývali dalšími projekty, které řeší správu balíčků a
+ani se těmito projekty pravděpodobně zabývat nebudeme. Některé z&nbsp;těchto
+projektů sice jsou (alespoň podle mého skromného názoru) technologicky
+propracovanější, než oficiální systém modulů, ovšem v&nbsp;tomto případě hraje
+největší roli standardizace (a právě jazyk Go je jazykem, který se snaží
+standardy dodržovat).</div></p>
 
 
 
 <p><a name="k02"></a></p>
-<h2 id="k02">2. </h2>
+<h2 id="k02">2. Původní koncept jazyka Go</h2>
+
+<p>Nejdříve si alespoň ve stručnosti připomeňme, jak vlastně vypadal původní
+koncept programovacího jazyka Go při práci s&nbsp;balíčky (<i>package</i>), a
+to jak s&nbsp;balíčky lokálními, tak i s&nbsp;externími knihovnami. Již <a
+href="http://www.root.cz/clanky/go-minimalisticky-a-prekvapive-vykonny-programovaci-jazyk">v&nbsp;úvodním
+článku</a> <a href="http://www.root.cz/serialy/programovaci-jazyk-go">tohoto
+seriálu</a> jsme si řekli, že při instalaci programovacího jazyka Go je vhodné
+nastavit proměnnou <strong>GOPATH</strong>, například na adresář
+<strong>~/home/go</strong>. Ve skutečnosti je problematika proměnné prostředí
+<strong>GOPATH</strong> a jejího významu poněkud složitější, protože tato
+proměnná by měla obsahovat absolutní (!) cestu k&nbsp;adresáři, který má či
+bude mít následující strukturu:</p>
+
+<pre>
+.
+├── bin
+│   ├──
+│   └──
+├── pkg
+│   ├──
+│   └──
+└── src
+    ├──
+    ├──
+    └──
+</pre>
+
+<p>Celý adresář se v&nbsp;dokumentaci nazývá pracovní plocha (<i>workspace</i>)
+a obsahuje tři podadresáře pojmenované <strong>src</strong>,
+<strong>pkg</strong> a <strong>bin</strong>. Z&nbsp;pohledu vývojáře je
+nejdůležitější podadresář <strong>src</strong>, v&nbsp;němž jsou typicky
+uloženy repositáře (<i>repository</i>) a v&nbsp;každém repositáři je umístěn
+libovolný počet balíčků (<i>package</i>). V&nbsp;balíčcích už nalezneme
+jednotlivé zdrojové soubory <strong>.go</strong>, pomocné skripty, datové
+soubory, dokumentaci, testy atd. Workspace představovaný adresářem nazvaným
+<strong>go</strong>, v&nbsp;němž jsou umístěny tři repositáře, může vypadat
+například následovně:</p>
+
+<pre>
+.
+└── go
+    ├── bin
+    ├── pkg
+    └── src
+        ├── repository1
+        │   ├── hello1
+        │   │   └── hello.go
+        │   └── hello2
+        │       └── hello.go
+        ├── repository2
+        └── repository3
+</pre>
+
+<p>Vidíme, že v&nbsp;repositáři pojmenovaném <strong>repository1</strong> jsou
+umístěny dva balíčky, které mají názvy <strong>hello1</strong> a
+<strong>hello2</strong>, přičemž v&nbsp;každém balíčku je jediný zdrojový
+soubor, který je (čistě náhodou) shodně pojmenován <strong>hello.go</strong>
+(což v&nbsp;tomto případě nevadí, protože nedojde ke kolizi).</p>
+
+<p>Soubor <strong>hello.go</strong> může vypadat následovně:</p>
+
+<pre>
+package main
+&nbsp;
+func main() {
+        println("repository1: Hello world!")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: aby byl výsledný soubor, který vznikne
+překladem, spustitelný, musí obsahovat funkci <strong>main</strong> a samotné
+označení balíčku se taktéž musí jmenovat <strong>main</strong>.</div></p>
+
+<p>Instalace externích knihoven, na nichž mohla nějaká aplikace záviset, se
+prováděla (a stále může provádět) příkazem <strong>go get</strong>.</p>
+
+<p>Pokud například budeme potřebovat vypočítat <a
+href="https://cs.wikipedia.org/wiki/Leven%C5%A1tejnova_vzd%C3%A1lenost">Levenštejnovu
+vzdálenost dvou řetězců</a> (což se provádí poměrně často například při
+implementaci uživatelsky přívětivé funkce <i>Search</i>), můžeme pro tento účel
+použít knihovnu/balíček s&nbsp;názvem <strong>levenshtein</strong> a
+s&nbsp;cestou <strong>github.com/agext/levenshtein</strong>, která je dostupná
+na GitHubu, konkrétně na adrese <a
+href="https://github.com/agext/levenshtein">https://github.com/agext/levenshtein</a>
+(součástí plné cesty balíčku je skutečně i &bdquo;github.com&ldquo;).</p>
+
+<p><div class="rs-tip-major">Mimochodem &ndash; odkazy na tuto a další knihovny
+naleznete na stránce <a
+href="https://github.com/avelino/awesome-go">https://github.com/avelino/awesome-go</a>,
+která samozřejmě neobsahuje všechny balíčky, které pro Go vznikly, ale pouze
+okomentované a odzkoušené knihovny (neměl by se zde tedy vyskytnout žádný
+&bdquo;odpad&ldquo; ani potenciálně škodlivé knihovny).</p></div></p>
+
+<p>Balíček <strong>agext/levenshtein</strong> se instaluje velmi snadno, a to
+již výše zmíněným příkazem <strong>go get</strong>, kterému předáme jméno
+repositáře s&nbsp;balíčkem (ovšem vynechá se protokol!):</p>
+
+<pre>
+$ <strong>go get github.com/agext/levenshtein</strong>
+</pre>
+
+<p>Pokud chcete vidět, jaké operace se provádí, přidejte přepínač
+<strong>-v</strong>:</p>
+
+<pre>
+$ <strong>go get -v github.com/agext/levenshtein</strong>
+&nbsp;
+github.com/agext/levenshtein (download)
+</pre>
+
+<p>Nyní by měla adresářová struktura <strong>~/go</strong> (přesněji řečeno
+adresář, na který ukazuje proměnná prostředí <strong>$GOPATH</strong>) vypadat
+zhruba následovně:</p>
+
+<pre>
+.
+.
+└── go
+    ├── bin
+    ├── pkg
+    │   └── linux_amd64
+    │       └── github.com
+    │           └── agext
+    │               └── levenshtein.a
+    └── src
+        ├── github.com
+        ├── agext
+        │   └── levenshtein
+        │       ├── DCO
+        │       ├── levenshtein.go
+        │       ├── levenshtein_test.go
+        │       ├── LICENSE
+        │       ├── MAINTAINERS
+        │       ├── NOTICE
+        │       ├── params.go
+        │       ├── params_test.go
+        │       └── README.md
+        ├── repository1
+        │   ├── hello1
+        │   │   └── hello.go
+        │   └── hello2
+        │       └── hello.go
+        ├── repository2
+        └── repository3
+&nbsp;
+15 directories, 16 files
+</pre>
+
+<p>Povšimněte si, že se balíček nainstaloval jak do podadresáře
+<strong>src</strong> (vlastní zdrojové kódy, testy, licence, další
+dokumentace), tak i do podadresáře <strong>pkg</strong> (binární knihovna
+určená pro slinkování s&nbsp;kódem výsledných aplikací). Po instalaci je
+součástí cesty k&nbsp;balíčku skutečně i prefix <strong>github.com</strong>,
+protože zdrojové kódy balíčku leží v&nbsp;podadresáři
+<strong>src/github.com/agext/levenshtein</strong>.</p>
+
+<p>Příkaz <strong>go list</strong> by nyní měl ukázat informace i o nově
+nainstalované knihovně <strong>agext/levenshtein</strong>:</p>
+
+<pre>
+$ <strong>go list ...</strong>
+&nbsp;
+...
+...
+...
+github.com/agext/levenshtein
+...
+...
+...
+</pre>
+
+<p>Podobně uvidíme základní informace o balíčku i na dynamicky generovaných
+stránkách s&nbsp;dokumentací.</p>
 
 
 
 <p><a name="k03"></a></p>
-<h2 id="k03">3. </h2>
+<h2 id="k03">3. Největší nevýhody původního konceptu</h2>
+
+<p><a href="#k02">V&nbsp;předchozí kapitole</a> jsme si ukázali, že i
+v&nbsp;původním Go, resp.&nbsp;přesněji řečeno při použití původního konceptu
+práce s&nbsp;balíčky, bylo možné alespoň nějakým způsobem standardně pracovat
+s&nbsp;externími balíčky a knihovnami, na nichž závisela vyvíjená aplikace.
+Ovšem současně měl tento systém hned několik špatných vlastností, mezi které
+patří zejména:</p>
+
+<ol>
+
+<li>Všechny projekty, nezávisle na tom, jakého mají zákazníka a popř.&nbsp;pro
+koho jsou vytvářeny, musí být umístěny ve stejném adresáři, na nějž ukazuje
+proměnná prostředí <strong>$GOPATH</strong>. Teoreticky je sice možné
+<strong>$GOPATH</strong> přepínat, ale jedná se o dosti křehké řešení.</li>
+
+<li>Prakticky žádným rozumným způsobem není řešeno verzování balíčků. To
+znamená, že není možné specifikovat verzi balíčku, s&nbsp;nímž budeme
+potřebovat pracovat a tím pádem ani není možné použít dvě verze stejného
+balíčku. Tuto vlastnost ještě více umocňuje bod číslo 1, tedy umístění všech
+zdrojových kódů v&nbsp;jediné adresářové struktuře.</li>
+
+<li>Všechny externí balíčky je nutné nějakým způsobem udržovat, zjišťovat
+případná CVE atd. Ovšem jak již plyne z&nbsp;bodů #1 a #2, je možné, že updatem
+jediného balíčku se může rozbít prakticky libovolná vyvíjená aplikace &ndash;
+typický &bdquo;dependency hell&ldquo;.</li>
+
+<li>Pokud externí balíček závisí na dalších balíčcích, musíme řešit i takzvané
+<i>tranzitivní závislosti</i>, s&nbsp;jejichž správou jednoduchý systém
+založený na <strong>go get</strong> příliš nepočítá.</li>
+
+</ol>
+
+<p>Dále představený standardní systém balíčků se výše uvedené problémy snaží do
+velké míry vyřešit.</p>
 
 
 
 <p><a name="k04"></a></p>
-<h2 id="k04">4. </h2>
+<h2 id="k04">4. Instalace Go verze 1.13</h2>
+
+<p>Doslova před několika dny bylo <a
+href="https://blog.golang.org/go1.13">vydáno Go verze 1.13</a>, viz též <a
+href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>.
+Všechny dnes popisované ukázky a demonstrační příklady již budou tuto verzi
+používat (už jen z&nbsp;toho důvodu, že oficiálně byly moduly v&nbsp;Go 1.11 a
+Go 1.12 jen ve stavu &bdquo;preliminary&ldquo;), takže si v&nbsp;této kapitole
+ve stručnosti ukážeme, jakým způsobem je možné Go 1.13 nainstalovat, a to i
+v&nbsp;případě, kdy tato verze ještě není dostupná v&nbsp;balíčcích vaší
+Linuxové distribuce. Předpokladem je, že předchozí verze Go byla nainstalována
+do adresáře <strong>/opt/go</strong>, ovšem pochopitelně změna cíle instalace
+je triviální.</p>
+
+<p>Nejprve se zbavíme předchozí verze:</p>
+
+<pre>
+$ <strong>rm -rf /opt/go</strong>
+<i>nebo</i>
+$ <strong>sudo rm -rf /opt/go</strong>
+</pre>
+
+<p>Dále stáhneme novou verzi Go 1.13, zde konkrétně pro 64bitovou platformu
+x86-64:</p>
+
+<pre>
+$ <strong>wget https://dl.google.com/go/go1.13.linux-amd64.tar.gz</strong>
+&nbsp;
+--2019-09-04 15:50:48--  https://dl.google.com/go/go1.13.linux-amd64.tar.gz
+Resolving dl.google.com (dl.google.com)... 2a00:1450:4014:801::200e, 216.58.201.110
+Connecting to dl.google.com (dl.google.com)|2a00:1450:4014:801::200e|:443... failed: No route to host.
+Connecting to dl.google.com (dl.google.com)|216.58.201.110|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 120050424 (114M) [application/octet-stream]
+Saving to: ‘go1.13.linux-amd64.tar.gz’
+&nbsp;
+go1.13.linux-amd64.tar.gz               100%[==============================================================================&gt;] 114.49M  68.6MB/s    in 1.7s    
+&nbsp;
+2019-09-04 15:50:50 (68.6 MB/s) - ‘go1.13.linux-amd64.tar.gz’ saved [120050424/120050424]
+</pre>
+
+<p>Stažený tarball rozbalíme, a to se specifikací cíle instalace, jímž je
+adresář <strong>/opt/</strong>:</p>
+
+<pre>
+$ <strong>tar xvfz go1.13.linux-amd64.tar.gz -C /opt/</strong>
+</pre>
+
+<p>V&nbsp;tomto adresáři by se měla vytvořit struktura s&nbsp;celým toolingem
+programovacího jazyka Go 1.13:</p>
+
+<pre>
+$ <strong>tree -d /opt -L 2</strong>
+&nbsp;
+/opt
+└── go
+    ├── api
+    ├── bin
+    ├── doc
+    ├── lib
+    ├── misc
+    ├── pkg
+    ├── src
+    └── test
+&nbsp;
+9 directories
+</pre>
+
+<p>Přesvědčíme se, že adresář <strong>/opt/go/bin</strong> je na
+<strong>PATH</strong>:</p>
+
+<pre>
+$ <strong>echo $PATH</strong>
+/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/home/tester/bin:/opt/go/bin:/home/tester/.local/bin:/home/tester/bin
+</pre>
+
+<p>Dále se přesvědčíme, zda je nastavena proměnná <strong>GOPATH</strong>, a to
+z&nbsp;důvodu zpětné kompatibility se starším systémem správy balíčků, který
+jsme si popsali <a href="#k02">ve druhé kapitole</a>:</p>
+
+<pre>
+$ <strong>echo $GOPATH</strong>
+/home/tester/go
+</pre>
+
+<p>V&nbsp;případě, že je <strong>PATH</strong> nastavená korektně, měl by
+následující příkaz vypsat verzi právě nově nainstalovaného jazyka Go:</p>
+
+<pre>
+$ <strong>go version</strong>
+go version go1.13 linux/amd64
+</pre>
 
 
 
 <p><a name="k05"></a></p>
-<h2 id="k05">5. </h2>
+<h2 id="k05">5. Balíčky, moduly a repositáře</h2>
+
+<p>Při práci s&nbsp;moduly v&nbsp;programovacím jazyku Go se rozlišuje mezi
+třemi termíny &ndash; balíčkem, modulem a repositářem:</p>
+
+<ul>
+
+<li><i>Balíček</i> je představován adresářem obsahujícím zdrojové kódy,
+většinou i včetně testů. Zdrojové kódy v&nbsp;jednom adresáři většinou začínají
+stejnou deklarací <strong>package</strong>.</li>
+
+<li><i>Modul</i> se obecně může skládat z&nbsp;většího množství balíčků.
+Všechny tyto balíčky jsou poskytovány a vydávány společně.
+V&nbsp;nejjednodušším případě modul obsahuje jediný balíček (což bude i náš
+případ).</li>
+
+<li><i>Repositář</i> obecně obsahuje více modulů (většinou jediný modul).
+V&nbsp;našich příkladech budeme počítat s&nbsp;tím, že v&nbsp;jednom repositáři
+je jediný modul popř.&nbsp;více verzí jednoho modulu.</li>
+
+</ul>
 
 
 
 <p><a name="k06"></a></p>
-<h2 id="k06">6. </h2>
+<h2 id="k06">6. Vytvoření prvního jednoduchého modulu</h2>
+
+<p>Nyní by již mělo být vše připravené pro otestování standardního systému pro
+práci s&nbsp;moduly. Všechny další příklady budou vytvářeny v&nbsp;adresáři
+<strong>~/src</strong>, což konkrétně znamená, že se vyhneme použití adresáře,
+na který ukazuje proměnná prostředí <strong>GOPATH</strong>.</p>
+
+<p>Nejprve provedeme inicializaci modulu, což zajistí příkaz <strong>go mod
+init</strong>, kterému předáme jméno repositáře, v&nbsp;němž může být modul
+umístěn. Ovšem platí, že pokud tento modul nebude použitý jiným modulem, nemusí
+být jméno repositáře shodné se skutečným repositářem (ovšem později si tím
+zbytečně zkomplikujeme další práci, proto je lepší rozlišovat pouze <a
+href="#k17">sémantické verze</a>).</p>
+
+<p>Náš modul se bude jmenovat
+<strong>github.com/tisnik/my-first-module</strong>, takže se jeho inicializace
+provede následovně:</p>
+
+<pre>
+$ <strong>go mod init github.com/tisnik/my-first-module</strong>
+&nbsp;
+go: creating new go.mod: module github.com/tisnik/my-first-module
+</pre>
+
+<p>Tento příkaz provede jen jedinou operaci &ndash; do aktuálního adresáře
+přidá soubor pojmenovaný <strong>go.mod</strong>, v&nbsp;němž budou (prozatím)
+pouze dva řádky &ndash; vlastní jméno modulu a taktéž verze programovacího
+jazyka Go, resp.&nbsp;přesněji řečeno celého toolchainu tohoto jazyka:</p>
+
+<pre>
+$ <strong>cat go.mod</strong>
+&nbsp;
+module github.com/tisnik/my-first-module
+&nbsp;
+go 1.13
+</pre>
 
 
 
 <p><a name="k07"></a></p>
-<h2 id="k07">7. </h2>
+<h2 id="k07">7. Zdrojový kód modulu, překlad a spuštění modulu</h2>
+
+<p>Nyní vytvoříme zdrojový kód modulu. Bude se jednat o jednoduchou aplikaci,
+v&nbsp;níž je deklarována funkce <strong>Add</strong>, kterou si odzkoušíme na
+čtyřech skupinách celých čísel. Vzhledem k&nbsp;tomu, že se skutečně má jednat
+o spustitelnou aplikaci, použijeme, jak je zvykem, balíček
+<strong>main</strong> a deklarovat budeme muset i funkci
+<strong>main</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>Add</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(Add(0, 0))
+        fmt.Println(Add(1, 0))
+        fmt.Println(Add(1, 2))
+        fmt.Println(Add(-1, 2))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: úplný zdrojový kód tohoto příkladu
+(správně naformátovaný s&nbsp;využitím tabulátorů, což redakční systém Rootu
+neumožňuje) naleznete na adrese <a
+href="https://github.com/tisnik/go-1st-module/blob/master/adder.go">https://github.com/tisnik/go-1st-module/blob/master/adder.go</a>
+(povšimněte si, že název repositáře je v&nbsp;tomto případě skutečně odlišný od
+jména modulu, což však nevadí).</div></p>
+
+<p>Modul přeložíme běžným způsobem, tj.&nbsp;příkazem <strong>go
+build</strong>:</p>
+
+<pre>
+$ <strong>go build -o adder</strong>
+</pre>
+
+<p>A pro jistotu otestujeme, že výsledná aplikace (spustitelný binární soubor)
+je skutečně plně funkční:</p>
+
+<pre>
+$ <strong>./adder</strong>
+0
+1
+3
+1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: co se vlastně změnilo oproti stavu, kdy
+jazyk Go moduly nepodporoval? V&nbsp;našem případě se prozatím jedná jen o
+maličkost &ndash; zdrojové kódy aplikace můžeme mít uloženy kdekoli a nemusíme
+se ohlížet na adresářovou strukturu <strong>$GOPATH</strong>. Další výhody si
+pochopitelně ukážeme v&nbsp;navazujících kapitolách.</div></p>
 
 
 
 <p><a name="k08"></a></p>
-<h2 id="k08">8. </h2>
+<h2 id="k08">8. Přidání balíčku, na němž modul závisí</h2>
+
+<p>Nyní si ukažme, jakým způsobem se situace změní ve chvíli, kdy do našeho
+projektu přidáme balíček, na němž projekt závisí. Samotný balíček bude velmi
+jednoduchý (až triviální) a nalezneme ho na adrese <a
+href="https://github.com/tisnik/intvalues">https://github.com/tisnik/intvalues</a>.
+V&nbsp;tomto balíčku je umístěn jediný zdrojový soubor, který pro jednoduchost
+obsahuje několik důležitých celočíselných konstant, které později v&nbsp;našem
+projektu použijeme, abychom nemuseli používat &bdquo;magické
+konstanty&ldquo;:</p>
+
+<pre>
+package <strong>intvalues</strong>
+&nbsp;
+const <strong>Zero</strong> = 0
+const <strong>One</strong> = 0
+&nbsp;
+const <strong>MaxInt</strong> = int(^uint(0) &gt;&gt; 1)
+const <strong>MinInt</strong> = -MaxInt - 1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: důležité je, že jména konstant mají na
+začátku velké písmeno. Takové konstanty je možné použít i v&nbsp;dalších
+balíčcích &ndash; jsou externě viditelné. Podobně bychom mohli do projektu
+přidat i funkce, globální proměnné a metody, ovšem nyní pro jednoduchost
+použijeme pouze konstanty.</div></p>
+
+<p>Přidání externího balíčku, na němž náš projekt závisí, je při použití modulů
+většinou zcela triviální, protože do zdrojového kódu pouze postačuje přidat
+příslušný import se jménem balíčku včetně cesty na GitHubu či na jiném
+podporovaném externím repositáři (z&nbsp;tohoto pohledu je GitHub skutečně
+chápán jako repositář s&nbsp;verzovanými balíčky):</p>
+
+<pre>
+import <strong>"github.com/tisnik/intvalues"</strong>
+</pre>
+
+<p>V&nbsp;našem konkrétním příkladu bude zdrojový kód vypadat následovně (nový
+import je zvýrazněn):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        <strong>"github.com/tisnik/intvalues"</strong>
+)
+&nbsp;
+func Add(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func main() {
+        fmt.Println(Add(intvalues.Zero, intvalues.Zero))
+        fmt.Println(Add(intvalues.One, 0))
+        fmt.Println(Add(1, 2))
+        fmt.Println(Add(-1, 2))
+}
+</pre>
+
+<p>Před spuštěním popř.&nbsp;před překladem takto upraveného příkladu se můžeme
+podívat na strukturu adresáře <strong>~/go</strong>, popř.&nbsp;toho adresáře,
+na který ukazuje proměnná prostředí se jménem <strong>GOPATH</strong>. Tento
+adresář může být prázdný, popř.&nbsp;může obsahovat některé starší projekty (ty
+nás ovšem nemusí příliš zajímat):</p>
+
+<pre>
+.
+├── bin
+├── pkg
+└── src
+</pre>
+
+<p>Můžeme se pokusit upravený příklad (s&nbsp;externí závislostí) spustit, a to
+klasicky příkazem <strong>go run</strong>::</p>
+
+<pre>
+$ <strong>go run adder.go </strong>
+&nbsp;
+go: finding github.com/tisnik/intvalues latest
+go: downloading github.com/tisnik/intvalues v0.0.0-20190905132008-dad69ec19589
+go: extracting github.com/tisnik/intvalues v0.0.0-20190905132008-dad69ec19589
+0
+0
+3
+1
+</pre>
+
+<p>Z&nbsp;předchozího výpisu je patrné, že ještě před samotným spuštěním
+přeloženého projektu nástroje jazyka Go stáhly balíček, na němž náš projekt
+závisí. To znamená, že už není zapotřebí používat příkaz <strong>go
+get</strong>, který má problematické chování! Dále si povšimněte, jak nástroje
+Go zajistily verzi externího balíčku. Tuto verzi jsme nikde nespecifikovali
+(tedy ani v&nbsp;projektu ani v&nbsp;závislém balíčku), proto bylo číslo verze
+uměle vytvořeno ze dvou dostupných údajů:</p>
+
+<ol>
+<li>Časového razítka posledního commitu (2019-09-05 přibližně v&nbsp;13:20)</li>
+<li>Hashe posledního commitu (plný hash je commit dad69ec1958979dd2b25b68e862550c1a29f17da)</li>
+</ol>
+
+<p>Spuštěním či překladem projektu navíc došlo i ke změně obsahu souboru
+<strong>go.mod</strong>, v&nbsp;němž se kromě předchozích dvou řádků <a
+href="#k05">popsaných výše</a> objevil nový řádek <strong>require</strong>
+obsahující nám již známé údaje o přidané závislosti i její přesné verzi (zde
+automaticky vygenerované):</p>
+
+<pre>
+module github.com/tisnik/my-first-module
+&nbsp;
+go 1.13
+&nbsp;
+<strong>require github.com/tisnik/intvalues v0.0.0-20190905132008-dad69ec19589 // indirect</strong>
+</pre>
+
+<p><div class="rs-tip-major">Rekapitulace: pokud používáme systém modulů a
+potřebujeme do projektu přidat nějakou externí knihovnu (balíček) ve stabilní
+verzi, postačuje do zdrojového kódu přidat příslušný import a aplikaci běžným
+způsobem přeložit.</div></p>
 
 
 
 <p><a name="k09"></a></p>
-<h2 id="k09">9. </h2>
+<h2 id="k09">9. Soubor <strong>go.sum</strong></h2>
+
+<p>Současně při překladu aplikace v&nbsp;adresáři s&nbsp;projektem automaticky
+vznikl i nový soubor se jménem <strong>go.sum</strong>. Obsah tohoto souboru by
+v&nbsp;našem triviálním demonstračním příkladu měl vypadat následovně:</p>
+
+<pre>
+github.com/tisnik/intvalues v0.0.0-20190905132008-dad69ec19589 h1:AAvNlAqsqYEVQUG4hHFNJOvvKVRh8DC+OI0wuEn0v7Y=
+github.com/tisnik/intvalues v0.0.0-20190905132008-dad69ec19589/go.mod h1:Pc260EFOSnRzU0A/CN2vfBETjFJ4B+LijhuPYjfUWrA=
+</pre>
+
+<p>Obecná struktura souboru <strong>go.sum</strong> dodržuje formát:</p>
+
+<pre>
+&lt;modul&gt; &lt;verze&gt;[/go.mod] &lt;hash&gt;
+</pre>
+
+<p>Každý modul (zde externí balíček), na němž projekt závisí, je zapsán na dvou
+po sobě jdoucích řádcích. Na prvním řádku je na konci uveden otisk (hash)
+stromu se soubory modulu, na druhém řádku pak hash souboru
+<strong>go.mod</strong> obsaženého přímo v&nbsp;modulu či automaticky
+vygenerovaného nástroji jazyka Go (pokud tento soubor v&nbsp;repositáři
+s&nbsp;modulem není uložen).</p>
+
+<p><div class="rs-tip-major">Poznámka: pokud vás zajímá, jakým algoritmem se
+vlastně otisky počítají, podívejte se na prefix otisku. Ten by měl
+v&nbsp;současné verzi začínat řetězcem &bdquo;h1:&ldquo;, který označuje
+algoritmus SHA-256.  Ostatně v&nbsp;současné verzi Go je podporován pouze tento
+algoritmus, ovšem v&nbsp;budoucnosti se mohou objevit algoritmy další.
+Podrobnější informace naleznete na stránce <a
+href="https://tip.golang.org/cmd/go/#hdr-Module_authentication_using_go_sum">https://tip.golang.org/cmd/go/#hdr-Module_authentication_using_go_sum</a>.</div></p>
 
 
 
 <p><a name="k10"></a></p>
-<h2 id="k10">10. </h2>
+<h2 id="k10">10. Struktura adresáře <strong>$GOPATH</strong> po stažení balíčku</h2>
+
+<p>Po automatickém stažení balíčku <strong>github.com/tisnik/intvalues</strong>
+a spuštění našeho demonstračního projektu se struktura adresáře, na který
+ukazuje proměnná prostředí <strong>$GOPATH</strong> dosti rapidním způsobem
+změní. V&nbsp;případě, že tento adresář byl před překladem projektu prázdný,
+měl by po jeho překladu vypadat zhruba následovně:</p>
+
+<pre>
+.
+├── bin
+├── pkg
+│   ├── mod
+│   │   ├── cache
+│   │   │   ├── download
+│   │   │   │   ├── github.com
+│   │   │   │   │   └── tisnik
+│   │   │   │   │       └── intvalues
+│   │   │   │   │           └── @v
+│   │   │   │   │               ├── list
+│   │   │   │   │               ├── list.lock
+│   │   │   │   │               ├── v0.0.0-20190905132008-dad69ec19589.info
+│   │   │   │   │               ├── v0.0.0-20190905132008-dad69ec19589.lock
+│   │   │   │   │               ├── v0.0.0-20190905132008-dad69ec19589.mod
+│   │   │   │   │               ├── v0.0.0-20190905132008-dad69ec19589.zip
+│   │   │   │   │               └── v0.0.0-20190905132008-dad69ec19589.ziphash
+│   │   │   │   └── sumdb
+│   │   │   │       └── sum.golang.org
+│   │   │   │           ├── lookup
+│   │   │   │           │   └── github.com
+│   │   │   │           │       └── tisnik
+│   │   │   │           │           └── intvalues@v0.0.0-20190905132008-dad69ec19589
+│   │   │   │           └── tile
+│   │   │   │               └── 8
+│   │   │   │                   ├── 0
+│   │   │   │                   │   └── 668.p
+│   │   │   │                   │       └── 214
+│   │   │   │                   ├── 1
+│   │   │   │                   │   └── 002.p
+│   │   │   │                   │       └── 156
+│   │   │   │                   └── 2
+│   │   │   │                       └── 000.p
+│   │   │   │                           └── 2
+│   │   │   └── lock
+│   │   └── github.com
+│   │       └── tisnik
+│   │           └── intvalues@v0.0.0-20190905132008-dad69ec19589
+│   │               ├── intvalues.go
+│   │               └── README.md
+│   └── sumdb
+│       └── sum.golang.org
+│           └── latest
+└── src
+&nbsp;
+28 directories, 16 files
+</pre>
+
+<p>Vidíme, že vznikl celý nový podadresář <strong>pkg/mod</strong>, v&nbsp;němž
+můžeme nalézt jak vlastní zdrojový kód staženého balíčku, tak i množství
+souborů s&nbsp;metadaty o verzi balíčku, jeho otisku (přesněji řečeno otiscích)
+atd. Tento podadresář je kdykoli možné smazat, protože se jeho struktura
+automaticky obnoví při novém překladu vyvíjených aplikací (ovšem s&nbsp;tím, že
+se metadata znovu zjistí z&nbsp;externích repositářů).</p>
+
+<p><div class="rs-tip-major">Poznámka: je zajímavé a pravděpodobně i nezbytné,
+že adresářová struktura prakticky všech systémů pro správu balíčků (Maven, pip,
+npm) mnohdy obsahují více metadat, než vlastních zdrojových kódů :-)</div></p>
 
 
 
 <p><a name="k11"></a></p>
-<h2 id="k11">11. </h2>
+<h2 id="k11">11. Verzování balíčků</h2>
+
+<p>Vlastnosti systému modulů, které jsme si až doposud popsali, jsou sice
+určitým pokrokem oproti použití klasického <strong>go get</strong>, ovšem celou
+sílu nového konceptu doceníme až tehdy, když začneme pracovat s&nbsp;verzemi
+balíčků (a modulů). Systém modulů nám totiž umožní použít konkrétní verzi
+balíčku a do určité míry řeší i tranzitivní závislosti, tj.&nbsp;situaci, kdy
+knihovna <strong>A</strong> vyžaduje balíček <strong>Z</strong> ve verzi
+<strong>1.0</strong> a knihovna <strong>B</strong> taktéž balíček
+<strong>Z</strong>, ovšem tentokrát ve verzi <strong>2.0</strong>. Některé
+ukázky budou uvedeny v&nbsp;navazujícím textu.</p>
 
 
 
 <p><a name="k12"></a></p>
-<h2 id="k12">12. </h2>
+<h2 id="k12">12. Problematika potencionálního rozbití API</h2>
+
+<p>Mohlo by se zdát, že na konkrétní verzi modulu/balíčku nemusí záležet,
+protože nové verze buď &bdquo;pouze&ldquo; opravují chyby verze předchozí, nebo
+přidávají další funkcionalitu. Na základě tohoto pohledu by tedy bylo jen
+výhodné slepě updatovat všechny moduly na nejnovější verzi, protože ta by měla
+být nejstabilnější a měla by obsahovat plnou funkcionalitu verzí předchozích.
+Ve skutečnosti tomu tak pochopitelně být nemusí, protože mezi jednotlivými
+verzemi balíčků (představme si zde nějakou knihovnu) může dojít ke změně jejího
+API, ať již přidáním/ubráním parametrů funkcí a metod, tak i mnohdy změnou celé
+filozofie ovládání. Tento problém, který ostatně musí řešit všechny balíčkovací
+systémy pro další programovací jazyky, je v&nbsp;Go řešen s&nbsp;využitím
+známého <i>sémantického verzování</i> [<a href="https://semver.org/">1</a>],
+kde je verze balíčku popř.&nbsp;modulu zapsána trojicí celý čísel &ndash;
+majoritní verze.minoritní verze.číslo patche.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti je (alespoň prozatím)
+situace jazyka Go poměrně přehledná, protože v&nbsp;naprosté většině případů
+moduly nevyžadují konkrétní verzi překladače. Nemusíme tedy řešit například
+problémy typu Python 2/Python 3.</div></p>
 
 
 
 <p><a name="k13"></a></p>
-<h2 id="k13">13. </h2>
+<h2 id="k13">13. Změna minoritní verze modulu</h2>
+
+<p>V&nbsp;ekosystému programovacího jazyka Go (ovšem nejenom zde) se
+předpokládá, že se oficiální aplikační programové rozhraní modulu
+s&nbsp;minoritní verzí nemění. Může se pochopitelně do určité míry měnit
+konkrétní chování (ostatně i oprava chyby mění chování), ovšem exportované
+konstanty, proměnné, datové typy, funkce a metody by alespoň měly mít zachovánu
+svoji signaturu a sémantiku chování. Otázkou zůstává, zda má být API zcela
+neměnné, nebo zda je do něj možné přidávat další funkce a metody. Samotné
+přidání &ndash; pokud se ovšem nejedná o rozdělení činnosti původní jediné
+funkce do funkcí dvou &ndash; by v&nbsp;Go nemělo vadit, už jen z&nbsp;toho
+důvodu, že se zde nepoužívá koncept tříd a OOP postaveného na třídách a
+explicitně implementovaných rozhraní.</p>
 
 
 
 <p><a name="k14"></a></p>
-<h2 id="k14">14. </h2>
+<h2 id="k14">14. Změna majoritní verze modulu</h2>
+
+<p>Zcela jiná situace nastane ve chvíli, kdy se změní majoritní verze modulu.
+V&nbsp;tomto případě se (obecně) předpokládá, že nová verze může mít API zcela
+odlišné od API předchozí verze a tudíž není možné bez dalších úprav vyvíjené
+aplikace na tuto verzi přejít. V&nbsp;programovacím jazyce Go existuje vcelku
+elegantní řešení tohoto problému, které spočívá v&nbsp;použití takzvaných
+<i>sémantických importů</i>, s&nbsp;nimiž se seznámíme <a
+href="#k17">v&nbsp;sedmnácté kapitole</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;ideálním světě by se
+&bdquo;rozbití&ldquo; API zjistilo snadno a taktéž včas pomocí jednotkových
+testů, popř.&nbsp;by alespoň například na nekompatibilní počty a typy parametrů
+upozornil překladač. Samotnou změnu chování však překladač nedokáže detekovat a
+pokrytí kódu jednotkovými testy mnohdy taktéž není příliš slavné...</div></p>
 
 
 
 <p><a name="k15"></a></p>
-<h2 id="k15">15. </h2>
+<h2 id="k15">15. Vytvoření externí knihovny s&nbsp;několika majoritními verzemi a jednou verzí minoritní</h2>
+
+<p>Pro otestování funkčnosti systému modulů v&nbsp;programovacím jazyku Go byl
+vytvořen repositář <a
+href="https://github.com/tisnik/integers">https://github.com/tisnik/integers</a>,
+v&nbsp;němž je uložen jediný modul s&nbsp;jediným balíčkem (viz též <a
+href="#k05">pátou kapitolu</a>, kde jsou vztahy mezi těmito pojmy vysvětleny.
+V&nbsp;tomto repositáři byly příkazem:</p>
+
+<pre>
+$ <strong>git tag -a _verze_ -m "zpráva"</strong>
+</pre>
+
+<p>vytvořeny celkem čtyři <i>tagy</i> označující čtyři různé stavy repositáře.
+Navíc byly ze všech čtyř tagů vytvořena <i>vydání</i> (<i>release</i>), jejichž
+seznam naleznete na stránce <a
+href="https://github.com/tisnik/integers/releases">https://github.com/tisnik/integers/releases</a>.</p>
+
+<p><a href="https://www.root.cz/obrazek/368756/"><img src="https://i.iinfo.cz/images/14/releases-1-prev.png" class="image-368756" alt="&#160;" width="191" height="270" /></a></p>
+<p><i>Informace o vydáních našeho testovacího balíčku</i></p>
+
+<p>Verzi 1.0.0 označenou tagem <strong>v1.0.0</strong> naleznete na adrese <a
+href="https://github.com/tisnik/integers/releases/tag/v1.0.0">https://github.com/tisnik/integers/releases/tag/v1.0.0</a>.
+V&nbsp;této verzi je vydán balíček nazvaný <strong>integers</strong>
+s&nbsp;dvojicí celočíselných konstant <strong>MaxInt</strong> a
+<strong>MinInt</strong>:</p>
+
+<pre>
+package <strong>integers</strong>
+&nbsp;
+const <strong>MaxInt</strong> = int(^uint(0) &gt;&gt; 1)
+const <strong>MinInt</strong> = -MaxInt - 1
+</pre>
+
+<p>Další verze je minoritní, což znamená, že její první číslo je stále 1.
+Konkrétně se jedná o verzi 1.1.0 s&nbsp;tagem <strong>v1.1.0</strong> a najdeme
+ji na adrese <a
+href="https://github.com/tisnik/integers/releases/tag/v1.1.0">https://github.com/tisnik/integers/releases/tag/v1.1.0</a>.
+API v&nbsp;tomto případě bylo rozšířeno o další dvě celočíselné konstanty
+<strong>Zero</strong> a <strong>One</strong>:</p>
+
+<pre>
+package <strong>integers</strong>
+&nbsp;
+const <strong>MaxInt</strong> = int(^uint(0) &gt;&gt; 1)
+const <strong>MinInt</strong> = -MaxInt - 1
+&nbsp;
+const <strong>Zero</strong> = 0
+const <strong>One</strong> = 1
+</pre>
+
+<p>Další verze nese číslo 2.0.0 a došlo zde ke změně API, která může vést
+k&nbsp;tomu, že bude zapotřebí upravit vyvíjenou aplikaci (konkrétně byly
+odstraněny konstanty <strong>MinInt</strong> a <strong>MaxInt</strong>). Tag
+této verze je podle očekávání <strong>v2.0.0</strong> a další podrobnosti
+najdete na adrese <a
+href="https://github.com/tisnik/integers/releases/tag/v2.0.0">https://github.com/tisnik/integers/releases/tag/v2.0.0</a>:</p>
+
+<pre>
+package <strong>integers</strong>
+&nbsp;
+const <strong>Zero</strong> = 0
+const <strong>One</strong> = 1
+</pre>
+
+<p>Navíc byla vydána i verze 4.0, ovšem touto verzí se budeme zabývat až <a
+href="#k17">v&nbsp;sedmnácté kapitole</a>.</p>
 
 
 
 <p><a name="k16"></a></p>
-<h2 id="k16">16. </h2>
+<h2 id="k16">16. Použití externí knihovny s&nbsp;více majoritními verzemi v&nbsp;demonstračním projektu</h2>
+
+<p>Nyní si zkusme vytvořit jednoduchý demonstrační projekt, který bude výše
+uvedený repositář a v&nbsp;něm uložený balíček používat. V&nbsp;tomto projektu
+nejdříve jednoduše naimportujeme balíček
+<strong>github.com/tisnik/integers</strong> a následně použijeme konstanty
+v&nbsp;tomto balíčku deklarované:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        <strong>"github.com/tisnik/integers"</strong>
+)
+&nbsp;
+func Add(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func main() {
+        fmt.Println(Add(integers.Zero, integers.Zero))
+        fmt.Println(Add(integers.One, 0))
+        fmt.Println(Add(integers.MaxInt, integers.MinInt))
+        fmt.Println(Add(1, 2))
+        fmt.Println(Add(-1, 2))
+}
+</pre>
+
+<p>V&nbsp;případě, že by byla vydána pouze verze 1.0.0 našeho testovacího
+balíčku, vypadal by pokus o překlad takto:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+go: downloading github.com/tisnik/integers v1.0.0
+go: extracting github.com/tisnik/integers v1.0.0
+go: finding github.com/tisnik/integers v1.0.0
+&nbsp;
+./adder.go:13:18: undefined: integers.Zero
+./adder.go:14:18: undefined: integers.One
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: do tohoto stavu se můžeme dostat i po
+vydání dalších verzí &ndash; pouhou úpravou verze v&nbsp;souboru
+<strong>go.mod</strong>. Tím se verze pro danou vyvíjenou aplikace
+&bdquo;uzamče&ldquo; a systém již nebude hledat poslední vydanou
+verzi.</div></p>
+
+<p>Vidíme, že se systém jazyka Go pokusil o stažení poslední stabilní verze
+(1.0.0), ve které ovšem nejsou specifikovány konstanty <strong>Zero</strong> a
+<strong>One</strong>, takže překlad skončí s&nbsp;chybou.</p>
+
+<p>Ve chvíli, kdy je vydána verze 1.1.0 (a je automaticky označena jako &bdquo;latest version&ldquo;), se dočkáme bezchybného překladu, protože všechny čtyři potřebné konstanty existují pouze v&nbsp;této verzi:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+go: downloading github.com/tisnik/integers v1.1.0
+go: extracting github.com/tisnik/integers v1.1.0
+go: finding github.com/tisnik/integers v1.1.0
+</pre>
+
+<p>Ovšem může taktéž nastat situace, kdy již byla vydána verze 2.0.0, která
+původní API rozbije. Potom se opět překlad nepovede, tentokrát ovšem kvůli
+tomu, že chybí konstanty <strong>MinInt</strong> a <strong>MaxInt</strong>:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+go: finding github.com/tisnik/integers v2.0.0
+./adder.go:15:18: undefined: integers.MaxInt
+./adder.go:15:35: undefined: integers.MinInt
+</pre>
+
+<p>Zajímavé bude se v&nbsp;tomto okamžiku podívat na obsah souboru
+<strong>go.sum</strong>. Ten by měl obsahovat následující záznamy (tři dvojice
+verzí):</p>
+
+<pre>
+$ <strong>cat go.sum </strong>
+&nbsp;
+github.com/tisnik/integers v1.0.0 h1:hTvDeOyjmLt1BJqeQmSnJNOlSst9LthLfQnU53h0Ik0=
+github.com/tisnik/integers v1.0.0/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+github.com/tisnik/integers v1.1.0 h1:xygWKRg5EGDS/PZyR7SuhYp3PXQTkRdY6TcPsOd4iio=
+github.com/tisnik/integers v1.1.0/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+github.com/tisnik/integers v2.0.0+incompatible h1:wJnU/uiLwDL1CWiDyhb+lhS/ByAkfWlAsRlh54wL5mc=
+github.com/tisnik/integers v2.0.0+incompatible/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+</pre>
+
+<p>Všechny prozatím stažené a dostupné verze vypíše příkaz:</p>
+
+<pre>
+$ <strong>go list -m -versions github.com/tisnik/integers</strong>
+&nbsp;
+github.com/tisnik/integers v1.0.0 v1.1.0 v2.0.0+incompatible
+</pre>
 
 
 
 <p><a name="k17"></a></p>
-<h2 id="k17">17. </h2>
+<h2 id="k17">17. Sémantické importy</h2>
+
+<p>Pro řešení kolizí mezi více majoritními verzemi balíčku (či modulu)
+s&nbsp;rozdílným API podporuje programovací jazyk Go i koncept takzvaných
+sémantických importů. Jedná se o téma na samostatný článek, ovšem již dnes si
+můžeme ukázat, jak snadno je možné upravit náš balíček tak, aby se mohl
+sémantický import provést. Do repositáře s&nbsp;balíčkem vložíme soubor
+<strong>go.mod</strong> vytvořený příkazem <strong>go mod init</strong> (ten
+jsme až doposud nepotřebovali, protože náš balíček na žádném dalším balíčku
+nezávisel). Důležité je, že nově vytvořený soubor <a
+href="https://github.com/tisnik/integers/blob/master/go.mod">go.mod</a> vypadá
+takto:</p>
+
+<pre>
+module github.com/tisnik/integers/<strong>v4</strong>
+&nbsp;
+go 1.13
+</pre>
+
+<p>Povšimněte si, že jsme jméno modulu rozšířili o suffix <strong>/v4</strong>.
+Po přidání tohoto souboru do repositáře byl vytvořen nový tag:</p>
+
+<pre>
+$ <strong>git tag -a v4.0.0 -m "Version 4.0.0 as module"</strong>
+</pre>
+
+<p>A z&nbsp;něj byla vydána nová verze balíčku.</p>
 
 
 
 <p><a name="k18"></a></p>
-<h2 id="k18">18. </h2>
+<h2 id="k18">18. Změna demonstračního příkladu &ndash; využití sémantického importu</h2>
+
+<p>Nyní musíme upravit i náš demonstrační příklad, a to tak, že změníme jméno
+importovaného modulu přidáním suffixu <strong>/v4</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "github.com/tisnik/integers<strong>/v4</strong>"
+)
+&nbsp;
+func Add(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func main() {
+        fmt.Println(Add(integers.Zero, integers.Zero))
+        fmt.Println(Add(integers.One, 0))
+        <i>//fmt.Println(Add(integers.MaxInt, integers.MinInt))</i>
+        fmt.Println(Add(1, 2))
+        fmt.Println(Add(-1, 2))
+}
+</pre>
+
+<p>V&nbsp;této chvíli je možné používat API verze 4.0.0, které obecně nemusí
+být kompatibilní se starším API. Povšimněte si, že další úpravy zdrojového kódu
+příkladu nebyly nutné, tj.&nbsp;stále používáme konstanty
+<strong>integers.Zero</strong> atd. a nikoli (například)
+<strong>v4.Zero</strong>.</p>
+
+<p>Na závěr se podívejme, jak se změnil obsah souboru <strong>go.sum</strong>
+po vydání čtvrté verze s&nbsp;podporou sémantického importu:</p>
+
+<pre>
+$ <strong>cat go.sum </strong>
+&nbsp;
+github.com/tisnik/integers v1.0.0 h1:hTvDeOyjmLt1BJqeQmSnJNOlSst9LthLfQnU53h0Ik0=
+github.com/tisnik/integers v1.0.0/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+github.com/tisnik/integers v1.1.0 h1:xygWKRg5EGDS/PZyR7SuhYp3PXQTkRdY6TcPsOd4iio=
+github.com/tisnik/integers v1.1.0/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+github.com/tisnik/integers v2.0.0+incompatible h1:wJnU/uiLwDL1CWiDyhb+lhS/ByAkfWlAsRlh54wL5mc=
+github.com/tisnik/integers v2.0.0+incompatible/go.mod h1:qfkSORAgW6E8jwfni4JdVE4AKzFvQs7239NSw/cf+fU=
+github.com/tisnik/integers/v4 v4.0.0 h1:ynI0tihEdy9TGA5hbQFNcJHekTEBE5sgDJhfyIifGdA=
+github.com/tisnik/integers/v4 v4.0.0/go.mod h1:O74h6zHFVUNb1K13mibPK1GGgRgJqKdEpp5Z6vay2Pc=
+</pre>
+
+<p>Vidíme, že na posledních dvou řádcích se objevila informace o nové verzi,
+včetně suffixu <strong>/v4</strong>.</p>
 
 
 
 <p><a name="k19"></a></p>
-<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+<h2 id="k19">19. Repositáře s&nbsp;demonstračními příklady</h2>
+
+<p>V&nbsp;dnešním článku jsme použili hned několik repositářů obsahujících jak demonstrační příklady, tak i repositáře s&nbsp;balíčky (jak verzovanými, tak i neverzovanými). Odkazy na jednotlivé repositáře jsou uvedeny v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Repositář</th><th>Stručný popis</th><th>Adresa na GitHubu</th></tr>
+<tr><td>1</td><td>go-1st-module</td><td>první testovaný modul</td><td><a href="https://github.com/tisnik/go-1st-module">https://github.com/tisnik/go-1st-module</a></td></tr>
+<tr><td>2</td><td>go-2nd-module</td><td>druhý testovaný modul</td><td><a href="https://github.com/tisnik/go-2nd-module">https://github.com/tisnik/go-2nd-module</a></td></tr>
+<tr><td>3</td><td>intvalues</td><td>repositář s&nbsp;jedinou verzí balíčku <strong>intvalues</strong></td><td><a href="https://github.com/tisnik/intvalues">https://github.com/tisnik/intvalues</a></td></tr>
+<tr><td>4</td><td>integers</td><td>repositář se čtyřmi vydáními balíčku <strong>integers</strong></td><td><a href="https://github.com/tisnik/integers">https://github.com/tisnik/integers</a></td></tr>
+</table>
 
 
 
@@ -159,6 +1124,46 @@
 <h2 id="k20">20. Odkazy na Internetu</h2>
 
 <ol>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
 
 <li>What is REPL?<br />
 <a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
@@ -1022,6 +2027,146 @@
 
 <li>Strings, bytes, runes and characters in Go<br />
 <a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
 </li>
 
 </ol>
