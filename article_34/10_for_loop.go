@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 10:
+//    Implementace programové smyčky typu "for" v jazyce Go.
+
 package main
 
 import "fmt"
