@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 18:
+//    Variadické funkce.
+
 package main
 
 import "fmt"
