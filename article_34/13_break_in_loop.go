@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 13:
+//     Smyčky a příkaz break.
+
 package main
 
 import "fmt"
