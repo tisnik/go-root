@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 16:
+//    Funkce s parametry.
+
 package main
 
 import "fmt"
