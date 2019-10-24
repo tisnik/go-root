@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 17:
+//    Příkaz return pro ukončení funkce.
+
 package main
 
 import "fmt"
