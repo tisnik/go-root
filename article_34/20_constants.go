@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá čtvrtá část
+//
+// Demonstrační příklad číslo 20:
+//    Deklarace konstant v Go.
+
 package main
 
 import "fmt"
