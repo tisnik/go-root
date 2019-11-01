@@ -14,3 +14,4 @@ Feature: simple accumulator checks
    | 1    | 1         | 1     | 2          |
    | 2    | 2         | 2     | 4          |
    | 10   | 10        | 10    | 20         |
+
