@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Sedmnáctá část
+//
+// Demonstrační příklad číslo 6:
+//     Testovaný balíček.
+
 package main
 
 func add(x int32, y int32) int32 {
