@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Sedmnáctá část
+//
+// Jednotkové testy pro výpočet faktoriálu.
+
 package factorial_test
 
 import (
