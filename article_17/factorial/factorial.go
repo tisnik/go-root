@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+// Sedmnáctá část
+//
 // Balíček s funkcí pro výpočet faktoriálu
 
 package factorial
