@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Sedmnáctá část
+//
+// Demonstrační příklad číslo 3:
+//     Testovaný balíček.
+
 package main
 
 func add(x int, y int) int {
