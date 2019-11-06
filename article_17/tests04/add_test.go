@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Sedmnáctá část
+//
+// Demonstrační příklad číslo 4:
+//     Implementace jednotkových testů.
+
 package main
 
 import "testing"
