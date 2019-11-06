@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Sedmnáctá část
+//
+// Demonstrační příklad číslo 8:
+//     Implementace jednotkových testů.
+
 // +build fast
 
 package main
