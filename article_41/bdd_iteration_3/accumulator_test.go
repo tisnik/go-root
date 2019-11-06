@@ -5,10 +5,10 @@ import (
 	"github.com/DATA-DOG/godog"
 )
 
-var testAccumulator *acc
+var testAccumulator *acc = nil
 
 func iHaveAnAccumulatorWith(initialValue int) error {
-	testAccumulator = &acc{value: initialValue}
+	testAccumulator.value = initialValue
 	return nil
 }
 
@@ -25,7 +25,12 @@ func theAccumulatedResultShouldBe(expected int) error {
 }
 
 func FeatureContext(s *godog.Suite) {
+
 	s.Step(`^I have an accumulator with (\d+)$`, iHaveAnAccumulatorWith)
 	s.Step(`^I add (\d+) to accumulator$`, iAddToAccumulator)
 	s.Step(`^the accumulated result should be (\d+)$`, theAccumulatedResultShouldBe)
+
+	s.BeforeScenario(func(interface{}) {
+		testAccumulator = &acc{}
+	})
 }
