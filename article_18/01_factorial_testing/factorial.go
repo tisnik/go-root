@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Osmnáctá část
+//
+// Demonstrační příklad číslo 1:
+//     Testovaný balíček.
+
 package factorial
 
 func Factorial(n int64) int64 {
