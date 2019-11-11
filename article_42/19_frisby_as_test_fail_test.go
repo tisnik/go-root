@@ -8,7 +8,7 @@ import (
 func TestHttpGet(t *testing.T) {
 	f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
 	f.Send()
-	f.ExpectStatus(200)
+	f.ExpectStatus(400)
 	err := f.Error()
 	if err != nil {
 		t.Error(err)
