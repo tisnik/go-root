@@ -5,7 +5,6 @@
 // Demonstrační příklad číslo 17:
 //     Transformace (rotace).
 
-
 package main
 
 import "github.com/fogleman/gg"
