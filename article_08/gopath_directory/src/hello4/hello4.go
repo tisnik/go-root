@@ -7,4 +7,3 @@ func init() {
 func Hello_world() {
 	println("Hello world #4!")
 }
-
