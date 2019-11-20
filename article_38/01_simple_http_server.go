@@ -9,6 +9,7 @@ import (
 	"sync"
 )
 
+// ADDRESS represents base address for the HTTP/HTTPs server
 const ADDRESS = ":8080"
 
 var counter int
