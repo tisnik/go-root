@@ -11,8 +11,8 @@ import "fmt"
 
 func main() {
 	var a int8 = -10
-	var signed_int int32 = -100000
-	var unsigned_int uint32 = 100000
+	var signedInt int32 = -100000
+	var unsignedInt uint32 = 100000
 	var e float32 = 1e4
 	var f float64 = 1.5e30
 
@@ -24,8 +24,8 @@ func main() {
 	fmt.Println(y)
 	fmt.Println(z)
 
-	var b2 uint8 = uint8(signed_int)
-	var b3 uint8 = uint8(unsigned_int)
+	var b2 uint8 = uint8(signedInt)
+	var b3 uint8 = uint8(unsignedInt)
 
 	fmt.Println(b2)
 	fmt.Println(b3)
