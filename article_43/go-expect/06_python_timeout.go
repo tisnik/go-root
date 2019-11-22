@@ -31,8 +31,8 @@ func main() {
 
 	str, err := console.Expect(expect.String("Python 2", "Python 3"), expect.WithTimeout(100*time.Millisecond))
 	if err != nil {
-		fmt.Println(err)
 		fmt.Println("Python not detected")
+		log.Fatal(err)
 	}
 	if str == "Python 2" {
 		console.SendLine("print 1,2,3")
