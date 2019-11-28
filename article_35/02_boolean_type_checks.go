@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 2:
+//     Převod různých hodnot na typ bool.
+
 package main
 
 import "fmt"
