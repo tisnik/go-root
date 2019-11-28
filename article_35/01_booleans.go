@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 1:
+//     Pravdivostní hodnoty v jazyce Go.
+
 package main
 
 func main() {
