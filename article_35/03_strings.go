@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 3:
+//     Práce s řetězci v jazyce Go.
+
 package main
 
 import "fmt"
