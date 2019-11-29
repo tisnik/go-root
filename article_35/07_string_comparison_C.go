@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 7C:
+//     Porovnávání řetězců v Go s podporou češtiny.
+
 package main
 
 import "golang.org/x/text/collate"
