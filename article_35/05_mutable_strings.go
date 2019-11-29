@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 5:
+//    Alternativa k měnitelným řetězcům.
+
 package main
 
 import "fmt"
