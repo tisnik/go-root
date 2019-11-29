@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 7:
+//     Porovnávání řetězců v Go.
+
 package main
 
 import "fmt"
