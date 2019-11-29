@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 4:
+//     Řetězce jsou v Go neměnitelné.
+
 package main
 
 import "fmt"
