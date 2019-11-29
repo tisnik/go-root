@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//
+// Demonstrační příklad číslo 6B:
+//     Přístup k bajtům řetězce v UTF-8.
+
 package main
 
 import "fmt"
