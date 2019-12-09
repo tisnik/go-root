@@ -14,11 +14,11 @@ import (
 	"runtime/trace"
 )
 
-func perform_login() {
+func performLogin() {
 	log.Println("login")
 }
 
-func perform_logout() {
+func performLogout() {
 	log.Println("logout")
 }
 
@@ -49,7 +49,7 @@ func main() {
 	ctx, task := trace.NewTask(ctx, "transactionTask")
 
 	region1 := trace.StartRegion(ctx, "login")
-	perform_login()
+	performLogin()
 	region1.End()
 
 	region2 := trace.StartRegion(ctx, "transactions")
@@ -58,7 +58,7 @@ func main() {
 	region2.End()
 
 	region3 := trace.StartRegion(ctx, "logout")
-	perform_logout()
+	performLogout()
 	region3.End()
 
 	task.End()
