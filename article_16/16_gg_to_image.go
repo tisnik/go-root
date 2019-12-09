@@ -5,7 +5,6 @@
 // Demonstrační příklad číslo 16:
 //     Rasterizace do zvoleného rastrového formátu.
 
-
 package main
 
 import (

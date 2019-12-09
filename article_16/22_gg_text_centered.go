@@ -5,7 +5,6 @@
 // Demonstrační příklad číslo 22:
 //     Vykreslení vycentrovaného textu.
 
-
 package main
 
 import "github.com/fogleman/gg"

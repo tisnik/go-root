@@ -5,7 +5,6 @@
 // Demonstrační příklad číslo 21:
 //     Vykreslení textu.
 
-
 package main
 
 import "github.com/fogleman/gg"

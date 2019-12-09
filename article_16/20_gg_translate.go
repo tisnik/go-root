@@ -5,7 +5,6 @@
 // Demonstrační příklad číslo 20:
 //     Transformace (posun).
 
-
 package main
 
 import "github.com/fogleman/gg"
