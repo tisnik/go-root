@@ -4,7 +4,7 @@
 //
 // Demonstrační příklad číslo 8:
 //    Zavolání Lua funkce z Go s předáním parametrů.
-//    
+//
 
 package main
 
