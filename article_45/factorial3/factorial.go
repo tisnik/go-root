@@ -1,5 +1,6 @@
 package main
 
+// Factorial represents a classic recursive implementation of factorial function
 func Factorial(n int64) int64 {
 	switch {
 	case n < 0:

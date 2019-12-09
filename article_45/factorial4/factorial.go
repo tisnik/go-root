@@ -2,6 +2,7 @@ package main
 
 import "errors"
 
+// Factorial represents a classic recursive implementation of factorial function
 func Factorial(n int64) (int64, error) {
 	switch {
 	case n < 0:
