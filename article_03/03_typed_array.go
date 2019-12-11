@@ -9,6 +9,7 @@ package main
 
 import "fmt"
 
+// Mesic is type of item in array/slice
 type Mesic string
 
 func main() {
