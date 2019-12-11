@@ -9,18 +9,23 @@ package main
 
 import "fmt"
 
-type Id uint32
+// ID of user
+type ID uint32
+
+// Name of user
 type Name string
+
+// Surname of user
 type Surname string
 
-func register_user(id Id, name Name, surname Surname) {
+func registerUser(id ID, name Name, surname Surname) {
 	fmt.Printf("Registering: %d %s %s", id, name, surname)
 }
 
 func main() {
-	var i Id = 1
+	var i ID = 1
 	var n Name = "Jan"
 	var s Surname = "Novák"
 
-	register_user(i, s, n)
+	registerUser(i, s, n)
 }
