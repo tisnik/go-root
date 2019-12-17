@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 2:
+//     Zadání parametrů připojení z&nbsp;příkazového řádku
+
 package main
 
 import (
