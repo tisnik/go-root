@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 10:
+//     Kopie objektu v rámci Minia bez jejich přesunu na lokální počítač
+
 package main
 
 import (
