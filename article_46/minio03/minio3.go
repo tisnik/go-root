@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 3:
+//     Zadání parametrů připojení z příkazového řádku, výpis bucketů
+
 package main
 
 import (

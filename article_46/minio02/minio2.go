@@ -3,7 +3,7 @@
 // Čtyřicátá šestá část
 //
 // Demonstrační příklad číslo 2:
-//     Zadání parametrů připojení z&nbsp;příkazového řádku
+//     Zadání parametrů připojení z příkazového řádku
 
 package main
 
