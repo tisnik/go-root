@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 4:
+//     Výpis všech objektů ve zvoleném bucketu
+
 package main
 
 import (
