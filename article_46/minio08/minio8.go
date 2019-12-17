@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 8:
+//     Alternativní způsob přístupu k obsahu objektu
+
 package main
 
 import (
