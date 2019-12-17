@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 1:
+//     Kostra aplikace, která provede inicializaci klienta služby Minio
+
 package main
 
 import (
