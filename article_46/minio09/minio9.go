@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 9:
+//     Poslání dat do Minia s jejich uložením do objektu
+
 package main
 
 import (
