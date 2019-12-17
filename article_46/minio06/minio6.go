@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 6:
+//     Uložení objektu z bucketu do lokálního souboru
+
 package main
 
 import (
