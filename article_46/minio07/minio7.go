@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá šestá část
+//
+// Demonstrační příklad číslo 7:
+//    Přečtení obsahu objektu s textem
+
 package main
 
 import (
