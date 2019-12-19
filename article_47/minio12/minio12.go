@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá sedmá část
+//
+// Demonstrační příklad číslo 12:
+//     Použití metody ComposeObject
+
 package main
 
 import (
