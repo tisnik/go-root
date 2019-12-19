@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá sedmá část
+//
+// Demonstrační příklad číslo 11:
+//     Použití metody StatObject
+
 package main
 
 import (
