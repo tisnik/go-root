@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá sedmá část
+//
+// Demonstrační příklad číslo 15:
+//     Použití metody EnableVersioning
+
 package main
 
 import (
