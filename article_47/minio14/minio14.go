@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá sedmá část
+//
+// Demonstrační příklad číslo 14:
+//     Použití metody SetBucketPolicy
+
 package main
 
 import (
