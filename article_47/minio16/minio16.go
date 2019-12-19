@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá sedmá část
+//
+// Demonstrační příklad číslo 16:
+//     Použití metody GetBucketLifecycle
+
 package main
 
 import (
