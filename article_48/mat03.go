@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá osmá část
+//
+// Demonstrační příklad číslo 3:
+//     Vytištění obsahu rozsáhlé matice
+
 package main
 
 import (
