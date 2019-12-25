@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá osmá část
+//
+// Demonstrační příklad číslo 1:
+//     Vytvoření matice konstruktorem mat.NewDense.
+
 package main
 
 import (
