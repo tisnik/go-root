@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá osmá část
+//
+// Demonstrační příklad číslo 4:
+//     Vytištění obsahu rozsáhlé matice funkcí mat.Formatted
+
 package main
 
 import (
