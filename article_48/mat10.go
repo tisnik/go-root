@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá osmá část
+//
+// Demonstrační příklad číslo 10:
+//     Výpočet inverzní matice.
+
 package main
 
 import (
