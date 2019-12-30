@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá osmá část
+//
+// Demonstrační příklad číslo 7:
+//     Transpozice matice.
+
 package main
 
 import (
