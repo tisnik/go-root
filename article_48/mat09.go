@@ -3,7 +3,7 @@
 // Čtyřicátá osmá část
 //
 // Demonstrační příklad číslo 9:
-//     Další operace nad maticemi.
+//     Použití rozhraní mat.Matrix
 
 package main
 
