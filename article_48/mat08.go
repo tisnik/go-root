@@ -3,7 +3,7 @@
 // Čtyřicátá osmá část
 //
 // Demonstrační příklad číslo 8:
-//     Další operace nad maticemi.
+//     Součet a součin matic
 
 package main
 
