@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//
+// Čtyřicátá devátá část
+//
+// Demonstrační příklad číslo 11:
+//
+
 package main
 
 import (
