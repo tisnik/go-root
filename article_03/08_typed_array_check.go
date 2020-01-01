@@ -9,6 +9,7 @@ package main
 
 import "fmt"
 
+// Mesic je nový datový typ se jménem viditelným mimo balíček
 type Mesic string
 
 func main() {
