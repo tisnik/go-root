@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
-// Druhá část
+// Druhá část:
+//    Datové typy v programovacím jazyku Go
+//    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go/
 //
 // Demonstrační příklad číslo 15
 //    Datový typ Boolean - kontroly při překladu
