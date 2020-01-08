@@ -14,16 +14,16 @@ func main() {
 
 	fmt.Println(i)
 
-	var p_i *int
-	fmt.Println(p_i)
+	var pI *int
+	fmt.Println(pI)
 
-	p_i = &i
+	pI = &i
 
-	fmt.Println(p_i)
-	fmt.Println(*p_i)
+	fmt.Println(pI)
+	fmt.Println(*pI)
 
-	*p_i++
+	*pI++
 
 	fmt.Println(i)
-	fmt.Println(*p_i)
+	fmt.Println(*pI)
 }
