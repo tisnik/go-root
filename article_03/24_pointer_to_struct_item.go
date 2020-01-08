@@ -24,12 +24,12 @@ func main() {
 
 	fmt.Println(u)
 
-	var p_n *string
-	p_n = &u.name
+	var pName *string
+	pName = &u.name
 
-	fmt.Println(p_n)
-	fmt.Println(*p_n)
+	fmt.Println(pName)
+	fmt.Println(*pName)
 
-	(*p_n) = "Zdeněk"
-	fmt.Println(*p_n)
+	(*pName) = "Zdeněk"
+	fmt.Println(*pName)
 }
