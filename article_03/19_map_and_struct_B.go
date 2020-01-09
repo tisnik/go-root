@@ -9,11 +9,13 @@ package main
 
 import "fmt"
 
+// Key je uživatelsky definovaná datová struktura
 type Key struct {
 	id   uint32
 	role string
 }
 
+// User je uživatelsky definovaná datová struktura
 type User struct {
 	id      uint32
 	name    string
