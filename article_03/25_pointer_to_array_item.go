@@ -26,8 +26,8 @@ func main() {
 
 	fmt.Println(mesice)
 
-	p_treti := &mesice[2]
-	*p_treti = "March"
+	pThirdMonth := &mesice[2]
+	*pThirdMonth = "March"
 
 	fmt.Println(mesice)
 }
