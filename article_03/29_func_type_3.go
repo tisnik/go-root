@@ -9,8 +9,8 @@ package main
 
 import "fmt"
 
-type no_param_function func() int
-type two_int_param_function func(int, int) int
+type noParamFunction func() int
+type twoIntParamFunction func(int, int) int
 
 func funkce1() int {
 	return 42
@@ -29,8 +29,8 @@ func funkce4(x int, y int) int {
 }
 
 func main() {
-	var a no_param_function
-	var b two_int_param_function
+	var a noParamFunction
+	var b twoIntParamFunction
 
 	fmt.Println(a)
 	fmt.Println(b)
