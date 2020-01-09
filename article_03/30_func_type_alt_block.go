@@ -2,7 +2,7 @@
 //
 // Třetí část
 //
-// Demonstrační příklad číslo 28:
+// Demonstrační příklad číslo 30:
 //    Datový typ "funkce s návratovou hodnotou"
 
 package main
@@ -10,8 +10,8 @@ package main
 import "fmt"
 
 type (
-	no_param_function func() int
-	two_int_param_function func(int, int) int
+	noParamFunction     func() int
+	twoIntParamFunction func(int, int) int
 )
 
 func funkce1() int {
@@ -31,8 +31,8 @@ func funkce4(x int, y int) int {
 }
 
 func main() {
-	var a no_param_function
-	var b two_int_param_function
+	var a noParamFunction
+	var b twoIntParamFunction
 
 	fmt.Println(a)
 	fmt.Println(b)
