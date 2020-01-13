@@ -11,7 +11,7 @@ type Points struct {
 	Y []int `json:"y"`
 }
 
-func dataHandler(writer http.ResponseWriter, reader *http.Request) {
+func dataHandler(writer http.ResponseWriter, request *http.Request) {
 	var points Points
 	points.X = []int{1, 2, 3, 4, 5}
 	points.Y = []int{1, 2, 4, 8, 16}

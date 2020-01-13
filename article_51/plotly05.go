@@ -32,7 +32,7 @@ func makePoints(npoints uint) Points {
 	return points
 }
 
-func dataHandler(writer http.ResponseWriter, reader *http.Request) {
+func dataHandler(writer http.ResponseWriter, request *http.Request) {
 	points := makePoints(npoints)
 
 	writer.Header().Set("Content-Type", "application/json")

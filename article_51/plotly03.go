@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func dataHandler(writer http.ResponseWriter, reader *http.Request) {
+func dataHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	fmt.Fprintf(writer, `
