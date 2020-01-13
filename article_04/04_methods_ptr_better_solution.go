@@ -12,6 +12,7 @@ import (
 	"math"
 )
 
+// Line je datová struktura, ke které budou přidány metody
 type Line struct {
 	x1, y1 float64
 	x2, y2 float64
@@ -36,6 +37,6 @@ func main() {
 	line1.translate(5, 5)
 	fmt.Println(line1)
 
-	line_length := line1.length()
-	fmt.Println(line_length)
+	lineLength := line1.length()
+	fmt.Println(lineLength)
 }
