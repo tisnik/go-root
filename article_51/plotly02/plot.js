@@ -1,7 +1,7 @@
 $(document).ready(function() {
     $.getJSON("data.json",
         function (data) {
-            var graphElement = document.getElementById('graphElement');
+            var graphElement = $('#graphElement')[0];
             var opts = {
                 margin: { t: 0}
             };
