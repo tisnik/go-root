@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Třetí část
+//    Datové typy v programovacím jazyku Go (2.část)
+//    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/
 //
 // Demonstrační příklad číslo 18:
 //    Mapa struktur.
