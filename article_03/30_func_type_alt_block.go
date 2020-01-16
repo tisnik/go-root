@@ -1,8 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
+// Třetí část
 //    Datové typy v programovacím jazyku Go (2.část)
 //    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/
-// Třetí část
 //
 // Demonstrační příklad číslo 30:
 //    Datový typ "funkce s návratovou hodnotou"
