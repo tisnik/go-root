@@ -1,5 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //
+//    Datové typy v programovacím jazyku Go (2.část)
+//    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/
 // Třetí část
 //
 // Demonstrační příklad číslo 30:
