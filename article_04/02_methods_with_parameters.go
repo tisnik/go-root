@@ -36,6 +36,6 @@ func main() {
 	line1.translate(5, 5)
 	fmt.Println(line1)
 
-	line_length := line1.length()
-	fmt.Println(line_length)
+	lineLength := line1.length()
+	fmt.Println(lineLength)
 }
