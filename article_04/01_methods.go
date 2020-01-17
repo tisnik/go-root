@@ -12,11 +12,13 @@ import (
 	"math"
 )
 
+// Line je uživatelsky definovaná datová struktura
 type Line struct {
 	x1, y1 float64
 	x2, y2 float64
 }
 
+// Metoda definovaná pro strukturu Line
 func (line Line) length() float64 {
 	return math.Hypot(line.x1-line.x2, line.y1-line.y2)
 }
