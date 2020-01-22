@@ -32,6 +32,8 @@ type Ellipse struct {
 	a, b float64
 }
 
+// Rectangle je uživatelsky definovaná datová struktura
+// představující geometrický tvar obdélníka
 type Rectangle struct {
 	x, y          float64
 	width, height float64
