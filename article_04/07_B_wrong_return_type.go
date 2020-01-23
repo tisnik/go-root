@@ -18,6 +18,7 @@ type OpenShape interface {
 	length() float32
 }
 
+// Line je uživatelsky definovaná datová struktura
 type Line struct {
 	x1, y1 float64
 	x2, y2 float64
