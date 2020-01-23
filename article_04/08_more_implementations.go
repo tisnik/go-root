@@ -35,16 +35,23 @@ func area(shape ClosedShape) float64 {
 }
 
 // Line je uživatelsky definovaná datová struktura
+// představující úsečku z bodu [x1, y1] do bodu [x2, y2]
 type Line struct {
 	x1, y1 float64
 	x2, y2 float64
 }
 
+// Circle je uživatelsky definovaná datová struktura
+// představující kružnici se středem v bodě [x, y]
+// a poloměrem radius
 type Circle struct {
 	x, y   float64
 	radius float64
 }
 
+// Ellipse je uživatelsky definovaná datová struktura
+// představující elipsu se středem v bodě [x, y]
+// a poloměrem poloos a a b
 type Ellipse struct {
 	x, y float64
 	a, b float64
