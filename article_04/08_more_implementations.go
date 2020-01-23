@@ -15,11 +15,13 @@ import (
 )
 
 // OpenShape je uživatelsky definovaná datová struktura
-// představující otevřené tvary (úsečka, oblouk, křivka)
+// představující otevřené geometrické tvary (úsečka, oblouk, křivka)
 type OpenShape interface {
 	length() float64
 }
 
+// ClosedShape je uživatelsky definovaná datová struktura
+// představující uzavřené geometrické tvary (úsečka, oblouk, křivka)
 type ClosedShape interface {
 	area() float64
 }
