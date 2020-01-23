@@ -14,6 +14,8 @@ import (
 	"math"
 )
 
+// OpenShape je uživatelsky definovaná datová struktura
+// představující otevřené tvary (úsečka, oblouk, křivka)
 type OpenShape interface {
 	length() float64
 }
