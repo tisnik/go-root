@@ -30,6 +30,7 @@ func area(shape ClosedShape) float64 {
 	return shape.area()
 }
 
+// Line je uživatelsky definovaná datová struktura
 type Line struct {
 	x1, y1 float64
 	x2, y2 float64
