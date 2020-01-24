@@ -11,7 +11,7 @@ package main
 
 import "fmt"
 
-func worker(taskChannel chan int, worker_done chan bool) {
+func worker(taskChannel chan int, workerDone chan bool) {
 	fmt.Println("worker started")
 	for {
 		value, more := <-taskChannel
@@ -19,7 +19,7 @@ func worker(taskChannel chan int, worker_done chan bool) {
 			fmt.Printf("worker received task with parameter %d\n", value)
 		} else {
 			fmt.Println("finishing worker")
-			worker_done <- true
+			workerDone <- true
 			fmt.Println("worker finished")
 			return
 		}
@@ -28,11 +28,11 @@ func worker(taskChannel chan int, worker_done chan bool) {
 
 func main() {
 	taskChannel := make(chan int)
-	worker_done := make(chan bool)
+	workerDone := make(chan bool)
 
 	fmt.Println("main begin")
 
-	go worker(taskChannel, worker_done)
+	go worker(taskChannel, workerDone)
 
 	for i := 1; i <= 10; i++ {
 		fmt.Printf("sending task with parameter %d\n", i)
@@ -42,7 +42,7 @@ func main() {
 
 	fmt.Println("waiting for workers...")
 
-	code, status := <-worker_done
+	code, status := <-workerDone
 
 	fmt.Printf("received code: %t and status: %t\n", code, status)
 	fmt.Println("main end")
