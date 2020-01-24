@@ -11,15 +11,18 @@ package main
 
 import "fmt"
 
+// Interface1 je exportované rozhraní s jedinou metodou
 type Interface1 interface {
 	method1()
 }
 
+// Interface2 je exportované rozhraní s jedinou metodou
 type Interface2 interface {
 	Interface1
 	method2()
 }
 
+// Type je uživatelsky definovaný datový typ
 type Type struct{}
 
 func (Type) method1() {
