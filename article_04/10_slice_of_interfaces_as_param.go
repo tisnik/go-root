@@ -14,6 +14,8 @@ import (
 	"math"
 )
 
+// ClosedShape je uživatelsky definovaná datová struktura
+// představující uzavřené geometrické tvary (úsečka, oblouk, křivka)
 type ClosedShape interface {
 	area() float64
 }
