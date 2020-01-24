@@ -11,10 +11,10 @@ package main
 
 import "fmt"
 
-func worker(task_channel chan int, worker_done chan bool) {
+func worker(taskChannel chan int, worker_done chan bool) {
 	fmt.Println("worker started")
 	for {
-		value, more := <-task_channel
+		value, more := <-taskChannel
 		if more {
 			fmt.Printf("worker received task with parameter %d\n", value)
 		} else {
@@ -27,18 +27,18 @@ func worker(task_channel chan int, worker_done chan bool) {
 }
 
 func main() {
-	task_channel := make(chan int)
+	taskChannel := make(chan int)
 	worker_done := make(chan bool)
 
 	fmt.Println("main begin")
 
-	go worker(task_channel, worker_done)
+	go worker(taskChannel, worker_done)
 
 	for i := 1; i <= 10; i++ {
 		fmt.Printf("sending task with parameter %d\n", i)
-		task_channel <- i
+		taskChannel <- i
 	}
-	close(task_channel)
+	close(taskChannel)
 
 	fmt.Println("waiting for workers...")
 
