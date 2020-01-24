@@ -14,16 +14,16 @@ import (
 	"time"
 )
 
-func worker(id int, task_channel chan int, worker_done chan bool) {
+func worker(id int, taskChannel chan int, workerDone chan bool) {
 	fmt.Printf("worker %d started\n", id)
 	for {
-		value, more := <-task_channel
+		value, more := <-taskChannel
 		if more {
 			fmt.Printf("worker %d received task with parameter %d\n", id, value)
 			time.Sleep(2 * time.Second)
 		} else {
 			fmt.Printf("finishing worker %d\n", id)
-			worker_done <- true
+			workerDone <- true
 			fmt.Printf("worker %d finished\n", id)
 			return
 		}
@@ -31,25 +31,25 @@ func worker(id int, task_channel chan int, worker_done chan bool) {
 }
 
 func main() {
-	task_channel := make(chan int)
-	worker_done := make(chan bool)
+	taskChannel := make(chan int)
+	workerDone := make(chan bool)
 
 	fmt.Println("main begin")
 
 	for i := 1; i <= 3; i++ {
-		go worker(i, task_channel, worker_done)
+		go worker(i, taskChannel, workerDone)
 	}
 	time.Sleep(2 * time.Second)
 
 	for i := 1; i <= 10; i++ {
 		fmt.Printf("sending task with parameter %d\n", i)
-		task_channel <- i
+		taskChannel <- i
 	}
-	close(task_channel)
+	close(taskChannel)
 
 	fmt.Println("waiting for workers...")
 
-	code, status := <-worker_done
+	code, status := <-workerDone
 
 	fmt.Printf("received code: %t and status: %t\n", code, status)
 	fmt.Println("main end")
