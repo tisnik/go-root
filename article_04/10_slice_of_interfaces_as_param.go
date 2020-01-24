@@ -59,7 +59,7 @@ func (ellipse Ellipse) area() float64 {
 	return math.Pi * ellipse.a * ellipse.b
 }
 
-func print_areas(shapes []ClosedShape) {
+func printAreas(shapes []ClosedShape) {
 	for _, shape := range shapes {
 		fmt.Println(shape)
 		fmt.Println(area(shape))
@@ -74,5 +74,5 @@ func main() {
 		Circle{x: 0, y: 0, radius: 100},
 		Ellipse{x: 0, y: 0, a: 100, b: 50}}
 
-	print_areas(shapes)
+	printAreas(shapes)
 }
