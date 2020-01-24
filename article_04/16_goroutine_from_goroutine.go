@@ -14,23 +14,23 @@ import (
 	"time"
 )
 
-func print_chars() {
+func printChars() {
 	for ch := 'a'; ch <= 'z'; ch++ {
 		fmt.Printf("%c", ch)
 		time.Sleep(200 * time.Millisecond)
 	}
 }
 
-func print_dots() {
+func printDots() {
 	for i := 0; i < 30; i++ {
 		fmt.Print(".")
 		time.Sleep(200 * time.Millisecond)
 	}
 }
 
-func print_spaces() {
-	go print_chars()
-	go print_dots()
+func printSpaces() {
+	go printChars()
+	go printDots()
 	for i := 0; i < 60; i++ {
 		fmt.Print(" ")
 		time.Sleep(110 * time.Millisecond)
@@ -39,7 +39,7 @@ func print_spaces() {
 
 func main() {
 	fmt.Println("main begin")
-	go print_spaces()
+	go printSpaces()
 	time.Sleep(6 * time.Second)
 	fmt.Println("main end")
 }
