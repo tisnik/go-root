@@ -24,16 +24,24 @@ func area(shape ClosedShape) float64 {
 	return shape.area()
 }
 
+// Circle je uživatelsky definovaná datová struktura
+// představující kružnici se středem v bodě [x, y]
+// a poloměrem radius
 type Circle struct {
 	x, y   float64
 	radius float64
 }
 
+// Ellipse je uživatelsky definovaná datová struktura
+// představující elipsu se středem v bodě [x, y]
+// a poloměrem poloos a a b
 type Ellipse struct {
 	x, y float64
 	a, b float64
 }
 
+// Rectangle je uživatelsky definovaná datová struktura
+// představující geometrický tvar obdélníka
 type Rectangle struct {
 	x, y          float64
 	width, height float64
