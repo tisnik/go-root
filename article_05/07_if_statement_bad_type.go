@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Pátá část
+//    Konstrukce pro řízení běhu programu v jazyce Go
+//    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/
 //
 // Demonstrační příklad číslo 7:
 //    Řídicí konstrukce if a hodnoty, které nejsou typu boolean.
