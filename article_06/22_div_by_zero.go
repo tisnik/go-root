@@ -9,10 +9,10 @@ package main
 
 import "fmt"
 
-func compute_div_mod(x, y int) {
+func computeDivMod(x, y int) {
 	fmt.Printf("%3d / %2d = %3d   %3d %% %2d = %3d\n", x, y, x/y, x, y, x%y)
 }
 
 func main() {
-	compute_div_mod(10, 0)
+	computeDivMod(10, 0)
 }
