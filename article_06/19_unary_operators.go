@@ -34,8 +34,8 @@ func main() {
 	// unární operátory & a *
 	fmt.Println(&i)
 
-	p_i := &i
-	fmt.Println(*p_i)
+	ptrI := &i
+	fmt.Println(*ptrI)
 
 	// unární operátor <-
 	channel := make(chan int)
