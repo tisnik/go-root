@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Šestá část
+//    Konstrukce pro řízení běhu programu v jazyce Go (dokončení)
+//    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go-dokonceni/
 //
 // Demonstrační příklad číslo 7:
 //    Použití příkazu defer.
