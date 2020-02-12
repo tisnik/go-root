@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Sedmá část
+//    Programovací jazyk Go: dokončení popisu vlastností samotného jazyka
+//    https://www.root.cz/clanky/programovaci-jazyk-go-dokonceni-popisu-vlastnosti-samotneho-jazyka/
 //
 // Demonstrační příklad číslo 10:
 //    Použití příkazu select pro zápis do kanálu i pro čtení z kanálu.
