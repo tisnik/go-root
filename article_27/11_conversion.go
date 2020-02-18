@@ -12,6 +12,7 @@ import (
 	"log"
 )
 
+// LuaSource contains file name with script written in Lua
 const LuaSource = "add.lua"
 
 func main() {
