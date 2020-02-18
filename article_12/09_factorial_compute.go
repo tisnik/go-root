@@ -14,6 +14,7 @@ import (
 	"strconv"
 )
 
+// FactorialPageDynContent holds all required information for factorial page template
 type FactorialPageDynContent struct {
 	N      int64
 	Result int64
