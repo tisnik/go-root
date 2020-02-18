@@ -13,7 +13,7 @@ import (
 	"net/http"
 )
 
-// IndexPageDynContent hold all required information for a main page template
+// IndexPageDynContent holds all required information for a main page template
 type IndexPageDynContent struct {
 	Title  string
 	Header string

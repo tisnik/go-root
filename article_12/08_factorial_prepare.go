@@ -13,6 +13,7 @@ import (
 	"net/http"
 )
 
+// FactorialPageDynContent holds all required information for factorial page template
 type FactorialPageDynContent struct {
 	Result int
 }
