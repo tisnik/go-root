@@ -19,6 +19,7 @@ type FactorialPageDynContent struct {
 	Result int64
 }
 
+// Factorial computes factorial for a given n that must be non negative integer
 func Factorial(n int64) int64 {
 	switch {
 	case n < 0:
