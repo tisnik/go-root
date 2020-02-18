@@ -4,6 +4,7 @@
 
 package factorial
 
+// Factorial computes factorial for given n that might be positive integer
 func Factorial(n int64) int64 {
 	switch {
 	case n < 0:
