@@ -12,7 +12,10 @@ import (
 	"log"
 )
 
+// LuaSource1 contains file name with first script written in Lua
 const LuaSource1 = "l1.lua"
+
+// LuaSource2 contains file name with second script written in Lua
 const LuaSource2 = "l2.lua"
 
 func callLuaVM1(c chan bool) {
