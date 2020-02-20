@@ -14,6 +14,7 @@ import (
 	"strings"
 )
 
+// Stack představuje jednoduchou implementaci zásobníku
 type Stack list.List
 
 func printStack(l *list.List) {
