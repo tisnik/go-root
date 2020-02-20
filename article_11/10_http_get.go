@@ -23,11 +23,11 @@ func main() {
 	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("Content length: %d\n", response.ContentLength)
 
-	raw_body, err := ioutil.ReadAll(response.Body)
+	rawBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		println("Response body can't be read")
 	} else {
-		body := string(raw_body)
+		body := string(rawBody)
 		println(body)
 	}
 }
