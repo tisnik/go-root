@@ -8,24 +8,24 @@
 package main
 
 import (
-	. "fmt"
+	"fmt"
 	"math"
 )
 
 func main() {
 	value := 42
-	s := Sprintf("%10d", value)
+	s := fmt.Sprintf("%10d", value)
 	println(s)
 
-	s = Sprintf("%10.5f", math.Pi)
+	s = fmt.Sprintf("%10.5f", math.Pi)
 	println(s)
 
-	s = Sprintf("%10.9f", math.Pi)
+	s = fmt.Sprintf("%10.9f", math.Pi)
 	println(s)
 
 	a := []int{10, 20, 30}
 
-	s = Sprintf("%v", a)
+	s = fmt.Sprintf("%v", a)
 	println(s)
 
 }
