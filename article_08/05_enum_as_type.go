@@ -25,6 +25,7 @@ const (
 	Nedele
 )
 
+// Den je uživatelsky definovaná datová struktura reprezentující jeden den v týdnu
 type Den struct {
 	X Enum
 }
