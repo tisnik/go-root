@@ -11,6 +11,7 @@ package main
 
 import "fmt"
 
+// Enum je užitevatelsky definovaný datový typ mj. i pro dny v týdnu
 type Enum int
 
 // Konstanty reprezentující dny v týdnu
