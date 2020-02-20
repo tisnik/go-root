@@ -11,6 +11,7 @@ package main
 
 import "fmt"
 
+// Konstanty reprezentující dny v týdnu
 const (
 	Pondeli = iota
 	Utery
