@@ -13,6 +13,7 @@ import "fmt"
 
 type Enum int
 
+// Konstanty reprezentující dny v týdnu
 const (
 	Pondeli Enum = iota
 	Utery
