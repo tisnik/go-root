@@ -8,11 +8,11 @@
 package main
 
 import (
-	. "strconv"
+	"strconv"
 )
 
 func main() {
-	println(Itoa(42))
-	println(Itoa(0))
-	println(Itoa(-1))
+	println(strconv.Itoa(42))
+	println(strconv.Itoa(0))
+	println(strconv.Itoa(-1))
 }
