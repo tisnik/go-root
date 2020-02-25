@@ -27,6 +27,12 @@ func main() {
 	c.Left = nil
 	c.Right = nil
 
+	fmt.Println("A before serialization:")
+	fmt.Printf("Node:        %p %v\n", &a, a)
+	fmt.Printf("Left:        %p %v\n", a.Left, *a.Left)
+	fmt.Printf("Right:       %p %v\n", a.Right, *a.Right)
+	fmt.Printf("Left/Right:  %p %v\n", a.Left.Right, *a.Left.Right)
+
 	var x Node
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -37,6 +43,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println("X after deserialization:")
 	fmt.Printf("Node:        %p %v\n", &x, x)
 	fmt.Printf("Left:        %p %v\n", x.Left, *x.Left)
 	fmt.Printf("Right:       %p %v\n", x.Right, *x.Right)
