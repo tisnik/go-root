@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Devátá část
+//     Užitečné balíčky pro každodenní použití jazyka Go
+//     https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-jazyka-go/
 //
 // Demonstrační příklad číslo 11:
 //    Použití standardního balíčku "container/list"
