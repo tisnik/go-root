@@ -11,12 +11,12 @@ package main
 
 import (
 	"fmt"
-	. "math/big"
+	"math/big"
 )
 
 func main() {
-	var x Int
-	var y Int
+	var x big.Int
+	var y big.Int
 	x.SetInt64(1)
 	y.SetInt64(2)
 
