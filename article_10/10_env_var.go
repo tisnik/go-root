@@ -15,10 +15,10 @@ import (
 )
 
 func main() {
-	env_vars := os.Environ()
+	envVars := os.Environ()
 
-	for i, env_var := range env_vars {
-		fmt.Printf("%02d\t%s\n", i, env_var)
+	for i, envVar := range envVars {
+		fmt.Printf("%02d\t%s\n", i, envVar)
 	}
 
 	term, found := os.LookupEnv("TERM")
