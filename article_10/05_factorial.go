@@ -18,9 +18,8 @@ func factorial(n *big.Int) *big.Int {
 	one := big.NewInt(1)
 	if n.Cmp(big.NewInt(0)) <= 0 {
 		return one
-	} else {
-		return one.Mul(n, factorial(one.Sub(n, one)))
 	}
+	return one.Mul(n, factorial(one.Sub(n, one)))
 }
 
 func main() {
