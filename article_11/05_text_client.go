@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Jedenáctá část
+//     Vývoj síťových aplikací v programovacím jazyku Go
+//     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/
 //
 // Demonstrační příklad číslo 5:
 //     	Jednoduchý klient akceptující celý textový řádek
@@ -23,7 +25,7 @@ func main() {
 		println(status, err)
 		if err != nil {
 			println("No response!")
-		} else { 
+		} else {
 			println(status)
 		}
 	}
