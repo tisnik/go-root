@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Jedenáctá část
+//     Vývoj síťových aplikací v programovacím jazyku Go
+//     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/
 //
 // Demonstrační příklad číslo 2B:
 //     Úprava adresy v předchozím příkladu
