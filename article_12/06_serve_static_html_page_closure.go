@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvanáctá část
+//     Vývoj síťových aplikací v programovacím jazyku Go (pokračování)
+//     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-pokracovani/
 //
 // Demonstrační příklad číslo 6:
 //    Využití uzávěrů pro zápis kratšího kódu
