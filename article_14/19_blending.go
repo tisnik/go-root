@@ -38,6 +38,7 @@ func DrawVerticalLine(img *image.NRGBA, color color.Color, x int, y1 int, y2 int
 	}
 }
 
+// Abs computes absolute value for given signed integer
 func Abs(x int) int {
 	if x < 0 {
 		return -x
