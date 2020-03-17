@@ -23,27 +23,27 @@ func main() {
 	var r3 rune = '\n'
 	var r4 rune = '\u03BB'
 
-	a_json, _ := json.Marshal(a)
-	fmt.Println(string(a_json))
+	aJSON, _ := json.Marshal(a)
+	fmt.Println(string(aJSON))
 
-	b_json, _ := json.Marshal(b)
-	fmt.Println(string(b_json))
+	bJSON, _ := json.Marshal(b)
+	fmt.Println(string(bJSON))
 
-	c_json, _ := json.Marshal(c)
-	fmt.Println(string(c_json))
+	cJSON, _ := json.Marshal(c)
+	fmt.Println(string(cJSON))
 
-	d_json, _ := json.Marshal(d)
-	fmt.Println(string(d_json))
+	dJSON, _ := json.Marshal(d)
+	fmt.Println(string(dJSON))
 
-	r1_json, _ := json.Marshal(r1)
-	fmt.Println(string(r1_json))
+	r1JSON, _ := json.Marshal(r1)
+	fmt.Println(string(r1JSON))
 
-	r2_json, _ := json.Marshal(r2)
-	fmt.Println(string(r2_json))
+	r2JSON, _ := json.Marshal(r2)
+	fmt.Println(string(r2JSON))
 
-	r3_json, _ := json.Marshal(r3)
-	fmt.Println(string(r3_json))
+	r3JSON, _ := json.Marshal(r3)
+	fmt.Println(string(r3JSON))
 
-	r4_json, _ := json.Marshal(r4)
-	fmt.Println(string(r4_json))
+	r4JSON, _ := json.Marshal(r4)
+	fmt.Println(string(r4JSON))
 }
