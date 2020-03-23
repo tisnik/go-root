@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Třináctá část
+//     Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)
+//     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-prace-s-jsonem-a-rastrovymi-obrazky/
 //
 // Demonstrační příklad číslo 3:
 //     Pokus o marshalling komplexních čísel do JSONu
