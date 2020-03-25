@@ -24,8 +24,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	primarySurface.FillRect(nil, 0)
-
 	primarySurface.FillRect(nil, sdl.MapRGB(primarySurface.Format, 192, 255, 192))
 	window.UpdateSurface()
 
