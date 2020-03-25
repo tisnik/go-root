@@ -16,7 +16,7 @@ func main() {
 	}
 	defer sdl.Quit()
 
-	window, err := sdl.CreateWindow("Example #3", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+	window, err := sdl.CreateWindow("Example #4", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		width, height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
@@ -43,10 +43,10 @@ func main() {
 	primarySurface.FillRect(nil, sdl.MapRGB(convertedImage.Format, 192, 255, 192))
 
 	var destRect sdl.Rect
-	destRect.X = 160
-	destRect.Y = 120
-	destRect.W = 250
-	destRect.H = 250
+	destRect.X = primarySurface.W/2 - convertedImage.W/4
+	destRect.Y = primarySurface.H/2 - convertedImage.H/4
+	destRect.W = convertedImage.W / 2
+	destRect.H = convertedImage.H / 2
 
 	err = convertedImage.BlitScaled(nil, primarySurface, &destRect)
 	if err != nil {
