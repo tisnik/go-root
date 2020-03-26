@@ -1,5 +1,5 @@
 package hello3
 
-func hello_world() {
+func helloWorld() {
 	println("Hello world #3!")
 }
