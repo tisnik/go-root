@@ -4,6 +4,6 @@ func init() {
 	println("hello4.init() called")
 }
 
-func Hello_world() {
+func HelloWorld() {
 	println("Hello world #4!")
 }
