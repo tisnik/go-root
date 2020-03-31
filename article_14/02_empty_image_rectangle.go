@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Čtrnáctá část
+//     Programovací jazyk Go a počítačová grafika (úvod)
+//     https://www.root.cz/clanky/programovaci-jazyk-go-a-pocitacova-grafika-uvod/
 //
 // Demonstrační příklad číslo 2:
 //     Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku
