@@ -22,7 +22,7 @@ func initialize() {
 		panic(err)
 	}
 
-	window, err = sdl.CreateWindow("SDL2 example #10", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+	window, err = sdl.CreateWindow("SDL2 example #2", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		width, height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
@@ -40,6 +40,8 @@ func initialize() {
 }
 
 func finalize() {
+	primarySurface.Free()
+	image.Free()
 	window.Destroy()
 	sdl.Quit()
 }
@@ -69,6 +71,4 @@ func main() {
 	sdl.Delay(10)
 	redraw()
 	sdl.Delay(5000)
-
-	finalize()
 }
