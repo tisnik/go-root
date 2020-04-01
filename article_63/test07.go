@@ -86,14 +86,24 @@ func (state *gameState) eventLoop() {
 	done := false
 	for !done {
 		event = sdl.PollEvent()
-		switch event.(type) {
+		switch t := event.(type) {
 		case *sdl.QuitEvent:
-			log.Println("Quitting")
 			done = true
+		case *sdl.KeyboardEvent:
+			keyCode := t.Keysym.Sym
+			if t.State == sdl.PRESSED {
+				switch keyCode {
+				case sdl.K_ESCAPE:
+					done = true
+				case sdl.K_q:
+					done = true
+				}
+			}
 		}
 		state.redraw()
 		sdl.Delay(20)
 	}
+	log.Println("Quitting")
 }
 
 func main() {
