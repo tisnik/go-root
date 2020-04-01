@@ -39,7 +39,7 @@ func (state *gameState) initialize() {
 		panic(err)
 	}
 
-	state.Window, err = sdl.CreateWindow("SDL2 example #6", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+	state.Window, err = sdl.CreateWindow("SDL2 example #7", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		width, height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
