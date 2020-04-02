@@ -110,8 +110,6 @@ func (state *gameState) redraw() {
 	}
 	state.PrimarySurface.FillRect(&playerRect, sdl.MapRGB(state.PrimarySurface.Format, 255, 192, 192))
 
-	moveNPC(state)
-
 	dstRect := sdl.Rect{
 		X: state.NPCX,
 		Y: state.NPCY,
@@ -183,6 +181,7 @@ func (state *gameState) eventLoop() {
 		if down {
 			state.PlayerY += 2
 		}
+		moveNPC(state)
 		state.redraw()
 		sdl.Delay(10)
 	}
