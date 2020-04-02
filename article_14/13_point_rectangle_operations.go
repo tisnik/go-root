@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Čtrnáctá část
+//     Programovací jazyk Go a počítačová grafika (úvod)
+//     https://www.root.cz/clanky/programovaci-jazyk-go-a-pocitacova-grafika-uvod/
 //
 // Demonstrační příklad číslo 13:
 //     Základní operace s obdélníky a body
