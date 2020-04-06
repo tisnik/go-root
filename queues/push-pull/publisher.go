@@ -16,9 +16,9 @@ func sendMessages() {
 	if err != nil {
 		println("cannot connect to server", err.Error())
 		return
-	} else {
-		println("connected to server", serverAddr)
 	}
+	println("connected to server", serverAddr)
+
 	defer conn.Disconnect()
 
 	for i := 1; i <= messageCount; i++ {
