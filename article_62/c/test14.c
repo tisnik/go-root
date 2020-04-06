@@ -14,7 +14,7 @@ int main(int argc, char** args) {
         return 1;
     } 
 
-    window = SDL_CreateWindow("SDL2 example #10", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("SDL2 example #14", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
 
     if (!window) {
         puts("Error creating window");
