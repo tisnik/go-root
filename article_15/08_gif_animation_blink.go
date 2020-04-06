@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Patnáctá část
+//     Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG
+//     https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-tvorba-animovanych-gifu-graficka-knihovna-gg/
 //
 // Demonstrační příklad číslo 8:
 //     Jednoduchá animace se dvěma snímky o velikosti 32×32 pixelů
