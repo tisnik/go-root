@@ -19,9 +19,8 @@ func receiveMessages(subscribed chan bool) {
 	if err != nil {
 		println("cannot connect to server", err.Error())
 		return
-	} else {
-		println("connected to server", serverAddr)
 	}
+	println("connected to server", serverAddr)
 
 	defer conn.Disconnect()
 
