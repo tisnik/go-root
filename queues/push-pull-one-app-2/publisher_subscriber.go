@@ -23,9 +23,8 @@ func sendMessages(stop chan bool) {
 	if err != nil {
 		println("Cannot connect to server", err.Error())
 		return
-	} else {
-		println("Publisher part connected to server", serverAddr)
 	}
+	println("Publisher part connected to server", serverAddr)
 	defer conn.Disconnect()
 
 	time.Sleep(5 * time.Second)
