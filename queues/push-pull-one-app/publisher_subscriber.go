@@ -42,9 +42,8 @@ func sendMessages() {
 	if err != nil {
 		println("Failed to send EXIT message to server", err)
 		return
-	} else {
-		println("Message sent")
 	}
+	println("Message sent")
 	println("Publisher finished")
 }
 
