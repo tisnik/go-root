@@ -33,9 +33,8 @@ func sendMessages() {
 		if err != nil {
 			println("failed to send to server", err)
 			return
-		} else {
-			println("message sent")
 		}
+		println("message sent")
 	}
 	println("sending EXIT message")
 	err = conn.Send(queueName, "text/plain", []byte("EXIT"), nil)
