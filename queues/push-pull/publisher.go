@@ -35,9 +35,8 @@ func sendMessages() {
 	if err != nil {
 		println("failed to send EXIT message to server", err)
 		return
-	} else {
-		println("message sent")
 	}
+	println("message sent")
 	println("sender finished")
 }
 
