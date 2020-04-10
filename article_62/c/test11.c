@@ -61,6 +61,6 @@ int main(int argc, char** args) {
     SDL_FreeSurface(image);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    
+
     return 0;
 }
