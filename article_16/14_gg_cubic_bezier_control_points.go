@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Šestnáctá část
+//     Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG
+//     https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-dalsi-uzitecne-funkce-poskytovane-knihovnou-gg/
 //
 // Demonstrační příklad číslo 14:
 //     Kubická Bézierova křivka s řídicími body.
