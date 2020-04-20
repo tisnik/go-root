@@ -1,5 +1,9 @@
 // Seriál "Programovací jazyk Go"
 //
+// Sedmnáctá část
+//     Testování aplikací naprogramovaných v jazyce Go
+//     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
+//
 // Přístup k tabulce kurzů a použití kurzů při výpočtu převodu měn.
 
 package main
