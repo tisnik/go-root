@@ -1,3 +1,12 @@
+// Seriál "Programovací jazyk Go"
+//
+// Osmnáctá část
+//     Knihovny určené pro tvorbu testů v programovacím jazyce Go
+//     https://www.root.cz/clanky/knihovny-urcene-pro-tvorbu-testu-v-programovacim-jazyce-go/
+//
+// Demonstrační příklad číslo 7:
+//     Testy pro balíček.
+
 package factorial_test
 
 import (
