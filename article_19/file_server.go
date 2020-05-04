@@ -1,8 +1,10 @@
 // Seriál "Programovací jazyk Go"
 //
-// Jedenáctá část
+// Devatenáctá část
+//     Využití WebAssembly z programovacího jazyka Go
+//     https://www.root.cz/clanky/vyuziti-webassembly-z-programovaciho-jazyka-go/
 //
-// Demonstrační příklad číslo 15:
+// Demonstrační příklad:
 //     HTTP server vracející statický obsah
 
 package main
