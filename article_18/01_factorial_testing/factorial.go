@@ -9,6 +9,7 @@
 
 package factorial
 
+// Factorial computes factorial for given input using recurrence relation formula
 func Factorial(n int64) int64 {
 	switch {
 	case n < 0:
