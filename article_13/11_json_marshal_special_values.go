@@ -48,8 +48,8 @@ func main() {
 	slice2JSON, _ := json.Marshal(slice2)
 	fmt.Println(string(slice2JSON))
 
-	map1_json, _ := json.Marshal(map1)
-	fmt.Println(string(map1_json))
+	map1JSON, _ := json.Marshal(map1)
+	fmt.Println(string(map1JSON))
 
 	map2_json, _ := json.Marshal(map2)
 	fmt.Println(string(map2_json))
