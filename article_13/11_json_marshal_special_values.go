@@ -42,8 +42,8 @@ func main() {
 	v4JSON, _ := json.Marshal(v4)
 	fmt.Println(string(v4JSON))
 
-	slice1_json, _ := json.Marshal(slice1)
-	fmt.Println(string(slice1_json))
+	slice1JSON, _ := json.Marshal(slice1)
+	fmt.Println(string(slice1JSON))
 
 	slice2_json, _ := json.Marshal(slice2)
 	fmt.Println(string(slice2_json))
