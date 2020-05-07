@@ -30,8 +30,8 @@ func main() {
 	// https://speakerdeck.com/campoy/understanding-nil
 	var iface interface{} = nil
 
-	v1_json, _ := json.Marshal(v1)
-	fmt.Println(string(v1_json))
+	v1JSON, _ := json.Marshal(v1)
+	fmt.Println(string(v1JSON))
 
 	v2_json, _ := json.Marshal(v2)
 	fmt.Println(string(v2_json))
