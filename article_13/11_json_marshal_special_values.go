@@ -57,8 +57,8 @@ func main() {
 	map3JSON, _ := json.Marshal(map3)
 	fmt.Println(string(map3JSON))
 
-	iface_json, _ := json.Marshal(iface)
-	fmt.Println(string(iface_json))
+	ifaceJSON, _ := json.Marshal(iface)
+	fmt.Println(string(ifaceJSON))
 
 	var f = func() {}
 	f_json, _ := json.Marshal(f)
