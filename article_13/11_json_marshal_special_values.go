@@ -36,11 +36,11 @@ func main() {
 	v2JSON, _ := json.Marshal(v2)
 	fmt.Println(string(v2JSON))
 
-	v3_json, _ := json.Marshal(v3)
-	fmt.Println(string(v3_json))
+	v3JSON, _ := json.Marshal(v3)
+	fmt.Println(string(v3JSON))
 
-	v4_json, _ := json.Marshal(v4)
-	fmt.Println(string(v4_json))
+	v4JSON, _ := json.Marshal(v4)
+	fmt.Println(string(v4JSON))
 
 	slice1_json, _ := json.Marshal(slice1)
 	fmt.Println(string(slice1_json))
