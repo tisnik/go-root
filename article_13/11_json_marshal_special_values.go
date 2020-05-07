@@ -51,8 +51,8 @@ func main() {
 	map1JSON, _ := json.Marshal(map1)
 	fmt.Println(string(map1JSON))
 
-	map2_json, _ := json.Marshal(map2)
-	fmt.Println(string(map2_json))
+	map2JSON, _ := json.Marshal(map2)
+	fmt.Println(string(map2JSON))
 
 	map3_json, _ := json.Marshal(map3)
 	fmt.Println(string(map3_json))
