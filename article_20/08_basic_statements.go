@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá část
+//     Jazyk Go a aplikace s vlastním příkazovým řádkem
+//     https://www.root.cz/clanky/jazyk-go-a-aplikace-s-vlastnim-prikazovym-radkem/
 //
 // Demonstrační příklad číslo 8:
 //     Zápis příkazů Atari BASICu.
