@@ -21,8 +21,8 @@ func main() {
 	var c uint32 = 10000
 	var d uint32 = 1000000
 
-	b8_json, _ := json.Marshal(b8)
-	fmt.Println(string(b8_json))
+	b8JSON, _ := json.Marshal(b8)
+	fmt.Println(string(b8JSON))
 
 	a_json, _ := json.Marshal(a)
 	fmt.Println(string(a_json))
