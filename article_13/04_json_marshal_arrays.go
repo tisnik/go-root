@@ -27,8 +27,8 @@ func main() {
 		{0, -1, 0},
 	}
 
-	a1_json, _ := json.Marshal(a1)
-	fmt.Println(string(a1_json))
+	a1JSON, _ := json.Marshal(a1)
+	fmt.Println(string(a1JSON))
 
 	a2_json, _ := json.Marshal(a2)
 	fmt.Println(string(a2_json))
