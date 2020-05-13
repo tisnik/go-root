@@ -33,8 +33,8 @@ func main() {
 	a2JSON, _ := json.Marshal(a2)
 	fmt.Println(string(a2JSON))
 
-	a3_json, _ := json.Marshal(a3)
-	fmt.Println(string(a3_json))
+	a3JSON, _ := json.Marshal(a3)
+	fmt.Println(string(a3JSON))
 
 	a4_json, _ := json.Marshal(a4)
 	fmt.Println(string(a4_json))
