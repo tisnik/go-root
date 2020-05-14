@@ -14,6 +14,7 @@ import (
 	"fmt"
 )
 
+// Identifiers je datová struktura reprezentující ID uživatele v systému
 type Identifiers struct {
 	UID uint32
 	GID uint32
