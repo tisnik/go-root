@@ -14,6 +14,7 @@ import (
 	"fmt"
 )
 
+// Key reprezentuje klíč použitý pro identifikaci uživatele
 type Key struct {
 	Id   uint32
 	Role string
