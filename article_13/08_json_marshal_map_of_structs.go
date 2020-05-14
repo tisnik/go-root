@@ -20,6 +20,7 @@ type Key struct {
 	Role string
 }
 
+// User je uživatelsky definovaná datová struktura
 type User struct {
 	ID      uint32
 	Name    string
