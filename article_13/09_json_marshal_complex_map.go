@@ -20,6 +20,7 @@ type Identifiers struct {
 	GID uint32
 }
 
+// User je uživatelsky definovaná datová struktura
 type User struct {
 	Name    string
 	Surname string
