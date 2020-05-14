@@ -42,6 +42,6 @@ func main() {
 	user1_json, _ := json.Marshal(user1)
 	fmt.Println(string(user1_json))
 
-	user2_json, _ := json.Marshal(user2)
-	fmt.Println(string(user2_json))
+	user2JSON, _ := json.Marshal(user2)
+	fmt.Println(string(user2JSON))
 }
