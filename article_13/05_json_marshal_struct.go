@@ -14,13 +14,14 @@ import (
 	"fmt"
 )
 
-// User1 je uživatelsky definovaná datová struktura
+// User1 je uživatelsky definovaná datová struktura s privátními atributy
 type User1 struct {
 	id      uint32
 	name    string
 	surname string
 }
 
+// User2 je uživatelsky definovaná datová struktura s viditelnými atributy
 type User2 struct {
 	ID      uint32
 	Name    string
