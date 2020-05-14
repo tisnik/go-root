@@ -49,11 +49,13 @@ func Abs(x int) int {
 
 // Step function computes step direction (left/right, up/down) for Bresenham algorithm
 func Step(v1 int, v2 int) int {
+	// is first coordinate less than the second one?
 	if v1 < v2 {
+		// if yes, step up or right
 		return 1
-	} else {
-		return -1
 	}
+	// if no, step down or left
+	return -1
 }
 
 func DrawLine(img *image.RGBA, color color.Color, x1 int, y1 int, x2 int, y2 int) {
