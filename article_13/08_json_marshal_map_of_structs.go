@@ -40,6 +40,6 @@ func main() {
 		Name:    "Josef",
 		Surname: "Vyskočil"}
 
-	m1_json, _ := json.Marshal(m1)
-	fmt.Println(string(m1_json))
+	m1JSON, _ := json.Marshal(m1)
+	fmt.Println(string(m1JSON))
 }
