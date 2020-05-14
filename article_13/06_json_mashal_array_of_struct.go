@@ -36,6 +36,6 @@ func main() {
 			Surname: "Vyskočil"},
 	}
 
-	users_json, _ := json.Marshal(users)
-	fmt.Println(string(users_json))
+	usersJSON, _ := json.Marshal(users)
+	fmt.Println(string(usersJSON))
 }
