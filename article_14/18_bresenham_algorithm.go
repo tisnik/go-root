@@ -39,6 +39,7 @@ func DrawVerticalLine(img *image.RGBA, color color.Color, x int, y1 int, y2 int)
 	}
 }
 
+// Abs function computer absolute value for given integer input
 func Abs(x int) int {
 	if x < 0 {
 		return -x
