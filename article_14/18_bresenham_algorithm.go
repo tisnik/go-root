@@ -47,6 +47,7 @@ func Abs(x int) int {
 	return x
 }
 
+// Step function computes step direction (left/right, up/down) for Bresenham algorithm
 func Step(v1 int, v2 int) int {
 	if v1 < v2 {
 		return 1
