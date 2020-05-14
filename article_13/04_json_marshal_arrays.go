@@ -43,6 +43,6 @@ func main() {
 	a5JSON, _ := json.Marshal(a5)
 	fmt.Println(string(a5JSON))
 
-	matice_json, _ := json.Marshal(matice)
-	fmt.Println(string(matice_json))
+	maticeJSON, _ := json.Marshal(matice)
+	fmt.Println(string(maticeJSON))
 }
