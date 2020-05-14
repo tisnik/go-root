@@ -114,6 +114,8 @@ func DrawLine(img *image.NRGBA, color color.Color, x1 int, y1 int, x2 int, y2 in
 	}
 }
 
+// CreateStringArt functions draws a so-called string art into the test image
+// https://en.wikipedia.org/wiki/String_art
 func CreateStringArt(width int, height int) draw.Image {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
