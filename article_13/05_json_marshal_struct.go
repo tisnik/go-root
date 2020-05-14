@@ -21,7 +21,7 @@ type User1 struct {
 }
 
 type User2 struct {
-	Id      uint32
+	ID      uint32
 	Name    string
 	Surname string
 }
