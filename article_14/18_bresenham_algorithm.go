@@ -29,6 +29,7 @@ func DrawHorizontalLine(img *image.RGBA, color color.Color, x1 int, x2 int, y in
 	}
 }
 
+// DrawVerticalLine function draws vertical line from [x, y1] to [x, y2] into the given image
 func DrawVerticalLine(img *image.RGBA, color color.Color, x int, y1 int, y2 int) {
 	if y1 > y2 {
 		y1, y2 = y2, y1
