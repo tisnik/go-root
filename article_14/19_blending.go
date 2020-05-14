@@ -50,11 +50,13 @@ func Abs(x int) int {
 
 // Step computes whether the horizontal/vertical step should be positive or negative
 func Step(v1 int, v2 int) int {
+	// is first coordinate less than the second one?
 	if v1 < v2 {
+		// if yes, step up or right
 		return 1
-	} else {
-		return -1
 	}
+	// if no, step down or left
+	return -1
 }
 
 // DrawLine draws line from [x1,y1] to [x2,y2] by specified color
