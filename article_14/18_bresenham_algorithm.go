@@ -58,6 +58,7 @@ func Step(v1 int, v2 int) int {
 	return -1
 }
 
+// DrawLine function draws line from [x1, y1] to [x2, y2] into the given image
 func DrawLine(img *image.RGBA, color color.Color, x1 int, y1 int, x2 int, y2 int) {
 	// specialni pripad - svisla usecka
 	if x1 == x2 {
