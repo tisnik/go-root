@@ -143,6 +143,7 @@ func CreateStringArt(width int, height int) draw.Image {
 	return img
 }
 
+// CreateChessboard function draws chessboard onto the test image
 func CreateChessboard(width int, height int) draw.Image {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	palette := make(map[int]color.RGBA, 2)
