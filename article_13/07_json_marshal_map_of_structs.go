@@ -16,7 +16,7 @@ import (
 
 // User je uživatelsky definovaná datová struktura
 type User struct {
-	Id      uint32
+	ID      uint32
 	Name    string
 	Surname string
 }
@@ -25,12 +25,12 @@ func main() {
 	m1 := make(map[string]User)
 
 	m1["user-id-1"] = User{
-		Id:      1,
+		ID:      1,
 		Name:    "Pepek",
 		Surname: "Vyskoč"}
 
 	m1["user-id-2"] = User{
-		Id:      2,
+		ID:      2,
 		Name:    "Josef",
 		Surname: "Vyskočil"}
 
