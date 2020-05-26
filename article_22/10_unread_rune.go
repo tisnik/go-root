@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá druhá část
+//     Vstupně-výstupní funkce standardní knihovny programovacího jazyka Go
+//     https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/
 //
 // Demonstrační příklad číslo 10:
 //     Použití metody UnreadRune.
