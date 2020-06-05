@@ -32,7 +32,7 @@ func main() {
 	fmt.Println(string(cJSON))
 	fmt.Println(cErr)
 
-	d_json, d_err := json.Marshal(d)
-	fmt.Println(string(d_json))
+	dJSON, d_err := json.Marshal(d)
+	fmt.Println(string(dJSON))
 	fmt.Println(d_err)
 }
