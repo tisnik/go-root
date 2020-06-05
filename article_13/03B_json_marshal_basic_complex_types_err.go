@@ -24,9 +24,9 @@ func main() {
 	fmt.Println(string(aJSON))
 	fmt.Println(aErr)
 
-	bJSON, b_err := json.Marshal(b)
+	bJSON, bErr := json.Marshal(b)
 	fmt.Println(string(bJSON))
-	fmt.Println(b_err)
+	fmt.Println(bErr)
 
 	c_json, c_err := json.Marshal(c)
 	fmt.Println(string(c_json))
