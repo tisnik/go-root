@@ -14,6 +14,7 @@ import (
 	"fmt"
 )
 
+// User je uživatelsky definovaná datová struktura
 type User struct {
 	id      uint32
 	name    string
