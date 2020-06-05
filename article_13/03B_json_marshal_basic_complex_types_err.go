@@ -20,9 +20,9 @@ func main() {
 	var c complex64 = 1e30 + 1e30i
 	var d complex64 = 1i
 
-	aJSON, a_err := json.Marshal(a)
+	aJSON, aErr := json.Marshal(a)
 	fmt.Println(string(aJSON))
-	fmt.Println(a_err)
+	fmt.Println(aErr)
 
 	b_json, b_err := json.Marshal(b)
 	fmt.Println(string(b_json))
