@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá třetí část
+//     Pokročilejší použití vstupně-výstupních funkcí standardní knihovny jazyka Go
+//     https://www.root.cz/clanky/pokrocilejsi-pouziti-vstupne-vystupnich-funkci-standardni-knihovny-jazyka-go/
 //
 // Demonstrační příklad číslo 12:
 //     Zápis řetězců (StringWriter).
