@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá čtvrtá část
+//     Kontejnery v základní knihovně programovacího jazyka Go
+//     https://www.root.cz/clanky/kontejnery-v-zakladni-knihovne-programovaciho-jazyka-go/
 //
 // Demonstrační příklad číslo 2:
 //     	Zpomalení generování jednotlivých bloků generovaného obsahu
