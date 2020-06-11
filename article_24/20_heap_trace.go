@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá čtvrtá část
+//     Kontejnery v základní knihovně programovacího jazyka Go
+//     https://www.root.cz/clanky/kontejnery-v-zakladni-knihovne-programovaciho-jazyka-go/
 //
 // Demonstrační příklad číslo 20:
 //     	Úprava předchozího příkladu, aby zobrazoval prováděné operace
