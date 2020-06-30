@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá šestá část
+//    Problematika nulových hodnot v Go, aneb proč nil != nil
+//    https://www.root.cz/clanky/problematika-nulovych-hodnot-v-go-aneb-proc-nil-nil/
 //
 // Demonstrační příklad číslo 16:
 //    Prázdná mapa a přidání prvků do prázdné mapy
