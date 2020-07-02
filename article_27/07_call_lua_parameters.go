@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá sedmá část
+//    Skriptovací jazyk Lua v aplikacích naprogramovaných v Go
+//    https://www.root.cz/clanky/skriptovaci-jazyk-lua-v-aplikacich-naprogramovanych-v-go/
 //
 // Demonstrační příklad číslo 7:
 //    Zavolání Lua funkce z Go s předáním parametrů.
