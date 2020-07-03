@@ -1,9 +1,11 @@
 // Seriál "Programovací jazyk Go"
 //
 // Dvacátá pátá část
+//     Ladění aplikací v Go s využitím GNU Debuggeru a debuggeru Delve
+//     https://www.root.cz/clanky/ladeni-aplikaci-v-go-s-vyuzitim-gnu-debuggeru-a-debuggeru-delve/
 //
 // Demonstrační příklad číslo 5:
-//     	Spuštění dvou gorutin
+//     Spuštění dvou gorutin
 
 package main
 
