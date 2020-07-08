@@ -1,3 +1,12 @@
+// Seriál "Programovací jazyk Go"
+//
+// Dvacátá osmá část
+//    Datové struktury s líným vyhodnocováním v programovacím jazyce Go
+//    https://www.root.cz/clanky/datove-struktury-s-linym-vyhodnocovanim-v-programovacim-jazyce-go/
+//
+// Demonstrační příklad číslo 20:
+//    Metoda Reduce().
+
 package main
 
 import (
