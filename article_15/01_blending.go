@@ -143,11 +143,11 @@ func CreateChessboard(width int, height int) draw.Image {
 
 	index_color := 0
 	board_size := 8
-	hor_block := int(width / board_size)
+	horizontalBlock := int(width / board_size)
 	verticalBlock := int(height / board_size)
 
 	x_from := 0
-	x_to := hor_block
+	x_to := horizontalBlock
 	for x := 0; x < board_size; x++ {
 		y_from := 0
 		y_to := verticalBlock
@@ -159,7 +159,7 @@ func CreateChessboard(width int, height int) draw.Image {
 			index_color = 1 - index_color
 		}
 		x_from = x_to
-		x_to += hor_block
+		x_to += horizontalBlock
 		index_color = 1 - index_color
 	}
 	return img
