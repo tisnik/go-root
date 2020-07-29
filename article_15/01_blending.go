@@ -48,6 +48,7 @@ func Abs(x int) int {
 	return x
 }
 
+// Step computes whether the horizontal/vertical step should be positive or negative
 func Step(v1 int, v2 int) int {
 	if v1 < v2 {
 		return 1
