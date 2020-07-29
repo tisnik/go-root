@@ -20,6 +20,7 @@ import (
 const width = 256
 const height = 256
 
+// DrawHorizontalLine draws horizontal line from [x1,y] to [x2,y] by specified color
 func DrawHorizontalLine(img *image.NRGBA, color color.Color, x1 int, x2 int, y int) {
 	if x1 > x2 {
 		x1, x2 = x2, x1
