@@ -17,6 +17,7 @@ import (
 	"os"
 )
 
+// BoardSize represents size of chessboard being rendered
 const BoardSize = 8
 
 func CreateChessboard(width int, height int, board_size int) *image.RGBA {
