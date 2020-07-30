@@ -147,7 +147,7 @@ func CreateChessboard(width int, height int) draw.Image {
 	palette[0] = color.RGBA{150, 205, 50, 255}
 	palette[1] = color.RGBA{0, 100, 0, 0}
 
-	index_color := 0
+	indexColor := 0
 	board_size := 8
 	horizontalBlock := int(width / board_size)
 	verticalBlock := int(height / board_size)
@@ -159,14 +159,14 @@ func CreateChessboard(width int, height int) draw.Image {
 		yTo := verticalBlock
 		for y := 0; y < board_size; y++ {
 			r := image.Rect(xFrom, yFrom, xTo, yTo)
-			draw.Draw(img, r, &image.Uniform{palette[index_color]}, image.ZP, draw.Src)
+			draw.Draw(img, r, &image.Uniform{palette[indexColor]}, image.ZP, draw.Src)
 			yFrom = yTo
 			yTo += verticalBlock
-			index_color = 1 - index_color
+			indexColor = 1 - indexColor
 		}
 		xFrom = xTo
 		xTo += horizontalBlock
-		index_color = 1 - index_color
+		indexColor = 1 - indexColor
 	}
 	return img
 }
