@@ -149,16 +149,16 @@ func CreateChessboard(width int, height int) draw.Image {
 	palette[1] = color.RGBA{0, 100, 0, 0}
 
 	indexColor := 0
-	board_size := 8
-	horizontalBlock := int(width / board_size)
-	verticalBlock := int(height / board_size)
+	boardSize := 8
+	horizontalBlock := int(width / boardSize)
+	verticalBlock := int(height / boardSize)
 
 	xFrom := 0
 	xTo := horizontalBlock
-	for x := 0; x < board_size; x++ {
+	for x := 0; x < boardSize; x++ {
 		yFrom := 0
 		yTo := verticalBlock
-		for y := 0; y < board_size; y++ {
+		for y := 0; y < boardSize; y++ {
 			r := image.Rect(xFrom, yFrom, xTo, yTo)
 			draw.Draw(img, r, &image.Uniform{palette[indexColor]}, image.ZP, draw.Src)
 			yFrom = yTo
