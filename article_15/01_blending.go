@@ -52,9 +52,8 @@ func Abs(x int) int {
 func Step(v1 int, v2 int) int {
 	if v1 < v2 {
 		return 1
-	} else {
-		return -1
 	}
+	return -1
 }
 
 // DrawLine draws line from [x1,y1] to [x2,y2] by specified color
