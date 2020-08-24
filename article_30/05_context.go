@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Třicátá část
+//    Trasování a profilování aplikací naprogramovaných v Go (dokončení
+//    https://www.root.cz/clanky/trasovani-a-profilovani-aplikaci-naprogramovanych-v-go-dokonceni/
 //
 // Demonstrační příklad číslo 5:
 //    Zpracování kontextu v trasovacích informacích.
