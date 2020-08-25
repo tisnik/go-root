@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Třicátá první část
+//    Sledování vybraných metrik služeb naprogramovaných v jazyku Go
+//    https://www.root.cz/clanky/sledovani-vybranych-metrik-sluzeb-naprogramovanych-v-jazyku-go/
 //
 // Demonstrační příklad číslo 4:
 //    Atomická změna čítače.
