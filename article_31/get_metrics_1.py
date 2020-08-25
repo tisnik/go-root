@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# vim: set fileencoding=utf-8
+
 import requests
 
 response = requests.get("http://localhost:8080/debug/vars")
