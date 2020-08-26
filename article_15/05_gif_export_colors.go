@@ -32,19 +32,19 @@ func CreateChessboard(width int, height int, board_size int) *image.RGBA {
 	ver_block := int(height / board_size)
 
 	x_from := 0
-	x_to := hor_block
+	xTo := hor_block
 	for x := 0; x < board_size; x++ {
 		y_from := 0
 		y_to := ver_block
 		for y := 0; y < board_size; y++ {
-			r := image.Rect(x_from, y_from, x_to, y_to)
+			r := image.Rect(x_from, y_from, xTo, y_to)
 			draw.Draw(img, r, &image.Uniform{palette[index_color]}, image.ZP, draw.Src)
 			y_from = y_to
 			y_to += ver_block
 			index_color = 1 - index_color
 		}
-		x_from = x_to
-		x_to += hor_block
+		x_from = xTo
+		xTo += hor_block
 		index_color = 1 - index_color
 	}
 	return img
