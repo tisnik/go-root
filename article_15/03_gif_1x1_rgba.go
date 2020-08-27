@@ -16,6 +16,7 @@ import (
 	"os"
 )
 
+// CreateImage function creates a new RGBA image with resolution width x height
 func CreateImage(width int, height int) *image.RGBA {
 	c := color.RGBA{255, 0, 0, 255}
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
