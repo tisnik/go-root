@@ -20,6 +20,7 @@ type Identifiers struct {
 	GID uint32 `json:"group-id"`
 }
 
+// User je uživatelsky definovaná datová struktura s veřejnými atributy
 type User struct {
 	Name    string `json:"user-name"`
 	Surname string `json:"user-surname"`
