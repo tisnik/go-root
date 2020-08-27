@@ -20,6 +20,7 @@ import (
 // BoardSize represents size of chessboard being rendered
 const BoardSize = 8
 
+// CreateChessboard function draws chessboard onto the test image
 func CreateChessboard(width int, height int, boardSize int) *image.RGBA {
 	var palette = []color.Color{
 		color.RGBA{150, 205, 50, 255},
