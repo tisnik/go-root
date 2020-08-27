@@ -16,6 +16,8 @@ import (
 	"os"
 )
 
+// CreateImage function creates a new image with color palette and with
+// resolution width x height
 func CreateImage(width int, height int) *image.Paletted {
 	var palette = []color.Color{
 		color.RGBA{255, 128, 128, 255},
