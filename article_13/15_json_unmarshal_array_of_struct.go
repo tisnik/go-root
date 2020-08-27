@@ -16,6 +16,7 @@ import (
 	"log"
 )
 
+// User je uživatelsky definovaná datová struktura s veřejnými atributy
 type User struct {
 	Id      uint32
 	Name    string
