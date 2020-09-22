@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Třicátá pátá část
+//    Programovací jazyk Go pro skalní céčkaře (2.část)
+//    https://www.root.cz/clanky/programovaci-jazyk-go-pro-skalni-ceckare-2-cast/
 //
 // Demonstrační příklad číslo 2:
 //     Převod různých hodnot na typ bool.
