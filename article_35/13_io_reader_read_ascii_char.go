@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá pátá část
+//    Programovací jazyk Go pro skalní céčkaře (2.část)
+//    https://www.root.cz/clanky/programovaci-jazyk-go-pro-skalni-ceckare-2-cast/
+
 package main
 
 import (
