@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá sedmá část
+//    Monitoring služeb a mikroslužeb psaných v Go nástrojem Prometheus
+//    https://www.root.cz/clanky/monitoring-sluzeb-a-mikrosluzeb-psanych-v-go-nastrojem-prometheus/
+
 package main
 
 import (
