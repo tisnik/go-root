@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá osmá část
+//    Tvorba webových aplikací v Go s využitím projektu Gorilla web toolkit
+//    https://www.root.cz/clanky/tvorba-webovych-aplikaci-v-go-s-vyuzitim-projektu-gorilla-web-toolkit/
+
 package main
 
 import (
