@@ -13,7 +13,7 @@ import (
 	"fmt"
 )
 
-func fill_in_channel(channel chan rune) {
+func fillInChannel(channel chan rune) {
 	channel <- 'A'
 	channel <- 'B'
 	channel <- 'C'
@@ -22,7 +22,7 @@ func fill_in_channel(channel chan rune) {
 func main() {
 	channel := make(chan rune, 3)
 
-	go fill_in_channel(channel)
+	go fillInChannel(channel)
 
 	for msg := range channel {
 		fmt.Printf("%c ", msg)
