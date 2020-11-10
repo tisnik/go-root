@@ -51,6 +51,6 @@ func main() {
 		Name:    "Varel",
 		Surname: "Frištenský"}
 
-	mapOfUsers_json, _ := json.Marshal(mapOfUsers)
-	fmt.Println(string(mapOfUsers_json))
+	mapOfUsersJSON, _ := json.Marshal(mapOfUsers)
+	fmt.Println(string(mapOfUsersJSON))
 }
