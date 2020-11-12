@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Třicátá devátá část
+//    Programovací jazyk Go a relační databáze
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-relacni-databaze/
+
 package main
 
 import (
