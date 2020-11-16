@@ -1,8 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Čtyřicátá čtvrtá část
-//
-// Demonstrační příklad číslo 1:
+//    Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem (dokončení)
+//    https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem-dokonceni/
 
 package main
 
