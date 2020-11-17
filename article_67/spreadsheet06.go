@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šedesátá sedmá část
+//    Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go – formát xlsx
+//    https://www.root.cz/clanky/tvorba-sesitu-pro-tabulkove-procesory-v-programovacim-jazyku-go-format-xlsx/
+
 package main
 
 import (
