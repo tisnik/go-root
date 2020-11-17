@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šedesátá šestá část
+//    Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go
+//    https://www.root.cz/clanky/tvorba-sesitu-pro-tabulkove-procesory-v-programovacim-jazyku-go/
+
 package main
 
 import (
