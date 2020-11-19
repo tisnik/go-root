@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šedesátá osmá část
+//    Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory
+//    https://www.root.cz/clanky/komunikace-se-sloupcovymi-databazemi-z-jazyka-go-parquet-soubory/
+
 package main
 
 import (
