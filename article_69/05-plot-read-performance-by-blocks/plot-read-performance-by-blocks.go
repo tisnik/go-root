@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Šedesátá devátá část
+//    Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory (dokončení)
+//    https://www.root.cz/clanky/komunikace-se-sloupcovymi-databazemi-z-jazyka-go-parquet-soubory-dokonceni/
+
 // This tool is able to read all records stored in selected Parquet file.
 // Currently, only records with the structure `Record` is read correctly. Name
 // of input Parquet file needs to be selected from command line.
