@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Čtyřicátá šestá část
+//     Projekt MinIO: jedna z nejužitečnějších aplikací naprogramovaných v Go
+//     https://www.root.cz/clanky/projekt-minio-jedna-z-nejuzitecnejsich-aplikaci-naprogramovanych-v-go/#k19
 //
 // Demonstrační příklad číslo 4:
 //     Výpis všech objektů ve zvoleném bucketu
