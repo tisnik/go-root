@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//
+// Padesátá pátá část
+//    Knihovna Gift pro zpracování rastrových obrázků v Go
+//    https://www.root.cz/clanky/knihovna-gift-pro-zpracovani-rastrovych-obrazku-v-go/
+
 package main
 
 import (
