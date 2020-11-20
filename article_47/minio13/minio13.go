@@ -1,6 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //
 // Čtyřicátá sedmá část
+//     Další možnosti nabízené projektem MinIO
+//     https://www.root.cz/clanky/dalsi-moznosti-nabizene-projektem-minio/
 //
 // Demonstrační příklad číslo 13:
 //     Použití metody GetBucketPolicy
