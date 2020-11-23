@@ -1,0 +1,2807 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Programovací jazyk Go a assembler (2.část)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Programovací jazyk Go a assembler (2.část)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Padesátá čtvrtá část seriálu o programovacím jazyce Go je opět věnována použití assembleru. Představíme si některé základní techniky použitelné jak na platformě x86-64, tak i na procesorech ARM (32bitové i 64bitové řady). Na tento základ navážeme popisem ručních optimalizací.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Architektury mikroprocesorů podporované překladačem a assemblerem programovacího jazyka Go</a></p>
+<p><a href="#k02">2. Předávání parametrů přes zásobník na architektuře x86-64</a></p>
+<p><a href="#k03">3. Malá odbočka &ndash; jména instrukcí a velikost parametrů v&nbsp;assembleru jazyka Go</a></p>
+<p><a href="#k04">4. Klasický matematický koprocesor i387</a></p>
+<p><a href="#k05">5. Technologie SSE/SSE2 a její využití překladačem programovacího jazyka Go</a></p>
+<p><a href="#k06">6. Nové registry SSE</a></p>
+<p><a href="#k07">7. Příklad využití SSE</a></p>
+<p><a href="#k08">8. Práce s&nbsp;poli a řezy (slices)</a></p>
+<p><a href="#k09">9. Podpora 32bitových mikroprocesorů ARM</a></p>
+<p><a href="#k10">10. Specifika architektury ARM</a></p>
+<p><a href="#k11">11. Překlad funkcí pro součet svých operandů</a></p>
+<p><a href="#k12">12. Podpora výpočtů s&nbsp;typy <i>float32</i> a <i>float64</i> na mikroprocesorech ARM</a></p>
+<p><a href="#k13">13. Podmíněné a nepodmíněné skoky jako základ pro realizaci rozvětvení a programových smyček</a></p>
+<p><a href="#k14">14. Strojové instrukce určené pro provedení skoku na architekturách i386 a x86-64</a></p>
+<p><a href="#k15">15. Překlad funkce <strong>Sign</strong> pro architekturu x86-64</a></p>
+<p><a href="#k16">16. Příznakové a stavové bity na mikroprocesorech s&nbsp;architekturou ARM</a></p>
+<p><a href="#k17">17. Překlad funkce <strong>Sign</strong> pro 32bitovou architekturu ARM</a></p>
+<p><a href="#k18">18. AArch64: od podmínkových bitů k&nbsp;podmíněným skokům</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Architektury mikroprocesorů podporované překladačem a assemblerem programovacího jazyka Go</h2>
+
+<p><i>&bdquo;There's something beautiful about programming in
+assembly.&ldquo;</i></p>
+
+<p>Na <a
+href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler/">předchozí
+část</a> <a href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> dnes navážeme, protože si popíšeme některé další
+možnosti, které nám nabízí kombinace (relativně) vysokoúrovňového jazyka Go
+s&nbsp;assemblerem, přesněji řečeno s&nbsp;assemblerem, který je nedílnou
+součástí standardní sady nástrojů Go (tento assembler je v&nbsp;mnoha ohledech
+dosti specifický a někdy též matoucí, což ostatně uvidíme v&nbsp;navazujících
+kapitolách).</p>
+
+<p>Nejprve se zmiňme o architekturách mikroprocesorů, které jsou podporovány
+jak překladačem jazyka Go, tak i některými základními nástroji (assembler,
+objdump atd.). Zkrácené názvy těchto architektur, které se specifikují
+proměnnou prostředí <strong>GOARCH</strong>, jsou vypsány v&nbsp;navazující
+tabulce:</p>
+
+<table>
+<tr><th> #</th><th>$GOARCH</th><th>Význam (vybraná architektura)</th></tr>
+<tr><td> 1</td><td>amd64</td><td>64bitové mikroprocesory x86-64 (samozřejmě nejenom AMD)</td></tr>
+<tr><td> 2</td><td>386</td><td>varianta s&nbsp;použitím instrukcí 387 nebo SSE2</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>arm</td><td>32bitový ARMv5, ARMv6 nebo ARMv7, bude blíže popsáno <a href="#k09">v&nbsp;deváté kapitole</a></td></tr>
+<tr><td> 4</td><td>arm64</td><td>ARMv8-A (neboli AArch64)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>ppc64</td><td>POWER8 a vyšší (varianta <i>big endian</i>)</td></tr>
+<tr><td> 6</td><td>ppc64le</td><td>POWER8 a vyšší (varianta <i>little endian</i>)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>mips</td><td>klasický MIPS (varianta <i>big endian</i>)</td></tr>
+<tr><td> 8</td><td>mipsle</td><td>klasický MIPS (varianta <i>little endian</i>)</td></tr>
+<tr><td> 9</td><td>mips64</td><td>MIPS III a vyšší (varianta <i>big endian</i>)</td></tr>
+<tr><td>10</td><td>mips64le</td><td>MIPS III a vyšší (varianta <i>little endian</i>)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>s390x</td><td>z196 a vyšší</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že u některých
+architektur je nutné dále rozhodnout, jaká konkrétní varianta se má použít.
+Týká se to zejména architektury i386 (možná správněji i586) a taktéž 32bitové
+řady mikroprocesorů s&nbsp;architekturou ARM, která existuje ve více
+verzích.</div></p>
+
+<p>Pro úplnost se ještě zmiňme o kombinaci operačního systému (specifikovaného
+v&nbsp;proměnné prostředí <strong>GOOS</strong>) a mikroprocesorové.
+Podporovány jsou pouze některé kombinace, protože mnoho dalších kombinací
+nedává smysl; typicky v&nbsp;případě procesorů PowerPC a MIPS:</p>
+
+<table>
+<tr><th>$GOOS</th><th>$GOARCH</th></tr>
+<tr><td>aix</td><td>ppc64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>android</td><td>386</td></tr>
+<tr><td>android</td><td>amd64</td></tr>
+<tr><td>android</td><td>arm</td></tr>
+<tr><td>android</td><td>arm64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>darwin</td><td>386</td></tr>
+<tr><td>darwin</td><td>amd64</td></tr>
+<tr><td>darwin</td><td>arm</td></tr>
+<tr><td>darwin</td><td>arm64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>dragonfly</td><td>amd64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>freebsd</td><td>386</td></tr>
+<tr><td>freebsd</td><td>amd64</td></tr>
+<tr><td>freebsd</td><td>arm</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>illumos</td><td>amd64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>js</td><td>wasm</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>linux</td><td>386</td></tr>
+<tr><td>linux</td><td>amd64</td></tr>
+<tr><td>linux</td><td>arm</td></tr>
+<tr><td>linux</td><td>arm64</td></tr>
+<tr><td>linux</td><td>ppc64</td></tr>
+<tr><td>linux</td><td>ppc64le</td></tr>
+<tr><td>linux</td><td>mips</td></tr>
+<tr><td>linux</td><td>mipsle</td></tr>
+<tr><td>linux</td><td>mips64</td></tr>
+<tr><td>linux</td><td>mips64le</td></tr>
+<tr><td>linux</td><td>s390x</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>netbsd</td><td>386</td></tr>
+<tr><td>netbsd</td><td>amd64</td></tr>
+<tr><td>netbsd</td><td>arm</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>openbsd</td><td>386</td></tr>
+<tr><td>openbsd</td><td>amd64</td></tr>
+<tr><td>openbsd</td><td>arm</td></tr>
+<tr><td>openbsd</td><td>arm64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>plan9</td><td>386</td></tr>
+<tr><td>plan9</td><td>amd64</td></tr>
+<tr><td>plan9</td><td>arm</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>solaris</td><td>amd64</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>windows</td><td>386</td></tr>
+<tr><td>windows</td><td>amd64</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: prozatím v&nbsp;Go chybí oficiální <a
+href="https://golang.org/doc/go1.11#riscv">podpora RISC-V</a>, to se však může
+v&nbsp;poměrně krátké době změnit, společně s&nbsp;širším nasazováním této
+architektury v&nbsp;praxi.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Předávání parametrů přes zásobník na architektuře x86-64</h2>
+
+<p>V&nbsp;dnešním článku se budeme zabývat mnoha tématy, které do větší či
+menší míry souvisí s&nbsp;použitím assembleru. První důležitou věcí je způsob
+předávání parametrů přes zásobník na architektuře x86-64. Překladač jazyka Go
+se v&nbsp;tomto případě nemusí příliš ohlížet na jazyk C, takže je možné zvolit
+jiné konvence. Podívejme se nejprve na způsob předávání celočíselných parametrů
+všech podporovaných bitových šířek (8, 16, 32 a 64 bitů). Vše si ověříme na
+čtveřici funkcí, z&nbsp;nichž každá provede součet tří operandů stejné bitové
+šířky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>Add8</strong>(x int8, y int8, z int8) int8 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add16</strong>(x int16, y int16, z int16) int16 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add32</strong>(x int32, y int32, z int32) int32 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add64</strong>(x int64, y int64, z int64) int64 {
+        return x + y + z
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(Add8(1, 2, 3))
+        println(Add16(1, 2, 3))
+        println(Add32(1, 2, 3))
+        println(Add64(1, 2, 3))
+}
+</pre>
+
+<p>Překlad je nutné provést s&nbsp;vypnutým inliningem (jinak by se volání
+funkce nahradilo jejím výsledkem) a taktéž s&nbsp;vypnutou a později zapnutou
+optimalizací (získáte tak dvě varianty kódu):</p>
+
+<pre>
+$ <strong>go build -gcflags '-N -l' asm04.go</strong>
+</pre>
+
+<p>Výsledná sekvence instrukcí pro jednotlivé varianty funkce
+<strong>Add</strong> vypadá následovně:</p>
+
+<pre>
+func <strong>Add8</strong>(x int8, y int8, z int8) int8 {
+  0x44ea70              c644241000              MOVB $0x0, 0x10(SP)
+  0x44ea75              0fb6442409              MOVZX 0x9(SP), AX
+  0x44ea7a              0fb64c2408              MOVZX 0x8(SP), CX
+  0x44ea7f              0fb654240a              MOVZX 0xa(SP), DX
+  0x44ea84              01c8                    ADDL CX, AX
+  0x44ea86              01d0                    ADDL DX, AX
+  0x44ea88              88442410                MOVB AL, 0x10(SP)
+  0x44ea8c              c3                      RET
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že prvních osm bajtů na
+zásobníku (resp.&nbsp;přesněji řečeno zásobníkovém rámci) zabírá návratová
+adresa, za níž následují jednotlivé operandy s&nbsp;offsety +8, +9 a +10.
+Výsledek je uložen na offsetu +16. Jinými slovy to znamená, že se
+v&nbsp;případě parametrů neprovádí zarovnání; výsledek je zarovnán na adresu
+dělitelnou osmi. Provádí se bezznaménkové rozšíření operandů, protože se stejně
+bere v&nbsp;úvahu jen nejnižších osm bitů výsledku.</div></p>
+
+<p>Šestnáctibitové součty:</p>
+
+<pre>
+func <strong>Add16</strong>(x int16, y int16, z int16) int16 {
+  0x44ea90              66c74424100000          MOVW $0x0, 0x10(SP)
+  0x44ea97              0fb744240a              MOVZX 0xa(SP), AX
+  0x44ea9c              0fb74c2408              MOVZX 0x8(SP), CX
+  0x44eaa1              0fb754240c              MOVZX 0xc(SP), DX
+  0x44eaa6              01c8                    ADDL CX, AX
+  0x44eaa8              01d0                    ADDL DX, AX
+  0x44eaaa              6689442410              MOVW AX, 0x10(SP)
+  0x44eaaf              c3                      RET
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: i zde můžeme vidět stejný vzor: offsety
+parametrů na zásobníkovém rámci jsou +8, +10 a +12, ovšem výsledek je již
+zarovnán na adresu dělitelnou osmi.</div></p>
+
+<p>32bitové součty:</p>
+
+<pre>
+func <strong>Add32</strong>(x int32, y int32, z int32) int32 {
+  0x44eab0              c744241800000000        MOVL $0x0, 0x18(SP)
+  0x44eab8              8b442408                MOVL 0x8(SP), AX
+  0x44eabc              0344240c                ADDL 0xc(SP), AX
+  0x44eac0              03442410                ADDL 0x10(SP), AX
+  0x44eac4              89442418                MOVL AX, 0x18(SP)
+  0x44eac8              c3                      RET
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: protože nyní mají parametry šířku čtyř
+bajtů, je offset posledního parametru +16 (0x10) a tudíž se musela návratová
+hodnota posunout na další adresu dělitelnou osmi: +0x18 neboli +24.</div></p>
+
+<p>A konečně varianta 64bitová:</p>
+
+<pre>
+func <strong>Add64</strong>(x int64, y int64, z int64) int64 {
+  0x44ead0              48c744242000000000      MOVQ $0x0, 0x20(SP)
+  0x44ead9              488b442408              MOVQ 0x8(SP), AX
+  0x44eade              4803442410              ADDQ 0x10(SP), AX
+  0x44eae3              4803442418              ADDQ 0x18(SP), AX
+  0x44eae8              4889442420              MOVQ AX, 0x20(SP)
+  0x44eaed              c3                      RET
+</pre>
+
+<p>Zajímavé bude zjistit, jak se pracuje s&nbsp;návratovými hodnotami, kterých
+může být v&nbsp;programovacím jazyce Go větší množství (a u funkcí, které mohou
+skončit s&nbsp;chybou, se jedná o běžný idiom spočívající v&nbsp;použití více
+návratových hodnot). Studovat budeme funkci, která vrátí hodnoty svých
+operandů, ovšem v&nbsp;opačném pořadí:</p>
+
+<pre>
+func <strong>Swap</strong>(x int64, y int64) (int64, int64) {
+        return y, x
+}
+</pre>
+
+<p>Výsledkem by měl být následující strojový kód:</p>
+
+<pre>
+func <strong>Swap</strong>(x int64, y int64) (int64, int64) {
+  0x44ea70              48c744241800000000      MOVQ $0x0, 0x18(SP)
+  0x44ea79              48c744242000000000      MOVQ $0x0, 0x20(SP)
+  0x44ea82              488b442410              MOVQ 0x10(SP), AX
+  0x44ea87              4889442418              MOVQ AX, 0x18(SP)
+  0x44ea8c              488b442408              MOVQ 0x8(SP), AX
+  0x44ea91              4889442420              MOVQ AX, 0x20(SP)
+  0x44ea96              c3                      RET
+</pre>
+
+<p>Struktura zásobníkového rámce je v&nbsp;tomto případě zhruba následující:</p>
+
+<table>
+<tr><th>SP+offset</th><th>Význam</th></tr>
+<tr><td>+0</td><td>návratová adresa</td></tr>
+<tr><td>+8</td><td>první parametr (64 bitů)</td></tr>
+<tr><td>+16</td><td>druhý parametr (64 bitů)</td></tr>
+<tr><td>+24</td><td>první návratová hodnota (64 bitů)</td></tr>
+<tr><td>+32</td><td>druhá návratová hodnota (64 bitů)</td></tr>
+</table>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Malá odbočka &ndash; jména instrukcí a velikost parametrů v&nbsp;assembleru jazyka Go</h2>
+
+<p>Vraťme se na chvíli k&nbsp;implementaci funkce <strong>Add8</strong> a
+<strong>Add16</strong>. V&nbsp;osmibitové variantě této funkce jsme mohli vidět
+trojici instrukcí, které provádí načtení operandů ze zásobníku s&nbsp;jejich
+rozšířením (konverzí) na plnou bitovou šířku (<i>zero extension</i>). Jedná se
+o instrukci <strong>MOVZX</strong>:</p>
+
+<pre>
+  0x44ea75              0fb6442409              MOVZX 0x9(SP), AX
+  0x44ea7a              0fb64c2408              MOVZX 0x8(SP), CX
+  0x44ea7f              0fb654240a              MOVZX 0xa(SP), DX
+</pre>
+
+<p>Ovšem podobnou instrukci bylo možné zahlédnout i v&nbsp;šestnáctibitové
+variantě, což je už na první pohled podivné:</p>
+
+<pre>
+  0x44ea97              0fb744240a              MOVZX 0xa(SP), AX
+  0x44ea9c              0fb74c2408              MOVZX 0x8(SP), CX
+  0x44eaa1              0fb754240c              MOVZX 0xc(SP), DX
+</pre>
+
+<p>Při pozornějším pohledu je však možné zjistit, že kódy instrukcí jsou
+odlišné. Je tedy vhodnější použít &bdquo;lepší&ldquo; disassember, než ten,
+který je nabízený přímo v&nbsp;základních nástrojích programovacího jazyka Go.
+Můžeme například instrukční kódy zkopírovat do webové aplikace dostupné na
+stránce <a
+href="https://defuse.ca/online-x86-assembler.htm#disassembly2">https://defuse.ca/online-x86-assembler.htm#disassembly2</a>
+(do druhého textového pole <i>disassemble</i>) a vybrat architekturu
+x86-64.</p>
+
+<p>Disassemblingem získáme následující instrukce, z&nbsp;nichž je jasně patrné,
+že se pokaždé zpracovávají odlišné operandy, i když disassembler jazyka Go tyto
+&bdquo;maličkosti&ldquo; prozatím nerozlišuje:</p>
+
+<pre>
+0:  0f b6 44 24 09          movzx  eax,BYTE PTR [rsp+0x9]
+5:  0f b6 4c 24 08          movzx  ecx,BYTE PTR [rsp+0x8]
+a:  0f b6 4c 24 08          movzx  ecx,BYTE PTR [rsp+0x8]
+&nbsp;
+f:  0f b7 44 24 0a          movzx  eax,WORD PTR [rsp+0xa]
+14: 0f b7 4c 24 08          movzx  ecx,WORD PTR [rsp+0x8]
+19: 0f b7 4c 24 08          movzx  ecx,WORD PTR [rsp+0x8] 
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Klasický matematický koprocesor i387</h2>
+
+<p>Nyní prozkoumáme způsob překladu této jednoduché funkce:</p>
+
+<pre>
+func <strong>AddFloat64</strong>(x float64, y float64, z float64) float64 {
+        return x + y + z
+}
+</pre>
+
+<p><a href="#k01">V&nbsp;úvodní kapitole</a> jsme se mj.&nbsp;zmínili o tom, že
+při výběru architektury i386 (tedy přesněji řečeno 32bitových mikroprocesorů
+řady i386 resp.&nbsp;i586) je možné zvolit, jakým způsobem se budou překládat
+instrukce pracující s&nbsp;datovými typy <i>float32</i>, <i>float64</i>,
+<i>complex64</i> a <i>complex128</i>. Pro starší typy mikroprocesorů se mohou
+používat instrukce mikroprocesoru i387, pro novější typy pak instrukce SSE nebo
+SSE2. Pokud je z&nbsp;nějakého důvodu nutné podporovat mikroprocesory bez
+podpory SSE a SSE2 (což je již dnes poněkud raritní hardware), lze použít
+proměnnou prostředí pojmenovanou <strong>GO386</strong> s&nbsp;podrobnějším
+nastavením používané architektury:</p>
+
+<pre>
+$ <strong>GOARCH=386 GO386=387 go build -gcflags '-N -l' asm06.go</strong>
+</pre>
+
+<p>Neoptimalizovaná varianta funkce pro součet tří hodnot typu
+<strong>float64</strong> je skutečně velmi dlouhá, i když první čtyři instrukce
+slouží pro práci se zásobníkem:</p>
+
+<pre>
+func <strong>AddFloat64</strong>(x float64, y float64, z float64) float64 {
+  0x808dde0             658b0d00000000          MOVL GS:0, CX
+  0x808dde7             8b89fcffffff            MOVL 0xfffffffc(CX), CX
+  0x808dded             3b6108                  CMPL 0x8(CX), SP
+  0x808ddf0             762f                    JBE 0x808de21
+  0x808ddf2             dd0568f50a08            FLD $f64.0000000000000000(SB)
+  0x808ddf8             d9c0                    FLD F0
+  0x808ddfa             dd5c241c                FSTP 0x1c(SP)
+  0x808ddfe             dd44240c                FLD 0xc(SP)
+  0x808de02             ddd9                    FSTP F1
+  0x808de04             dd442404                FLD 0x4(SP)
+  0x808de08             dd442414                FLD 0x14(SP)
+  0x808de0c             d9c2                    FLD F2
+  0x808de0e             dec2                    FADDP F0, F2
+  0x808de10             d9c0                    FLD F0
+  0x808de12             dec2                    FADDP F0, F2
+  0x808de14             d9c1                    FLD F1
+  0x808de16             dd5c241c                FSTP 0x1c(SP)
+  0x808de1a             ddd8                    FSTP F0
+  0x808de1c             ddd8                    FSTP F0
+  0x808de1e             ddd8                    FSTP F0
+  0x808de20             c3                      RET
+</pre>
+
+<p>Vyzkoušíme si ještě přeložit variantu s&nbsp;optimalizacemi:</p>
+
+<pre>
+$ <strong>GOARCH=386 GO386=387 go build -gcflags '-l' asm06.go</strong>
+</pre>
+
+<p>Výsledek je sice kratší, ale stále má k&nbsp;dobrému kódu velmi daleko (celý
+výpočet lze totiž ve skutečnosti provést jen pěti instrukcemi
+mikroprocesoru):</p>
+
+<pre>
+func <strong>AddFloat64</strong>(x float64, y float64, z float64) float64 {
+  0x808ddd0             658b0d00000000          MOVL GS:0, CX
+  0x808ddd7             8b89fcffffff            MOVL 0xfffffffc(CX), CX
+  0x808dddd             3b6108                  CMPL 0x8(CX), SP
+  0x808dde0             7621                    JBE 0x808de03
+  0x808dde2             dd44240c                FLD 0xc(SP)
+  0x808dde6             dd442404                FLD 0x4(SP)
+  0x808ddea             d9c0                    FLD F0
+  0x808ddec             dec2                    FADDP F0, F2
+  0x808ddee             dd442414                FLD 0x14(SP)
+  0x808ddf2             ddd9                    FSTP F1
+  0x808ddf4             d9c1                    FLD F1
+  0x808ddf6             dec1                    FADDP F0, F1
+  0x808ddf8             d9c0                    FLD F0
+  0x808ddfa             dd5c241c                FSTP 0x1c(SP)
+  0x808ddfe             ddd8                    FSTP F0
+  0x808de00             ddd8                    FSTP F0
+  0x808de02             c3                      RET
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;nějakého důvodu je výsledek
+překladu pro i387 prakticky vždy velmi špatný, takže volbu
+<strong>GO386=387</strong> používejte skutečně jen tehdy, pokud je to
+nezbytné.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Technologie SSE/SSE2 a její využití překladačem programovacího jazyka Go</h2>
+
+<p>U procesorů řady x86 se prakticky kontinuálně provádí rozšiřování instrukční
+sady. Po úspěšném a relativně bezproblémovém zavedení rozšíření <i>MMX</i> i
+<i>3DNow!</i> do praxe není divu, že obě nejvýznamnější společnosti podnikající
+v&nbsp;oblasti návrhu a prodeje mikroprocesorů patřících do rodiny <i>x86</i>,
+tj.&nbsp;firmy <i>Intel</i> a <i>AMD</i>, začaly pro tyto typy mikroprocesorů
+navrhovat i další rozšiřující instrukční sady s&nbsp;&bdquo;vektorovými&ldquo;
+instrukcemi typu <i>SIMD</i>. V&nbsp;následující tabulce jsou tyto rozšiřující
+instrukční sady vypsány, včetně roku vzniku dané technologie i informace o tom,
+v&nbsp;jakém mikroprocesoru byla ta která technologie zpočátku využita:</p>
+
+<table>
+<tr><th>Název technologie</th><th>Společnost</th><th>Rok uvedení</th><th>Poprvé použito v&nbsp;čipu</th></tr>
+<tr><td>MMX   </td><td>Intel    </td><td>1996 </td><td>Intel Pentium P5</td></tr>
+<tr><td>3DNow!</td><td>AMD      </td><td>1998 </td><td>AMD K6-2</td></tr>
+<tr><td>SSE   </td><td>Intel    </td><td>1999 </td><td>Intel Pentium III (mikroarchitektura P6)</td></tr>
+<tr><td>SSE2  </td><td>Intel    </td><td>2001 </td><td>Intel Pentium 4 (mikroarchitektura NetBurst)</td></tr>
+<tr><td>SSE3  </td><td>Intel    </td><td>2004 </td><td>Intel Pentium 4 (Prescott)</td></tr>
+<tr><td>SSSE3 </td><td>Intel    </td><td>2006 </td><td>mikroarchitektura Intel Core</td></tr>
+<tr><td>SSE4  </td><td>Intel+AMD</td><td>2006 </td><td>AMD K10 (SSE4a) , mikroarchitektura Intel Core</td></tr>
+<tr><td>XOP   </td><td>AMD      </td><td>2011?</td><td>založeno na SSE5</td></tr>
+<tr><td>CVT16 </td><td>AMD      </td><td>2011?</td><td>založeno na SSE5</td></tr>
+<tr><td>AVX   </td><td>Intel+AMD</td><td>2013?</td><td>rozšíření SSE registrů na 256 bitů, celkem 32 registrů</td></tr>
+</table>
+
+<img src="http://i.iinfo.cz/images/503/pc160-1.jpg" width="400" height="365" alt="&#160;" />
+<p><i>Obrázek 1: Intel Xeon 5600 je zástupcem mikroprocesorů určených pro
+oblast serverů. Samozřejmě taktéž podporuje SIMD operace: MMX, SSE, SSE2, SSE3,
+SSSE3, SSE4.1, SSE4.2</i></p>
+
+<p>Překladač i assembler jazyka Go podporuje prakticky všechny instrukce SSE i
+SSE2. Další způsoby a ruční (!) optimalizace budou popsány příště.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Nové registry SSE</h2>
+
+<p>Nejprve se zaměřme na registry využívané v&nbsp;technologii <i>SSE</i>. U
+mikroprocesorů implementujících instrukční sadu <i>SSE</i> je využita nová sada
+registrů pojmenovaných <strong>XMM0</strong> až <strong>XMM7</strong>. Na
+64bitové platformě (architektura AMD 64) navíc došlo k&nbsp;přidání dalších
+osmi registrů se jmény <strong>XMM8</strong> až <strong>XMM15</strong>
+využitelných pouze v&nbsp;64bitovém režimu. Všechny nové registry mají šířku
+128 bitů, tj.&nbsp;jsou dvakrát širší, než registry používané v&nbsp;<i>MMX</i>
+i <i>3DNow!</i> a čtyřikrát širší, než běžné pracovní registry na platformě
+<i>x86</i> (bavíme se o 32bitovém režimu). Do každého registru je možné uložit
+čtveřici reálných numerických hodnot reprezentovaných v&nbsp;systému plovoucí
+řádové tečky podle normy <i>IEEE 754</i>, přičemž tato norma je dodržována
+přesněji, než v&nbsp;případě <i>3DNow!</i> (různé zaokrouhlovací režimy či
+práce s&nbsp;denormalizovanými čísly sice mohou vypadat trošku jako černá
+magie, ovšem například v&nbsp;knihovnách pro numerické výpočty, které musí vždy
+za specifikovaných okolností dát stejný výsledek, se jedná o velmi důležitou
+vlastnost). K&nbsp;osmi či šestnácti novým registrům <strong>XMM*</strong> byl
+ještě přidán jeden 32bitový registr nazvaný <strong>MXCSR</strong>, jenž byl
+určený pro nastavení (řízení) režimů výpočtu.</p>
+
+<img src="http://i.iinfo.cz/images/503/pc160-3.jpg" width="220" height="194" alt="&#160;" />
+<p><i>Obrázek 2: Sada nových pracovních registrů přidaných v&nbsp;rámci
+SSE.</i></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Příklad využití SSE</h2>
+
+<p>Zajímavá je podpora jak skalárních operací, tak i operací vektorových
+v&nbsp;instrukční sadě <i>SSE</i>. Příkladem může být například skalární
+instrukce součtu <strong>ADDSS</strong> (SS=single scalar), která může mít
+dvojí podobu:</p>
+
+<pre>
+ADDSS xmm1, xmm2     ; instrukce pracující s dvojicí registrů SSE
+ADDSS xmm1, mem32    ; instrukce pracující s registrem SSE a paměťovým místem (32 bitů)
+</pre>
+
+<p>Vraťme se nyní k&nbsp;dvojici funkcí pro součet trojice hodnot
+s&nbsp;plovoucí řádovou čárkou:</p>
+
+<pre>
+func <strong>AddFloat32</strong>(x float32, y float32, z float32) float32 {
+        return x + y + z
+}
+&nbsp;
+func <strong>AddFloat64</strong>(x float64, y float64, z float64) float64 {
+        return x + y + z
+}
+</pre>
+
+<p>Překlad založený na instrukcích SSE (ovšem nutno podotknout instrukcích
+&bdquo;nevektorových&ldquo;) je již oproti variantě určené pro i387 mnohem
+čitelnější, kratší a ve výsledku i rychlejší:</p>
+
+<pre>
+func <strong>AddFloat32</strong>(x float32, y float32, z float32) float32 {
+  0x44ea70              0f57c0                  XORPS X0, X0
+  0x44ea73              f30f11442418            MOVSS X0, 0x18(SP)
+  0x44ea79              f30f10442408            MOVSS 0x8(SP), X0
+  0x44ea7f              f30f5844240c            ADDSS 0xc(SP), X0
+  0x44ea85              f30f58442410            ADDSS 0x10(SP), X0
+  0x44ea8b              f30f11442418            MOVSS X0, 0x18(SP)
+  0x44ea91              c3                      RET
+&nbsp;
+func <strong>AddFloat64</strong>(x float64, y float64, z float64) float64 {
+  0x44eaa0              0f57c0                  XORPS X0, X0
+  0x44eaa3              f20f11442420            MOVSD_XMM X0, 0x20(SP)
+  0x44eaa9              f20f10442408            MOVSD_XMM 0x8(SP), X0
+  0x44eaaf              f20f58442410            ADDSD 0x10(SP), X0
+  0x44eab5              f20f58442418            ADDSD 0x18(SP), X0
+  0x44eabb              f20f11442420            MOVSD_XMM X0, 0x20(SP)
+  0x44eac1              c3                      RET
+</pre>
+
+<p>Obě varianty, jak pro typ <i>float32/float</i>, tak i pro typ
+<i>float64/double</i> jsou sémanticky totožné. Odlišují se pochopitelně offsety
+parametrů ukládaných na zásobníkový rámec a taktéž tím, že v&nbsp;64bitové
+variantě se používají funkce _XMM. Zajímavé taktéž je, že si zde překladač
+vystačil s&nbsp;jediným 32bitovým popř.&nbsp;64bitovým registrem
+<strong>X0</strong>.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Práce s&nbsp;poli a řezy (slices)</h2>
+
+<p>Do funkcí je pochopitelně možné předávat i další parametry, například (což
+je zcela typické) řezy. Příklad použití řezů může vypadat následovně:</p>
+
+<pre>
+func <strong>Sum</strong>(values []int) int {
+        sum := 0
+        for _, v := range values {
+                sum += v
+        }
+        return sum
+}
+</pre>
+
+<p>Připomeňme si, že řez je tvořen trojicí &ndash; ukazatel, délka a kapacita
+řezu. Používá se takto:</p>
+
+<pre>
+        for _, v := range values {
+  0x44ea70              488b442408              MOVQ 0x8(SP), AX        
+  0x44ea75              488b4c2410              MOVQ 0x10(SP), CX       
+  0x44ea7a              31d2                    XORL DX, DX             
+  0x44ea7c              31db                    XORL BX, BX             
+  0x44ea7e              eb0a                    JMP 0x44ea8a            
+  0x44ea80              488b34d0                MOVQ 0(AX)(DX*8), SI    
+  0x44ea84              48ffc2                  INCQ DX                 
+                sum += v
+  0x44ea87              4801f3                  ADDQ SI, BX             
+        for _, v := range values {
+  0x44ea8a              4839ca                  CMPQ CX, DX             
+  0x44ea8d              7cf1                    JL 0x44ea80             
+        return sum
+  0x44ea8f              48895c2420              MOVQ BX, 0x20(SP)       
+  0x44ea94              c3                      RET                     
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: práce s&nbsp;řezy je tak důležitá, že se
+jimi budeme podrobněji zabývat příště.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Podpora 32bitových mikroprocesorů ARM</h2>
+
+<p>Ve druhé části dnešního článku se ve stručnosti seznámíme s&nbsp;podporou
+32bitových mikroprocesorů ARM překladačem a assemblerem programovacího jazyka
+Go. V&nbsp;následující tabulce jsou vypsány kombinace proměnných prostředí
+<strong>GOARCH</strong> a <strong>GOARM</strong>:</p>
+
+<table>
+<tr><th>Architektura</th><th>Stav</th><th>GOARM</th><th>GOARCH</th></tr>
+<tr><td>ARMv4 a nižší</td><td>není podporováno</td><td>n/a</td><td>n/a</td></tr>
+<tr><td>ARMv5</td><td>podporováno</td><td>GOARM=5</td><td>GOARCH=arm</td></tr>
+<tr><td>ARMv6</td><td>podporováno</td><td>GOARM=6</td><td>GOARCH=arm</td></tr>
+<tr><td>ARMv7</td><td>podporováno</td><td>GOARM=7</td><td>GOARCH=arm</td></tr>
+<tr><td>ARMv8</td><td>podporováno</td><td>n/a</td><td>GOARCH=arm64</td></tr>
+</table>
+
+<p>Z&nbsp;tabulky je patrné, že rozhodnutí mezi 32bitovými ARMy a 64bitovou
+architekturou AArch64 je provedeno na základě proměnné prostředí
+<strong>GOARCH</strong>. Obsahem proměnné <strong>GOARM</strong> se specifikuje
+verze 32bitových mikroprocesorů a mikrořadičů ARM.</p>
+
+<p><div class="rs-tip-major">Poznámka: existuje i alternativní projekt nazvaný
+<a href="https://github.com/tinygo-org/tinygo">tinygo</a>, který podporuje
+další typy mikroprocesorů a především mikrořadičů postavených nad různými jádry
+ARM. Tímto projektem se budeme zabývat v&nbsp;samostatném článku.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Specifika architektury ARM</h2>
+
+<p>V&nbsp;klasické architektuře ARM se používá 16 pracovních registrů, každý o
+šířce 32bitů, přičemž poslední tři registry mívají speciální význam: ukazatel
+na vrchol zásobníku, link register (návratová adresa z&nbsp;procedury) a
+programový čítač. Kvůli konstantní šířce všech instrukcí může být problematické
+uložení konstanty či adresy do některého pracovního registru. Problém je to
+logický a vlastně shodný pro všechny &bdquo;klasické&ldquo; RISCové
+mikroprocesory: šířka pracovních registrů je 32 bitů a současně je šířka
+instrukcí taktéž 32 bitů, tudíž není možné, aby se v&nbsp;instrukci vedle
+operačního kódu nacházela i 32 bitová konstanta. Tvůrci dalších RISCových
+mikroprocesorů se s&nbsp;touto problematikou snažili vypořádat různým způsobem,
+například zavedli speciální instrukci pro naplnění horních šestnácti bitů
+registru, zatímco pro naplnění spodních šestnácti bitů bylo možné použít
+například instrukci <strong>ADD</strong> s&nbsp;konstantou a nulovým registrem
+<i>R0</i> (zhruba takovýmto způsobem je tato problematika řešena na
+mikroprocesorech <i>MIPS</i>). U mikroprocesorů ARM se zdá, že jeho
+konstruktéři nechtěli &bdquo;obětovat&ldquo; další tranzistory na podobné typy
+instrukcí, takže se pro načtení konstanty používá dvojice instrukcí se stejným
+formátem, jako mají ostatní aritmetické a logické instrukce:</p>
+
+<table>
+<tr><th>#</th><th>Instrukce</th><th>Význam</th></tr>
+<tr><td>1</td><td>MOV</td><td>načtení osmibitové konstanty 0..255</td></tr>
+<tr><td>2</td><td>MVN</td><td>načtení osmibitové konstanty s&nbsp;negací -1..-256</td></tr>
+</table>
+
+<p>To je samozřejmě pro mnoho účelů zcela nedostatečné, ovšem ve skutečnosti je
+možné tuto konstantu pomocí <i>barrel shifteru</i> posunout o sudý počet míst
+0, 2, 4, .. 30, takže se ve skutečnosti celkový počet konstant zvyšuje na
+hodnotu 8192 z&nbsp;celkového množství kombinací 2<sup>32</sup>. Aby
+programátoři mohli relativně snadno načíst <strong>libovolnou</strong>
+konstantu do zvoleného registru, nabízí většina assemblerů pro mikroprocesory
+<i>ARM</i> pseudoinstrukci <strong>LDR</strong> ve tvaru:</p>
+
+<pre>
+LDR Rx, =konstanta
+</pre>
+
+<p>Podle hodnoty použité konstanty se tato instrukce buď převede na instrukci
+<strong>MOV</strong>, alternativně <strong>MVN</strong>, nebo na instrukci
+<strong>LDR</strong> načítající konstantu uloženou někde v&nbsp;programovém
+kódu (například za tělem subrutiny, kde lze vyhradit prostor pomocí direktivy
+LTORG). Tato konstanta je potom adresována relativně k&nbsp;hodnotě registru
+<i>PC</i>, pouze je nutné dát pozor na to, že offset pro relativní adresování
+má pouze dvanáct bitů, takže tato konstanta nemůže být uložena příliš
+&bdquo;daleko&ldquo; (na to ostatně upozorní assembler).</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Překlad funkcí pro součet svých operandů</h2>
+
+<p>Otestujme si tedy způsob překladu funkcí pro součet svých parametrů do
+strojového kódu 32bitových mikroprocesorů ARM:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>Add8</strong>(x int8, y int8, z int8) int8 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add16</strong>(x int16, y int16, z int16) int16 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add32</strong>(x int32, y int32, z int32) int32 {
+        return x + y + z
+}
+&nbsp;
+func <strong>Add64</strong>(x int64, y int64, z int64) int64 {
+        return x + y + z
+}
+</pre>
+
+<p>Překlad bude proveden tímto příkazem:</p>
+
+<pre>
+$ <strong>GOARCH=arm GOARM=5 go build -gcflags '-l' asm04.go</strong>
+</pre>
+
+<p>Disasembling zajistí příkaz:</p>
+
+<pre>
+$ <strong>go tool objdump -S -s main.Add asm04</strong>
+</pre>
+
+<p>V&nbsp;osmibitové variantě můžeme vidět, že operandy leží na offsetech +4,
++5 a +6, protože návratová adresa má šířku jen čtyři bajty. O načtení bajtu
+s&nbsp;jeho rozšířením na celých 32bitů se stará instrukce
+<strong>MOVBS</strong>:</p>
+
+<pre>
+TEXT main.Add8(SB) /home/tester/go-root/article_54/asm04.go
+func <strong>Add8</strong>(x int8, y int8, z int8) int8 {
+  0x5e794               e1dd00d5                MOVBS 0x5(R13), R0
+  0x5e798               e1dd10d4                MOVBS 0x4(R13), R1
+  0x5e79c               e0800001                ADD R1, R0, R0
+  0x5e7a0               e1dd10d6                MOVBS 0x6(R13), R1
+  0x5e7a4               e0810000                ADD R0, R1, R0
+  0x5e7a8               e5cd0008                MOVB R0, 0x8(R13)
+  0x5e7ac               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poslední instrukce je obdobou instrukce
+<strong>RET</strong>, protože se zde přenáší hodnota z&nbsp;registru R14
+(<i>link register</i>) do registru R15 (<i>program counter</i>).</div></p>
+
+<p>Šestnáctibitová varianta používá offsety parametrů +4, +6 a +8 a znaménkové
+rozšíření ze šestnácti bitů na plných 32bitů se stará instrukce
+<strong>MOVHS</strong>:</p>
+
+<pre>
+TEXT main.Add16(SB) /home/tester/go-root/article_54/asm04.go
+func <strong>Add16</strong>(x int16, y int16, z int16) int16 {
+  0x5e7b0               e1dd00f6                MOVHS 0x6(R13), R0
+  0x5e7b4               e1dd10f4                MOVHS 0x4(R13), R1
+  0x5e7b8               e0800001                ADD R1, R0, R0
+  0x5e7bc               e1dd10f8                MOVHS 0x8(R13), R1
+  0x5e7c0               e0810000                ADD R0, R1, R0
+  0x5e7c4               e1cd00bc                MOVH R0, 0xc(R13)
+  0x5e7c8               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p>Následuje 32bitová varianta, v&nbsp;níž se (podle očekávání) neprovádí
+znaménkové rozšíření parametrů, neboť všechny výpočty probíhají přímo
+v&nbsp;32bitovém režimu, tedy nativním režimu těchto mikroprocesorů:</p>
+
+<pre>
+TEXT main.Add32(SB) /home/tester/go-root/article_54/asm04.go
+func <strong>Add32</strong>(x int32, y int32, z int32) int32 {
+  0x5e7cc               e59d0008                MOVW 0x8(R13), R0
+  0x5e7d0               e59d1004                MOVW 0x4(R13), R1
+  0x5e7d4               e0800001                ADD R1, R0, R0
+  0x5e7d8               e59d100c                MOVW 0xc(R13), R1
+  0x5e7dc               e0810000                ADD R0, R1, R0
+  0x5e7e0               e58d0010                MOVW R0, 0x10(R13)
+  0x5e7e4               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p>A konečně se podívejme na variantu 64bitovou. Ta je (na rozdíl od
+architektury x86-64) složitější, z&nbsp;toho prostého důvodů, že 64bitový
+součet je nutné na 32bitové architektuře provádět postupně &ndash; od nižší
+poloviny operandů k&nbsp;vyšší polovině (zde je nutné brát v&nbsp;potaz i
+přenos uložený do příznaku <i>carry</i>):</p>
+
+<pre>
+TEXT main.Add64(SB) /home/tester/go-root/article_54/asm04.go
+func <strong>Add64</strong>(x int64, y int64, z int64) int64 {
+  0x5e7e8               e59d0004                MOVW 0x4(R13), R0
+  0x5e7ec               e59d100c                MOVW 0xc(R13), R1
+  0x5e7f0               e0902001                ADD.S R1, R0, R2
+  0x5e7f4               e59d3014                MOVW 0x14(R13), R3
+  0x5e7f8               e0924003                ADD.S R3, R2, R4
+  0x5e7fc               e58d401c                MOVW R4, 0x1c(R13)
+  0x5e800               e0900001                ADD.S R1, R0, R0
+  0x5e804               e59d0008                MOVW 0x8(R13), R0
+  0x5e808               e59d1010                MOVW 0x10(R13), R1
+  0x5e80c               e0a00001                ADC R1, R0, R0
+  0x5e810               e0921003                ADD.S R3, R2, R1
+  0x5e814               e59d1018                MOVW 0x18(R13), R1
+  0x5e818               e0a10000                ADC R0, R1, R0
+  0x5e81c               e58d0020                MOVW R0, 0x20(R13)
+  0x5e820               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: varianta instrukce
+<strong>ADD.S</strong> nastavuje příznakové bity.</div></p>
+
+<p>Výše uvedenou sekvenci instrukcí bude vhodné okomentovat:</p>
+
+<pre>
+MOVW     x.low, R0
+MOVW     y.low, R1
+ADD.S    R1, R0, R2       <i>// R2=mezisoučet x.low + y.low</i>
+MOVW     z.low, R3
+ADD.S    R3, R2, R4       <i>// R4=mezisoučet x.low + y.low + z.low</i>
+MOVW     R4, result.low   <i>// uložení spodních 32bitů výsledku</i>
+&nbsp;
+ADD.S    R1, R0, R0       <i>// nastavení příznaků při mezisoučtu x.low + y.low</i>
+MOVW     x.high, R0
+MOVW     y.high, R1
+ADC      R1, R0, R0       <i>// R0=mezisoučet x.high + y.high + přetečení z x.low + y.low</i>
+ADD.S    R3, R2, R1       <i>// nastavení příznaků při mezisoučtu všech nižších slov</i>
+MOVW     z.high, R1
+ADC      R0, R1, R0       <i>// přičtení z.high k mezivýsledku + carry</i>
+MOVW     R0, result.high  <i>// uložení horních 32bitů výsledku</i>
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Podpora výpočtů s&nbsp;typy <i>float32</i> a <i>float64</i> na mikroprocesorech ARM</h2>
+
+<p>Některé čipy ARM nemají matematický koprocesor. V&nbsp;takovém případě se
+výpočty s&nbsp;typy <i>float32</i> a <i>float64</i> provádí softwarově
+(&bdquo;armel&ldquo;). Čipy, které mají matematický koprocesor, se někdy
+označují &bdquo;armhf&ldquo; (typicky ARMv6 a vyšší). Podívejme se na překlad
+funkcí <strong>AddFloat32</strong> a <strong>AddFloat64</strong> pro ty čipy
+ARM, které matematický koprocesor mají:</p>
+
+<pre>
+$ <strong>GOARCH=arm GOARM=6 go build -gcflags '-l' asm06.go</strong>
+</pre>
+
+<p>Získání vygenerované sekvence instrukcí:</p>
+
+<pre>
+$ <strong>go tool objdump -S -s main.Add asm06</strong>
+</pre>
+
+<pre>
+TEXT main.<strong>AddFloat32</strong>(SB) /home/tester/go-root/article_54/asm06.go
+        return x + y + z
+  0x5b854               ed9d0a02                MOVF 0x8(R13), F0
+  0x5b858               ed9d1a01                MOVF 0x4(R13), F1
+  0x5b85c               ee300a01                ADDF F1, F0, F0
+  0x5b860               ed9d1a03                MOVF 0xc(R13), F1
+  0x5b864               ee310a00                ADDF F0, F1, F0
+  0x5b868               ed8d0a04                MOVF F0, 0x10(R13)
+  0x5b86c               e28ef000                ADD $0, R14, R15
+&nbsp;
+TEXT main.<strong>AddFloat64</strong>(SB) /home/tester/go-root/article_54/asm06.go
+        return x + y + z
+  0x5b870               ed9d0b03                MOVD 0xc(R13), F0
+  0x5b874               ed9d1b01                MOVD 0x4(R13), F1
+  0x5b878               ee300b01                ADDD F1, F0, F0
+  0x5b87c               ed9d1b05                MOVD 0x14(R13), F1
+  0x5b880               ee310b00                ADDD F0, F1, F0
+  0x5b884               ed8d0b07                MOVD F0, 0x1c(R13)
+  0x5b888               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p>Překlad je v&nbsp;tomto případě přímočarý &ndash; používají se FPU registry
+F0 a F1, instrukce mají koncovku &bdquo;F&ldquo; pro typ <i>float32</i> a
+&bdquo;D&ldquo; pro typ <i>float64</i>.</p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Podmíněné a nepodmíněné skoky jako základ pro realizaci rozvětvení a programových smyček</h2>
+
+<p>Velmi důležitým typem strojových instrukcí, které v&nbsp;různé podobě
+najdeme prakticky u všech modelů mikroprocesorů (resp.&nbsp;přesněji řečeno u
+mikroprocesorů všech dnes rozšířených mikroprocesorových architektur), jsou
+instrukce provádějící skoky na nějakou adresu v&nbsp;operační paměti.
+Implementace skoku není, alespoň na první pohled a u jednodušších architektur
+bez instrukční pipeline, vlastně nijak složitá, protože se v&nbsp;případě
+použití <i>absolutní adresy</i> dosadí hodnota z&nbsp;operačního kódu instrukce
+do registru <i>PC</i> a v&nbsp;případě použití <i>relativní adresy</i> se tato
+hodnota (nazývaná někdy poněkud nepřesně <i>offset</i>) přičte k&nbsp;aktuální
+hodnotě registru <i>PC</i>. Relativní adresa je v&nbsp;tomto případě
+v&nbsp;kódu instrukce uložena se znaménkem, proto se skok může provést dozadu i
+dopředu (ostatně právě použití relativní adresy uvidíme v&nbsp;dále
+popisovaných demonstračních příkladech).</p>
+
+<p>Skoky většinou dělíme podle jednoho kritéria (formy zápisu adresy) na
+<i>absolutní</i> a <i>relativní</i> a podle kritéria druhého (za jakým
+okolností se skok provede) na skoky <i>podmíněné</i> a <i>nepodmíněné</i>.
+V&nbsp;závislosti na použité instrukční sadě jsou možné různé kombinace,
+typicky však u většiny mikroprocesorů nalezneme kombinace nepodmíněný absolutní
+skok, nepodmíněný relativní skok a podmíněný relativní skok. Skoky nepodmíněné
+jsou jednodušší a svou podstatou odpovídají příkazu <strong>goto</strong>
+známého z&nbsp;některých programovacích jazyků (včetně Go!) a také z&nbsp;mnoha
+článků, ve kterých autoři mnohdy bez hlubšího zamyšlení se nad původní
+myšlenkou opakují, že by se <strong>goto</strong> nemělo při strukturovaném
+programování používat :-). V&nbsp;assembleru se však skoky vesele používají,
+neboť právě pomocí nich se vytváří základní konstrukce strukturovaného
+programování &ndash; podmínky a programové smyčky.</p>
+
+<p>Využití podmínek a podmíněných skoků budeme testovat na následujícím kódu
+&ndash; implementaci funkce typu <i>Sign/Sgn</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>Sign</strong>(value int) int {
+        if value &lt; 0 {
+                return -1
+        } else if value &gt; 0 {
+                return 1
+        } else {
+                return 0
+        }
+
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(Sign(-100))
+        println(Sign(100))
+        println(Sign(0))
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Strojové instrukce určené pro provedení skoku na architekturách i386 a x86_64</h2>
+
+<p>U architektury mikroprocesorů 32bitové řady i386 a taktéž 64bitové řady
+x86-64 je základní strojovou instrukcí určenou pro provedení <i>nepodmíněného
+skoku</i> instrukce nazvaná jednoduše a přímočaře <strong>JMP</strong> (což je,
+jak jste zajisté zjistili, mnemotechnická zkratka slova <i>jump</i>).
+V&nbsp;assembleru většinou za mnemotechnickou zkratkou jména instrukce
+následuje návěští (<i>label</i>), z&nbsp;něhož assembler odvodí reálnou
+adresu.</p>
+
+<p>Alternativně je možné použít i další způsoby adresování, čímž se například
+implementuje tabulka skoků (jedna z&nbsp;možných realizací stavového automatu)
+atd., ovšem tyto techniky pro účely dnešního článku prozatím nepotřebujeme
+znát. Mnohem zajímavější jsou <i>podmíněné skoky</i>, které se při programování
+v&nbsp;assembleru či ve strojovém kódu používají pro implementaci programových
+smyček <strong>while</strong>, <strong>do-while</strong>, <strong>for</strong>
+a taktéž konstrukcí typu <strong>if-then-else</strong> atd. Podmíněný skok je
+proveden či naopak neproveden na základě nějaké podmínky. Vzhledem k&nbsp;tomu,
+že pracujeme na té nejnižší programové úrovni, tj.&nbsp;na úrovni strojových
+instrukcí, není samozřejmě možné podmínku definovat nějakým složitým a
+sofistikovaným způsobem &ndash; musí se jednat o operaci, kterou mikroprocesor
+dokáže jednoduše a především dostatečně rychle zpracovat (i přesto představují
+skoky úzké místo v&nbsp;programech).</p>
+
+<p>Z&nbsp;tohoto prostého důvodu &ndash; podmínky musí být realizovány
+dostatečně jednoduchým způsobem pro snadnou implementaci na čipu &ndash; jsou
+na mikroprocesorových architekturách i386 a x86-64 podmínky založeny na
+testování jednoho z&nbsp;takzvaných příznakových bitů, negací těchto bitů či
+dokonce jejich kombinací. Pokud z&nbsp;důvodu zjednodušení výkladu celé
+relativně rozsáhlé problematiky budeme ignorovat některé speciálnější příznaky
+a především pak rozdíly mezi hodnotami bez znaménka (unsigned) a se znaménkem
+(signed), můžeme zpočátku použít především příznaky nazvané <strong>Carry
+flag</strong>, <strong>Sign flag</strong> a <strong>Zero flag</strong>,
+tj.&nbsp;<i>příznak přenosu</i>, <i>příznak záporného výsledku</i> a <i>příznak
+nulovosti</i>. Význam těchto příznakových bitů se shrnut v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th>Příznak</th><th>Význam zkratky</th><th>Poznámka</th></tr>
+<tr><td>ZF</td><td>zero flag</td><td>výsledek předchozí operace je nulový</td></tr>
+<tr><td>CF</td><td>carry flag</td><td>přenos (bezznaménková aritmetika)</td></tr>
+<tr><td>SF</td><td>sign flag</td><td>výsledek je záporný (nastaven nejvyšší bit bajtu či slova)</td></tr>
+</table>
+
+<p>Strojové instrukce určené pro provedení podmíněných skoků jsou ve své
+základní variantě (existují pro ně totiž i jmenné aliasy zmíněné níže)
+pojmenovány jednoduše a přímočaře &ndash; začínají písmenem <strong>J</strong>
+(jump), za nímž následuje volitelné písmeno <strong>N</strong> (negace) a
+jednoznaková zkratka příznaku. Instrukce <strong>JNC</strong> tedy znamená
+&bdquo;proveď skok, pokud příznak Carry není nastaven&ldquo;, zatímco instrukce
+<strong>JZ</strong> znamená &bdquo;proveď skok pouze při nastavení příznaku
+Zero&ldquo;:</p>
+
+<table>
+<tr><th>Mnemotechnická zkratka instrukce</th><th>Význam instrukce podmíněného skoku</th></tr>
+<tr><td>JC </td><td>podmíněný skok za předpokladu, že je nastaven příznak přenosu (<strong>Carry flag</strong>)</td></tr>
+<tr><td>JNC</td><td>podmíněný skok za předpokladu, že je vynulován příznak přenosu (<strong>Carry flag</strong>)</td></tr>
+<tr><td>JZ </td><td>podmíněný skok za předpokladu, že je nastaven příznak nulovosti (<strong>Zero flag</strong>)</td></tr>
+<tr><td>JNZ</td><td>podmíněný skok za předpokladu, že je vynulován příznak nulovosti (<strong>Zero flag</strong>)</td></tr>
+<tr><td>JS </td><td>podmíněný skok za předpokladu, že je nastaven příznak záporného výsledku (<strong>Sign flag</strong>)</td></tr>
+<tr><td>JNS</td><td>podmíněný skok za předpokladu, že je vynulován příznak záporného výsledku (<strong>Sign flag</strong>)</td></tr>
+</table>
+
+<p>Jmenné aliasy podporované většinou assemblerů:</p>
+
+<table>
+<tr><th>Instrukce</th><th>Alias</th></tr>
+<tr><td>JZ </td><td>JE </td></tr>
+<tr><td>JNZ</td><td>JNE</td></tr>
+<tr><td>JC </td><td>JB, JNAE</td></tr>
+<tr><td>JNC</td><td>JNB, JAE</td></tr>
+<tr><td>JS </td><td>nemá alias</td></tr>
+<tr><td>JNS</td><td>nemá alias</td></tr>
+</table>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Překlad funkce <strong>Sign</strong> pro architekturu x86-64</h2>
+
+<p>Podívejme se nyní na způsob překladu funkce <i>Sign</i> pro 64bitovou
+architekturu x86-64. Překlad se provede příkazem:</p>
+
+<pre>
+$ <strong>go build -gcflags '-l' asm08.go</strong>
+</pre>
+
+<p>Výpis strojových instrukcí pro funkci <i>Sign</i> příkazem:</p>
+<pre>
+$ <strong>go tool objdump -S -s main.Sign asm08</strong>
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+TEXT main.Sign(SB) /home/tester/go-root/article_54/asm08.go
+        if value &lt; 0 {
+  0x44ea70              488b442408              MOVQ 0x8(SP), AX
+  0x44ea75              4885c0                  TESTQ AX, AX
+  0x44ea78              7c16                    JL 0x44ea90
+        } else if value &gt; 0 {
+  0x44ea7a              7e0a                    JLE 0x44ea86
+                return 1
+  0x44ea7c              48c744241001000000      MOVQ $0x1, 0x10(SP)
+  0x44ea85              c3                      RET
+                return 0
+  0x44ea86              48c744241000000000      MOVQ $0x0, 0x10(SP)
+  0x44ea8f              c3                      RET
+                return -1
+  0x44ea90              48c7442410ffffffff      MOVQ $-0x1, 0x10(SP)
+  0x44ea99              c3                      RET
+</pre>
+
+<p>Můžeme zde vidět kombinaci testu (nastavuje příznakové bity) a podmíněného
+skoku:</p>
+
+<pre>
+TESTQ AX, AX
+JL ...
+</pre>
+
+<p>a:</p>
+
+<pre>
+TESTQ AX, AX
+JLE ...
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Příznakové a stavové bity na mikroprocesorech s&nbsp;architekturou ARM</h2>
+
+<p>Nyní se již můžeme zabývat populární architekturou ARM. Kromě patnácti
+32bitových pracovních registrů a programového čítače obsahují mikroprocesory
+s&nbsp;touto architekturou i registry, v&nbsp;nichž se uchovávají různé
+příznaky. V&nbsp;uživatelském režimu se pracuje s&nbsp;příznaky uloženými
+v&nbsp;registru nazvaném <strong>CPSR</strong> (<i>Current Program Status
+Register</i>) a pro každý další režim existuje navíc zvláštní registr nazvaný
+<strong>SPSR</strong> (<i>Saved Program Status Register</i>), v&nbsp;němž jsou
+uchovány původní příznaky ze <strong>CPSR</strong>. Podobně jako všechny
+pracovní registry, mají i registry <strong>CPSR</strong> a
+<strong>SPSR</strong> shodnou šířku 32 bitů, což má svoje výhody. Mimo jiné i
+to, že šířka 32 bitů ponechala konstruktérům procesorů ARM mnoho prostoru pro
+uložení různých důležitých informací do registrů <strong>CPSR/SPSR</strong>,
+takže se nemuseli uchylovat k&nbsp;nepříliš promyšleným technikám známým
+například z&nbsp;platformy x86, kde se původně šestnáctibitový registr
+<strong>FLAGS</strong> (<i>8086</i>) postupně změnil na 32bitový registr
+<strong>EFLAGS</strong> (<i>80386</i>), vedle něho vznikl registr
+<strong>MSW</strong> (<i>80286</i>) rozšířený na <strong>CR0</strong> atd.</p>
+
+<p>Ve výše zmíněných stavových registrech <strong>CPSR/SPSR</strong>
+mikroprocesorů ARM jsou uloženy především příznakové bity nastavované
+aritmeticko-logickou jednotkou při provádění základních aritmetických instrukcí
+či bitových operací, dále pak bity určující, jakou instrukční sadu
+mikroprocesor v&nbsp;daný okamžik zpracovává (<i>ARM</i>, <i>Thumb</i>,
+<i>Jazelle</i>), příznak pořadí zpracovávání bajtů (little/big endian) a taktéž
+příznaky používané u SIMD operací. Zdaleka ne všechny mikroprocesory ARM však
+skutečně pracují se všemi bity, což je logické, protože například příznak
+<strong>Q</strong> je používán jen u mikroprocesorů podporujících aritmetiku se
+saturací, příznak <strong>J</strong> u čipů s&nbsp;podporou technologie
+<i>Jazelle</i> atd. Pojďme si tedy jednotlivé příznakové i stavové bity vypsat.
+Povšimněte si, že především první čtyři bity mají prakticky shodný název i
+stejný význam, jako je tomu u již popsané architektury i386 a x86-64 (rozdíl je
+jen v&nbsp;pojmenování příznaku <i>sign flag</i> a <i>negative flag</i>, význam
+je však shodný):</p>
+
+<table>
+<tr><th>Příznak</th><th>Význam zkratky</th><th>Poznámka</th></tr>
+<tr><td>N</td><td>negative</td><td>výsledek ALU operace je záporný</td></tr>
+<tr><td>V</td><td>overflow</td><td>přetečení (znaménková aritmetika, signed)</td></tr>
+<tr><td>Z</td><td>zero</td><td>výsledek je nulový</td></tr>
+<tr><td>C</td><td>carry</td><td>přenos (bezznaménková aritmetika, unsigned)</td></tr>
+<tr><td>Q</td><td>sticky overflow</td><td>aritmetika se saturací, od ARMv5e výše</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>I</td><td>interrupt</td><td>zákaz IRQ (přerušení)</td></tr>
+<tr><td>F</td><td>fast interrupt</td><td>zákaz FIRQ (rychlého přerušení)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>T</td><td>thumb</td><td>příznak zpracování instrukční sady Thumb (jen u procesorů se znakem "T" v&nbsp;názvu)</td></tr>
+<tr><td>J</td><td>jazelle</td><td>příznak zpracování instrukční sady Jazelle (jen u procesorů se znakem "J" v&nbsp;názvu)</td></tr>
+<tr><td>E</td><td>endianness</td><td>pořadí bajtů při práci s RAM (big/little endian)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>GE</td><td>4 bity</td><td>použito u SIMD operací (pouze některé čipy)</td></tr>
+<tr><td>IF</td><td>5 bitů</td><td>použito u instrukcí Thumb2 (pouze některé čipy)</td></tr>
+<tr><td>M</td><td>5 bitů</td><td>režim práce mikroprocesoru (user, IRQ, FIRQ, ...)</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tabulce zobrazené výše nejsou
+jednotlivé bity uvedeny v&nbsp;takovém pořadí, v&nbsp;jakém se nachází ve
+stavovém registru; sdruženy jsou podle své funkce.</div></p>
+
+<p>U klasické RISCové instrukční sady ARM se v&nbsp;nejvyšších čtyřech bitech
+každé instrukce nachází takzvaný kód podmínky. Konstruktéři těchto
+mikroprocesorů totiž (alespoň částečně) vyřešili problematiku podmíněných skoků
+tím, že umožnili vykonat každou instrukci pouze v&nbsp;tom případě, že je
+splněna podmínka, jejíž kód je zapsán právě v&nbsp;oněch čtyřech nejvyšších
+bitech instrukce. A o jakou problematiku podmíněných skoků se vlastně jedná?
+Podmíněné skoky představují pro klasickou RISCovou pipeline obtížný úkol:
+důvodem existence instrukční pipeline je to, aby se v&nbsp;každém taktu
+v&nbsp;ideálním případě dokončila jedna instrukce. U skoků, zvláště těch
+podmíněných, se však již <strong>před</strong> rozhodnutím, zda se skok provede
+či nikoli, začnou zpracovávat další instrukce umístěné za skokem, což však
+znamená, že se v&nbsp;případě provedení skoku tyto instrukce ve skutečnosti
+nemají vykonat. Konstruktéři RISCových a posléze i CISCových mikroprocesorů
+tedy hledali různé způsoby řešení této problematiky, ať se již jedná o
+spekulativní provádění instrukcí (příliš mnoho tranzistorů) či o prediktory
+skoků (ne vždy jsou úspěšné).</p>
+
+<p>Díky tomu, že u mikroprocesorů <i>ARM</i> lze podmínku vykonání zadat u
+každé instrukce, je možné, aby se celkový počet podmíněných skoků
+v&nbsp;programu minimalizoval. Zejména se to týká skoků používaných pro
+implementaci programové konstrukce <strong>if-then-else</strong>, kde se
+v&nbsp;jednotlivých větvích nachází jen malé množství instrukcí. Aby však mělo
+použití podmínkových kódů smysl, musela se změnit ještě jedna vlastnost
+procesorů <i>ARM</i>: jejich aritmeticko-logická jednotka totiž změní stavové
+bity <i>carry</i>, <i>zero</i>, <i>overflow</i> a <i>negative</i> pouze
+v&nbsp;tom případě, že je to explicitně v&nbsp;instrukčním kódu zapsáno
+(výjimku tvoří porovnávací instrukce). Touto vlastností se budeme zabývat až
+v&nbsp;následujícím textu.</p>
+
+<p>První sada podmínkových kódů se používá pro provedení či naopak neprovedení
+instrukce na základě hodnoty jednoho z&nbsp;příznakových bitů <i>zero</i>,
+<i>overflow</i> či <i>negative</i>. Poslední podmínkový kód z&nbsp;této skupiny
+má název <i>AL (Any/Always)</i> a značí, že se instrukce provede v&nbsp;každém
+případě. Tento podmínkový kód se tudíž většinou v&nbsp;assembleru nezapisuje,
+protože je (celkem pochopitelně) považován za implicitní:</p>
+
+<table>
+<tr><th>Kód</td></th><th>Přípona</th><th>Význam</th><th>Testovaná podmínka</th></tr>
+<tr><td>0000</td><td>EQ</td><td>Z set     </td><td>rovnost (či nulový výsledek)</td></tr>
+<tr><td>0001</td><td>NE</td><td>Z clear   </td><td>nerovnost (či nenulový výsledek)</td></tr>
+<tr><td>0100</td><td>MI</td><td>N set     </td><td>výsledek je záporný</td></tr>
+<tr><td>0101</td><td>PL</td><td>N clear   </td><td>výsledek je kladný či 0</td></tr>
+<tr><td>0110</td><td>VS</td><td>V set     </td><td>nastalo přetečení</td></tr>
+<tr><td>0111</td><td>VC</td><td>V clear   </td><td>nenastalo přetečení</td></tr>
+<tr><td>1110</td><td>AL</td><td>Any/Always</td><td>většinou se nezapisuje, implicitní podmínka</td></tr>
+</table>
+
+<p>Další čtyři podmínkové kódy se většinou používají při porovnávání dvou
+hodnot bez znaménka (unsigned). V&nbsp;těchto případech se testují stavy
+příznakových bitů <i>carry</i> a <i>zero</i>, přesněji řečeno kombinací těchto
+bitů:</p>
+
+<table>
+<tr><th>Kód</td><th>Přípona</th><th>Význam</th><th>Testovaná podmínka</th></tr>
+<tr><td>0010</td><td>CS/HS</td><td>C set            </td><td>&gt;=</td></tr>
+<tr><td>0011</td><td>CC/LO</td><td>C clear          </td><td>&lt;</td></tr>
+<tr><td>1000</td><td>HI   </td><td>C set and Z clear</td><td>&gt;</td></tr>
+<tr><td>1001</td><td>LS   </td><td>C clear or Z set </td><td>&lt;=</td></tr>
+</table>
+
+<p>Poslední čtyři podmínkové kódy se používají pro porovnávání hodnot se
+znaménkem (signed). V&nbsp;těchto případech se namísto příznakových bitů
+<i>carry</i> a <i>zero</i> testují kombinace bitů <i>negative</i>,
+<i>overflow</i> a <i>zero</i>:</p>
+
+<table>
+<tr><th>Kód</td><th>Přípona</th><th>Význam</th><th>Testovaná podmínka</th></tr>
+<tr><td>1010</td><td>GE</td><td>N and V the same</td><td>&gt;=</td></tr>
+<tr><td>1011</td><td>LT</td><td>N and V differ  </td><td>&lt;</td></tr>
+<tr><td>1100</td><td>GT</td><td>Z clear, N == V </td><td>&gt;</td></tr>
+<tr><td>1101</td><td>LE</td><td>Z set, N != V   </td><td>&lt;=</td></tr>
+</table>
+
+<p>Mezi základní aritmetické instrukce patří samozřejmě instrukce součtu a
+rozdílu. U instrukcí rozdílu je zajímavé, že existují ve dvou variantách podle
+toho, zda se odečítá první operand od druhého nebo naopak. Motivace je zřejmá
+&ndash; pro oba operandy existují odlišná pravidla:</p>
+
+<table>
+<tr><th>#</th><th>Instrukce</th><th>Význam</th></tr>
+<tr><td>1</td><td>ADD</td><td>operand1+operand2</td></tr>
+<tr><td>2</td><td>ADC</td><td>operand1+operand2+carry</td></tr>
+<tr><td>3</td><td>SUB</td><td>operand1-operand2</td></tr>
+<tr><td>4</td><td>SBC</td><td>operand1-operand2+carry-1</td></tr>
+<tr><td>5</td><td>RSB</td><td>operand2-operand1</td></tr>
+<tr><td>6</td><td>RSC</td><td>operand2-operand1+carry-1</td></tr>
+</table>
+
+<p>Tyto instrukce navíc ještě ve svém slově obsahují takzvaný <i>S-bit</i>
+určující, zda má instrukce nastavit příznaky ALU (N, V, Z, C) na základě
+výsledku operace. Jediné instrukce, u nichž je tento bit nastaven stále, jsou
+instrukce provádějící porovnání bez uložení výsledku operace (popsané ihned
+v&nbsp;následujícím odstavci):</p>
+
+<table>
+<tr><th>#</th><th>Instrukce</th><th>Význam</th></tr>
+<tr><td>1</td><td>ADDS</td><td>operand1+operand2 a současně nastavení příznakových bitů</td></tr>
+<tr><td>2</td><td>ADCS</td><td>operand1+operand2+carry a současně nastavení příznakových bitů</td></tr>
+<tr><td>3</td><td>SUBS</td><td>operand1-operand2 a současně nastavení příznakových bitů</td></tr>
+<tr><td>4</td><td>SBCS</td><td>operand1-operand2+carry-1 a současně nastavení příznakových bitů</td></tr>
+<tr><td>5</td><td>RSBS</td><td>operand2-operand1 a současně nastavení příznakových bitů</td></tr>
+<tr><td>6</td><td>RSCS</td><td>operand2-operand1+carry-1 a současně nastavení příznakových bitů</td></tr>
+</table>
+
+<p>Další skupinou instrukcí jsou instrukce provádějící nějakou aritmetickou či
+logickou operaci. Ovšem výsledek této operace se nikam neuloží, pouze se
+nastaví příznakové bity (navíc se tyto bity nastaví vždy, není zde možnost
+volby bitu <i>S</i>):</p>
+
+<table>
+<tr><th>#</th><th>Instrukce</th><th>Význam</th></tr>
+<tr><td>1</td><td>CMP</td><td>operand1-operand2</td></tr>
+<tr><td>2</td><td>CMN</td><td>operand1+operand2 (compare negative)</td></tr>
+<tr><td>3</td><td>TST</td><td>operand1 and operand2</td></tr>
+<tr><td>4</td><td>TEQ</td><td>operand1 xor operand2</td></tr>
+</table>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Překlad funkce <strong>Sign</strong> pro 32bitovou architekturu ARM</h2>
+
+<p>Zkusme si tedy naši funkci <i>Sign</i> přeložit pro 32bitovou architekturu
+ARM. Postup je prakticky stejný s&nbsp;postupem naznačeným v&nbsp;předchozích
+kapitolách:</p>
+
+<pre>
+$ <strong>GOARCH=arm GOARM=5 go build -gcflags '-l' asm08.go</strong>
+$ <strong>go tool objdump -S -s main.Sign asm08</strong>
+</pre>
+
+<p>Výsledek do značné míry odpovídá kódu, který jsme viděli u architektury
+x86-64 &ndash; kombinace instrukce <strong>CMP</strong> a podmíněného skoku
+<strong>B.LT</strong> resp.&nbsp;<strong>B.LE</strong>:</p>
+
+<pre>
+TEXT main.Sign(SB) /home/tester/go-root/article_54/asm08.go
+        if value &lt; 0 {
+  0x5e794               e59d0004                MOVW 0x4(R13), R0
+  0x5e798               e3500000                CMP $0, R0
+  0x5e79c               ba000006                B.LT 0x5e7bc
+        } else if value &gt; 0 {
+  0x5e7a0               da000002                B.LE 0x5e7b0
+                return 1
+  0x5e7a4               e3a00001                MOVW $1, R0
+  0x5e7a8               e58d0008                MOVW R0, 0x8(R13)
+  0x5e7ac               e28ef000                ADD $0, R14, R15
+                return 0
+  0x5e7b0               e3a00000                MOVW $0, R0
+  0x5e7b4               e58d0008                MOVW R0, 0x8(R13)
+  0x5e7b8               e28ef000                ADD $0, R14, R15
+                return -1
+  0x5e7bc               e3e00000                MVN $0, R0
+  0x5e7c0               e58d0008                MOVW R0, 0x8(R13)
+  0x5e7c4               e28ef000                ADD $0, R14, R15
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si instrukce
+<strong>MVN</strong> pro získání hodnoty -1.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. AArch64: od podmínkových bitů k&nbsp;podmíněným skokům</h2>
+
+<p>Procesory s&nbsp;architekturou AArch64 sice používají shodné podmínkové
+bity, ty jsou ovšem použity jen v&nbsp;několika instrukcích. Příznak přetečení
+je, podobně jako u mnoha dalších typů procesorů, používán při aritmetických
+operacích a testy podmínkových bitů lze provádět především u podmíněných skoků,
+tj.&nbsp;u instrukcí, jejichž mnemotechnická zkratka začíná znakem
+&bdquo;B&ldquo; od slova &bdquo;Branch&ldquo;. Rozeznáváme následující typy
+nepodmíněných podmíněných skoků:</p>
+
+<table>
+<tr><th>#</th><th>Instrukce</th><th>Alternativní zápis</th></tr>
+<tr><td>1</td><td>B</td><td>BAL</td></tr>
+<tr><td>2</td><td>B.EQ</td><td>BEQ</td></tr>
+<tr><td>3</td><td>B.NE</td><td>BNE</td></tr>
+<tr><td>4</td><td>B.MI</td><td>BMI</td></tr>
+<tr><td>5</td><td>B.PL</td><td>BPL</td></tr>
+<tr><td>6</td><td>B.VS</td><td>BVS</td></tr>
+<tr><td>7</td><td>B.VC</td><td>BVC</td></tr>
+<tr><td>8</td><td>B.CS</td><td>BCS</td></tr>
+<tr><td>9</td><td>B.CC</td><td>BCC</td></tr>
+<tr><td>10</td><td>B.HI</td><td>BHI</td></tr>
+<tr><td>11</td><td>B.LS</td><td>BLS</td></tr>
+<tr><td>12</td><td>B.GE</td><td>BGE</td></tr>
+<tr><td>13</td><td>B.LT</td><td>BLT</td></tr>
+<tr><td>14</td><td>B.GT</td><td>BGT</td></tr>
+<tr><td>15</td><td>B.LE</td><td>BLE</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: alternativní zápis je podporován
+například GNU Assemblerem.</div></p>
+
+<p>Nastavení příznakových bitů a podmíněné skoky si otestujeme na demonstračním
+příkladu, v&nbsp;němž je implementována počítaná programová smyčka, ve které se
+naplňuje řetězec (resp.&nbsp;přesněji řečeno předem zvolená oblast paměti)
+znakem &bdquo;*&ldquo;. První varianta tohoto příkladu vypadá na architektuře
+AArch64 takto: používá se sekvence tří instrukcí určených pro snížení hodnoty
+počitadla smyčky o jedničku, testu, zda již počitadlo dosáhlo nuly a
+podmíněného skoku provedeného za předpokladu, že se nuly nedosáhlo:</p>
+
+<pre>
+loop:
+        strb  w3, [x1]               <i>// zapis znaku do bufferu</i>
+        add   x1, x1, #1             <i>// uprava ukazatele do bufferu</i>
+        sub   x2, x2, #1             <i>// zmenseni pocitadla</i>
+        cmp   x2, #0                 <i>// otestovani, zda jsme jiz nedosahli nuly</i>
+        bne   loop                   <i>// pokud jsme se nedostali k nule, skok na zacatek smycky</i>
+</pre>
+
+<p>Vraťme se nyní k&nbsp;funkci <i>Sign</i>, kterou přeložíme pro AArch64
+takto:</p>
+
+<pre>
+$ <strong>GOARCH=arm64 go build -gcflags '-l' asm08.go</strong>
+$ <strong>go tool objdump -S -s main.Sign asm08</strong>
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+TEXT main.Sign(SB) /home/tester/go-root/article_54/asm08.go
+        if value &lt; 0 {
+  0x58f30               f94007e0                MOVD 8(RSP), R0
+  0x58f34               b7f80100                TBNZ $63, R0, 8(PC)
+  0x58f38               eb1f001f                CMP ZR, R0
+        } else if value &gt; 0 {
+  0x58f3c               5400008d                BLE 4(PC)
+                return 1
+  0x58f40               b24003e0                ORR $1, ZR, R0
+  0x58f44               f9000be0                MOVD R0, 16(RSP)
+  0x58f48               d65f03c0                RET
+                return 0
+  0x58f4c               f9000bff                MOVD ZR, 16(RSP)
+  0x58f50               d65f03c0                RET
+                return -1
+  0x58f54               92800000                MOVD $-1, R0
+  0x58f58               f9000be0                MOVD R0, 16(RSP)
+  0x58f5c               d65f03c0                RET
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: <strong>ZR</strong> je registr
+obsahující konstantní nulu, trikem s&nbsp;instrukcí <strong>ORR</strong> tedy
+získáme konstantu 1, 0 atd.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně pět až šest megabajtů), můžete namísto toho použít odkazy na
+jednotlivé příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>asm04.go</td><td>funkce pro součet tří operandů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_54/asm04.go">https://github.com/tisnik/go-root/blob/master/article_54/asm04.go</a></td></tr>
+<tr><td>2</td><td>asm05.go</td><td>funkce vracející své parametry v&nbsp;opačném pořadí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_54/asm05.go">https://github.com/tisnik/go-root/blob/master/article_54/asm05.go</a></td></tr>
+<tr><td>3</td><td>asm06.go</td><td>funkce pro součet tří operandů (typ <i>float32</i> a <i>float64</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_54/asm06.go">https://github.com/tisnik/go-root/blob/master/article_54/asm06.go</a></td></tr>
+<tr><td>4</td><td>asm07.go</td><td>funkce pro součet položek v&nbsp;řezu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_54/asm07.go">https://github.com/tisnik/go-root/blob/master/article_54/asm07.go</a></td></tr>
+<tr><td>5</td><td>asm08.go</td><td>funkce typu <strong>Sing/Sgn</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_54/asm08.go">https://github.com/tisnik/go-root/blob/master/article_54/asm08.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Online x86 / x64 Assembler and Disassembler<br />
+<a href="https://defuse.ca/online-x86-assembler.htm#disassembly2">https://defuse.ca/online-x86-assembler.htm#disassembly2</a>
+</li>
+
+<li>The Design of the Go Assembler<br />
+<a href="https://talks.golang.org/2016/asm.slide#1">https://talks.golang.org/2016/asm.slide#1</a>
+</li>
+
+<li>A Quick Guide to Go's Assembler<br />
+<a href="https://golang.org/doc/asm">https://golang.org/doc/asm</a>
+</li>
+
+<li>AssemblyPolicy<br />
+<a href="https://github.com/golang/go/wiki/AssemblyPolicy">https://github.com/golang/go/wiki/AssemblyPolicy</a>
+</li>
+
+<li>Geohash in Golang Assembly<br />
+<a href="https://mmcloughlin.com/posts/geohash-assembly">https://mmcloughlin.com/posts/geohash-assembly</a>
+</li>
+
+<li>Command objdump<br />
+<a href="https://golang.org/cmd/objdump/">https://golang.org/cmd/objdump/</a>
+</li>
+
+<li>Assembly<br />
+<a href="https://goroutines.com/asm">https://goroutines.com/asm</a>
+</li>
+
+<li>Go &amp; Assembly<br />
+<a href="http://www.doxsey.net/blog/go-and-assembly">http://www.doxsey.net/blog/go-and-assembly</a>
+</li>
+
+<li>A Foray Into Go Assembly Programming<br />
+<a href="https://blog.sgmansfield.com/2017/04/a-foray-into-go-assembly-programming/">https://blog.sgmansfield.com/2017/04/a-foray-into-go-assembly-programming/</a>
+</li>
+
+<li>Golang Capturing log.Println And fmt.Println Output<br />
+<a href="https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4">https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4</a>
+</li>
+
+<li>Stránka projektu plotly<br />
+<a href="https://plot.ly/">https://plot.ly/</a>
+</li>
+
+<li>Plotly JavaScript Open Source Graphing Library<br />
+<a href="https://plot.ly/javascript/">https://plot.ly/javascript/</a>
+</li>
+
+<li>Domain coloring<br />
+<a href="https://en.wikipedia.org/wiki/Domain_coloring">https://en.wikipedia.org/wiki/Domain_coloring</a>
+</li>
+
+<li>Michael Fogleman's projects<br />
+<a href="https://www.michaelfogleman.com/projects/tagged/graphics/">https://www.michaelfogleman.com/projects/tagged/graphics/</a>
+</li>
+
+<li>Color Graphs of Complex Functions<br />
+<a href="https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html">https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html</a>
+</li>
+
+<li>A Gallery of Complex Functions<br />
+<a href="http://wismuth.com/complex/gallery.html">http://wismuth.com/complex/gallery.html</a>
+</li>
+
+<li>package glot<br />
+<a href="https://godoc.org/github.com/Arafatk/glot">https://godoc.org/github.com/Arafatk/glot</a>
+</li>
+
+<li>Gnuplotting: Output terminals<br />
+<a href="http://www.gnuplotting.org/output-terminals/">http://www.gnuplotting.org/output-terminals/</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1">https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://blog.gopheracademy.com/advent-2018/introducing-glot/">https://blog.gopheracademy.com/advent-2018/introducing-glot/</a>
+</li>
+
+<li>Glot is a plotting library for Golang built on top of gnuplot<br />
+<a href="https://github.com/Arafatk/glot">https://github.com/Arafatk/glot</a>
+</li>
+
+<li>Example plots (gonum/plot)<br />
+<a href="https://github.com/gonum/plot/wiki/Example-plots">https://github.com/gonum/plot/wiki/Example-plots</a>
+</li>
+
+<li>A repository for plotting and visualizing data (gonum/plot)<br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>golang library to make https://chartjs.org/ plots<br />
+<a href="https://github.com/brentp/go-chartjs">https://github.com/brentp/go-chartjs</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>The Gonum Numerical Computing Package<br />
+<a href="https://www.gonum.org/post/introtogonum/">https://www.gonum.org/post/introtogonum/</a>
+</li>
+
+<li>Gomacro na GitHubu<br />
+<a href="https://github.com/cosmos72/gomacro">https://github.com/cosmos72/gomacro</a>
+</li>
+
+<li>gophernotes - Use Go in Jupyter notebooks and nteract<br />
+<a href="https://github.com/gopherdata/gophernotes">https://github.com/gopherdata/gophernotes</a>
+</li>
+
+<li>gonum<br />
+<a href="https://github.com/gonum">https://github.com/gonum</a>
+</li>
+
+<li>go-gota/gota -  DataFrames and data wrangling in Go (Golang)<br />
+<a href="https://porter.io/github.com/go-gota/gota">https://porter.io/github.com/go-gota/gota</a>
+</li>
+
+<li>A repository for plotting and visualizing data <br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>Gonum Numerical Packages<br />
+<a href="https://www.gonum.org/">https://www.gonum.org/</a>
+</li>
+
+<li>Stránky projektu MinIO<br />
+<a href="https://min.io/">https://min.io/</a>
+</li>
+
+<li>MinIO Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-quickstart-guide.html">https://docs.min.io/docs/minio-quickstart-guide.html</a>
+</li>
+
+<li>MinIO Go Client API Reference<br />
+<a href="https://docs.min.io/docs/golang-client-api-reference">https://docs.min.io/docs/golang-client-api-reference</a>
+</li>
+
+<li>MinIO Python Client API Reference<br />
+<a href="https://docs.min.io/docs/python-client-api-reference.html">https://docs.min.io/docs/python-client-api-reference.html</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>MinIO Client Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-client-quickstart-guide.html">https://docs.min.io/docs/minio-client-quickstart-guide.html</a>
+</li>
+
+<li>Analýza kvality zdrojových kódů Minia<br />
+<a href="https://goreportcard.com/report/github.com/minio/minio">https://goreportcard.com/report/github.com/minio/minio</a>
+</li>
+
+<li>This is MinIO<br />
+<a href="https://www.youtube.com/watch?v=vF0lQh0XOCs">https://www.youtube.com/watch?v=vF0lQh0XOCs</a>
+</li>
+
+<li>Running MinIO Standalone<br />
+<a href="https://www.youtube.com/watch?v=dIQsPCHvHoM">https://www.youtube.com/watch?v=dIQsPCHvHoM</a>
+</li>
+
+<li>"Amazon S3 Compatible Storage in Kubernetes" - Rob Girard, Principal Tech Marketing Engineer, Minio<br />
+<a href="https://www.youtube.com/watch?v=wlpn8K0jJ4U">https://www.youtube.com/watch?v=wlpn8K0jJ4U</a>
+</li>
+
+<li>Ginkgo<br />
+<a href="http://onsi.github.io/ginkgo/">http://onsi.github.io/ginkgo/</a>
+</li>
+
+<li>Gomega<br />
+<a href="https://onsi.github.io/gomega/">https://onsi.github.io/gomega/</a>
+</li>
+
+<li>Ginkgo's Preferred Matcher Library na GitHubu<br />
+<a href="https://github.com/onsi/gomega/">https://github.com/onsi/gomega/</a>
+</li>
+
+<li>Provided Matchers<br />
+<a href="http://onsi.github.io/gomega/#provided-matchers">http://onsi.github.io/gomega/#provided-matchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku goexpect<br />
+<a href="https://godoc.org/github.com/google/goexpect">https://godoc.org/github.com/google/goexpect</a>
+</li>
+
+<li>Balíček goexpect<br />
+<a href="https://github.com/google/goexpect">https://github.com/google/goexpect</a>
+</li>
+
+<li>Balíček go-expect<br />
+<a href="https://github.com/Netflix/go-expect">https://github.com/Netflix/go-expect</a>
+</li>
+
+<li>Balíček gexpect<br />
+<a href="https://github.com/ThomasRooney/gexpect">https://github.com/ThomasRooney/gexpect</a>
+</li>
+
+<li>Expect (originál naprogramovaný v&nbsp;TCL)<br />
+<a href="https://core.tcl-lang.org/expect/index">https://core.tcl-lang.org/expect/index</a>
+</li>
+
+<li>Expect (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Expect">https://en.wikipedia.org/wiki/Expect</a>
+</li>
+
+<li>Pexpect<br />
+<a href="https://pexpect.readthedocs.io/en/stable/">https://pexpect.readthedocs.io/en/stable/</a>
+</li>
+
+<li>Golang SSH Client: Multiple Commands, Crypto &amp; Goexpect Examples<br />
+<a href="http://networkbit.ch/golang-ssh-client/">http://networkbit.ch/golang-ssh-client/</a>
+</li>
+
+<li>goblin na GitHubu<br />
+<a href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>
+</li>
+
+<li>Mocha framework<br />
+<a href="https://mochajs.org/">https://mochajs.org/</a>
+</li>
+
+<li>frisby na GitHubu<br />
+<a href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>
+</li>
+
+<li>package frisby<br />
+<a href="https://godoc.org/github.com/verdverm/frisby">https://godoc.org/github.com/verdverm/frisby</a>
+</li>
+
+<li>Frisby alternatives and similar packages (generováno)<br />
+<a href="https://go.libhunt.com/frisby-alternatives">https://go.libhunt.com/frisby-alternatives</a>
+</li>
+
+<li>Cucumber for golang<br />
+<a href="https://github.com/DATA-DOG/godog">https://github.com/DATA-DOG/godog</a>
+</li>
+
+<li>How to Use Godog for Behavior-driven Development in Go<br />
+<a href="https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go">https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go</a>
+</li>
+
+<li>Comparative Analysis Of GoLang Testing Frameworks<br />
+<a href="https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks">https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks</a>
+</li>
+
+<li>A Quick Guide to Testing in Golang<br />
+<a href="https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/">https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/</a>
+</li>
+
+<li>Tom's Obvious, Minimal Language.<br />
+<a href="https://github.com/toml-lang/toml">https://github.com/toml-lang/toml</a>
+</li>
+
+<li>xml.org<br />
+<a href="http://www.xml.org/">http://www.xml.org/</a>
+</li>
+
+<li>Soubory .properties<br />
+<a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
+</li>
+
+<li>Soubory INI<br />
+<a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
+</li>
+
+<li>JSON to YAML<br />
+<a href="https://www.json2yaml.com/">https://www.json2yaml.com/</a>
+</li>
+
+<li>Data Format Converter<br />
+<a href="https://toolkit.site/format.html">https://toolkit.site/format.html</a>
+</li>
+
+<li>Viper na GitHubu<br />
+<a href="https://github.com/spf13/viper">https://github.com/spf13/viper</a>
+</li>
+
+<li>GoDotEnv na GitHubu<br />
+<a href="https://github.com/joho/godotenv">https://github.com/joho/godotenv</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2020</small></p>
+</body>
+</html>
+
