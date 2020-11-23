@@ -1,0 +1,2752 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Jedním z nejužitečnějších nástrojů pro automatizaci i testování aplikací ovládaných z příkazové řádky je nástroj expect. Původní verze tohoto nástroje je vyvinuta v Tcl, ovšem existuje i mnoho alternativních knihoven určených pro jiné jazyky. Ve světě Go se jedná o go-expect a GoExpect.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Nástroje typu <strong>expect</strong></a></p>
+<p><a href="#k02">2. Ukázky použití původního <strong>expect</strong> a varianty vytvořené v&nbsp;Pythonu</a></p>
+<p><a href="#k03">3. Balíčky <strong>go-expect</strong>, <strong>gexpect</strong> a <strong>GoExpect</strong></a></p>
+<p><a href="#k04">4. Nejjednodušší použití balíčku <strong>go-expect</strong> &ndash; test obsahu standardního výstupu vybrané aplikace</a></p>
+<p><a href="#k05">5. Nastavení doby čekání při testu standardního výstupu aplikace</a></p>
+<p><a href="#k06">6. Podobný příklad s&nbsp;testem výstupu příkazu <strong>curl</strong></a></p>
+<p><a href="#k07">7. Automatické ovládání aplikace díky koordinaci jejího standardního výstupu a vstupu</a></p>
+<p><a href="#k08">8. Programové ovládání interpretru jazyka Python</a></p>
+<p><a href="#k09">9. Reakce na několik alternativních řetězců na výstupu aplikace</a></p>
+<p><a href="#k10">10. Testování aplikací s&nbsp;textovým rozhraním kombinací balíčků <strong>testing</strong> a <strong>go-expect</strong></a></p>
+<p><a href="#k11">11. Složitější příklad &ndash; test korektnosti výpočtů prováděných intepretrem Pythonu</a></p>
+<p><a href="#k12">12. Balíček <strong>gexpect</strong></a></p>
+<p><a href="#k13">13. Přepis příkladu volajícího příkaz <strong>curl</strong></a></p>
+<p><a href="#k14">14. Ovládání interaktivní hry spuštěné přes <strong>telnet</strong></a></p>
+<p><a href="#k15">15. Ovládání interpretru Pythonu</a></p>
+<p><a href="#k16">16. Detekce, který interpret Pythonu byl spuštěn</a></p>
+<p><a href="#k17">17. Kombinace knihoven <strong>testing</strong> a <strong>gexpect</strong></a></p>
+<p><a href="#k18">18. Test korektnosti výpočtů prováděných intepretrem Pythonu podruhé</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Nástroje typu <strong>expect</strong></h2>
+
+<p>Při automatizaci úloh, v&nbsp;nichž je nutné kooperovat
+s&nbsp;interaktivními nástroji ovládanými ze standardního vstupu (telnet, ssh,
+ftp, všechny interpretry, gdb, různé instalační skripty atd. atd.), se mnohdy
+používá nástroj <strong>expect</strong>. S&nbsp;využitím tohoto nástroje je
+možné specifikovat a následně spouštět operace typu &bdquo;pokud se na
+terminálu objeví text 'login', pošli aplikaci na její standardní vstup obsah
+proměnné <strong>login</strong>&ldquo;, popř.&nbsp;je dokonce možné provést
+rozeskoky podle toho, jaká zpráva se na terminálu objeví. I z&nbsp;tohoto
+důvodu se <strong>expect</strong> používá pro testování aplikací, například
+v&nbsp;telcom oblasti. Nástroj <a
+href="https://core.tcl-lang.org/expect/index">expect</a> je skutečně všestranně
+použitelný, ovšem má také několik nevýhod. Jednou z&nbsp;nich je, že je
+naprogramován v&nbsp;dnes již poněkud obstarožním <a
+href="https://www.root.cz/serialy/programovaci-jazyk-tcl/">programovacím jazyce
+TCL</a> a i skripty pro <strong>expect</strong> je tedy nutné v&nbsp;TCL
+vytvářet.</p>
+
+<p>To může být pro současné programátory poněkud těžký oříšek a navíc je
+relativně složité zařadit <strong>expect</strong> například do integračních
+testů vyvinutých v&nbsp;odlišném programovacím jazyce. Dnes ovšem již existuje
+větší množství alternativních implementací prakticky stejné funkcionality,
+jakou nabízí samotný <strong>expect</strong>. Pro prakticky jakýkoli rozšířený
+programovací jazyk <a href="https://en.wikipedia.org/wiki/Expect">najdeme
+alespoň jednu alternativní implementaci</a>. Týká se to pochopitelně i <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacího jazyka
+Go</a>, pro který existuje knihoven hned několik. A právě těmito knihovnami
+&ndash; přesněji řečeno dvěma knihovnami z&nbsp;rozsáhlejší nabídky &ndash; se
+budeme v&nbsp;dnešní části seriálu o programovacím jazyce Go podrobněji
+zabývat.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Ukázky použití původního <strong>expect</strong> a varianty vytvořené v&nbsp;Pythonu</h2>
+
+<p>Podívejme se však nejprve na typický příklad použití nástroje
+<strong>expect</strong>. Tento příklad najdete například na Wikipedii, ale i
+v&nbsp;mnoha dalších článcích, které se tímto užitečným nástrojem zabývají. Ve
+skriptu je provedeno připojení (přes <i>telnet</i>) na vzdálený stroj. Ve
+chvíli, kdy vzdálený stroj čeká na zadání uživatelského jména, je mu posláno
+jméno (resp.&nbsp;přesněji řečeno jakýkoli text) uložené v&nbsp;proměnné
+<strong>my_user_id</strong>. Dále se na výzvu pro zadání hesla naprosto stejným
+způsobem předá heslo z&nbsp;proměnné nazvané <strong>my_password</strong>.
+Nakonec se očekává zobrazení výzvy (zde ve tvaru %); v&nbsp;této chvíli se na
+vzdálený stroj pošle specifikovaný příkaz a spojení se ukončí příkazem
+&bdquo;exit&ldquo;:</p>
+
+<pre>
+spawn telnet $remote_server
+expect "username:"
+<i># Send the username, and then wait for a password prompt.</i>
+send "$my_user_id\r"
+expect "password:"
+<i># Send the password, and then wait for a shell prompt.</i>
+send "$my_password\r"
+expect "%"
+<i># Send the prebuilt command, and then wait for another shell prompt.</i>
+send "$my_command\r"
+expect "%"
+<i># Capture the results of the command into a variable. This can be displayed, or written to disk.</i>
+set results $expect_out(buffer)
+<i># Exit the telnet session, and wait for a special end-of-file character.</i>
+send "exit\r"
+expect eof
+</pre>
+
+<p>Nepatrně složitější příklad (taktéž ovšem velmi typický &ndash; najdete ho
+v&nbsp;prakticky každém tutoriálu o <strong>expectu</strong>) se pokusí
+připojit na vzdálený stroj přes <strong>ssh</strong>. Tentokrát je ovšem
+proveden rozeskok na základě toho, jaká informace se vypíše. Při prvním
+připojení se totiž <strong>ssh</strong> zeptá, zda se skutečně připojuje
+k&nbsp;ověřenému stroji (odpovídáme zde automaticky &bdquo;yes&ldquo;, což
+ovšem není příliš bezpečné), při dalším připojení je již adresa zapamatována,
+takže se <strong>ssh</strong> přímo zeptá na heslo. Pokud nedojde ani
+k&nbsp;jedné variantě, je připojení ihned ukončeno příkazem
+<strong>exit</strong>:</p>
+
+<pre>
+set timeout 60
+spawn ssh $user@machine
+while {1} {
+  expect {
+    eof                          {break}
+    "The authenticity of host"   {send "yes\r"}
+    "password:"                  {send "$password\r"}
+    "*\]"                        {send "exit\r"}
+  }
+}
+wait
+close $spawn_id
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotný příkaz <strong>expect</strong>
+v&nbsp;předchozím skriptu umožňuje rozeskok. V&nbsp;programovacím jazyce TCL je
+totiž velmi snadné přidávat další jazykové konstrukce, protože celé TCL je
+(poněkud zjednodušeně řečeno) postaveno pouze na několika textových
+substitucích a nikoli na pevně zadané syntaxi.</div></p>
+
+<p>Pro zajímavost se ještě podívejme na způsob implementace funkcionality
+nástroje <strong>expect</strong> <a
+href="https://www.root.cz/n/python/">v&nbsp;Pythonu</a>, konkrétně
+s&nbsp;využitím balíčku nazvaného <a
+href="https://pypi.org/project/pexpect/">pexpect</a>. Tentokrát se spustí
+interpret Pythonu, na jeho výzvu (<i>prompt</i>) se zadá příkaz pro otočení
+řetězce a z&nbsp;výstupu se zjistí výsledek této operace:</p>
+
+<pre>
+import pexpect
+&nbsp;
+c = pexpect.spawnu('/usr/bin/env python')
+&nbsp;
+c.expect('&gt;&gt;&gt;')
+print('And now for something completely different...')
+print(''.join(reversed((c.before))))
+print('Yes, it\'s python, but it\'s backwards.')
+print()
+print('Escape character is \'^]\'.')
+print(c.after, end=' ')
+c.interact()
+c.kill(1)
+print('is alive:', c.isalive())
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Balíčky <strong>go-expect</strong>, <strong>gexpect</strong> a <strong>GoExpect</strong></h2>
+
+<p>Jak jsme si již řekli <a href="#k01">v&nbsp;úvodní kapitole</a>, existuje
+pro programovací jazyk Go hned několik knihoven, které ve větší či menší míře
+implementují základní operace, které známe z&nbsp;původního nástroje
+<strong>expect</strong>. Jedná se o následující knihovny:</p>
+
+<ol>
+
+<li>Balíček goexpect<br />
+<a href="https://github.com/google/goexpect">https://github.com/google/goexpect</a>
+</li>
+
+<li>Balíček go-expect<br />
+<a href="https://github.com/Netflix/go-expect">https://github.com/Netflix/go-expect</a>
+</li>
+
+<li>Balíček gexpect<br />
+<a href="https://github.com/ThomasRooney/gexpect">https://github.com/ThomasRooney/gexpect</a>
+</li>
+
+</ol>
+
+<p>V&nbsp;navazujících kapitolách se budeme zabývat především druhým zmíněným
+balíčkem pojmenovaným <strong>go-expect</strong> a balíčkem třetím
+<strong>gexpect</strong>. První balíček bude popsán v&nbsp;samostatném článku,
+protože se nabízí poměrně rozsáhlou funkcionalitu.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Nejjednodušší použití balíčku <strong>go-expect</strong> &ndash; test obsahu standardního výstupu vybrané aplikace</h2>
+
+<p>Prvním balíčkem s&nbsp;implementací vybraných operací nástroje
+<strong>expect</strong> v&nbsp;programovacím jazyce Go je balíček nazvaný
+<strong>go-expect</strong>. Ukažme si nyní jedno z&nbsp;nejjednodušších použití
+tohoto balíčku. Vytvoříme test, v&nbsp;němž spustíme příkaz
+<strong>uname</strong> (bez dalších parametrů) a následně otestujeme, zda se na
+standardním výstupu z&nbsp;tohoto nástroje objevil text &bdquo;Linux&ldquo;.
+Nejprve je nutné získat instanci virtuální konzole, pochopitelně
+s&nbsp;kontrolou, zda při její konstrukci nedošlo k&nbsp;chybě:</p>
+
+<pre>
+console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+if err != nil {
+        log.Fatal(err)
+}
+defer console.Close()
+</pre>
+
+<p>Dále se přes standardní knihovnu <strong>os/exec</strong> spustí příkaz
+&bdquo;uname&ldquo; a upraví se jeho vstupně/výstupní proudy, aby příkaz bylo
+možné ovládat z&nbsp;virtuální konzole:</p>
+
+<pre>
+command := exec.Command("uname")
+command.Stdin = console.Tty()
+command.Stdout = console.Tty()
+command.Stderr = console.Tty()
+err = command.Start()
+</pre>
+
+<p>Na standardním výstupu aplikace by se měl objevit řetězec
+&bdquo;Linux&ldquo;, což ihned zjistíme:</p>
+
+<pre>
+console.ExpectString("Linux")
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/01_check_uname.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/01_check_uname.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("uname")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+        console.ExpectString("Linux")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+<p>Při spuštění aplikace (psané v&nbsp;Go) se na standardním výstupu postupně
+objevují i texty vypsané spuštěným nástrojem <strong>uname</strong>:</p>
+
+<pre>
+Linux
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Nastavení doby čekání při testu standardního výstupu aplikace</h2>
+
+<p>V&nbsp;případě, že se na standardním výstupu spuštěné aplikace neobjeví
+očekávaný řetězec (v&nbsp;předchozím příkladu to byl text &bdquo;Linux&ldquo;),
+bude program ve výchozím nastavení pozastaven na neomezenou dobu, protože
+nemůže vědět, kdy (a zda vůbec) se tento řetězec může objevit. Toto chování
+většinou není ideální, protože se může stát, že se očekávaný řetězec neukáže
+nikdy. Z&nbsp;tohoto důvodu lze již při inicializaci konzole určit čas, po
+který se má po zavolání metody <strong>Expect</strong> na řetězec čekat:</p>
+
+<pre>
+console, err := expect.NewConsole(expect.WithStdout(os.Stdout), expect.WithDefaultTimeout(100*time.Millisecond))
+</pre>
+
+<p>Příklad nepatrně upravíme takovým způsobem, aby se očekával řetězec
+&bdquo;BSD&ldquo; namísto &bdquo;Linux&ldquo;:</p>
+
+<pre>
+str, err := console.ExpectString("BSD")
+if err != nil {
+        log.Fatalf("BSD expected, but got %s", str)
+}
+</pre>
+
+<p>Takový řetězec se na testovaném stroji nemůže objevit, proto dojde po
+spuštění aplikace k&nbsp;očekávané chybě:</p>
+
+<pre>
+Linux
+2019/11/23 13:01:37 BSD expected, but got Linux
+exit status 1
+</pre>
+
+<p>Úplný kód druhého demonstračního příkladu najdeme na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/02_check_uname_timeout.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/02_check_uname_timeout.go</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout), expect.WithDefaultTimeout(100*time.Millisecond))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("uname")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+        str, err := console.ExpectString("BSD")
+        if err != nil {
+                log.Fatalf("BSD expected, but got %s", str)
+        }
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Podobný příklad s&nbsp;testem výstupu příkazu <strong>curl</strong></h2>
+
+<p>Přesné chování metody <strong>console.ExpectString</strong> si ověříme na
+dalším demonstračním příkladu, v&nbsp;němž bude spuštěn příkaz
+<strong>curl</strong> a testovat budeme, zda odpověď obsahuje informaci o
+přesunu stránky na odlišnou adresu (<strong>301 Moved
+Permanently</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("curl", "-X", "HEAD", "-v", "github.com")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+        console.ExpectString("Location: https://github.com/")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+<p>Po spuštění příkladu si povšimněte, že se vypíše pouze výstup až do
+očekávaného řetězce, ale další zprávy již nejsou ani vypsány ani zpracovány.
+Metoda <strong>console.ExpectString</strong> totiž prochází přečteným výstupem
+aplikace od aktuálního bodu až do toho okamžiku, kdy řetězec nalezne (pokud ho
+nenalezne, bude čekat na další výstup, popř.&nbsp;po určeném timeoutu skončí
+s&nbsp;chybou):</p>
+
+<pre>
+* Rebuilt URL to: github.com/
+* Hostname was NOT found in DNS cache
+*   Trying 140.82.118.4...
+* Connected to github.com (140.82.118.4) port 80 (#0)
+&gt; HEAD / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: github.com
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 301 Moved Permanently
+&lt; Content-length: 0
+&lt; <strong>Location: https://github.com/</strong>
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Automatické ovládání aplikace díky koordinaci jejího standardního výstupu a vstupu</h2>
+
+<p>Největší přednost nástrojů typu <strong>expect</strong> spočívá
+v&nbsp;jejich schopnosti ovládat jinou aplikaci díky koordinaci jejího
+standardního výstupu (tisknutých zpráv, například otázek) a vstupu. Ukážeme si
+to na jednoduchém příkladu &ndash; přes <i>telnet</i> se přihlásíme do hry
+<i>Zombie MUD</i> (<i>MUD=Multi-User Dungeon</i>), počkáme na zobrazení
+hlavního menu a pokud se menu skutečně zobrazí, použijeme příkaz
+<strong>D</strong> (<i>Disconnect</i>). Naprosto stejným způsobem by ovšem bylo
+možné naskriptovat vytvoření nové postavy či dokonce projití několika patry
+podzemí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("telnet", "zombiemud.org")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+        console.ExpectString("... online since 1994")
+        console.ExpectString("Your choice or name:")
+        console.Send("d\n")
+        console.ExpectString("Ok, see you later!")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+<p>Ukázka komunikace námi vytvořeného pomocného prográmku se hrou:</p>
+
+<pre>
+Trying 85.23.110.31...
+Connected to zombiemud.org.
+Escape character is '^]'.
+      Welcome to ...
+          ___                       __     __) __     __) ______   
+         (,   )          /)  ,     (, /|  /|  (, /   /   (, /    ) 
+             / ______   (/_     _    / | / |    /   /      /    /  
+           _/_(_) // (_/_) _(__(/_) /  |/  |_  /   /     _/___ /_  
+       )   /                     (_/   '      (___(_   (_/___ /    
+      (__ /
+                 ... online since 1994.
+&nbsp;
+      There are currently 45 mortals and 5 wizards online.
+&nbsp;
+            Give me your name or choose one of the following:
+&nbsp;
+            [C]reate a new character     [W]ho is playing
+            [V]isit the game             [S]tatus of the game
+            [D]isconnect
+&nbsp;
+            Your choice or name: d
+Ok, see you later!
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Programové ovládání interpretru jazyka Python</h2>
+
+<p>Podobným způsobem můžeme ovládat i interpretry různých programovacích
+jazyků. Další demonstrační příklad ukazuje ovládání interpretru Pythonu
+spouštěného příkazem <strong>python</strong> (na základě nastavení systému se
+tedy může jednat buď o Python 2 nebo o Python 3). Po spuštění interpretru
+očekáváme jeho výzvu (<i>prompt</i>), po jejímž objevení zadáme aritmetický
+výraz s&nbsp;očekáváním správného výsledku. Nakonec je interpret ukončen
+příkazem (přesněji řečeno funkcí) <strong>quit()</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("python")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+        console.ExpectString("&gt;&gt;&gt; ")
+&nbsp;
+        console.SendLine("1+2")
+        console.ExpectString("3")
+        console.ExpectString("&gt;&gt;&gt; ")
+&nbsp;
+        console.SendLine("6*7")
+        console.ExpectString("42")
+        console.ExpectString("&gt;&gt;&gt; ")
+&nbsp;
+        console.SendLine("quit()")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+<p>Ukázka dialogu mezi naším prográmkem a interpretrem Pythonu (schválně
+nastaveným na starší verzi):</p>
+
+<pre>
+Python 2.7.6 (default, Nov 23 2017, 15:49:48) 
+[GCC 4.8.4] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+&gt;&gt;&gt; 1+2
+3
+&gt;&gt;&gt; 6*7
+42
+&gt;&gt;&gt;
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Reakce na několik alternativních řetězců na výstupu aplikace</h2>
+
+<p>Poněkud komplikovanější situace nastane ve chvíli, kdy je nutné rozhodnout,
+který z&nbsp;řetězců se objevil na konzoli ovládané či testované aplikace. Máme
+dvě možnosti &ndash; buď použít regulární výrazy následované rozeskokem, nebo
+metodu <strong>console.ExpectString</strong> nahradit její obecnější
+variantou s&nbsp;více alternativními řetězci:</p>
+
+<pre>
+str, err := console.Expect(expect.String("Python 2", "Python 3"), expect.WithTimeout(100*time.Millisecond))
+</pre>
+
+<p>Následně je již možné zjistit, jaká situace nastala &ndash; zda se objevil
+alespoň jeden z&nbsp;řetězců či naopak řetězec žádný (což je chyba):</p>
+
+<pre>
+if err != nil {
+        fmt.Println("Python not detected")
+        log.Fatal(err)
+}
+if str == "Python 2" {
+        console.SendLine("print 1,2,3")
+        _, err = console.ExpectString("1 2 3")
+        if err != nil {
+                log.Fatal(err)
+        }
+        console.ExpectString("&gt;&gt;&gt; ")
+} else {
+        console.SendLine("print(1,2,3)")
+        _, err = console.ExpectString("1 2 3")
+        if err != nil {
+                log.Fatal(err)
+        }
+        console.ExpectString("&gt;&gt;&gt; ")
+}
+</pre>
+
+<p>Ukázka možného výstupu:</p>
+
+<pre>
+Python 2.7.6 (default, Nov 23 2017, 15:49:48) 
+[GCC 4.8.4] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+&gt;&gt;&gt; print 1,2,3
+1 2 3
+&gt;&gt;&gt;
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: můžete si vyzkoušet nahradit příkaz
+<strong>python</strong> za <strong>python3</strong>.</div></p>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+        "os/exec"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer console.Close()
+&nbsp;
+        command := exec.Command("python")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        time.Sleep(time.Second)
+&nbsp;
+        str, err := console.Expect(expect.String("Python 2", "Python 3"), expect.WithTimeout(100*time.Millisecond))
+        if err != nil {
+                fmt.Println("Python not detected")
+                log.Fatal(err)
+        }
+        if str == "Python 2" {
+                console.SendLine("print 1,2,3")
+                _, err = console.ExpectString("1 2 3")
+                if err != nil {
+                        log.Fatal(err)
+                }
+                console.ExpectString("&gt;&gt;&gt; ")
+        } else {
+                console.SendLine("print(1,2,3)")
+                _, err = console.ExpectString("1 2 3")
+                if err != nil {
+                        log.Fatal(err)
+                }
+                console.ExpectString("&gt;&gt;&gt; ")
+        }
+&nbsp;
+        console.SendLine("quit()")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Testování aplikací s&nbsp;textovým rozhraním kombinací balíčků <strong>testing</strong> a <strong>go-expect</strong></h2>
+
+<p>Nic nám nebrání použít knihovnu <strong>go-expect</strong> společně
+s&nbsp;knihovnou <strong>testing</strong> pro vytvoření testů funkcionality či
+integračních testů. Jedna z&nbsp;možností (pravda &ndash; poněkud umělá) je
+ukázána v&nbsp;dalším příkladu, v&nbsp;němž testujeme schopnost interpretru
+Pythonu vyhodnotit parametry příkazu <strong>print</strong> (Python 2) či
+funkce <strong>print</strong> (Python 3). Celý test je psán s&nbsp;využitím
+možností nabízených standardní knihovnou <strong>testing</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "os/exec"
+        "testing"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>TestPythonInterpreter</strong>(t *testing.T) {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                t.Fatal(err)
+        }
+        defer console.Close()
+        t.Log("Console created")
+&nbsp;
+        command := exec.Command("python")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        t.Log("Python interpreter started")
+        time.Sleep(time.Second)
+&nbsp;
+        str, err := console.Expect(expect.String("Python 2", "Python 3"), expect.WithTimeout(100*time.Millisecond))
+        if err != nil {
+                t.Fatal("Python not detected")
+        }
+        t.Log("Python interpreter detected: " + str)
+&nbsp;
+        if str == "Python 2" {
+                console.SendLine("print 1,2,3")
+                _, err = console.ExpectString("1 2 3")
+                if err != nil {
+                        t.Fatal("print statement failure")
+                }
+                t.Log("print statement works as expected")
+                _, err = console.ExpectString("&gt;&gt;&gt; ")
+                if err != nil {
+                        t.Fatal("prompt is not displayed")
+                }
+        } else {
+                console.SendLine("print(1,2,3)")
+                _, err = console.ExpectString("1 2 3")
+                if err != nil {
+                        t.Fatal("print function failure")
+                }
+                t.Log("print function works as expected")
+                _, err = console.ExpectString("&gt;&gt;&gt; ")
+                if err != nil {
+                        t.Fatal("prompt is not displayed")
+                }
+        }
+&nbsp;
+        console.SendLine("quit()")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                t.Fatal(err)
+        }
+        t.Log("Done")
+}
+</pre>
+
+<p>Test musíme spustit příkazem <strong>go test -v jméno_souboru.go</strong>.
+Výstup může vypadat následovně:</p>
+
+<pre>
+=== RUN   TestPythonInterpreter
+Python 2.7.6 (default, Nov 23 2017, 15:49:48)
+[GCC 4.8.4] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+&gt;&gt;&gt; print 1,2,3
+1 2 3
+&gt;&gt;&gt;
+--- PASS: TestPythonInterpreter (1.01s)
+    07_python_test.go:18: Console created
+    07_python_test.go:30: Python interpreter started
+    07_python_test.go:37: Python interpreter detected: Python 2
+    07_python_test.go:45: print statement works as expected
+    07_python_test.go:69: Done
+PASS
+ok      command-line-arguments  1.011s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pochopitelně je možné (spíše více než
+pravděpodobné), že konkrétní verze Pythonu se bude na vašem počítači odlišovat.
+Ovšem testy by měly proběhnout bez chyby proti jakémukoli
+interpretru.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Složitější příklad &ndash; test korektnosti výpočtů prováděných intepretrem Pythonu</h2>
+
+<p>Posledním příkladem, v&nbsp;němž využijeme knihovnu
+<strong>go-expect</strong> bude test korektnosti výpočtů s&nbsp;využitím
+operátoru ** v&nbsp;Pythonu. Tento operátor slouží pro výpočet funkce
+x<sup>y</sup>; pro jednoduchost otestujeme jeho funkcionalitu při výpočtu
+mocninné řady o základu 2 (1, 2, 4, 8, 16, ...). Naivní, ovšem funkční
+implementace založená na použití knihoven <strong>testing</strong> a
+<strong>go-expect</strong> může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "os/exec"
+        "testing"
+        "time"
+&nbsp;
+        expect "github.com/Netflix/go-expect"
+)
+&nbsp;
+func <strong>TestPythonInterpreter</strong>(t *testing.T) {
+        console, err := expect.NewConsole(expect.WithStdout(os.Stdout))
+        if err != nil {
+                t.Fatal(err)
+        }
+        defer console.Close()
+        t.Log("Console created")
+&nbsp;
+        command := exec.Command("python")
+        command.Stdin = console.Tty()
+        command.Stdout = console.Tty()
+        command.Stderr = console.Tty()
+&nbsp;
+        err = command.Start()
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        t.Log("Python interpreter started")
+        time.Sleep(time.Second)
+&nbsp;
+        str, err := console.Expect(expect.String("Python 2", "Python 3"), expect.WithTimeout(100*time.Millisecond))
+        if err != nil {
+                t.Fatal("Python not detected")
+        }
+        t.Log("Python interpreter detected: " + str)
+&nbsp;
+        for i := uint(1); i &lt; 10; i++ {
+                console.SendLine(fmt.Sprintf("2**%d", i))
+                _, err = console.Expectf("%d", 1&lt;&lt;i)
+                if err != nil {
+                        t.Fatal("Math is wrong!")
+                }
+                t.Logf("Math is ok for input %d", i)
+        }
+&nbsp;
+        console.SendLine("quit()")
+&nbsp;
+        err = command.Wait()
+        if err != nil {
+                t.Fatal(err)
+        }
+        t.Log("Done")
+}
+</pre>
+
+<p>Tento test spustíme příkazem:</p>
+
+<pre>
+$ <strong>go test -v 08_python_math_test.go</strong>
+</pre>
+
+<p>S&nbsp;následujícími výsledky (platí pro výchozí interpret Pythonu na
+testovacím počítači):</p>
+
+<pre>
+=== RUN   TestPythonInterpreter
+Python 2.7.6 (default, Nov 23 2017, 15:49:48) 
+[GCC 4.8.4] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+&gt;&gt;&gt; 2**1
+2**2
+2
+&gt;&gt;&gt; 2**2
+4
+&gt;&gt;&gt; 2**3
+8
+&gt;&gt;&gt; 2**4
+16
+&gt;&gt;&gt; 2**5
+32
+&gt;&gt;&gt; 2**6
+64
+&gt;&gt;&gt; 2**7
+128
+&gt;&gt;&gt; 2**8
+256
+&gt;&gt;&gt; 2**9
+512
+--- PASS: TestPythonInterpreter (1.01s)
+    08_python_math_test.go:19: Console created
+    08_python_math_test.go:31: Python interpreter started
+    08_python_math_test.go:38: Python interpreter detected: Python 2
+    08_python_math_test.go:46: Math is ok for input 1
+    08_python_math_test.go:46: Math is ok for input 2
+    08_python_math_test.go:46: Math is ok for input 3
+    08_python_math_test.go:46: Math is ok for input 4
+    08_python_math_test.go:46: Math is ok for input 5
+    08_python_math_test.go:46: Math is ok for input 6
+    08_python_math_test.go:46: Math is ok for input 7
+    08_python_math_test.go:46: Math is ok for input 8
+    08_python_math_test.go:46: Math is ok for input 9
+    08_python_math_test.go:55: Done
+PASS
+ok      command-line-arguments  1.013s
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Balíček <strong>gexpect</strong></h2>
+
+<p>Druhým balíčkem, s&nbsp;nímž se dnes ve stručnosti seznámíme, je balíček
+nazvaný <strong>gexpect</strong>. Jeho použití je ve skutečnosti pro jednodušší
+případy mnohem snadnější, než tomu bylo u balíčku <strong>go-expect</strong>.
+Ostatně se podívejme na to, jak lze přepsat příklad spouštějící nástroj
+<strong>uname</strong> a testující jeho výsledek:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("uname")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("Linux")
+        if err != nil {
+                log.Fatal(err)
+        }
+        child.Wait()
+}
+</pre>
+
+<p>Druhý příklad (se jménem &bdquo;BSD&ldquo; namísto &bdquo;Linux&ldquo;)
+ukazuje, jak se knihovna <strong>gexpect</strong> chová ve chvíli, kdy
+nenalezne očekávaný řetězec:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("uname")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("BSD")
+        if err != nil {
+                log.Fatal(err)
+        }
+        child.Wait()
+}
+</pre>
+
+<p>Výsledek ukazuje (mj.), že se testovaný příkaz ukončil dřív, než byl
+očekávaný řetězec nalezen:</p>
+
+<pre>
+2019/11/23 19:05:46 read /dev/ptmx: input/output error
+exit status 1
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Přepis příkladu volajícího příkaz <strong>curl</strong></h2>
+
+<p>Jen pro úplnost si ukažme i přepis demonstračního příkladu <a href="#k06">ze
+šesté kapitoly</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("curl -X HEAD -v github.com")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("Location: https://github.com/")
+        if err != nil {
+                log.Fatal(err)
+        }
+        child.Wait()
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Ovládání interaktivní hry spuštěné přes <strong>telnet</strong></h2>
+
+<p>Hru <i>Zombie MUD</i>, s&nbsp;jejíž existencí jsme se již seznámili <a
+href="#k07">v&nbsp;sedmé kapitole</a>, můžeme spustit (resp.&nbsp;přesněji
+řečeno připojit se k&nbsp;ní) a ovládat s&nbsp;využitím knihovny
+<strong>goexpect</strong> relativně snadno. Prozatím si uvedeme variantu,
+v&nbsp;níž se neustále opakují testy úspěšnosti jednotlivých příkazů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("telnet zombiemud.org")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("... online since 1994")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("Your choice or name:")
+        if err != nil {
+                log.Fatal(err)
+        }
+        child.Send("d\n")
+        err = child.Expect("Ok, see you later!")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+<p>Namísto příkazu:</p>
+
+<pre>
+child.Send("d\n")
+</pre>
+
+<p>je výhodnější použít příkaz:</p>
+
+<pre>
+child.SendLine("d")
+</pre>
+
+<p>Takže výše uvedený příklad můžeme nepatrně upravit a vylepšit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("telnet zombiemud.org")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("... online since 1994")
+        if err != nil {
+                log.Fatal(err)
+        }
+        err = child.Expect("Your choice or name:")
+        if err != nil {
+                log.Fatal(err)
+        }
+        child.SendLine("d")
+        err = child.Expect("Ok, see you later!")
+        if err != nil {
+                log.Fatal(err)
+        }
+
+        child.Wait()
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Ovládání interpretru Pythonu</h2>
+
+<p>Pro ovládání interpretru Pythonu si připravíme několik pomocných funkcí,
+které nám zjednoduší vlastní zápis &bdquo;skriptu&ldquo;. Bude se jednat o
+funkci pro poslání příkazu (ukončeného Enterem) s&nbsp;kontrolou, zda se
+poslání podařilo:</p>
+
+<pre>
+func <strong>sendCommand</strong>(child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+</pre>
+
+<p>A dále o dvojici funkcí, které očekávají obecný výstup produkovaný
+interpretrem popř.&nbsp;konkrétně výzvu (<i>prompt</i>):</p>
+
+<pre>
+func <strong>expectOutput</strong>(child *gexpect.ExpectSubprocess, output string) {
+        err := child.Expect(output)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(child *gexpect.ExpectSubprocess) {
+        expectOutput(child, "&gt;&gt;&gt; ")
+}
+</pre>
+
+<p>Samotný &bdquo;skript&ldquo;, který do interpretru vloží dvojici
+aritmetických výrazů a bude očekávat a testovat jejich výsledek, se tak zkrátí
+(včetně příkazu pro ukončení interpretru):</p>
+
+<pre>
+expectPrompt(child)
+sendCommand(child, "1+2")
+expectOutput(child, "3")
+&nbsp;
+expectPrompt(child)
+sendCommand(child, "6*7")
+expectOutput(child, "42")
+&nbsp;
+expectPrompt(child)
+sendCommand(child, "quit()")
+</pre>
+
+<p>Podívejme se nyní na úplný zdrojový kód takto upraveného příkladu. Je
+přehlednější, než tomu bylo v&nbsp;případě použití knihovny
+<strong>go-expect</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>expectOutput</strong>(child *gexpect.ExpectSubprocess, output string) {
+        err := child.Expect(output)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(child *gexpect.ExpectSubprocess) {
+        expectOutput(child, "&gt;&gt;&gt; ")
+}
+&nbsp;
+func <strong>sendCommand</strong>(child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("python")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "1+2")
+        expectOutput(child, "3")
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "6*7")
+        expectOutput(child, "42")
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "quit()")
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Detekce, který interpret Pythonu byl spuštěn</h2>
+
+<p>V&nbsp;předchozím textu jsme se seznámili s&nbsp;tím, jakým způsobem je
+možné s&nbsp;využitím knihovny <strong>go-expect</strong> zjistit, který
+interpret Pythonu je spuštěn. V&nbsp;knihovně <strong>gexpect</strong>
+k&nbsp;tomuto účelu použijeme regulární výraz:</p>
+
+<pre>
+strs, err := child.ExpectRegexFind("Python [23]")
+if err != nil {
+        log.Fatal(err)
+}
+</pre>
+
+<p>Pokud se nevrátí chyba, bude proměnná <strong>strs</strong> obsahovat
+všechny řetězce odpovídající uvedenému regulárnímu výrazu, které byly na
+standardním výstupu aplikace detekovány. Nás bude zajímat první (a jediný!)
+výskyt, tedy například:</p>
+
+<pre>
+if strs[0] == "Python 2" {
+        log.Println("Python 2")
+        ...
+        ...
+        ...
+} else {
+        log.Println("Python 3")
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Příklad použití této konstrukce při testování příkazu <strong>print</strong>
+(Python 2) nebo funkce <strong>print()</strong> (Python 3):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "time"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>expectOutput</strong>(child *gexpect.ExpectSubprocess, output string) {
+        err := child.ExpectTimeout(output, time.Second)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(child *gexpect.ExpectSubprocess) {
+        expectOutput(child, "&gt;&gt;&gt; ")
+}
+&nbsp;
+func <strong>sendCommand</strong>(child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("python")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        strs, err := child.ExpectRegexFind("Python [23]")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        if strs[0] == "Python 2" {
+                log.Println("Python 2")
+                expectPrompt(child)
+                sendCommand(child, "print 1,2,3")
+                expectOutput(child, "1 2 3")
+        } else {
+                log.Println("Python 3")
+                expectPrompt(child)
+                sendCommand(child, "print(1,2,3)")
+                expectOutput(child, "1 2 3")
+        }
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "quit()")
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Kombinace knihoven <strong>testing</strong> a <strong>gexpect</strong></h2>
+
+<p>Pochopitelně nám nic nebrání využít knihovnu <strong>testing</strong>
+společně s&nbsp;knihovnou <strong>gexpect</strong>. Předchozí příklad lze
+přepsat do formy jednotkových testů následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+        "time"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>expectOutput</strong>(t *testing.T, child *gexpect.ExpectSubprocess, output string) {
+        err := child.ExpectTimeout(output, time.Second)
+        if err != nil {
+                t.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(t *testing.T, child *gexpect.ExpectSubprocess) {
+        expectOutput(t, child, "&gt;&gt;&gt; ")
+}
+&nbsp;
+func <strong>sendCommand</strong>(t *testing.T, child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                t.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>TestPythonInterpreter</strong>(t *testing.T) {
+        child, err := gexpect.Spawn("python")
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        strs, err := child.ExpectRegexFind("Python [23]")
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        if strs[0] == "Python 2" {
+                t.Log("Python 2")
+                expectPrompt(t, child)
+                sendCommand(t, child, "print 1,2,3")
+                expectOutput(t, child, "1 2 3")
+        } else {
+                t.Log("Python 3")
+                expectPrompt(t, child)
+                sendCommand(t, child, "print(1,2,3)")
+                expectOutput(t, child, "1 2 3")
+        }
+&nbsp;
+        expectPrompt(t, child)
+        sendCommand(t, child, "quit()")
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+<p>Pro spuštění takto naprogramovaných testů je nutné použít příkaz <strong>go
+test -v</strong> a nikoli <strong>go run</strong>:</p>
+
+<pre>
+=== RUN   TestPythonInterpreter
+--- PASS: TestPythonInterpreter (0.03s)
+    08_python_test.go:40: Python 2
+PASS
+ok  	command-line-arguments	0.032s
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Test korektnosti výpočtů prováděných intepretrem Pythonu podruhé</h2>
+
+<p><a href="#k11">V&nbsp;jedenácté kapitole</a> jsme se seznámili
+s&nbsp;utilitou (jednalo se o test) sloužící pro zjištění, zda
+v&nbsp;interpretru Pythonu pracuje správně aritmetický operátor **. Tento test
+můžeme přepsat takovým způsobem, aby se v&nbsp;něm použila jak standardní
+knihovna <strong>testing</strong>, tak i knihovna <strong>gexpect</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "testing"
+        "time"
+
+        "github.com/ThomasRooney/gexpect"
+)
+&nbsp;
+func <strong>expectOutput</strong>(t *testing.T, child *gexpect.ExpectSubprocess, output string) {
+        err := child.ExpectTimeout(output, time.Second)
+        if err != nil {
+                t.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(t *testing.T, child *gexpect.ExpectSubprocess) {
+        expectOutput(t, child, "&gt;&gt;&gt; ")
+}
+&nbsp;
+func <strong>sendCommand</strong>(t *testing.T, child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                t.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>TestPythonInterpreter</strong>(t *testing.T) {
+        child, err := gexpect.Spawn("python")
+        if err != nil {
+                t.Fatal(err)
+        }
+        t.Log("Python interpreter started")
+&nbsp;
+        strs, err := child.ExpectRegexFind("Python [23]")
+        if err != nil {
+                t.Fatal("Python not detected")
+        }
+        t.Log("Python interpreter detected: " + strs[0])
+&nbsp;
+        for i := uint(1); i &lt; 10; i++ {
+                sendCommand(t, child, fmt.Sprintf("2**%d", i))
+                expectOutput(t, child, fmt.Sprintf("%d", 1&lt;&lt;i))
+                t.Logf("Math is ok for input %d", i)
+        }
+&nbsp;
+        expectPrompt(t, child)
+        sendCommand(t, child, "quit()")
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+<p>Po spuštění výše uvedeného demonstračního příkladu příkazem <strong>go test
+-v</strong> by se měly objevit zprávy oznamující, že test funkcionality
+operátoru ** proběhl v&nbsp;pořádku:</p>
+
+<pre>
+=== RUN   TestPythonInterpreter
+--- PASS: TestPythonInterpreter (0.03s)
+    09_python_math_test.go:34: Python interpreter started
+    09_python_math_test.go:40: Python interpreter detected: Python 2
+    09_python_math_test.go:45: Math is ok for input 1
+    09_python_math_test.go:45: Math is ok for input 2
+    09_python_math_test.go:45: Math is ok for input 3
+    09_python_math_test.go:45: Math is ok for input 4
+    09_python_math_test.go:45: Math is ok for input 5
+    09_python_math_test.go:45: Math is ok for input 6
+    09_python_math_test.go:45: Math is ok for input 7
+    09_python_math_test.go:45: Math is ok for input 8
+    09_python_math_test.go:45: Math is ok for input 9
+PASS
+ok  	command-line-arguments	0.035s
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně pět megabajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_check_uname.go</td><td>základní použití knihovny go-expect</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/01_check_uname.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/01_check_uname.go</a></td></tr>
+<tr><td> 2</td><td>02_check_uname_timeout.go</td><td>nastavení timeoutu při čekání na řetězec, který se má na konzoli objevit</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/02_check_uname_timeout.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/02_check_uname_timeout.go</a></td></tr>
+<tr><td> 3</td><td>03_check_curl_output.go</td><td>test výstupu příkazu <strong>curl</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/03_check_curl_output.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/03_check_curl_output.go</a></td></tr>
+<tr><td> 4</td><td>04_telnet_game.go</td><td>ovládání hry dostupné přes <strong>telnet</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/04_telnet_game.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/04_telnet_game.go</a></td></tr>
+<tr><td> 5</td><td>05_python.go</td><td>ovládání interpretu programovacího jazyka Python</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/05_python.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/05_python.go</a></td></tr>
+<tr><td> 6</td><td>06_python_timeout.go</td><td>ovládání interpretu programovacího jazyka Python, rozhodnutí o verzi Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/06_python_timeout.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/06_python_timeout.go</a></td></tr>
+<tr><td> 7</td><td>07_python_test.go</td><td>ovládání Pythonu ve formě unit testu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/07_python_test.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/07_python_test.go</a></td></tr>
+<tr><td> 8</td><td>08_python_math_test.go</td><td>test aritmetických schopností interpretru Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/go-expect/08_python_math_test.go">https://github.com/tisnik/go-root/blob/master/article_43/go-expect/08_python_math_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>01_check_uname_linux.go</td><td>základní použití knihovny go-expect</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/01_check_uname_linux.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/01_check_uname_linux.go</a></td></tr>
+<tr><td>10</td><td>02_check_uname_bsd.go</td><td>základní použití knihovny go-expect</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/02_check_uname_bsd.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/02_check_uname_bsd.go</a></td></tr>
+<tr><td>11</td><td>03_curl_output.go</td><td>test výstupu příkazu <strong>curl</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/03_curl_output.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/03_curl_output.go</a></td></tr>
+<tr><td>12</td><td>04_telnet_game.go</td><td>ovládání hry dostupné přes <strong>telnet</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/04_telnet_game.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/04_telnet_game.go</a></td></tr>
+<tr><td>13</td><td>05_telnet_game.go</td><td>vylepšené ovládání hry dostupné přes <strong>telnet</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/05_telnet_game.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/05_telnet_game.go</a></td></tr>
+<tr><td>14</td><td>06_python.go</td><td>ovládání interpretru Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/06_python.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/06_python.go</a></td></tr>
+<tr><td>15</td><td>07_python.go</td><td>ovládání Pythonu ve formě unit testu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/07_python.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/07_python.go</a></td></tr>
+<tr><td>16</td><td>08_python_test.go</td><td>test aritmetických schopností interpretru Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/08_python_test.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/08_python_test.go</a></td></tr>
+<tr><td>17</td><td>09_python_math_test.go</td><td></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_43/gexpect/09_python_math_test.go">https://github.com/tisnik/go-root/blob/master/article_43/gexpect/09_python_math_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Balíček goexpect<br />
+<a href="https://github.com/google/goexpect">https://github.com/google/goexpect</a>
+</li>
+
+<li>Balíček go-expect<br />
+<a href="https://github.com/Netflix/go-expect">https://github.com/Netflix/go-expect</a>
+</li>
+
+<li>Balíček gexpect<br />
+<a href="https://github.com/ThomasRooney/gexpect">https://github.com/ThomasRooney/gexpect</a>
+</li>
+
+<li>Expect (originál naprogramovaný v&nbsp;TCL)<br />
+<a href="https://core.tcl-lang.org/expect/index">https://core.tcl-lang.org/expect/index</a>
+</li>
+
+<li>Expect (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Expect">https://en.wikipedia.org/wiki/Expect</a>
+</li>
+
+<li>Pexpect<br />
+<a href="https://pexpect.readthedocs.io/en/stable/">https://pexpect.readthedocs.io/en/stable/</a>
+</li>
+
+<li>Golang SSH Client: Multiple Commands, Crypto &amp; Goexpect Examples<br />
+<a href="http://networkbit.ch/golang-ssh-client/">http://networkbit.ch/golang-ssh-client/</a>
+</li>
+
+<li>goblin na GitHubu<br />
+<a href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>
+</li>
+
+<li>Mocha framework<br />
+<a href="https://mochajs.org/">https://mochajs.org/</a>
+</li>
+
+<li>frisby na GitHubu<br />
+<a href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>
+</li>
+
+<li>package frisby<br />
+<a href="https://godoc.org/github.com/verdverm/frisby">https://godoc.org/github.com/verdverm/frisby</a>
+</li>
+
+<li>Frisby alternatives and similar packages (generováno)<br />
+<a href="https://go.libhunt.com/frisby-alternatives">https://go.libhunt.com/frisby-alternatives</a>
+</li>
+
+<li>Cucumber for golang<br />
+<a href="https://github.com/DATA-DOG/godog">https://github.com/DATA-DOG/godog</a>
+</li>
+
+<li>How to Use Godog for Behavior-driven Development in Go<br />
+<a href="https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go">https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go</a>
+</li>
+
+<li>Comparative Analysis Of GoLang Testing Frameworks<br />
+<a href="https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks">https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks</a>
+</li>
+
+<li>A Quick Guide to Testing in Golang<br />
+<a href="https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/">https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/</a>
+</li>
+
+<li>Tom's Obvious, Minimal Language.<br />
+<a href="https://github.com/toml-lang/toml">https://github.com/toml-lang/toml</a>
+</li>
+
+<li>xml.org<br />
+<a href="http://www.xml.org/">http://www.xml.org/</a>
+</li>
+
+<li>Soubory .properties<br />
+<a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
+</li>
+
+<li>Soubory INI<br />
+<a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
+</li>
+
+<li>JSON to YAML<br />
+<a href="https://www.json2yaml.com/">https://www.json2yaml.com/</a>
+</li>
+
+<li>Data Format Converter<br />
+<a href="https://toolkit.site/format.html">https://toolkit.site/format.html</a>
+</li>
+
+<li>Viper na GitHubu<br />
+<a href="https://github.com/spf13/viper">https://github.com/spf13/viper</a>
+</li>
+
+<li>GoDotEnv na GitHubu<br />
+<a href="https://github.com/joho/godotenv">https://github.com/joho/godotenv</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
