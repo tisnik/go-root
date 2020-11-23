@@ -1,0 +1,3126 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Testování aplikací psaných v Go s využitím knihoven Goblin a Frisby</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1></h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešní části seriálu o programovacím jazyce Go si popíšeme knihovny Goblin a Frisby. První knihovna zjednodušuje zápis jednotkových či integračních testů, druhá pak slouží pro testování REST API, což je přesně oblast, ve které se jazyk Go velmi často používá.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Knihovna Goblin: zjednodušení testů v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Jednoduché testy vytvořené s&nbsp;využitím knihovny Goblin</a></p>
+<p><a href="#k03">3. Testy se složitější strukturou</a></p>
+<p><a href="#k04">4. Vnořené bloky <strong>Describe</strong></a></p>
+<p><a href="#k05">5. Větší množství funkcí s&nbsp;implementací testů</a></p>
+<p><a href="#k06">6. Klauzule <strong>Before</strong></a></p>
+<p><a href="#k07">7. Testování aplikací s&nbsp;REST API s&nbsp;využitím knihovny Frisby</a></p>
+<p><a href="#k08">8. Otestování koncových bodů REST API přístupných přes HTTP metodu GET</a></p>
+<p><a href="#k09">9. Chování Frisby ve chvíli, kdy není splněna testovaná podmínka</a></p>
+<p><a href="#k10">10. Kontrola hlaviček odpovědí poslaných serverem</a></p>
+<p><a href="#k11">11. Použití HTTP metody POST</a></p>
+<p><a href="#k12">12. Poslání dat ve formátu JSON na server</a></p>
+<p><a href="#k13">13. Kontrola obsahu odpovědi serveru</a></p>
+<p><a href="#k14">14. Nastavení cookies</a></p>
+<p><a href="#k15">15. Způsob zápisu testů</a></p>
+<p><a href="#k16">16. Využití knihovny Frisby společně s&nbsp;knihovnou Testing</a></p>
+<p><a href="#k17">17. Padající jednotkový test založený na knihovně Frisby</a></p>
+<p><a href="#k18">18. Jednotkové testy s&nbsp;více funkcemi</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Knihovna Goblin: zjednodušení testů v&nbsp;programovacím jazyku Go</h2>
+
+<p>První knihovnou určenou pro tvorbu čitelných a současně i snadno
+upravitelných a pochopitelných testů, s&nbsp;níž se dnes seznámíme, je knihovna
+nazvaná <i>Goblin</i>. Zdrojové kódy i dokumentace k&nbsp;této knihovně jsou
+dostupné na adrese <a
+href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>.
+Tato knihovna je do značné míry inspirována známým testovacím frameworkem <a
+href="https://mochajs.org/">Mocha</a>, který se používá se světě <a
+href="https://developer.mozilla.org/en-US/docs/Web/JavaScript">JavaScriptu</a>
+a taktéž <a href="https://www.typescriptlang.org/">TypeScriptu</a>. Při použití
+frameworku Mocha se testy zapisují s&nbsp;využitím funkcí
+<strong>describe</strong> a <strong>it</strong> (volání těchto funkcí lze
+v&nbsp;případě potřeby vnořovat), přičemž pro samotné testování podmínek je
+možné použít prakticky libovolnou další knihovnu s&nbsp;implementací <a
+href="https://cs.wikipedia.org/wiki/Aserce">asercí</a>, které vyhazují výjimku
+<strong>Error</strong> (expects.js, should.js, assert z&nbsp;Node.js atd.
+atd.).</p>
+
+<img src="https://i.iinfo.cz/images/154/goblin-frisby-1.png" class="image-396128" alt="&#160;" width="180" height="195" />
+<p><i>Obrázek 1: Logo frameworku Mocha, kterým se inspirovali tvůrci knihovny Goblin.</i></p>
+
+<p>Jednoduchý test, který kontroluje chování metody <strong>indexOf</strong>
+pro prvek, který v&nbsp;poli neexistuje, je možné zapsat následujícím způsobem
+(viz též <a
+href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf">popis
+chování)</a>:</p>
+
+<pre>
+var assert = require('assert');
+&nbsp;
+<strong>describe</strong>('Array', function() {
+    <strong>describe</strong>('#indexOf()', function() {
+        <strong>it</strong>('should return -1 when the value is not present', function() {
+            assert.equal([1, 2, 3].indexOf(4), -1);
+        });
+    });
+});
+</pre>
+
+<p>Povšimněte si použití funkcí <strong>describe</strong> pro popis testů i pro
+určení jejich struktury (není plochá, může se jednat o libovolně strukturovaný
+strom) a pro zápis samotného testu. V&nbsp;knihovně <i>Mocha</i> se tedy velmi
+často setkáme s&nbsp;použitím anonymních funkcí a totéž platí i pro knihovnu
+<i>Goblin</i> popsanou níže.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;případě, že se ve vlastním testu
+nemusí použít <i>kontext</i> (spravovaný knihovnou Mocha), lze zápis zkrátit
+následujícím způsobem:</div></p>
+
+<pre>
+var assert = require('assert');
+&nbsp;
+<strong>describe</strong>('Array', () =&gt; {
+    <strong>describe</strong>('#indexOf()', () =&gt; {
+        <strong>it</strong>('should return -1 when the value is not present', function() {
+            assert.equal([1, 2, 3].indexOf(4), -1);
+        });
+    });
+});
+</pre>
+
+<p>Vraťme se nyní ke knihovně <i>Goblin</i>, kterou lze použít
+v&nbsp;programovacím jazyku Go ke zjednodušení zápisu jednotkových testů
+popř.&nbsp;v&nbsp;případě potřeby i testů integračních. Samotná knihovna
+<i>Goblin</i> se v&nbsp;takovém případě používá jako doplněk k&nbsp;základní
+knihovně <i>Testing</i>, s&nbsp;níž jsme se již <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;seriálu o
+programovacím jazyce Go</a> <a
+href="https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/">setkali</a>.
+Připomeňme si, že základní knihovna <i>Testing</i> vývojářům neposkytuje žádné
+funkce pro aserce, takže veškerý zápis podmínek musí být proveden explicitně,
+s&nbsp;případným zavoláním metody <strong>testing.T.Error()</strong> nebo
+<strong>testing.T.Error()</strong> (popř.&nbsp;dalších alternativ) ve chvíli,
+kdy není podmínka splněna:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp; 
+import "testing"
+&nbsp; 
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+}
+</pre>
+
+<p>Výše uvedeným způsobem je pochopitelně možné zapsat i složitější testy,
+ovšem jedná se o poměrně nízkoúrovňový přístup, který s&nbsp;sebou přináší
+několik nevýhod. Především se &ndash; kvůli neexistenci asercí &ndash; celý
+test skládá z&nbsp;mnoha explicitně zapisovaných podmínek (ostatně jazyk Go je
+jedním z&nbsp;mála moderních programovacích jazyků, v&nbsp;němž není konstrukce
+<strong>assert</strong> přímo součástí vlastního jazyka). Navíc mají testy jen
+jednorozměrnou strukturu, bez přidané hierarchie (tu mnohdy musíme doplnit sami
+vhodným pojmenováním funkcí představujících jednotlivé testy). A konečně
+&ndash; standardní knihovna <i>Testing</i> neposkytuje vývojářům možnost
+explicitně zapsat informaci o tom, jaká vlastnost se právě testuje. A navíc
+mnohdy potřebujeme dopředu vytvořit alespoň kostru testů, ovšem bez podrobnější
+implementace, popř.&nbsp;je nutné některé testy zakázat (vyloučit
+z&nbsp;testovacího scénáře). Tyto informace je samozřejmě možné přidat ve formě
+poznámky popř.&nbsp;do případných chybových hlášení, ovšem nejedná se o součást
+definice testu (lze použít volání <strong>testing.T.Skip()</strong>). A právě
+tato omezení knihovny <i>Testing</i> jsou v&nbsp;uspokojivé míře
+&bdquo;napravena&ldquo; knihovnou <i>Goblin</i>, která možnosti základní
+knihovny rozšiřuje.</p>
+
+<img src="https://i.iinfo.cz/images/154/goblin-frisby-2.png" class="image-396129" alt="&#160;" width="350" height="245" />
+<p><i>Obrázek 2: Logo projektu Goblin.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: propojení <i>Testing+Goblin</i>
+představuje dobrý a praktický přístup, protože na knihovnu <i>testing</i> jsou
+navázány další nástroje používané v&nbsp;ekosystému programovacího jazyka Go.
+Díky tomu, že <i>Goblin</i> rozšiřuje a doplňuje možnosti <i>testing</i> (a
+nenahrazuje je), můžeme stále používat <strong>go test</strong>, knihovnu
+<i>Gocov</i> atd.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Jednoduché testy vytvořené s&nbsp;využitím knihovny Goblin</h2>
+
+<p>Podívejme se nyní na způsob zápisu jednoduchých testů založených na
+kombinaci standardní knihovny <i>Testing</i> s&nbsp;knihovnou <i>Goblin</i>.
+Samotné funkce představující testy budou mít stejnou signaturu, kterou očekává
+knihovna <i>Testing</i>. To v&nbsp;praxi znamená, že každá funkce
+s&nbsp;implementací testu musí splňovat tyto podmínky:</p>
+
+<ol>
+<li>Jméno funkce začíná slovem &bdquo;Test&ldquo;.</li>
+<li>Jediný parametr funkce má typ <strong>*testing.T</strong>, tedy ukazatel na strukturu <strong>T</strong> definovanou v&nbsp;balíčku <strong>testing</strong>.</li>
+<li>Funkce nemá návratovou hodnotu.</li>
+</ol>
+
+<p>Prázdný test, jenž ve skutečnosti nebude provádět žádnou kontrolu podmínek,
+ovšem bude obsahovat popis, jaká operace/funkce/metoda se testuje, může vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+        })
+}
+</pre>
+
+<p>Povšimněte si, že v&nbsp;samotném testu je nutné inicializovat kontext
+spravovaný knihovnou <i>Goblin</i>:</p>
+
+<pre>
+g := Goblin(t)
+</pre>
+
+<p>Následně je již možné vytvořenou strukturu použít pro volání dalších metod,
+zde konkrétně metody <strong>Describe</strong>, které se předá jak popis
+testované oblasti, tak i (anonymní) funkce s&nbsp;vlastními kontrolami (zde je
+funkce prozatím prázdná, protože se jedná pouze o kostru testu):</p>
+
+<pre>
+g.Describe("Adder", func() {
+    <i>// prázdné tělo anonymní funkce</i>
+})
+</pre>
+
+<p>Tento test spustíme standardním způsobem, tedy jako jakýkoli jiný jednotkový
+test, příkazem <strong>go test</strong>. Přitom je vhodné použít i přepínač
+<strong>-v</strong>, aby se vypsaly informace i o těch krocích, které
+nezhavarovaly:</p>
+
+<pre>
+$ <strong>go test -v 01_intro_test.go </strong>
+&nbsp;
+=== RUN   Test
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Předchozí demonstrační příklad obsahoval pouze popis testované podmínky, ale
+ne již vlastní implementaci testu. Tento nedostatek ihned napravíme, protože
+následující test již kontroluje operaci součtu dvou kladných čísel. Povšimněte
+si zejména způsobů použití metod <strong>It</strong> a <strong>Assert</strong>
+(zde spojené s&nbsp;metodou <strong>Equal</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.It("Should add two numbers ", func() {
+                        g.Assert(1 + 1).Equal(2)
+                })
+        })
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: podmínku můžete v&nbsp;případě potřeby
+zapsat i explicitně pomocí <strong>if <i>podmínka</i></strong>, většinou to ale
+není nutné.</div></p>
+
+<p>Tento test opět spustíme standardním způsobem, tedy s&nbsp;využitím příkazu
+<strong>go test</strong>. Výsledek po spuštění již bude vypadat odlišně,
+protože vlastně uvidíme dva výpisy &ndash; první výpis (strukturovaný) je
+proveden knihovnou <i>Goblin</i>, druhý (standardní PASS/FAIL) pak knihovnou
+<i>Testing</i>, resp.&nbsp;přesněji řečeno nástroji, které výstup
+z&nbsp;knihovny <i>Testing</i> dále zpracovávají a zobrazují uživateli na
+terminálu:</p>
+
+<pre>
+$ <strong>go test -v 02_passing_test.go </strong>
+&nbsp;
+=== RUN   Test
+&nbsp;
+  Adder
+    ✓ Should add two numbers 
+&nbsp;
+&nbsp;
+ 1 tests complete (0 ms)
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Pochopitelně můžeme testy spustit i bez přepínače <strong>-v</strong>;
+v&nbsp;takovém případě je ovšem výstup do značné míry zminimalizován:</p>
+
+<pre>
+$ <strong>go test 02_passing_test.go </strong>
+&nbsp;
+ok      command-line-arguments  0.001s
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Testy se složitější strukturou</h2>
+
+<p>Další možnosti knihovny <i>Goblin</i> si ověříme na příkladu, v&nbsp;němž se
+provádí čtyři kroky (testování podmínek). První podmínka je splněna (1+1=2),
+druhá nesplněna (1+1&ne;5), třetí podmínka není vůbec implementována a čtvrtá
+je explicitně vyloučena a nebude při testování vůbec spuštěna. V&nbsp;tomto
+případě se použije metoda <strong>Xit</strong> a nikoli metoda
+<strong>It</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.It("Should add two numbers ", func() {
+                        g.Assert(1 + 1).Equal(2)
+                })
+                g.It("Should add two numbers", func() {
+                        g.Assert(1 + 1).Equal(5)
+                })
+                g.It("Should substract two numbers")
+                g.Xit("Should add two numbers, excluded ", func() {
+                        g.Assert(3 + 1).Equal(4)
+                })
+        })
+}
+</pre>
+
+<p>Opět se podívejme na to, jakým způsobem bude vypadat výstup po spuštění
+testů:</p>
+
+<pre>
+$ <strong>go test -v 03_intro_test.go </strong>
+&nbsp;
+=== RUN   Test
+&nbsp;
+  Adder
+    ✓ Should add two numbers 
+    1) Should add two numbers
+    - Should substract two numbers
+    - Should add two numbers, excluded 
+&nbsp;
+&nbsp;
+ 1 tests complete (0 ms)
+ 1 test(s) pending
+&nbsp;
+ 1 test(s) excluded
+&nbsp;
+ 1 tests failed: 
+&nbsp;
+  1) Adder Should add two numbers:
+&nbsp;
+    2 does not equal 5
+        /home/tester/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/tester/src/go-root/article_42/03_intro_test.go:15 +0x68
+        /home/tester/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/tester/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+--- FAIL: Test (0.00s)
+FAIL
+FAIL    command-line-arguments  0.001s
+FAIL
+</pre>
+
+<p>Povšimněte si, že se správně ohlásily všechny čtyři situace, které po
+spuštění testů nastaly, knihovna <i>Goblin</i> totiž zaznamená i ty testy,
+které prozatím nejsou implementovány (to je důležitá zpráva pro vývojáře), i
+testy, které byly explicitně zakázány (opět důležitá zpráva).</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti je výstup získaný
+spuštěním jednotkových testů obarven, takže na terminálu může vypadat
+takto:</div></p>
+
+<a href="https://www.root.cz/obrazek/396130/"><img src="https://i.iinfo.cz/images/154/goblin-frisby-3-prev.png" class="image-396130" alt="&#160;" width="370" height="250" /></a>
+<p><i>Obrázek 3: Výsledek spuštění testů na terminálu s&nbsp;podporou barevného
+výstupu (což je vlastnost podporovaná všemi moderními terminály).</i></p>
+
+<p>Ve skutečnosti se ovšem velmi často setkáme s&nbsp;testy, které mají
+složitější strukturu. V&nbsp;bloku <strong>Describe</strong> je například možné
+mít umístěno větší množství bloků <strong>It</strong>, pokaždé s&nbsp;odlišnou
+sadou podmínek. Takto strukturovaný test může vypadat například následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.It("Should add two numbers ", func() {
+                        g.Assert(1 + 1).Equal(2)
+                })
+                g.It("Should add two numbers", func() {
+                        g.Assert(2 + 2).Equal(4)
+                })
+                g.It("Should add two numbers", func() {
+                        g.Assert(10 + 20).Equal(30)
+                })
+        })
+}
+</pre>
+
+<p>Všechny testované podmínky se v&nbsp;tomto případě vypíšou odsazeně
+v&nbsp;sekci s&nbsp;nadpisem adder <strong>Adder</strong>:</p>
+
+<pre>
+$ <strong>go test -v 04_all_passing_test.go </strong>
+&nbsp;
+=== RUN   Test
+&nbsp;
+  Adder
+    ✓ Should add two numbers 
+    ✓ Should add two numbers
+    ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 3 tests complete (0 ms)
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Samozřejmě nám nic nebrání změnit popisky podsekcí <strong>It</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.It("Should add 1+1 ", func() {
+                        g.Assert(1 + 1).Equal(2)
+                })
+                g.It("Should add 2+2 ", func() {
+                        g.Assert(2 + 2).Equal(4)
+                })
+                g.It("Should add 10+20", func() {
+                        g.Assert(10 + 20).Equal(30)
+                })
+        })
+}
+</pre>
+
+<p>Výsledek nyní bude pro uživatele čitelnější:</p>
+
+<pre>
+=== RUN   Test
+&nbsp;
+  Adder
+    ✓ Should add 1+1 
+    ✓ Should add 2+2 
+    ✓ Should add 10+20
+&nbsp;
+&nbsp;
+ 3 tests complete (0 ms)
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Vnořené bloky <strong>Describe</strong></h2>
+
+<p>Boky <strong>Describe</strong> představované voláním metody
+<strong>G.Describe()</strong>, je možné v&nbsp;případě potřeby vnořovat do
+prakticky libovolné úrovně. Jeden testovací scénář tedy můžeme rozdělit na
+testování součtu dvou kladných čísel a na testování součtu kladného a záporného
+čísla:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + 1).Equal(2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + 20).Equal(30)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + -1).Equal(0)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + -4).Equal(-2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + -20).Equal(-10)
+                        })
+                })
+        })
+}
+</pre>
+
+<p>Výsledek běhu testů bude nyní naformátován tímto způsobem:</p>
+
+<pre>
+$ <strong>go test -v 05_nested_describe_test.go </strong>
+&nbsp;
+=== RUN   Test
+&nbsp;
+  Adder
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 6 tests complete (0 ms)
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Podobně lze pochopitelně bloky <strong>Describe</strong> vkládat za sebe.
+V&nbsp;dalším testu budeme nejdříve testovat chování operátoru + a následně i
+chování operátoru *:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + 1).Equal(2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + 20).Equal(30)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + -1).Equal(0)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + -4).Equal(-2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + -20).Equal(-10)
+                        })
+                })
+        })
+        g.Describe("Multiplier", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should multiply two numbers ", func() {
+                                g.Assert(1 * 1).Equal(1)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(2 * 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 * 20).Equal(200)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should multiply two numbers ", func() {
+                                g.Assert(1 * -1).Equal(-1)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(2 * -4).Equal(-8)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(10 * -20).Equal(-200)
+                        })
+                })
+        })
+}
+</pre>
+
+<p>Opět si samozřejmě ukážeme výsledky takto strukturovaného testovacího scénáře:</p>
+
+<pre>
+$ <strong>go test -v 06_nested_struct_test.go </strong>
+&nbsp;
+=== RUN   Test
+&nbsp;
+  Adder
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 6 tests complete (0 ms)
+&nbsp;
+  Multiplier
+&nbsp;
+    Positive numbers
+      ✓ Should multiply two numbers 
+      ✓ Should multiply two numbers
+      ✓ Should multiply two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should multiply two numbers 
+      ✓ Should multiply two numbers
+      ✓ Should multiply two numbers
+&nbsp;
+&nbsp;
+ 12 tests complete (0 ms)
+--- PASS: Test (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Větší množství funkcí s&nbsp;implementací testů</h2>
+
+<p>Nic nám pochopitelně nebrání v&nbsp;deklaraci většího množství funkcí
+s&nbsp;implementací testů. V&nbsp;následujícím demonstračním příkladu jsou
+použity dvě funkce pojmenované jednoduše <strong>TestAdder</strong> (test
+chování operátoru +) a <strong>TestMultiplier</strong> (test chování operátoru
+*):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>TestAdder</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + 1).Equal(2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + 20).Equal(30)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + -1).Equal(0)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + -4).Equal(-2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + -20).Equal(-10)
+                        })
+                })
+        })
+}
+&nbsp;
+func <strong>TestMultiplier</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Multiplier", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should multiply two numbers ", func() {
+                                g.Assert(1 * 1).Equal(1)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(2 * 2).Equal(4)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(10 * 20).Equal(200)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should multiply two numbers ", func() {
+                                g.Assert(1 * -1).Equal(-1)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(2 * -4).Equal(-8)
+                        })
+                        g.It("Should multiply two numbers", func() {
+                                g.Assert(10 * -20).Equal(-200)
+                        })
+                })
+        })
+}
+</pre>
+
+<p>Výsledky nyní budou rozděleny na dvě části, přičemž se každá část bude
+vztahovat k&nbsp;jedné funkci, v&nbsp;níž jsou jednotkové testy
+implementovány:</p>
+
+<pre>
+$ <strong>go test -v 07_split_test.go </strong>
+&nbsp;
+=== RUN   TestAdder
+&nbsp;
+  Adder
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 6 tests complete (0 ms)
+--- PASS: TestAdder (0.00s)
+=== RUN   TestMultiplier
+&nbsp;
+  Multiplier
+&nbsp;
+    Positive numbers
+      ✓ Should multiply two numbers 
+      ✓ Should multiply two numbers
+      ✓ Should multiply two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should multiply two numbers 
+      ✓ Should multiply two numbers
+      ✓ Should multiply two numbers
+&nbsp;
+&nbsp;
+ 6 tests complete (0 ms)
+--- PASS: TestMultiplier (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Další ukázka, tentokrát pro podmínky, které nejsou splněny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + 1).Equal(2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + 20).Equal(-100)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + -1).Equal(0)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + -4).Equal(-2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + -20).Equal(-10)
+                        })
+                })
+        })
+        g.Describe("Multiplier", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 * 1).Equal(1)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 * 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 * 20).Equal(200)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 * -1).Equal(-1)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 * -4).Equal(-8)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 * -20).Equal(200)
+                        })
+                })
+        })
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+=== RUN   Test
+&nbsp;
+  Adder
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      1) Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 5 tests complete (0 ms)
+ 1 tests failed: 
+&nbsp;
+  1) Positive numbers Should add two numbers:
+&nbsp;
+&nbsp;
+    30 does not equal -100
+        /home/ptisnovs/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/ptisnovs/src/go-root/article_42/08_nested_struct_failed_test.go:19 +0x68
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+&nbsp;
+  Multiplier
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      2) Should add two numbers
+&nbsp;
+&nbsp;
+ 10 tests complete (0 ms)
+&nbsp;
+ 2 tests failed: 
+&nbsp;
+  1) Positive numbers Should add two numbers:
+&nbsp;
+    30 does not equal -100
+        /home/ptisnovs/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/ptisnovs/src/go-root/article_42/08_nested_struct_failed_test.go:19 +0x68
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+  2) Negative numbers Should add two numbers:
+&nbsp;
+    -200 does not equal 200
+        /home/ptisnovs/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/ptisnovs/src/go-root/article_42/08_nested_struct_failed_test.go:54 +0x68
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+--- FAIL: Test (0.00s)
+FAIL
+FAIL    command-line-arguments  0.001s
+FAIL
+</pre>
+
+<p>Podobný test, ovšem tentokrát strukturovaný do dvou samostatných funkcí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>Test1</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Adder", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + 1).Equal(2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + 20).Equal(-30)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 + -1).Equal(0)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 + -4).Equal(-2)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 + -20).Equal(-10)
+                        })
+                })
+        })
+}
+&nbsp;
+func <strong>Test2</strong>(t *testing.T) {
+        g := Goblin(t)
+        g.Describe("Multiplier", func() {
+                g.Describe("Positive numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 * 1).Equal(1)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 * 2).Equal(4)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 * 20).Equal(200)
+                        })
+                })
+                g.Describe("Negative numbers", func() {
+                        g.It("Should add two numbers ", func() {
+                                g.Assert(1 * -1).Equal(-1)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(2 * -4).Equal(-8)
+                        })
+                        g.It("Should add two numbers", func() {
+                                g.Assert(10 * -20).Equal(200)
+                        })
+                })
+        })
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+=== RUN   Test1
+&nbsp;
+  Adder
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      1) Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+&nbsp;
+ 5 tests complete (0 ms)
+ 1 tests failed: 
+&nbsp;
+&nbsp;
+  1) Positive numbers Should add two numbers:
+&nbsp;
+    30 does not equal -30
+        /home/ptisnovs/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/ptisnovs/src/go-root/article_42/09_split_failed_test.go:19 +0x68
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+--- FAIL: Test1 (0.00s)
+=== RUN   Test2
+&nbsp;
+  Multiplier
+&nbsp;
+    Positive numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      ✓ Should add two numbers
+&nbsp;
+    Negative numbers
+      ✓ Should add two numbers 
+      ✓ Should add two numbers
+      1) Should add two numbers
+&nbsp;
+&nbsp;
+ 5 tests complete (0 ms)
+ 1 tests failed: 
+&nbsp;
+  1) Negative numbers Should add two numbers:
+&nbsp;
+    -200 does not equal 200
+        /home/ptisnovs/go/src/github.com/franela/goblin/assertions.go:48 +0x130
+        /home/ptisnovs/src/go-root/article_42/09_split_failed_test.go:58 +0x68
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x27
+        /home/ptisnovs/go/src/github.com/franela/goblin/goblin.go:229 +0x3e7
+--- FAIL: Test2 (0.00s)
+FAIL
+FAIL    command-line-arguments  0.001s
+FAIL
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Klauzule <strong>Before</strong></h2>
+
+<p>V&nbsp;testovacích scénářích lze použít libovolné množství klauzulí
+<strong>Before</strong> představovaných (anonymními) funkcemi, které jsou
+zavolány ještě před kontrolou jednotlivých podmínek v&nbsp;testech:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>TestBefore</strong>(t *testing.T) {
+        g := Goblin(t)
+        x := 0
+&nbsp;
+        g.Describe("Adder", func() {
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(1)
+                })
+        })
+&nbsp;
+        g.Describe("Adder", func() {
+                g.Before(func() {
+                        x = 10
+                })
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(11)
+                })
+        })
+&nbsp;
+        g.Describe("Adder", func() {
+                g.Before(func() {
+                        x = 1
+                })
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(2)
+                })
+        })
+}
+</pre>
+
+<p>V&nbsp;bloku <strong>Before</strong> se modifikuje hodnota proměnné
+<strong>x</strong> použité v&nbsp;testech:</p>
+
+<pre>
+=== RUN   TestBefore
+&nbsp;
+  Adder
+    ✓ x+1
+&nbsp;
+&nbsp;
+ 1 tests complete (0 ms)
+&nbsp;
+  Adder
+    ✓ x+1
+&nbsp;
+&nbsp;
+ 2 tests complete (0 ms)
+&nbsp;
+  Adder
+    ✓ x+1
+&nbsp;
+&nbsp;
+ 3 tests complete (0 ms)
+--- PASS: TestBefore (0.00s)
+PASS
+ok      command-line-arguments  0.001s
+</pre>
+
+<p>Naprosto stejného výsledku lze dosáhnout, i když bude blok
+<strong>Before</strong> uveden až za <strong>It</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        . "github.com/franela/goblin"
+        "testing"
+)
+&nbsp;
+func <strong>TestBefore</strong>(t *testing.T) {
+        g := Goblin(t)
+        x := 0
+&nbsp;
+        g.Describe("Adder", func() {
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(1)
+                })
+        })
+&nbsp;
+        g.Describe("Adder", func() {
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(11)
+                })
+                g.Before(func() {
+                        x = 10
+                })
+        })
+&nbsp;
+        g.Describe("Adder", func() {
+                g.It("x+1", func() {
+                        g.Assert(x + 1).Equal(2)
+                })
+                g.Before(func() {
+                        x = 1
+                })
+        })
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Testování aplikací s&nbsp;REST API s&nbsp;využitím knihovny Frisby</h2>
+
+<p>Ve druhé části dnešního článku se budeme zabývat popisem další knihovny
+určené pro zjednodušení testování aplikací. Tentokrát se bude jednat o knihovnu
+zaměřenou primárně na testování REST API, což je v&nbsp;praxi velmi užitečné,
+protože mnoho aplikací vytvořených v&nbsp;jazyce Go má podobu služeb a
+mikroslužeb právě s&nbsp;rozhraním REST API. Knihovna <i>Frisby</i>, kterou
+opět nalezneme na GitHubu, konkrétně na adrese <a
+href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>,
+dokáže pracovat se všemi šesti základními HTTP metodami <strong>GET</strong>,
+<strong>POST</strong>, <strong>PUT</strong>, <strong>DELETE</strong>,
+<strong>PATCH</strong>, <strong>HEAD</strong> i s&nbsp;metodou
+<strong>OPTIONS</strong>. Podporována je i práce s&nbsp;hlavičkami dotazů
+(<i>request</i>) i odpovědí (<i>response</i>), zpracování cookies, předávání
+dat, testování obsahu odpovědi (jak textové, tak i v&nbsp;podobě JSONu) a
+dokonce je možné i specifikovat funkce, které mají zpracovat obsah
+odpovědi.</p>
+
+<img src="https://i.iinfo.cz/images/154/goblin-frisby-4.png" class="image-396131" alt="&#160;" width="300" height="241" /></p>
+<p><i>Obrázek 4: Logo knihovny Frisby.</i></p>
+
+<p>Dnes si ukážeme základy práce s&nbsp;touto knihovnou, tj.&nbsp;se způsobem
+posílání dotazů na zvolené REST API endpointy, kontrolu odpovědí (včetně
+hlaviček) a taktéž s&nbsp;testováním vrácených dat, která jsou typicky předána
+ve formátu JSON. Ovšem možnosti knihovny <i>Frisby</i> jsou ve skutečnosti
+mnohem větší a s&nbsp;některými z&nbsp;nich se seznámíme v&nbsp;dalším
+pokračování seriálu o jazyku Go.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Otestování koncových bodů REST API přístupných přes HTTP metodu GET</h2>
+
+<p>S&nbsp;možnostmi nabízenými knihovnou <i>Frisby</i> se seznámíme
+s&nbsp;využitím několika demonstračních příkladů. První příklad bude velmi
+jednoduchý &ndash; budeme v&nbsp;něm testovat HTTP kódy vrácené pro adresy <a
+href="http://httpbin.org/get">http://httpbin.org/get</a> a <a
+href="http://httpbin.org/status/321">http://httpbin.org/status/321</a> při
+použití HTTP metody GET. V&nbsp;prvním případě by se měl vrátit kód 200 (OK),
+ve druhém pak kód 321. Samotné vytvoření dotazu proběhne tímto způsobem:</p>
+
+<pre>
+f := frisby.Create("Simplest test")
+f..Get("http://httpbin.org/get")
+</pre>
+
+<p>Alternativně je možné přípravu dotazu zapsat na jediný řádek:</p>
+
+<pre>
+f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
+</pre>
+
+<p>Tento řádek pouze připraví objekt reprezentující dotaz. Samotný dotaz (HTTP
+GET) bude proveden až spuštěním dalšího řádku:</p>
+
+<pre>
+f.Send()
+</pre>
+
+<p>Na řádku dalším pak probíhá test na stavový kód HTTP vrácený serverem
+v&nbsp;odpovědi:</p>
+
+<pre>
+f.ExpectStatus(200)
+</pre>
+
+<p>Na samotném konci testu si necháme vypsat výsledky:</p>
+
+<pre>
+frisby.Global.PrintReport()
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        f = frisby.Create("Check HTTP code").Get("http://httpbin.org/status/321")
+        f.Send()
+        f.ExpectStatus(321)
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Tento test spustíme běžným příkazem <strong>go run</strong>, protože se
+nejedná o skutečný jednotkový test:</p>
+
+<pre>
+$ <strong>go run 10_frisby_basic_usage.go</strong>
+&nbsp;
+For 2 requests made
+  All tests passed
+</pre>
+
+<p>Použité funkce a metody:</p>
+
+<pre>
+func <strong>Create</strong>(name string) *Frisby
+func (F *Frisby) <strong>Get</strong>(url string) *Frisby
+func (F *Frisby) <strong>Send</strong>() *Frisby
+func (F *Frisby) <strong>ExpectStatus</strong>(code int) *Frisby
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že je zde použit pattern
+<i>builder</i> umožňující zřetězení jednotlivých metod do jediného příkazu
+(zobecněním tohoto konceptu vzniká <i>fluent interface</i>, což je termín,
+který zavedl známý <a href="https://martinfowler.com/">Martin
+Fowler</a>).</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Chování Frisby ve chvíli, kdy není splněna testovaná podmínka</h2>
+
+<p>V&nbsp;případě, že nějaká testovaná podmínka není splněna, nebude výstup
+testů tak minimalistický, jako tomu bylo v&nbsp;předchozím příkladu. Můžeme se
+o tom ostatně velmi snadno přesvědčit, protože v&nbsp;následujícím příkladu
+jsou testovány tři koncové body REST API, přitom dvě podmínky (na HTTP kódy)
+nebudou po spuštění testů splněny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        f = frisby.Create("Test that fails").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(404)
+&nbsp;
+        f = frisby.Create("Another test that fails").Get("http://httpbin.org/status/456")
+        f.Send()
+        f.ExpectStatus(404)
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Po spuštění získáme podrobnější informace o dvou chybách:</p>
+
+<pre>
+$ <strong>go run 11_frisby_failures.go</strong>
+&nbsp;
+For 3 requests made
+  FAILED  [2/3]
+      [Test that fails]
+        -  Expected Status 404, but got 200: "200 OK"
+      [Another test that fails]
+        -  Expected Status 404, but got 456: "456 UNKNOWN"
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že výsledek testů je
+poměrně dobře čitelný, protože se zobrazí jak očekávaná hodnota, tak i hodnota,
+kterou jsme skutečně získali (a to bez nutnosti explicitního nastavení těchto
+informací).</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Kontrola hlaviček odpovědí poslaných serverem</h2>
+
+<p>Po přijetí odpovědi serveru můžeme zjišťovat i to, zda jsou správně
+nastaveny všechny požadované hlavičky. V&nbsp;dalším demonstračním příkladu
+zjišťujeme, jestli je nastavena hlavička se jménem &bdquo;Server&ldquo;.
+Předpokládáme, že tato hlavička bude obsahovat hodnotu &bdquo;nginx&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Headers check").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+        f.ExpectHeader("Server", "nginx")
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Spuštění tohoto testu nám prozradí, že podmínka byla splněna &ndash; odpověď
+nám skutečně poslal server <i>nginx</i> popř.&nbsp;jiný server, který se jen
+jako <i>nginx</i> maskuje:</p>
+
+<pre>
+$ <strong>go run 12_frisby_check_headers.go</strong>
+&nbsp;
+For 1 requests made
+  All tests passed
+</pre>
+
+<p>Pokud naopak budeme očekávat odlišný server, například &bdquo;apache&ldquo;,
+měl by test zhavarovat:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Headers check").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+        f.ExpectHeader("Server", "apache")
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Můžeme se o tom velmi snadno přesvědčit spuštěním druhé varianty testu:</p>
+
+<pre>
+$ <strong>go run 12B_frisby_check_headers.go</strong>
+&nbsp;
+For 1 requests made
+  FAILED  [1/2]
+      [Headers check]
+        -  Expected Header "Server" to be "apache", but got "nginx"
+</pre>
+
+<p>V&nbsp;případě, že budete chtít zobrazit výsledky jakéhokoli kroku testu,
+lze (prakticky kdykoli) zavolat metodu <strong>PrintReport</strong> (jedná se o
+metodu objektu <strong>Frisby</strong>):</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func main() {
+        f := frisby.Create("Simplest test")
+        f.Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+        f.PrintReport()
+&nbsp;
+        f = frisby.Create("Check HTTP code").Get("http://httpbin.org/status/321")
+        f.Send()
+        f.ExpectStatus(321)
+        f.PrintReport()
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Výsledek bude do značné míry podobný výsledkům spuštění jednotkových
+testů.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Použití HTTP metody POST</h2>
+
+<p>Použití HTTP metody POST namísto metody GET je snadné, zejména ve chvíli,
+kdy serveru neposíláme v&nbsp;dotazu žádná data:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Simplest test").Post("http://httpbin.org/post")
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Test v&nbsp;tomto případě nezhavaruje, protože koncový bod <a
+href="http://httpbin.org/post">http://httpbin.org/post</a> skutečně očekává
+použití metody POST a nikoli GET:</p>
+
+<pre>
+$ <strong>go run 13_frisby_post.go</strong>
+&nbsp;
+For 1 requests made
+  All tests passed
+</pre>
+
+<p>O tom, že se má použít metoda POST a nikoli GET se lze snadno přesvědčit
+nepatrnou úpravou testu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Simplest test").<strong>Get</strong>("http://httpbin.org/post")
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+$ <strong>go run 13B_frisby_post.go</strong>
+&nbsp;
+For 1 requests made
+  FAILED  [1/1]
+      [Simplest test]
+        -  Expected Status 200, but got 405: "405 METHOD NOT ALLOWED"
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Poslání dat ve formátu JSON na server</h2>
+
+<p>Mnoho služeb s&nbsp;rozhraním REST API akceptuje (a také posílá) data ve
+formátu JSON, což znamená, že musíme být schopni s&nbsp;takovými daty pracovat
+i v&nbsp;nástroji <i>Frisby</i>. Nejdříve je většinou nutné správně nastavit
+hlavičky HTTP dotazu &ndash; určit, že se přenáší data ve formátu JSON a že
+akceptujeme data (v&nbsp;odpovědi) ve stejném formátu:</p>
+
+<pre>
+...
+...
+...
+SetHeader("Content-Type", "application/json").
+SetHeader("Accept", "application/json").
+...
+...
+...
+</pre>
+
+<p>Pokud mají přenášená data jednoduchý formát, například se jedná o pole či o
+mapy, může být poslání dat snadné. V&nbsp;následujícím úryvku kódu se přenese
+JSON obsahující pole se třemi prvky typu řetězec (konverze se provádí
+automaticky a interně):</p>
+
+<pre>
+...
+...
+...
+SetJson([]string{"item1", "item2", "item3"})
+...
+...
+...
+</pre>
+
+<p>Samozřejmě je možné přenést i složitější data, například již zmíněnou
+mapu:</p>
+
+<pre>
+data := map[string]string{
+        "text": "Hello **world**!",
+}
+f = frisby.Create("Markdown conversion").Post("https://api.github.com/markdown").<strong>SetJson(data)</strong>
+</pre>
+
+<p>Podívejme se nyní na úplný zdrojový kód příkladu, který nejdříve přenese
+data ve formě pole a poté ve formě mapy (ve druhém případě se na straně služby
+provede konverze přeneseného textu z&nbsp;Markdownu do HTML):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Simplest test").Post("http://httpbin.org/post").
+                SetHeader("Content-Type", "application/json").SetHeader("Accept", "application/json").
+                SetJson([]string{"item1", "item2", "item3"})
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        data := map[string]string{
+                "text": "Hello **world**!",
+        }
+        f = frisby.Create("Markdown conversion").Post("https://api.github.com/markdown").SetJson(data)
+        f.Send()
+        f.ExpectStatus(200)
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Překlad a spuštění tohoto příkladu by nemělo vést k&nbsp;žádné chybě:</p>
+
+<pre>
+$ <strong>go run 14_frisby_post_json.go</strong>
+&nbsp;
+For 2 requests made
+  All tests passed
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Kontrola obsahu odpovědi serveru</h2>
+
+<p>Kontrolovat samozřejmě můžeme i data poslaná v&nbsp;odpovědi serveru.
+Nejjednodušší je v&nbsp;tomto případě použití metody
+<strong>ExpectContent()</strong>, která se snaží v&nbsp;těle odpovědi nalézt
+předaný řetězec (ať již se nachází kdekoli):</p>
+
+<pre>
+...
+...
+...
+f.ExpectHeader("Content-Type", "text/html; charset=utf-8").
+  ExpectContent("The Go Programming Language")
+...
+...
+...
+</pre>
+
+<p>Samozřejmě, že je možné hledat i části odpovědi zapsané v&nbsp;HTML. Víme
+již, že služba na adrese <a
+href="https://api.github.com/markdown">https://api.github.com/markdown</a>
+dokáže převést předaný text z&nbsp;Markdownu do HTML, takže můžeme psát:</p>
+
+<pre>
+data := map[string]string{
+        "text": "Hello **world**!",
+}
+&nbsp;
+f = frisby.Create("Markdown conversion").Post("https://api.github.com/markdown").SetJson(data)
+f.Send()
+f.ExpectContent("&lt;p&gt;Hello &lt;strong&gt;world&lt;/strong&gt;!&lt;/p&gt;")
+</pre>
+
+<p>Dokonce je možné si nechat obsah těla odpovědi vytisknout, a to metodou
+<strong>PrintBody:</strong>.</p>
+
+<p>Úplný kód dalšího demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Content check").Get("http://golang.org")
+        f.Send()
+        f.ExpectStatus(200)
+        f.ExpectHeader("Content-Type", "text/html; charset=utf-8").ExpectContent("The Go Programming Language")
+&nbsp;
+        data := map[string]string{
+                "text": "Hello **world**!",
+        }
+        f = frisby.Create("Markdown conversion").Post("https://api.github.com/markdown").SetJson(data)
+        f.Send()
+        f.ExpectStatus(200)
+        f.ExpectContent("&lt;p&gt;Hello &lt;strong&gt;world&lt;/strong&gt;!&lt;/p&gt;")
+&nbsp;
+        f.PrintBody()
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se mělo zobrazit hlášení převedené
+z&nbsp;Markdownu do HTML:</p>
+
+<pre>
+$ <strong>go run 15_frisby_check_content.go</strong>
+&nbsp;
+&lt;p&gt;Hello &lt;strong&gt;world&lt;/strong&gt;!&lt;/p&gt;
+&nbsp;
+&nbsp;
+For 2 requests made
+  All tests passed
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Nastavení cookies</h2>
+
+<p>V&nbsp;mnoha aplikacích je navíc nutné pracovat i <a
+href="https://en.wikipedia.org/wiki/HTTP_cookie">s&nbsp;cookies</a>. Nastavení
+cookie se provádí metodou <strong>SetCookie</strong>, které se předává jméno
+cookie i její hodnota (pozor na to, že v&nbsp;dokumentaci je napsáno
+<strong>SetCookies</strong>, což je jiná metoda určená po nastavení více
+cookies zavoláním jediné funkce). Nastavení cookies lze velmi snadno otestovat
+na adrese <a href="http://httpbin.org/cookies">http://httpbin.org/cookies</a>,
+kde běží služba vracející (ve formátu JSON) hodnoty všech nastavených
+cookies:</p>
+
+<pre>
+$ <strong>curl --cookie "foo=bar" http://httpbin.org/cookies</strong>
+&nbsp;
+{
+  "cookies": {
+    "foo": "bar"
+  }
+}
+</pre>
+
+<p>Podobný test můžeme zapsat i v&nbsp;jazyce Go s&nbsp;využitím knihovny
+<i>Frisby</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        f := frisby.Create("Cookies check").Get("http://httpbin.org/cookies").SetCookie("foo", "bar")
+        f.Send()
+        f.ExpectStatus(200)
+        f.ExpectJson("cookies.foo", "bar")
+&nbsp;
+        f.PrintBody()
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že je možné otestovat,
+zda vrácený JSON obsahuje určitou hodnotu. Pro tento účel se používá metoda
+nazvaná <strong>ExpectJson</strong>, v&nbsp;jejímž prvním parametru se
+specifikuje <i>selektor</i> a ve druhém pak očekávaná hodnota. V&nbsp;tomto
+konkrétním případě selektor vybírá z&nbsp;mapy (představované formátem JSON)
+nejdříve hodnotu pod klíčem <strong>cookies</strong> a posléze pod klíčem
+<strong>foo</strong>.</div></p>
+
+<p>Výsledek, jenž získáme po spuštění tohoto příkladu:</p>
+
+<pre>
+$ <strong>go run 16_frisby_cookies.go</strong>
+&nbsp;
+{
+  "cookies": {
+    "foo": "bar"
+  }
+}
+&nbsp;
+&nbsp;
+For 1 requests made
+  All tests passed
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Způsob zápisu testů</h2>
+
+<p>Nic nám nebrání používat různé zápisy testů. Jeden z&nbsp;možných přístupů
+spočívá v&nbsp;explicitním volání jednotlivých metod postupně za sebou tak, jak
+se celý test bude vykonávat:</p>
+
+<pre>
+f := frisby.Create("Cookies check")
+f.Get("http://httpbin.org/cookies")
+f.SetCookie("foo", "bar")
+f.Send()
+f.ExpectStatus(200)
+f.ExpectJson("cookies.foo", "bar")
+f.PrintBody()
+</pre>
+
+<p>Alternativně (díky použití fluent interface) se metody mohou zřetězit, a to
+do té míry, že vlastně ani není nutné explicitně vytvářet proměnnou pro hodnotu
+typu <strong>*Frisby</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "github.com/verdverm/frisby"
+&nbsp;
+func <strong>main</strong>() {
+        frisby.Create("Cookies check").
+                Get("http://httpbin.org/cookies").
+                SetCookie("foo", "bar").
+                Send().
+                ExpectStatus(200).
+                ExpectJson("cookies.foo", "bar").
+                PrintBody()
+&nbsp;
+        frisby.Global.PrintReport()
+}
+</pre>
+
+<p>Tento demonstrační příklad se bude chovat podobně, jako příklad
+z&nbsp;předchozí kapitoly:</p>
+
+<pre>
+$ <strong>go run 17_frisby_threading.go</strong>
+&nbsp;
+{
+  "cookies": {
+    "foo": "bar"
+  }
+}
+&nbsp;
+&nbsp;
+For 1 requests made
+  All tests passed
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Využití knihovny Frisby společně s&nbsp;knihovnou Testing</h2>
+
+<p>Knihovnu <i>Frisby</i> můžeme využít společně s&nbsp;knihovnou
+<i>Testing</i> v&nbsp;jednotkových testech. V&nbsp;takovém případě využijeme
+metodu <strong>Error</strong>, která vrací buď hodnotu <strong>nil</strong>
+nebo strukturu popisující chybu, k&nbsp;níž došlo. Jak se s&nbsp;takovou chybou
+v&nbsp;jednotkových testech nakládá již víme &ndash; musíme zavolat metodu
+<strong>Testing.Error</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/verdverm/frisby"
+        "testing"
+)
+&nbsp;
+func <strong>TestHttpGet</strong>(t *testing.T) {
+        f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+        err := f.Error()
+        if err != nil {
+                t.Error(err)
+        }
+}
+</pre>
+
+<p>Nyní musíme celý test spustit nikoli pomocí <strong>go run</strong>, ale
+s&nbsp;využitím <strong>go test</strong>:</p>
+
+<pre>
+$ <strong>go test -v 18_frisby_as_test_pass_test.go</strong>
+&nbsp;
+=== RUN   TestHttpGet
+--- PASS: TestHttpGet (0.21s)
+PASS
+ok      command-line-arguments  0.217s
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Padající jednotkový test založený na knihovně Frisby</h2>
+
+<p>Samozřejmě si můžeme otestovat, co se stane ve chvíli, kdy podmínka, kterou
+testujeme s&nbsp;využitím knihovny Frisby, není splněna. V&nbsp;dalším příkladu
+očekáváme, že se vrátí HTTP kód 400, ovšem ve skutečnosti se vrátí 200 OK:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/verdverm/frisby"
+        "testing"
+)
+&nbsp;
+func <strong>TestHttpGet</strong>(t *testing.T) {
+        f := frisby.Create("Simplest test").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(400)
+        err := f.Error()
+        if err != nil {
+                t.Error(err)
+        }
+}
+</pre>
+
+<p>Povšimněte si, že popis chyby přesně odpovídá testované podmínce a napoví
+testerovi, kde chyba nastala a z&nbsp;jaké příčiny (alespoň z&nbsp;pohledu
+vlastních testů):</p>
+
+<pre>
+$ <strong>go test -v 19_frisby_as_test_fail_test.go</strong>
+&nbsp;
+=== RUN   TestHttpGet400Ok
+--- FAIL: TestHttpGet400Ok (0.21s)
+    20_frisby_more_test.go:24: Expected Status 400, but got 200: "200 OK"
+FAIL
+FAIL    command-line-arguments  0.427s
+FAIL
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Jednotkové testy s&nbsp;více funkcemi</h2>
+
+<p>V&nbsp;posledním demonstračním příkladu, který si dnes ukážeme, jsou
+v&nbsp;jednotkovém testu použity dvě funkce, takže se změní i vygenerovaný
+výsledek:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/verdverm/frisby"
+        "testing"
+)
+&nbsp;
+func <strong>TestHttpGet200Ok</strong>(t *testing.T) {
+        f := frisby.Create("Simplest test for HTTP 200 OK").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(200)
+        err := f.Error()
+        if err != nil {
+                t.Error(err)
+        }
+}
+&nbsp;
+func <strong>TestHttpGet400Ok</strong>(t *testing.T) {
+        f := frisby.Create("Simplest test for HTTP 400 Bad Request").Get("http://httpbin.org/get")
+        f.Send()
+        f.ExpectStatus(400)
+        err := f.Error()
+        if err != nil {
+                t.Error(err)
+        }
+}
+</pre>
+
+<p>V&nbsp;tomto případě by měl první test proběhnout v&nbsp;pořádku a druhý by
+měl zahlásit chybu:</p>
+
+<pre>
+$ <strong>go test -v 20_frisby_more_test.go</strong>
+&nbsp;
+=== RUN   TestHttpGet200Ok
+--- PASS: TestHttpGet200Ok (0.21s)
+=== RUN   TestHttpGet400Ok
+--- FAIL: TestHttpGet400Ok (0.21s)
+    20_frisby_more_test.go:24: Expected Status 400, but got 200: "200 OK"
+FAIL
+FAIL    command-line-arguments  0.427s
+FAIL
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: můžete zkombinovat i oba způsoby,
+tj.&nbsp;použití jednotkových testů (se všemi z&nbsp;toho plynoucími výhodami)
+a zavolání:</div></p>
+
+<pre>
+frisby.Global.PrintReport()
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně pět megabajtů), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_intro_test.go</td><td>kostra testu vytvořeného pomocí knihovny Goblin</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/01_intro_test.go">https://github.com/tisnik/go-root/blob/master/article_42/01_intro_test.go</a></td></tr>
+<tr><td> 2</td><td>02_passing_test.go</td><td>ukázka otestování operátoru + s&nbsp;využitím <strong>Assert</strong> a <strong>Equal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/02_passing_test.go">https://github.com/tisnik/go-root/blob/master/article_42/02_passing_test.go</a></td></tr>
+<tr><td> 3</td><td>03_intro_test.go</td><td>čtyři možné výsledky testů: passed, failed, not implemented, skipped</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/03_intro_test.go">https://github.com/tisnik/go-root/blob/master/article_42/03_intro_test.go</a></td></tr>
+<tr><td> 4</td><td>04_all_passing_test.go</td><td>složitější struktura testů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/04_all_passing_test.go">https://github.com/tisnik/go-root/blob/master/article_42/04_all_passing_test.go</a></td></tr>
+<tr><td> 5</td><td>04B_all_passing_test.go</td><td>vylepšení zpráv z&nbsp;předchozího testu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/04B_all_passing_test.go">https://github.com/tisnik/go-root/blob/master/article_42/04B_all_passing_test.go</a></td></tr>
+<tr><td> 6</td><td>05_nested_describe_test.go</td><td>složitější struktura testů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/05_nested_describe_test.go">https://github.com/tisnik/go-root/blob/master/article_42/05_nested_describe_test.go</a></td></tr>
+<tr><td> 7</td><td>06_nested_struct_test.go</td><td>složitější struktura testů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/06_nested_struct_test.go">https://github.com/tisnik/go-root/blob/master/article_42/06_nested_struct_test.go</a></td></tr>
+<tr><td> 8</td><td>07_split_test.go</td><td>rozdělení jednotkových testů do dvou funkcí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/07_split_test.go">https://github.com/tisnik/go-root/blob/master/article_42/07_split_test.go</a></td></tr>
+<tr><td> 9</td><td>08_nested_struct_failed_test.go</td><td>složitější struktura testů, které havarují</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/08_nested_struct_failed_test.go">https://github.com/tisnik/go-root/blob/master/article_42/08_nested_struct_failed_test.go</a></td></tr>
+<tr><td>10</td><td>09_split_failed_test.go</td><td>složitější struktura testů, které havarují</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/09_split_failed_test.go">https://github.com/tisnik/go-root/blob/master/article_42/09_split_failed_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>10_frisby_basic_usage.go</td><td>otestování koncových bodů REST API přístupných přes HTTP metodu GET</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/10_frisby_basic_usage.go">https://github.com/tisnik/go-root/blob/master/article_42/10_frisby_basic_usage.go</a></td></tr>
+<tr><td>12</td><td>10B_frisby_basic_usage.go</td><td>otestování koncových bodů REST API přístupných přes HTTP metodu GET</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/10B_frisby_basic_usage.go">https://github.com/tisnik/go-root/blob/master/article_42/10B_frisby_basic_usage.go</a></td></tr>
+<tr><td>13</td><td>10C_frisby_basic_usage.go</td><td>tisk výsledku každého kroku testu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/10C_frisby_basic_usage.go">https://github.com/tisnik/go-root/blob/master/article_42/10C_frisby_basic_usage.go</a></td></tr>
+<tr><td>14</td><td>11_frisby_failures.go</td><td>chování Frisby ve chvíli, kdy není splněna testovaná podmínka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/11_frisby_failures.go">https://github.com/tisnik/go-root/blob/master/article_42/11_frisby_failures.go</a></td></tr>
+<tr><td>15</td><td>12_frisby_check_headers.go</td><td>kontrola hlaviček odpovědí poslaných serverem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/12_frisby_check_headers.go">https://github.com/tisnik/go-root/blob/master/article_42/12_frisby_check_headers.go</a></td></tr>
+<tr><td>16</td><td>12B_frisby_check_headers.go</td><td>kontrola hlaviček odpovědí poslaných serverem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/12B_frisby_check_headers.go">https://github.com/tisnik/go-root/blob/master/article_42/12B_frisby_check_headers.go</a></td></tr>
+<tr><td>17</td><td>13_frisby_post.go</td><td>použití HTTP metody POST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/13_frisby_post.go">https://github.com/tisnik/go-root/blob/master/article_42/13_frisby_post.go</a></td></tr>
+<tr><td>18</td><td>13B_frisby_post.go</td><td>použití HTTP metody GET ve chvíli, kdy se očekává POST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/13B_frisby_post.go">https://github.com/tisnik/go-root/blob/master/article_42/13B_frisby_post.go</a></td></tr>
+<tr><td>18</td><td>14_frisby_post_json.go</td><td>poslání dat ve formátu JSON na server</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/14_frisby_post_json.go">https://github.com/tisnik/go-root/blob/master/article_42/14_frisby_post_json.go</a></td></tr>
+<tr><td>19</td><td>15_frisby_check_content.go</td><td>kontrola obsahu odpovědi serveru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/15_frisby_check_content.go">https://github.com/tisnik/go-root/blob/master/article_42/15_frisby_check_content.go</a></td></tr>
+<tr><td>20</td><td>16_frisby_cookies.go</td><td>nastavení cookies</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/16_frisby_cookies.go">https://github.com/tisnik/go-root/blob/master/article_42/16_frisby_cookies.go</a></td></tr>
+<tr><td>21</td><td>17_frisby_threading.go</td><td>zřetězení volání metod</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/17_frisby_threading.go">https://github.com/tisnik/go-root/blob/master/article_42/17_frisby_threading.go</a></td></tr>
+<tr><td>22</td><td>18_frisby_as_test_pass_test.go</td><td>Frisby v&nbsp;jednotkových testech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/18_frisby_as_test_pass_test.go">https://github.com/tisnik/go-root/blob/master/article_42/18_frisby_as_test_pass_test.go</a></td></tr>
+<tr><td>23</td><td>19_frisby_as_test_fail_test.go</td><td>Frisby v&nbsp;jednotkových testech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/19_frisby_as_test_fail_test.go">https://github.com/tisnik/go-root/blob/master/article_42/19_frisby_as_test_fail_test.go</a></td></tr>
+<tr><td>24</td><td>20_frisby_more_test.go</td><td>Frisby v&nbsp;jednotkových testech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_42/20_frisby_more_test.go">https://github.com/tisnik/go-root/blob/master/article_42/20_frisby_more_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>goblin na GitHubu<br />
+<a href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>
+</li>
+
+<li>Mocha framework<br />
+<a href="https://mochajs.org/">https://mochajs.org/</a>
+</li>
+
+<li>frisby na GitHubu<br />
+<a href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>
+</li>
+
+<li>package frisby<br />
+<a href="https://godoc.org/github.com/verdverm/frisby">https://godoc.org/github.com/verdverm/frisby</a>
+</li>
+
+<li>Frisby alternatives and similar packages (generováno)<br />
+<a href="https://go.libhunt.com/frisby-alternatives">https://go.libhunt.com/frisby-alternatives</a>
+</li>
+
+<li>Cucumber for golang<br />
+<a href="https://github.com/DATA-DOG/godog">https://github.com/DATA-DOG/godog</a>
+</li>
+
+<li>How to Use Godog for Behavior-driven Development in Go<br />
+<a href="https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go">https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go</a>
+</li>
+
+<li>Comparative Analysis Of GoLang Testing Frameworks<br />
+<a href="https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks">https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks</a>
+</li>
+
+<li>A Quick Guide to Testing in Golang<br />
+<a href="https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/">https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/</a>
+</li>
+
+<li>Tom's Obvious, Minimal Language.<br />
+<a href="https://github.com/toml-lang/toml">https://github.com/toml-lang/toml</a>
+</li>
+
+<li>xml.org<br />
+<a href="http://www.xml.org/">http://www.xml.org/</a>
+</li>
+
+<li>Soubory .properties<br />
+<a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
+</li>
+
+<li>Soubory INI<br />
+<a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
+</li>
+
+<li>JSON to YAML<br />
+<a href="https://www.json2yaml.com/">https://www.json2yaml.com/</a>
+</li>
+
+<li>Data Format Converter<br />
+<a href="https://toolkit.site/format.html">https://toolkit.site/format.html</a>
+</li>
+
+<li>Viper na GitHubu<br />
+<a href="https://github.com/spf13/viper">https://github.com/spf13/viper</a>
+</li>
+
+<li>GoDotEnv na GitHubu<br />
+<a href="https://github.com/joho/godotenv">https://github.com/joho/godotenv</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
