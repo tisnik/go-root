@@ -1,0 +1,2566 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Pomůcky při tvorbě jednotkových testů v jazyce Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Pomůcky při tvorbě jednotkových testů v jazyce Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V padesáté druhé části seriálu o programovacím jazyce Go se budeme zabývat dvěma souvisejícími tématy, které se obě týkají testování aplikací. Ukážeme si, jakým způsobem lze zachytávat zápisy do standardního výstupu a následně si popíšeme možnosti standardní knihovny httptest.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Testování aplikací zapisujících informace na standardní výstup</a></p>
+<p><a href="#k02">2. Princip zachycení standardního výstupu</a></p>
+<p><a href="#k03">3. Postup při zachycení standardního výstupu</a></p>
+<p><a href="#k04">4. Implementace jednotlivých bodů z&nbsp;popsaného postupu</a></p>
+<p><a href="#k05">5. Úplný zdrojový kód funkce pro zachycení standardního výstupu</a></p>
+<p><a href="#k06">6. Otestování funkce pro zachycení standardního výstupu</a></p>
+<p><a href="#k07">7. Zachycení tisku na standardní výstup v&nbsp;jednotkových testech</a></p>
+<p><a href="#k08">8. Zachycení tisku do chybového výstupu</a></p>
+<p><a href="#k09">9. Zachycení tisku do logů</a></p>
+<p><a href="#k10">10. Implementace zachycení tisku do logů</a></p>
+<p><a href="#k11">11. Testování handlerů implementovaných v&nbsp;HTTP serveru</a></p>
+<p><a href="#k12">12. Jednoduchý HTTP server</a></p>
+<p><a href="#k13">13. Implementace testu handleru HTTP serveru</a></p>
+<p><a href="#k14">14. Pokrytí kódu HTTP serveru testy</a></p>
+<p><a href="#k15">15. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k16">16. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Testování aplikací zapisujících informace na standardní výstup</h2>
+
+<p>Při tvorbě testů pro ty aplikace, které zapisují informace na standardní
+(popř.&nbsp;na chybový) výstup se můžeme setkat s&nbsp;požadavkem, aby se
+zkontrolovalo, zda testovaná aplikace skutečně na standardní nebo chybový
+výstup zapsala očekávané zprávy. K&nbsp;této problematice je možné přistoupit
+několika způsoby. Jedno z&nbsp;možných (i když mnohdy ne ideálních) řešení
+spočívá v&nbsp;použití některé ze specializovaných knihoven, s&nbsp;nimiž jsme
+se již v&nbsp;tomto seriálu setkali. Jedná se především o knihovny
+s&nbsp;podobnými názvy <i>go-expect</i>, <i>goexpect</i> a <i>gexpect</i>,
+které byly popsány v&nbsp;následujících dvou článcích:</p>
+
+<ol>
+
+<li>Použití Go pro automatizaci práce s&nbsp;aplikacemi s&nbsp;interaktivním příkazovým řádkem<br />
+<a href="https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem/">https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem/</a>
+</li>
+
+<li>Použití Go pro automatizaci práce s&nbsp;aplikacemi s&nbsp;interaktivním příkazovým řádkem (dokončení)<br />
+<a href="https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem-dokonceni/">https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem-dokonceni/</a>
+</li>
+
+</ol>
+
+<p>Jen pro úplnost si ukažme jeden příklad použití těchto knihoven (který jsme
+si již v&nbsp;tomto seriálu taktéž uvedli). Jedná se o krátký program, který
+spustí interpret programovacího jazyka Python, počká na inicializaci
+interpretru a nakonec nechá tímto interpretrem vyhodnotit několik výrazů,
+pochopitelně s&nbsp;testem, zda jsme získali očekávané výsledky. Nakonec je
+Python ukončen standardním způsobem:</p>
+
+<pre>
+func <strong>expectOutput</strong>(child *gexpect.ExpectSubprocess, output string) {
+        err := child.Expect(output)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>expectPrompt</strong>(child *gexpect.ExpectSubprocess) {
+        expectOutput(child, "&gt;&gt;&gt; ")
+}
+&nbsp;
+func <strong>sendCommand</strong>(child *gexpect.ExpectSubprocess, command string) {
+        err := child.SendLine(command)
+        if err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        child, err := gexpect.Spawn("python")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "1+2")
+        expectOutput(child, "3")
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "6*7")
+        expectOutput(child, "42")
+&nbsp;
+        expectPrompt(child)
+        sendCommand(child, "quit()")
+&nbsp;
+        child.Wait()
+}
+</pre>
+
+<p>Výše zmíněné knihovny jsou však primárně určeny pro psaní testů
+popř.&nbsp;automatizačních skriptů, které většinou s&nbsp;aplikací pracují jako
+s&nbsp;<i>black boxem</i>. Ovšem mnohdy potřebujeme zjistit, jaké informace se
+na výstup zapsaly přímo v&nbsp;jednotkových testech (<i>unit tests</i>). A
+právě v&nbsp;takových případech lze využít postupu, jenž je popsán a ukázán
+v&nbsp;navazujících kapitolách.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Princip zachycení standardního výstupu</h2>
+
+<p>Vzhledem k&nbsp;tomu, že všechny funkce ze standardní knihovny, které jsou
+určeny pro výpis informací na standardní výstup (jedná se o funkce
+z&nbsp;balíčku <strong>fmt</strong>), jsou skutečně implementovány jako běžné
+funkce a nikoli jako metody, je v&nbsp;tomto případě relativně obtížné při
+psaní jednotkových testů použít <i>mockování</i> (které se v&nbsp;programovacím
+jazyce Go provádí poněkud obtížněji, než například v&nbsp;Pythonu). Můžeme však
+namísto toho změnit obsah proměnné <strong>os.Stdout</strong> a nahradit ho
+jiným vhodným objektem, přesněji řečeno takovým objektem, který je odvozen od
+struktury <strong>os.File</strong>.</p>
+
+<p>Ve zdrojových kódech balíčku <strong>os</strong> lze najít, jakého typu (a
+hodnoty) je proměnná <strong>os.Stdout</strong> a taktéž příbuzná proměnná
+<strong>os.Stderr</strong>:</p>
+
+<pre>
+var (
+        Stdin  = NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+        Stdout = NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+        Stderr = NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: obsah této proměnné je možné změnit
+z&nbsp;toho důvodu, že se jedná o globálně viditelnou proměnnou &ndash; její
+název začíná velkým písmenem.</div></p>
+
+<p>Jakmile se obsah této proměnné změní, například když do ní přiřadíme jiný
+otevřený soubor, budou všechny standardní funkce pro tisk (tedy funkce
+z&nbsp;balíčku <strong>fmt</strong>) používat nový cíl &ndash; odlišný soubor
+či strukturu, která chování souboru napodobuje. Je tomu tak z&nbsp;toho důvodu,
+že tyto funkce vypadají následovně:</p>
+
+<pre>
+func <strong>Print</strong>(a ...interface{}) (n int, err error) {
+        return Fprint(os.Stdout, a...)
+}
+&nbsp;
+func <strong>Println</strong>(a ...interface{}) (n int, err error) {
+        return Fprintln(os.Stdout, a...)
+}
+&nbsp;
+func <strong>Printf</strong>(format string, a ...interface{}) (n int, err error) {
+        return Fprintf(os.Stdout, format, a...)
+}
+</pre>
+
+<p>Ovšem řešení založené na tom, že se namísto standardního výstupu použije
+výstup do souboru, pochopitelně není ideální. Výhodnější by bylo, aby se tisk
+zprávy či zpráv provedl do k&nbsp;tomu alokované paměťové oblasti, tedy do
+nějakého bufferu, jehož obsah by bylo možné následně zkontrolovat a zjistit
+tak, jaké zprávy aplikace v&nbsp;dané (testované) funkci vytiskla. Právě pro
+tento účel lze použít strukturu, s&nbsp;níž jsme se již v&nbsp;tomto seriálu
+dobře seznámili &ndash; <strong>pipe</strong>:</p>
+
+<pre>
+$ <strong>go doc os.Pipe</strong>
+&nbsp;
+package os // import "os"
+&nbsp;
+func Pipe() (r *File, w *File, err error)
+    Pipe returns a connected pair of Files; reads from r return bytes written to
+    w. It returns the files and an error, if any.
+</pre>
+
+<p>Díky tomu, že do <strong>pipe</strong> může aplikace zapisovat (jakoby se
+jednalo o standardní výstup) a současně je možné data z&nbsp;druhé strany
+přečíst a zpracovat, může pipe posloužit právě ve funkci bufferu pro
+zapamatování zpráv, které aplikace zapsala na standardní výstup.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Postup při zachycení standardního výstupu</h2>
+
+<p>Celý postup při zachycování standardního výstupu může ve zkrácené podobě
+vypadat následovně:</p>
+
+<ol>
+
+<li>Zapamatujeme si původní obsah proměnné <strong>os.Stdout</strong>, protože
+ho budeme chtít po testování obnovit.</li>
+
+<li>Vytvoříme nový objekt typu <strong>Pipe</strong>, což mj.&nbsp;znamená, že
+získáme i implementace <i>readeru</i> a <i>writeru</i> (první dvě návratové
+hodnoty jsou typu <strong>*File</strong>).</li>
+
+<li>Do proměnné <strong>os.Stdout</strong> přiřadíme <i>writer</i>,
+tj.&nbsp;vstupní část objektu typu <strong>Pipe</strong> (část, do které se
+provádí zápis &ndash; tisk zpráv).</li>
+
+<li>V&nbsp;gorutině použijeme nějakou funkci, která přečte celý obsah
+<strong>pipe</strong> (použije výstupní část, tedy <i>reader</i>,
+s&nbsp;čekáním na dokončení zápisu) a převede ji na řetězec.</li>
+
+<li>Dále se zavolá testovaná funkce, která může provádět zápisy zpráv (tedy
+tisk) na standardní výstup.</li>
+
+<li>Na konci již pouze stačí <strong>pipe</strong> uzavřít (tím dojde
+k&nbsp;dokončení gorutiny, která svůj výsledek zapíše do kanálu), obnovit obsah
+proměnné <strong>os.Stdout</strong> a vrátit řetězec, který byl zachycen.</li>
+
+</ol>
+
+<p>Vlastní implementace je ve skutečnosti nepatrně složitější, a to zejména
+kvůli tomu, že gorutina určená pro zpracování zpráv zapisovaných na standardní
+výstup musí komunikovat s&nbsp;původní gorutinou, ve které (mj.) běží i
+testovaná funkce. A nakonec je vhodné počkat na to, až se nově vytvořená
+gorutina spustí. K&nbsp;tomuto účelu lze použít například nějakou formu
+synchronizačního objektu.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Implementace jednotlivých bodů z&nbsp;popsaného postupu</h2>
+
+<p>Pomocná funkce, která vrátí řetězec vytisknutý na standardní výstup
+libovolnou předanou funkcí, může mít tuto hlavičku:</p>
+
+<pre>
+func <strong>CaptureStandardOutput</strong>(function func()) (string, error) {
+}
+</pre>
+
+<p>Funkce tedy akceptuje libovolnou (typicky anonymní) testovanou funkci a na
+konci vrátí zachycený řetězec a popř.&nbsp;i objekt nesoucí informace o chybě,
+která v&nbsp;průběhu zachycování nastala.</p>
+
+<p><div class="rs-tip-major">Poznámka: omezení, že testovaná funkce je bez
+parametrů, je pouze zdánlivé, protože můžeme snadno vytvořit anonymní funkci
+bez parametrů, která zavolá testovanou funkci a předá ji všechny potřebné
+parametry.</div></p>
+
+<p><a href="#k03">V&nbsp;předchozí kapitole</a> popsaný postup pro zachycení
+tisku na standardním výstupu, přesněji řečeno jeho jednotlivé body, lze
+realizovat například následujícím způsobem.</p>
+
+
+
+<h4>1. Zapamatování původního obsahu proměnné <strong>os.Stdout</strong></h4>
+
+<p>Toto je velmi jednoduše implementovatelný bod. Postačuje nám do lokální
+proměnné uložit aktuální obsah proměnné <strong>os.Stdout</strong>, nezávisle
+na tom, zda se skutečně jedná o klasický standardní výstup, nebo o již dříve
+provedené přesměrování do souboru:</p>
+
+<pre>
+stdout := os.Stdout
+</pre>
+
+
+
+<h4>2. Vytvoření objektu typu <strong>Pipe</strong></h4>
+
+<p>Vytvoření objektu typu <strong>Pipe</strong> již známe, neboť jsme se tímto
+tématem již zabývali v&nbsp;předchozích částech tohoto seriálu. Pochopitelně
+nesmíme zapomenout na otestování chybového stavu, který (teoreticky) může
+nastat:</p>
+
+<pre>
+reader, writer, err := os.Pipe()
+if err != nil {
+        return "", err
+}
+</pre>
+
+<p>Po provedení výše uvedeného bloku kódu máme k&nbsp;dispozici proměnné
+obsahující ukazatele na dvojici pseudosouborů &ndash; jeden je určený pro
+čtení, druhý pro zápis.</p>
+
+
+
+<h4>3. Nový obsah proměnné <strong>os.Stdout</strong></h4>
+
+<p>Opět se jedná o snadno realizovatelný bod, neboť pouze nastavíme novou
+hodnotu proměnné <strong>os.Stdout</strong> a navíc zajistíme, aby se při
+ukončení celé funkce pro zachycení standardního výstupu obnovil původní obsah
+této proměnné. To je důležité, protože v&nbsp;opačném případě by přestaly
+pracovat všechny další tisky na standardní výstup (ovšem k&nbsp;chybě by
+nedošlo, a to i přesto, že se <i>pipe</i> uzavřela):</p>
+
+<pre>
+defer func() {
+        os.Stdout = stdout
+}()
+os.Stdout = writer
+</pre>
+
+
+
+<h4>4. Gorutina, která obsah <strong>Pipe</strong> přečte a převede na řetězec</h4>
+
+<p>V&nbsp;nejjednodušším případě tato asynchronně běžící gorutina přečte obsah
+<strong>Pipe</strong>, převede ho na řetězec a následně tento řetězec zapíše do
+kanálu, který je použit pro komunikaci s&nbsp;touto gorutinou:</p>
+
+<pre>
+captured := make(chan string)
+go func() {
+        var buf bytes.Buffer
+        io.Copy(&amp;buf, reader)
+        captured &lt;- buf.String()
+}()
+</pre>
+
+<p>Korektnější je však počkat na to, až se gorutina skutečně spustí:</p>
+
+<pre>
+captured := make(chan string)
+wg := new(sync.WaitGroup)
+wg.Add(1)
+go func() {
+        var buf bytes.Buffer
+        wg.Done()
+        io.Copy(&amp;buf, reader)
+        captured &lt;- buf.String()
+}()
+wg.Wait()
+</pre>
+
+<p>V&nbsp;tomto případě je použit synchronizační mechanismus představovaný
+objektem typu <strong>WaitGroup</strong>. V&nbsp;hlavní gorutině metodou
+<strong>Add</strong> nastavíme, že se má čekat na jedinou další gorutinu
+(předáme tedy hodnotu 1, kterou se inicializuje interní synchronizované
+počitadlo). V&nbsp;této gorutině (představované anonymní funkcí) zavoláme
+metodu <strong>Done</strong>, ovšem nikoli na konci gorutiny, ale na jejím
+začátku (ihned po její inicializaci). V&nbsp;hlavní gorutině poté metodou
+<strong>Wait</strong> čekáme na inicializaci asynchronně běžící gorutiny.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;dokumentaci <strong>go doc
+sync.WaitGroup</strong> je uveden odlišný příklad &ndash; čekání na
+<i>dokončení</i> gorutin, kdy je funkce <strong>wg.Done()</strong> na samotném
+konci těla gorutiny. Tento způsob použití nás ovšem nezajímá, protože pro tento
+účel používáme kanál <strong>captured</strong>. Pouze potřebujeme počkat na
+start gorutiny.</div></p>
+
+
+
+<h4>5. Zavolání testované funkce provádějící tisk na standardní výstup</h4>
+
+<p>Toto je jednoduchý bod &ndash; zavoláme jakoukoli funkci, která může (ale
+nutně nemusí) provádět tisk na standardní výstup:</p>
+
+<pre>
+function()
+</pre>
+
+
+
+<h4>6. Obnovení obsahu proměnné <strong>os.Stdout</strong>, vrácení zachyceného řetězce</h4>
+
+<p>Po zavolání testované funkce uzavřeme <strong>Pipe</strong> a vrátíme obsah
+kanálu, do kterého zapsala řetězec (i prázdný) asynchronně běžící gorutina.
+Současně se čtení kanálu používá pro čekání na dokončení této gorutiny:</p>
+
+<pre>
+writer.Close()
+return &lt;-captured, nil
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Úplný zdrojový kód funkce pro zachycení standardního výstupu</h2>
+
+<p>Úplný zdrojový kód balíčku s&nbsp;funkcí sloužící pro zachycení standardního
+výstupu může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bytes"
+        "io"
+        "os"
+        "sync"
+)
+&nbsp;
+func <strong>CaptureStandardOutput</strong>(function func()) (string, error) {
+        <i>// backup of the real stdout</i>
+        stdout := os.Stdout
+&nbsp;
+        <i>// temporary replacement for stdout</i>
+        reader, writer, err := os.Pipe()
+        if err != nil {
+                return "", err
+        }
+&nbsp;
+        <i>// temporarily replace real Stdout by the mocked one</i>
+        defer func() {
+                os.Stdout = stdout
+        }()
+        os.Stdout = writer
+&nbsp;
+        <i>// channel with captured standard output</i>
+        captured := make(chan string)
+        <i>// synchronization object</i>
+        wg := new(sync.WaitGroup)
+        <i>// we are going to wait for one goroutine only</i>
+        wg.Add(1)
+&nbsp;
+        go func() {
+                var buf bytes.Buffer
+                <i>// goroutine is started -&gt; inform main one via WaitGroup object</i>
+                wg.Done()
+                io.Copy(&amp;buf, reader)
+                captured &lt;- buf.String()
+        }()
+        <i>// wait for goroutine to start</i>
+        wg.Wait()
+        <i>// provided function that (probably) prints something to standard output</i>
+        function()
+        writer.Close()
+        return &lt;-captured, nil
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: popsaný zdrojový kód naleznete na adrese
+<a
+href="https://github.com/tisnik/go-root/blob/master/article_52/capture01.go">https://github.com/tisnik/go-root/blob/master/article_52/capture01.go</a>.</div>.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Otestování funkce pro zachycení standardního výstupu</h2>
+
+<p>To, zda výše popsaná funkce <strong>CaptureStandardOutput</strong> skutečně
+dokáže zachytit tisk na standardní výstup, lze relativně snadno ověřit.</p>
+
+<p>Nejprve vyzkoušíme zachycení tisku provedeného funkcí
+<strong>fmt.Print</strong>:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureStandardOutput(func() { fmt.Print("Hello world!") })
+        if err != nil {
+                panic(err)
+        }
+        fmt.Println("Captured output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Captured output:
+-------------------------------
+Hello world!
+-------------------------------
+</pre>
+
+<p>Vidíme, že se řetězec &bdquo;Hello world!&ldquo; skutečně zachytil a je na
+standardní výstup vypsán až mnohem později (v&nbsp;reálných testech by se výpis
+neprováděl, pouze by se zjistilo, zda řetězec obsahuje potřebné informace).</p>
+
+<p>Podobný příklad, ovšem zachycující tisk funkcí <strong>fmt.Println</strong>
+(s&nbsp;odřádkováním), je prakticky totožný s&nbsp;příkladem předchozím:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureStandardOutput(func() { fmt.Println("Hello world!") })
+        if err != nil {
+                panic(err)
+        }
+        fmt.Println("Captured output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Captured output:
+-------------------------------
+Hello world!
+&nbsp;
+-------------------------------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si přítomnosti dalšího znaku
+pro konec řádku.</div></p>
+
+<p>Tabulka s&nbsp;vybranými hodnotami funkce sinus:</p>
+
+<pre>
+func <strong>printSinus</strong>() {
+    epsilon := 1e-6
+    for x := 0.0; x &lt;= 2.0*math.Pi + epsilon; x+= math.Pi/6.0 {
+        fmt.Printf("sin(%5.2f) = %+5.3f\n", x, math.Sin(x))
+    }
+}
+&nbsp;
+func <strong>main</strong>() {
+        str, err := CaptureStandardOutput(printSinus)
+        if err != nil {
+                panic(err)
+        }
+        fmt.Println("Captured output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Captured output:
+-------------------------------
+sin( 0.00) = +0.000
+sin( 0.52) = +0.500
+sin( 1.05) = +0.866
+sin( 1.57) = +1.000
+sin( 2.09) = +0.866
+sin( 2.62) = +0.500
+sin( 3.14) = -0.000
+sin( 3.67) = -0.500
+sin( 4.19) = -0.866
+sin( 4.71) = -1.000
+sin( 5.24) = -0.866
+sin( 5.76) = -0.500
+sin( 6.28) = +0.000
+&nbsp;
+-------------------------------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zachytit a otestovat je možné i velmi
+dlouhé tisky na standardní výstup.</div></p>
+
+<p>Tisk do chybového výstupu funkcí <strong>println</strong> se ovšem nezachytí
+(což je ostatně korektní, tato základní funkce tiskne na chybový výstup a navíc
+obchází většinu funkcí z&nbsp;balíčku <strong>os</strong>):</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureStandardOutput(func() { println("Error output") })
+        if err != nil {
+                panic(err)
+        }
+        &nbsp;
+        fmt.Println("Last line of captured output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Error output
+Captured output:
+-------------------------------
+&nbsp;
+-------------------------------
+</pre>
+
+<p>Alternativně lze tisk na chybový výstup provést explicitně:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureStandardOutput(func() { fmt.Fprintln(os.Stderr, "Error output again") })
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        fmt.Println("Last line of captured output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Error output again
+Captured output:
+-------------------------------
+&nbsp;
+-------------------------------
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Zachycení tisku na standardní výstup v&nbsp;jednotkových testech</h2>
+
+<p>Jak jsme si již řekli v&nbsp;úvodní kapitole, je většinou zapotřebí zachytit
+tisk na standardní výstup v&nbsp;jednotkových testech. Se znalostmi, které jsme
+získali v&nbsp;předchozích kapitolách, je to ve skutečnosti velmi snadné.
+Ostatně se podívejme na následující příklad, v&nbsp;němž je nejdříve zopakována
+funkce pro zachycení výstupu (ovšem nikoli v&nbsp;balíčku
+<strong>main</strong>) a následně je pro tento balíček vytvořen jednoduchý
+jednotkový test:</p>
+
+<pre>
+package <strong>capture</strong>
+&nbsp;
+import (
+        "bytes"
+        "io"
+        "os"
+        "sync"
+)
+&nbsp;
+func <strong>StandardOutput</strong>(function func()) (string, error) {
+        <i>// backup of the real stdout</i>
+        stdout := os.Stdout
+&nbsp;
+        <i>// temporary replacement for stdout</i>
+        reader, writer, err := os.Pipe()
+        if err != nil {
+                return "", err
+        }
+&nbsp;
+        <i>// temporarily replace real Stdout by the mocked one</i>
+        defer func() {
+                os.Stdout = stdout
+        }()
+        os.Stdout = writer
+&nbsp;
+        <i>// channel with captured standard output</i>
+        captured := make(chan string)
+&nbsp;
+        <i>// synchronization object</i>
+        wg := new(sync.WaitGroup)
+        <i>// we are going to wait for one goroutine only</i>
+        wg.Add(1)
+&nbsp;
+        go func() {
+                var buf bytes.Buffer
+                <i>// goroutine is started -&gt; inform main one via WaitGroup object</i>
+                wg.Done()
+                io.Copy(&amp;buf, reader)
+                captured &lt;- buf.String()
+        }()
+        <i>// wait for goroutine to start</i>
+        wg.Wait()
+        <i>// provided function that (probably) prints something to standard output</i>
+        function()
+        writer.Close()
+        return &lt;-captured, nil
+}
+</pre>
+
+<p>Jednotkový test pro výše vypsaný balíček by mohl vypadat následovně:</p>
+
+<pre>
+package <strong>capture_test</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/tisnik/go-capture"
+        "os"
+        "testing"
+)
+&nbsp;
+<i>// TestNoOutput checks if empty standard output is captured properly</i>
+func <strong>TestNoOutput</strong>(t *testing.T) {
+        captured, err := capture.StandardOutput(func() {
+        })
+        if err != nil {
+                t.Fatal("Unable to capture standard output", err)
+        }
+        if captured != "" {
+                t.Fatal("Standard should be empty")
+        }
+}
+&nbsp;
+<i>// TestEmptyOutput checks if empty standard output is captured properly</i>
+func <strong>TestEmptyOutput</strong>(t *testing.T) {
+        captured, err := capture.StandardOutput(func() {
+                fmt.Print("")
+        })
+        if err != nil {
+                t.Fatal("Unable to capture standard output", err)
+        }
+        if captured != "" {
+                t.Fatal("Standard should be empty")
+        }
+}
+&nbsp;
+<i>// TestOutputWithoutNewlines checks if standard output created by fmt.Print is captured properly</i>
+func <strong>TestOutputWithoutNewlines</strong>(t *testing.T) {
+        captured, err := capture.StandardOutput(func() {
+                fmt.Print("Hello!")
+        })
+        if err != nil {
+                t.Fatal("Unable to capture standard output", err)
+        }
+        if captured != "Hello!" {
+                t.Fatal("Incorrect output has been captured:", captured)
+        }
+}
+&nbsp;
+<i>// TestOutputWithNewlines checks if standard output created by fmt.Println is captured properly</i>
+func <strong>TestOutputWithNewlines</strong>(t *testing.T) {
+        captured, err := capture.StandardOutput(func() {
+                fmt.Println("Hello!")
+        })
+        if err != nil {
+                t.Fatal("Unable to capture standard output", err)
+        }
+        if captured != "Hello!\n" {
+                t.Fatal("Incorrect output has been captured:", captured)
+        }
+}
+&nbsp;
+<i>// TestOutputToStdErr checks whether output to stderr is captured or not</i>
+func <strong>TestOutputToStdErr</strong>(t *testing.T) {
+        captured, err := capture.StandardOutput(func() {
+                fmt.Fprint(os.Stderr, "Hello!")
+        })
+        if err != nil {
+                t.Fatal("Unable to capture standard output", err)
+        }
+        if captured != "" {
+                t.Fatal("Incorrect output has been captured:", captured)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti není pokrytí kódu
+stoprocentní, protože jsme neotestovali větev, ve které funkce
+<strong>os.Pipe</strong> vrátí chybu.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Zachycení tisku do chybového výstupu</h2>
+
+<p>Po přečtení předchozích kapitol vás pravděpodobně nepřekvapí, že chybový
+výstup, resp.&nbsp;přesněji řečeno tisk do chybového výstupu, se provede
+prakticky totožným programovým kódem, takže jen v&nbsp;krátkosti:</p>
+
+<pre>
+func <strong>CaptureErrorOutput</strong>(function func()) (string, error) {
+        <i>// backup of the real stderr</i>
+        stderr := os.Stderr
+&nbsp;
+        <i>// temporary replacement for stdout</i>
+        reader, writer, err := os.Pipe()
+        if err != nil {
+                return "", err
+        }
+&nbsp;
+        <i>// temporarily replace real Stderr by the mocked one</i>
+        defer func() {
+                os.Stderr = stderr
+        }()
+        os.Stderr = writer
+&nbsp;
+        <i>// channel with captured standard output</i>
+        captured := make(chan string)
+        wg := new(sync.WaitGroup)
+        wg.Add(1)
+        go func() {
+                var buf bytes.Buffer
+                wg.Done()
+                io.Copy(&amp;buf, reader)
+                captured &lt;- buf.String()
+        }()
+        wg.Wait()
+        <i>// provided function that (probably) prints something to standard output</i>
+        function()
+        writer.Close()
+        return &lt;-captured, nil
+}
+</pre>
+
+<p>Otestování činnosti výše uvedené funkce:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureErrorOutput(func() { fmt.Fprintln(os.Stderr, "Error output again") })
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        fmt.Println("Captured error output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+Captured error output:
+-------------------------------
+Error output again
+&nbsp;
+-------------------------------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tisk na standardní výstup pochopitelně
+zachycen není, ovšem nyní již máte k&nbsp;dispozici všechny informace pro to,
+aby bylo možné vytvořit funkci zachycující zápisy do obou typů
+výstupů.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Zachycení tisku do logů</h2>
+
+<p>Nyní si vyzkoušejme, co se stane ve chvíli, kdy se pokusíme zachytit zápis
+do logu. Ve zdrojových kódech modulu <strong>log</strong> lze najít informaci o
+tom, do jakého výstupu se vlastně logy zapisují:</p>
+
+<pre>
+var std = New(os.Stderr, "", LstdFlags)
+</pre>
+
+<p>Ve skutečnosti ovšem nyní pouhá změna hodnoty <strong>os.Stderr</strong>
+není dostačující, protože si modul <strong>log</strong> drží vlastní referenci
+na chybový výstup. O tom se ostatně můžeme velmi snadno přesvědčit:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureErrorOutput(func() { log.Print("log.Print") })
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        fmt.Println("Captured standard output:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;tímto výsledkem:</p>
+
+<pre>
+2004/08/29 05:48:04 log.Print
+Captured error output:
+-------------------------------
+&nbsp;
+-------------------------------
+</pre>
+
+<p>Vidíme, že se funkce <strong>log.Print</strong> zavolala zcela standardním
+způsobem, bez ohledu na to, že zachytáváme chybový výstup.</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Implementace zachycení tisku do logů</h2>
+
+<p>Přímý přístup k&nbsp;proměnné <strong>log.std</strong> nemáme, musíme tedy
+použít nějaké jiné řešení. K&nbsp;dispozici je funkce
+<strong>log.SetOutput</strong>, které lze předat jiný objekt pro realizaci
+zápisu logu. Problém je zde vlastně jediný &ndash; neexistuje rozumná možnost,
+jak obnovit předchozí hodnotu, protože není k&nbsp;dispozici žádná funkce typu
+<strong>log.GetOutput</strong>. Částečné řešení (které obnoví zápis logů do
+chybového výstupu) může vypadat takto:</p>
+
+<pre>
+func <strong>CaptureLog</strong>(function func()) (string, error) {
+        <i>// temporary replacement for log output</i>
+        reader, writer, err := os.Pipe()
+        if err != nil {
+                return "", err
+        }
+&nbsp;
+        <i>// temporarily replace real log output by the mocked one</i>
+        defer func() {
+                log.SetOutput(os.Stderr)
+        }()
+        log.SetOutput(writer)
+&nbsp;
+        <i>// channel with captured standard output</i>
+        captured := make(chan string)
+&nbsp;
+        <i>// synchronization object</i>
+        wg := new(sync.WaitGroup)
+        <i>// we are going to wait for one goroutine only</i>
+        wg.Add(1)
+&nbsp;
+        go func() {
+                var buf bytes.Buffer
+                <i>// goroutine is started -> inform main one via WaitGroup object</i>
+                wg.Done()
+                io.Copy(&amp;buf, reader)
+                captured &lt;- buf.String()
+        }()
+        <i>// wait for goroutine to start</i>
+        wg.Wait()
+        <i>// provided function that (probably) prints something to standard output</i>
+        function()
+        writer.Close()
+        return &lt;-captured, nil
+}
+</pre>
+
+<p>Otestování by nyní mělo být triviální:</p>
+
+<pre>
+func <strong>main</strong>() {
+        str, err := CaptureLog(func() { log.Println("Hello world") })
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        fmt.Println("Captured logs:")
+        fmt.Println("-------------------------------")
+        fmt.Println(str)
+        fmt.Println("-------------------------------")
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Captured logs:
+-------------------------------
+2020/01/15 20:13:31 Hello world
+&nbsp;
+-------------------------------
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Testování handlerů implementovaných v&nbsp;HTTP serveru</h2>
+
+<p>Ve druhé části článku se ve stručnosti zmíníme o dalším úkolu, který mnohdy
+čeká na autory jednotkových testů. Jedná se o nutnost otestování
+<i>handlerů</i> implementovaných v&nbsp;HTTP/HTTPS serveru (a není žádnou
+novinkou, že programovací jazyk Go se pro podobné aplikace velmi často
+používá). Jednotkové testy handlerů by měly do značné míry napodobit chování
+celého HTTP serveru, tj.&nbsp;mělo by být možné posílat požadavky
+(<i>request</i>) na <i>mock</i> HTTP serveru, zjišťovat, jaké informace se
+vrátily v&nbsp;odpovědi (<i>response</i>) atd. Pro tento účel se používá
+standardní knihovna <a
+href="https://golang.org/pkg/net/http/httptest/">net/http/httptest</a>. Tato
+knihovna se skládá ze dvou částí &ndash; funkce <strong>NewRequest</strong>
+používané pro testování handlerů a datového typu <strong>Server</strong>, který
+(společně s&nbsp;příslušnými metodami) můžeme použít pro psaní (nejenom)
+jednotkových testů. Dnes se budeme zabývat především výše zmíněnou funkcí
+<strong>NewRequest</strong>.</p>
+
+<p><div class="rs-tip-major">Poznámka: pokud namísto jednotkových testů píšete
+testy funkcionální, je výhodnější použít například knihovny <a
+href="https://www.root.cz/clanky/testovani-aplikaci-psanych-v-go-s-vyuzitim-knihoven-goblin-a-frisby/">Goblin
+a Frisby</a>.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Jednoduchý HTTP server</h2>
+
+<p>Nejprve si ukažme kód HTTP serveru, který budeme chtít testovat. Tento
+server po svém spuštění poskytuje statické soubory umístěné v&nbsp;aktuálním
+adresáři a na endpointech <strong>/data</strong> a <strong>/other</strong>
+odpovídá posláním odpovědi s&nbsp;nastaveným typem
+&bdquo;application/json&ldquo;. V&nbsp;obou případech je kód odpovědi 200 OK (a
+ve skutečnosti druhý handler nevrací validní JSON). Zdrojový kód tohoto HTTP
+serveru naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_52/httpServer1.go">https://github.com/tisnik/go-root/blob/master/article_52/httpServer1.go</a></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+func <strong>dataHandler</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `"x": [1, 2, 3, 4, 5]`)
+}
+&nbsp;
+func <strong>otherHandler</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `foobar`)
+}
+&nbsp;
+func <strong>startHttpServer</strong>(address string) {
+        log.Printf("Starting server on address %s", address)
+        http.Handle("/", http.FileServer(http.Dir(".")))
+        http.HandleFunc("/data", dataHandler)
+        http.HandleFunc("/other", otherHandler)
+        http.ListenAndServe(address, nil)
+}
+&nbsp;
+func <strong>main</strong>() {
+        startHttpServer(":8080")
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Implementace testu handleru HTTP serveru</h2>
+
+<p>Typickou úlohou je otestování funkcionality jednotlivých handlerů. Realizaci
+si ukážeme na testu pro handler obsluhující endpoint <strong>/data</strong>.
+Nejdříve vytvoříme objekt realizující dotaz provedený HTTP metodou GET:</p>
+
+<pre>
+request, err := http.NewRequest("GET", "/data", nil)
+if err != nil {
+        t.Fatal(err)
+}
+</pre>
+
+<p>Dále vytvoříme objekt, který bude zaznamenávat provedené operace:</p>
+
+<pre>
+recorder := httptest.NewRecorder()
+</pre>
+
+<p>Třetím a posledním objektem je adaptér umožňující použít libovolnou funkci
+s&nbsp;příslušnou signaturou jako handler HTTP serveru:</p>
+
+<pre>
+handler := http.HandlerFunc(dataHandler)
+</pre>
+
+<p>Nyní spustíme &bdquo;záznam&ldquo; činnosti HTTP serveru pro již dříve
+vytvořený dotaz (HTTP GET na endpointu /data):</p>
+
+<pre>
+handler.ServeHTTP(recorder, request)
+</pre>
+
+<p>Celý průběh se zaznamená, což znamená, že později můžeme činnost handleru
+prozkoumat čtením atributů struktury <strong>recorder</strong>.</p>
+
+<p>Otestování HTTP kódu odpovědi (očekáváme 200 OK):</p>
+
+<pre>
+if status := recorder.Code; status != http.StatusOK {
+        t.Errorf("improper status code: got %v instead of %v",
+                status, http.StatusOK)
+}
+</pre>
+
+<p>Otestování, zda odpověď obsahuje hlavičku &bdquo;Content-Type&ldquo;
+s&nbsp;očekávaným obsahem &bdquo;application/json&ldquo;:</p>
+
+<pre>
+if ctype := recorder.Header().Get("Content-Type"); ctype != "application/json" {
+        t.Errorf("content type header does not match: got %s want %s",
+                ctype, "application/json")
+}
+</pre>
+
+<p>A pochopitelně můžeme přistupovat i k&nbsp;datům poslaným v&nbsp;těle
+odpovědi:</p>
+
+<pre>
+body := recorder.Body.String()
+if body != `"x": [1, 2, 3, 4, 5]` {
+        t.Errorf("wrong response body: %s", body)
+}
+</pre>
+
+<p>Úplný zdrojový kód jednotkového testu je umístěn na adrese: <a
+href="https://github.com/tisnik/go-root/blob/master/article_52/httpServer1_test.go">https://github.com/tisnik/go-root/blob/master/article_52/httpServer1_test.go</a></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "net/http/httptest"
+        "testing"
+)
+&nbsp;
+func <strong>TestDataHandler</strong>(t *testing.T) {
+        request, err := http.NewRequest("GET", "/data", nil)
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        recorder := httptest.NewRecorder()
+        handler := http.HandlerFunc(dataHandler)
+&nbsp;
+        handler.ServeHTTP(recorder, request)
+&nbsp;
+        if status := recorder.Code; status != http.StatusOK {
+                t.Errorf("improper status code: got %v instead of %v",
+                        status, http.StatusOK)
+        }
+&nbsp;
+        body := recorder.Body.String()
+        if body != `"x": [1, 2, 3, 4, 5]` {
+                t.Errorf("wrong response body: %s", body)
+        }
+&nbsp;
+        if ctype := recorder.Header().Get("Content-Type"); ctype != "application/json" {
+                t.Errorf("content type header does not match: got %s want %s",
+                        ctype, "application/json")
+        }
+}
+</pre>
+
+<p></p>
+
+<p><div class="rs-tip-major">Poznámka: knihovna
+<strong>net/http/httptest</strong> nabízí i další možnosti, těm se ovšem budeme
+věnovat až příště.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Pokrytí kódu HTTP serveru testy</h2>
+
+<p>Jednotkové testy spustíme příkazem <strong>go test</strong>, ovšem navíc
+budeme specifikovat, že je nutné zjistit pokrytí kódu testy a uložit naměřená
+data do souboru nazvaného &bdquo;coverage.out&ldquo;:</p>
+
+<pre>
+$ <strong>go test -coverprofile coverage.out</strong>
+</pre>
+
+<p>Dále z&nbsp;vytvořeného souboru &bdquo;coverage.out&ldquo; vytvoříme čitelný
+výpis s&nbsp;informacemi o tom, jaké funkce HTTP serveru byly skutečně
+otestovány:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out</strong>
+</pre>
+
+<p>Výsledek by mohl vypadat následovně (cesty se samozřejmě budou
+odlišovat):</p>
+
+<pre>
+/home/tester/src/go/httpServer1.go:9:   dataHandler     100.0%
+/home/tester/src/go/httpServer1.go:15:  otherHandler    0.0%
+/home/tester/src/go/httpServer1.go:21:  startHttpServer 0.0%
+/home/tester/src/go/httpServer1.go:29:  main            0.0%
+total:                                  (statements)    25.0%
+</pre>
+
+<p>Vidíme, že handler realizovaný funkcí <strong>dataHandler</strong> je
+skutečně plně pokryt testy, na rozdíl od ostatního programového kódu.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně pět až šest megabajtů), můžete namísto toho použít odkazy na
+jednotlivé příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>capture01.go</td><td>zachycení tisku na standardní výstup</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture01.go">https://github.com/tisnik/go-root/blob/master/article_52/capture01.go</a></td></tr>
+<tr><td> 2</td><td>capture02.go</td><td>alternativní příklad zachycení tisku na standardní výstup</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture02.go">https://github.com/tisnik/go-root/blob/master/article_52/capture02.go</a></td></tr>
+<tr><td> 3</td><td>capture03.go</td><td>delší standardní výstup</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture03.go">https://github.com/tisnik/go-root/blob/master/article_52/capture03.go</a></td></tr>
+<tr><td> 4</td><td>capture04.go</td><td>test, že chybový výstup není zachycen</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture04.go">https://github.com/tisnik/go-root/blob/master/article_52/capture04.go</a></td></tr>
+<tr><td> 5</td><td>capture05.go</td><td>test, že chybový výstup není zachycen</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture05.go">https://github.com/tisnik/go-root/blob/master/article_52/capture05.go</a></td></tr>
+<tr><td> 6</td><td>capture06.go</td><td>zachycení tisku do chybového výstupu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture06.go">https://github.com/tisnik/go-root/blob/master/article_52/capture06.go</a></td></tr>
+<tr><td> 7</td><td>capture07.go</td><td>zachycení logování</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/capture07.go">https://github.com/tisnik/go-root/blob/master/article_52/capture07.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 8</td><td>go-capture/capture.go</td><td>implementace balíčku <strong>capture</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/go-capture/capture.go">https://github.com/tisnik/go-root/blob/master/article_52/go-capture/capture.go</a></td></tr>
+<tr><td> 9</td><td>go-capture/capture_test.go</td><td>jednotkový test balíčku <strong>capture</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/go-capture/capture_test.go">https://github.com/tisnik/go-root/blob/master/article_52/go-capture/capture_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>httpServer1.go</td><td>jednoduchý HTTP server</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/httpServer1.go">https://github.com/tisnik/go-root/blob/master/article_52/httpServer1.go</a></td></tr>
+<tr><td>11</td><td>httpServer1_test.go</td><td>jednotkové testy pro HTTP server</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_52/httpServer1_test.go">https://github.com/tisnik/go-root/blob/master/article_52/httpServer1_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Golang Capturing log.Println And fmt.Println Output<br />
+<a href="https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4">https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4</a>
+</li>
+
+<li>Stránka projektu plotly<br />
+<a href="https://plot.ly/">https://plot.ly/</a>
+</li>
+
+<li>Plotly JavaScript Open Source Graphing Library<br />
+<a href="https://plot.ly/javascript/">https://plot.ly/javascript/</a>
+</li>
+
+<li>Domain coloring<br />
+<a href="https://en.wikipedia.org/wiki/Domain_coloring">https://en.wikipedia.org/wiki/Domain_coloring</a>
+</li>
+
+<li>Michael Fogleman's projects<br />
+<a href="https://www.michaelfogleman.com/projects/tagged/graphics/">https://www.michaelfogleman.com/projects/tagged/graphics/</a>
+</li>
+
+<li>Color Graphs of Complex Functions<br />
+<a href="https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html">https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html</a>
+</li>
+
+<li>A Gallery of Complex Functions<br />
+<a href="http://wismuth.com/complex/gallery.html">http://wismuth.com/complex/gallery.html</a>
+</li>
+
+<li>package glot<br />
+<a href="https://godoc.org/github.com/Arafatk/glot">https://godoc.org/github.com/Arafatk/glot</a>
+</li>
+
+<li>Gnuplotting: Output terminals<br />
+<a href="http://www.gnuplotting.org/output-terminals/">http://www.gnuplotting.org/output-terminals/</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1">https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://blog.gopheracademy.com/advent-2018/introducing-glot/">https://blog.gopheracademy.com/advent-2018/introducing-glot/</a>
+</li>
+
+<li>Glot is a plotting library for Golang built on top of gnuplot<br />
+<a href="https://github.com/Arafatk/glot">https://github.com/Arafatk/glot</a>
+</li>
+
+<li>Example plots (gonum/plot)<br />
+<a href="https://github.com/gonum/plot/wiki/Example-plots">https://github.com/gonum/plot/wiki/Example-plots</a>
+</li>
+
+<li>A repository for plotting and visualizing data (gonum/plot)<br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>golang library to make https://chartjs.org/ plots<br />
+<a href="https://github.com/brentp/go-chartjs">https://github.com/brentp/go-chartjs</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>The Gonum Numerical Computing Package<br />
+<a href="https://www.gonum.org/post/introtogonum/">https://www.gonum.org/post/introtogonum/</a>
+</li>
+
+<li>Gomacro na GitHubu<br />
+<a href="https://github.com/cosmos72/gomacro">https://github.com/cosmos72/gomacro</a>
+</li>
+
+<li>gophernotes - Use Go in Jupyter notebooks and nteract<br />
+<a href="https://github.com/gopherdata/gophernotes">https://github.com/gopherdata/gophernotes</a>
+</li>
+
+<li>gonum<br />
+<a href="https://github.com/gonum">https://github.com/gonum</a>
+</li>
+
+<li>go-gota/gota -  DataFrames and data wrangling in Go (Golang)<br />
+<a href="https://porter.io/github.com/go-gota/gota">https://porter.io/github.com/go-gota/gota</a>
+</li>
+
+<li>A repository for plotting and visualizing data <br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>Gonum Numerical Packages<br />
+<a href="https://www.gonum.org/">https://www.gonum.org/</a>
+</li>
+
+<li>Stránky projektu MinIO<br />
+<a href="https://min.io/">https://min.io/</a>
+</li>
+
+<li>MinIO Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-quickstart-guide.html">https://docs.min.io/docs/minio-quickstart-guide.html</a>
+</li>
+
+<li>MinIO Go Client API Reference<br />
+<a href="https://docs.min.io/docs/golang-client-api-reference">https://docs.min.io/docs/golang-client-api-reference</a>
+</li>
+
+<li>MinIO Python Client API Reference<br />
+<a href="https://docs.min.io/docs/python-client-api-reference.html">https://docs.min.io/docs/python-client-api-reference.html</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>MinIO Client Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-client-quickstart-guide.html">https://docs.min.io/docs/minio-client-quickstart-guide.html</a>
+</li>
+
+<li>Analýza kvality zdrojových kódů Minia<br />
+<a href="https://goreportcard.com/report/github.com/minio/minio">https://goreportcard.com/report/github.com/minio/minio</a>
+</li>
+
+<li>This is MinIO<br />
+<a href="https://www.youtube.com/watch?v=vF0lQh0XOCs">https://www.youtube.com/watch?v=vF0lQh0XOCs</a>
+</li>
+
+<li>Running MinIO Standalone<br />
+<a href="https://www.youtube.com/watch?v=dIQsPCHvHoM">https://www.youtube.com/watch?v=dIQsPCHvHoM</a>
+</li>
+
+<li>"Amazon S3 Compatible Storage in Kubernetes" - Rob Girard, Principal Tech Marketing Engineer, Minio<br />
+<a href="https://www.youtube.com/watch?v=wlpn8K0jJ4U">https://www.youtube.com/watch?v=wlpn8K0jJ4U</a>
+</li>
+
+<li>Ginkgo<br />
+<a href="http://onsi.github.io/ginkgo/">http://onsi.github.io/ginkgo/</a>
+</li>
+
+<li>Gomega<br />
+<a href="https://onsi.github.io/gomega/">https://onsi.github.io/gomega/</a>
+</li>
+
+<li>Ginkgo's Preferred Matcher Library na GitHubu<br />
+<a href="https://github.com/onsi/gomega/">https://github.com/onsi/gomega/</a>
+</li>
+
+<li>Provided Matchers<br />
+<a href="http://onsi.github.io/gomega/#provided-matchers">http://onsi.github.io/gomega/#provided-matchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku goexpect<br />
+<a href="https://godoc.org/github.com/google/goexpect">https://godoc.org/github.com/google/goexpect</a>
+</li>
+
+<li>Balíček goexpect<br />
+<a href="https://github.com/google/goexpect">https://github.com/google/goexpect</a>
+</li>
+
+<li>Balíček go-expect<br />
+<a href="https://github.com/Netflix/go-expect">https://github.com/Netflix/go-expect</a>
+</li>
+
+<li>Balíček gexpect<br />
+<a href="https://github.com/ThomasRooney/gexpect">https://github.com/ThomasRooney/gexpect</a>
+</li>
+
+<li>Expect (originál naprogramovaný v&nbsp;TCL)<br />
+<a href="https://core.tcl-lang.org/expect/index">https://core.tcl-lang.org/expect/index</a>
+</li>
+
+<li>Expect (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Expect">https://en.wikipedia.org/wiki/Expect</a>
+</li>
+
+<li>Pexpect<br />
+<a href="https://pexpect.readthedocs.io/en/stable/">https://pexpect.readthedocs.io/en/stable/</a>
+</li>
+
+<li>Golang SSH Client: Multiple Commands, Crypto &amp; Goexpect Examples<br />
+<a href="http://networkbit.ch/golang-ssh-client/">http://networkbit.ch/golang-ssh-client/</a>
+</li>
+
+<li>goblin na GitHubu<br />
+<a href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>
+</li>
+
+<li>Mocha framework<br />
+<a href="https://mochajs.org/">https://mochajs.org/</a>
+</li>
+
+<li>frisby na GitHubu<br />
+<a href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>
+</li>
+
+<li>package frisby<br />
+<a href="https://godoc.org/github.com/verdverm/frisby">https://godoc.org/github.com/verdverm/frisby</a>
+</li>
+
+<li>Frisby alternatives and similar packages (generováno)<br />
+<a href="https://go.libhunt.com/frisby-alternatives">https://go.libhunt.com/frisby-alternatives</a>
+</li>
+
+<li>Cucumber for golang<br />
+<a href="https://github.com/DATA-DOG/godog">https://github.com/DATA-DOG/godog</a>
+</li>
+
+<li>How to Use Godog for Behavior-driven Development in Go<br />
+<a href="https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go">https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go</a>
+</li>
+
+<li>Comparative Analysis Of GoLang Testing Frameworks<br />
+<a href="https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks">https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks</a>
+</li>
+
+<li>A Quick Guide to Testing in Golang<br />
+<a href="https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/">https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/</a>
+</li>
+
+<li>Tom's Obvious, Minimal Language.<br />
+<a href="https://github.com/toml-lang/toml">https://github.com/toml-lang/toml</a>
+</li>
+
+<li>xml.org<br />
+<a href="http://www.xml.org/">http://www.xml.org/</a>
+</li>
+
+<li>Soubory .properties<br />
+<a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
+</li>
+
+<li>Soubory INI<br />
+<a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
+</li>
+
+<li>JSON to YAML<br />
+<a href="https://www.json2yaml.com/">https://www.json2yaml.com/</a>
+</li>
+
+<li>Data Format Converter<br />
+<a href="https://toolkit.site/format.html">https://toolkit.site/format.html</a>
+</li>
+
+<li>Viper na GitHubu<br />
+<a href="https://github.com/spf13/viper">https://github.com/spf13/viper</a>
+</li>
+
+<li>GoDotEnv na GitHubu<br />
+<a href="https://github.com/joho/godotenv">https://github.com/joho/godotenv</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2020</small></p>
+</body>
+</html>
+
