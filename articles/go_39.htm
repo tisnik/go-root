@@ -1,0 +1,2794 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Programovací jazyk Go a relační databáze</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Programovací jazyk Go a relační databáze</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V&nbsp;dnešní části seriálu o programovacím jazyce Go se seznámíme se základními postupy a knihovnami, které se používají pro práci s&nbsp;relačními databázemi. Nejprve si ukážeme použití nízkoúrovňového přístupu s&nbsp;využitím balíčku database/sql a posléze se seznámíme i s&nbsp;ORM.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Programovací jazyk Go a relační databáze</a></p>
+<p><a href="#k02">2. Instalace balíčku <strong>go-sqlite3</strong></a></p>
+<p><a href="#k03">3. Vytvoření testovací databáze používané demonstračními příklady</a></p>
+<p><a href="#k04">4. Kostra aplikace, která se připojí k&nbsp;relační databázi</a></p>
+<p><a href="#k05">5. Specifikace ovladače databáze i způsobu připojení k&nbsp;databázi</a></p>
+<p><a href="#k06">6. Základní typ dotazu &ndash; query</a></p>
+<p><a href="#k07">7. Typové konverze a hlášení chyb ve chvíli, kdy konverzi nelze provést</a></p>
+<p><a href="#k08">8. Datový typ <strong>Customer</strong></a></p>
+<p><a href="#k09">9. Vylepšení předchozího příkladu &ndash; použití ukazatele na prvky datové struktury</a></p>
+<p><a href="#k10">10. Dotaz s&nbsp;parametry</a></p>
+<p><a href="#k11">11. Víceřádkové dotazy</a></p>
+<p><a href="#k12">12. Přidání nového zákazníka do databáze</a></p>
+<p><a href="#k13">13. Vymazání zákazníka z&nbsp;databáze</a></p>
+<p><a href="#k14">14. ORM v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k15">15. Získání seznamu všech zákazníků</a></p>
+<p><a href="#k16">16. Specifikace jména sloupce v&nbsp;databázové tabulce</a></p>
+<p><a href="#k17">17. Vytvoření nového zákazníka přes ORM</a></p>
+<p><a href="#k18">18. Vymazání zákazníka přes ORM</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Programovací jazyk Go a relační databáze</h2>
+
+<p>Již v&nbsp;úvodních částech <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a> jsme si řekli, že se tento jazyk velmi často a
+s&nbsp;úspěchem používá pro implementaci různých webových služeb a mikroslužeb
+(této problematice jsme se ostatně věnovali i <a
+href="https://www.root.cz/clanky/tvorba-webovych-aplikaci-v-go-s-vyuzitim-projektu-gorilla-web-toolkit/">minule</a>).
+Ovšem mnohé služby pochopitelně potřebují používat nějakou formu databáze pro
+perzistentní data. Může se jednat o relační databáze, dokumentové databáze,
+grafové databáze, objektové databáze atd. Dnes si ukážeme, jakými způsoby je
+možné z&nbsp;programovacího jazyka Go přistupovat k&nbsp;relačním databázím.
+Pro jednoduchost použijeme databázi <a
+href="https://www.sqlite.org/index.html">SQLite</a> (tato databáze nevyžaduje
+samostatně běžícího démona), ovšem všechny níže uvedené demonstrační příklady
+budou pracovat i s&nbsp;jinými relačními databázemi; pouze bude pochopitelně
+nutné změnit jméno ovladače a řetězec specifikující parametry připojení
+k&nbsp;databázi (popř.&nbsp;upravit sekci <strong>import</strong> pro načtení
+nového balíčku s&nbsp;ovladačem).</p>
+
+<p>Nejprve se seznámíme s&nbsp;nízkoúrovňovým přístupem k&nbsp;relačním
+databázím. Při použití tohoto přístupu je nutné explicitně zapisovat všechny
+SQL příkazy, předávat jim parametry a popř.&nbsp;explicitně načítat a
+zpracovávat jednotlivé záznamy vrácené dotazem <strong>SELECT</strong>.
+V&nbsp;některých případech je tento přístup velmi užitečný, protože například
+umožňuje snadné optimalizace dotazů. Ve druhé části článku si ukážeme přístup
+odlišný, který spočívá ve využití ORM, tedy mapování struktur psaných v&nbsp;Go
+se záznamy v&nbsp;databázi.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Instalace balíčku <strong>go-sqlite3</strong></h2>
+
+<p>Ve všech dále popsaných demonstračních příkladech budeme využívat databázi
+SQLite, pro jejíž úspěšné použití je nutné nainstalovat balíček
+<strong>go-sqlite3</strong>. To se provede příkazem <strong>go
+get</strong>:</p>
+
+<pre>
+$ <strong>go get github.com/mattn/go-sqlite3</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: instalace tohoto balíčku může trvat
+poněkud delší dobu, než jsme obvykle u programovacího jazyka Go zvyklí. Je tomu
+tak z&nbsp;toho důvodu, že se interně volá překladač <strong>gcc</strong> pro
+překlad implementace databázového engine.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Vytvoření testovací databáze používané demonstračními příklady</h2>
+
+<p>Dále je nutné připravit vlastní testovací databázi. Jedná se o velmi
+zjednodušenou strukturu systému obsahujícího informace o zákaznících
+(<strong>customers</strong>), prodávaných výrobcích
+(<strong>products</strong>), objednávkách zákazníků (<strong>orders</strong>) a
+jednotlivých položek na objednávkách (<strong>order_item</strong>). Celá
+databáze bude uložena v&nbsp;souboru pojmenovaném <strong>test.db</strong> a
+její struktura bude následující:</p>
+
+<pre>
+create table <strong>customers</strong> (
+    ID            integer primary key asc,
+    name          text not null,
+    surname       text not null,
+    address       text not null,
+    country       text not null,
+    phone         text not null
+);
+&nbsp;
+create table <strong>products</strong> (
+    ID            integer primary key asc,
+    name          text not null,
+    description   text not null,
+    price         number(6, 2) not null
+);
+&nbsp;
+create table <strong>orders</strong> (
+    ID            integer primary key asc,
+    customer_id   integer not null,
+    sold          datetime not null,
+    total         number(6, 2) not null,
+    foreign key(customer_id) references customers(ID)
+);
+&nbsp;
+create table <strong>order_item</strong> (
+    ID            integer primary key asc,
+    order_id      integer not null,
+    product_id    integer not null,
+    quantity      integer not null,
+    price         number(6,2) not null,
+    foreign key(order_id) references orders(ID),
+    foreign key(product_id) references products(ID)
+);
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti dnes využijeme pouze
+první a částečně i druhou tabulku, ovšem v&nbsp;navazující části tohoto seriálu
+již budeme používat všechny tabulky, včetně deklarovaných vazeb mezi
+nimi.</div></p>
+
+<p>Dále naši jednoduchou databázi naplníme testovacími daty:</p>
+
+<pre>
+insert into <strong>customers</strong> (id, name, surname, address, country, phone) values (0, 'Maria', 'Anders', 'Berlin', 'Germany', '030-0074321');
+insert into <strong>customers</strong> (id, name, surname, address, country, phone) values (1, 'Ana', 'Trujillo', 'México D.F.', 'Mexico', '(5) 555-4729');
+insert into <strong>customers</strong> (id, name, surname, address, country, phone) values (2, 'Antonio', 'Moreno', 'México D.F.', 'Mexico', '(5) 555-3932');
+insert into <strong>customers</strong> (id, name, surname, address, country, phone) values (3, 'Thomas', 'Hardy', 'London', 'UK', '(171) 555-7788');
+insert into <strong>customers</strong> (id, name, surname, address, country, phone) values (4, 'Christina', 'Berglund', 'Luleå', 'Sweden', '0921-12 34 65');
+&nbsp;
+insert into <strong>products</strong> (id, name, description, price) values (0, 'Matice M5', 'DIN 934', 0.25);
+insert into <strong>products</strong> (id, name, description, price) values (1, 'Matice M5 nízká', 'DIN 439', 0.15);
+insert into <strong>products</strong> (id, name, description, price) values (2, 'Matice M5 dlouhá', 'DIN 6334', 1.50);
+insert into <strong>products</strong> (id, name, description, price) values (3, 'Soustruh', 'S2-B', 10000.00);
+&nbsp;
+insert into <strong>orders</strong> (id, customer_id, sold, total) values (0, 0, CURRENT_TIMESTAMP, 10025);
+insert into <strong>orders</strong> (id, customer_id, sold, total) values (1, 1, CURRENT_TIMESTAMP, 150);
+&nbsp;
+insert into <strong>order_item</strong> (id, order_id, product_id, quantity, price) values (0, 0, 0, 100, 25);
+insert into <strong>order_item</strong> (id, order_id, product_id, quantity, price) values (1, 0, 3, 1, 10000);
+insert into <strong>order_item</strong> (id, order_id, product_id, quantity, price) values (2, 1, 2, 100, 150);
+</pre>
+
+<p>Vytvoření databázového schématu a vložení testovacích dat můžeme provést
+například tímto skriptem:</p>
+
+<pre>
+#!/bin/sh
+&nbsp;
+DATABASE=test.db
+&nbsp;
+SCRIPT_DIR="$( cd "$( dirname "$0" )" &amp;&amp; pwd )"
+&nbsp;
+cat "${SCRIPT_DIR}/schema.sql" | sqlite3 "${SCRIPT_DIR}/${DATABASE}"
+cat "${SCRIPT_DIR}/test_data.sql" | sqlite3 "${SCRIPT_DIR}/${DATABASE}"
+</pre>
+
+<p>Obsah databáze je možné otestovat přímo z&nbsp;příkazové řádky interpretrem
+<strong>sqlite3</strong>:</p>
+
+<pre>
+$ <strong>sqlite3 test.db </strong>
+SQLite version 3.20.1 2017-08-24 16:21:36
+Enter ".help" for usage hints.
+&nbsp;
+sqlite&gt; <strong>select * from customers;</strong>
+0|Maria|Anders|Berlin|Germany|030-0074321
+1|Ana|Trujillo|México D.F.|Mexico|(5) 555-4729
+2|Antonio|Moreno|México D.F.|Mexico|(5) 555-3932
+3|Thomas|Hardy|London|UK|(171) 555-7788
+4|Christina|Berglund|Luleå|Sweden|0921-12 34 65
+&nbsp;
+sqlite&gt; <strong>select * from products;</strong>
+0|Matice M5|DIN 934|0.25
+1|Matice M5 nízká|DIN 439|0.15
+2|Matice M5 dlouhá|DIN 6334|1.5
+3|Soustruh|S2-B|10000
+&nbsp;
+sqlite&gt; <strong>select customers.name, orders.total, orders.sold from orders join customers on orders.customer_id=customers.id;</strong>
+Maria|10025|2019-10-20 13:32:28
+Ana|150|2019-10-20 13:32:28
+&nbsp;
+sqlite&gt; 
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Kostra aplikace, která se připojí k&nbsp;relační databázi</h2>
+
+<p>V&nbsp;této chvíli již máme vše připraveno pro vytvoření základní kostry
+aplikace, která pouze inicializuje databázový ovladač a dále se pokusí navázat
+připojení k&nbsp;databázi. Kostra takového příkladu může vypadat následovně
+(podrobnosti budou vysvětleny pod zdrojovým kódem):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+func <strong>main</strong>() {
+        connections, err := sql.Open("sqlite3", "./test.db")
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+        log.Printf("Connected to database %v", connections)
+}
+</pre>
+
+<p>Povšimněte si, že musíme importovat i balíček <strong>go-sqlite3</strong>,
+ovšem nikde nevoláme žádnou funkci deklarovanou v&nbsp;tomto balíčku ani
+nepoužíváme žádnou jeho konstantu či proměnnou. Aby překladač nenahlásil
+chybnou strukturu programu, musíme před jméno balíčku vložit znak _:</p>
+
+<pre>
+_ "github.com/mattn/go-sqlite3"
+</pre>
+
+<p>Další činnost programu je zřejmá:</p>
+
+<ol>
+
+<li>Program se pokusí inicializovat připojení k&nbsp;lokální databázi
+s&nbsp;využitím ovladače &bdquo;sqlite3&ldquo;</li>
+
+<li>Dále zkontroluje, zda se inicializace připojení podařila s&nbsp;případným
+ohlášením chyby</li>
+
+<li>A následně zajistí, aby se program od databáze odpojil na konci své
+činnosti</li>
+
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti se v&nbsp;případě
+ovladače pro databázi SQLite skutečně pouze inicializuje &bdquo;pool&ldquo;
+připojení k&nbsp;databázi a pokud neprovedeme žádnou další operaci (SELECT,
+INSERT, UPDATE, DELETE), nemusíme vlastně ani zjistit, že například soubor
+s&nbsp;databází vůbec neexistuje.</div></p>
+
+<p>Tento demonstrační příklad by měl po svém spuštění vypsat přibližně
+následující (dodejme, že ne zcela čitelné) údaje:</p>
+
+<pre>
+2019/10/20 15:21:52 Connected to database &amp;{0 {./test.db 0xc0000a0020} 0 {0 0} [] map[] 0 0 0xc0000820c0 0xc0000aa120 false map[] map[] 0 0 0 &lt;nil&gt; 0 0 0 0x48bd80}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Specifikace ovladače databáze i způsobu připojení k&nbsp;databázi</h2>
+
+<p>Předchozí demonstrační příklad byl napsán poměrně rigidně, protože například
+neumožňoval změnit databázový ovladač ani parametry připojení k&nbsp;databázi.
+Provedeme tedy jeho nepatrnou úpravu, a to takovým způsobem, aby se ovladač a
+parametry připojení daly specifikovat na příkazové řádce. Využijeme zde
+standardní balíček <strong>flag</strong>, v&nbsp;němž budeme specifikovat
+jednotlivé parametry i jejich výchozí hodnoty použité ve chvíli, kdy program
+spustíme bez parametrů (o tomto balíčku jsme se již v&nbsp;seriálu o Go
+zmiňovali):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+        log.Printf("Connected to database %v", connections)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na této kostře budou postaveny všechny
+další příklady uvedené v&nbsp;dnešním článku.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Základní typ dotazu &ndash; query</h2>
+
+<p>Ve třetím demonstračním příkladu si ukážeme, jakým způsobem je možné získat
+(načíst) data z&nbsp;naší testovací databáze. Jak jsme si již řekli
+v&nbsp;úvodním textu, použijeme nejprve nízkoúrovňový přístup, v&nbsp;němž
+budeme muset napsat celý SQL dotaz a posléze zpracovat jeho výsledky. Po
+připojení k&nbsp;databázi můžeme jednoduchý dotaz bez parametrů vytvořit
+následujícím způsobem &ndash; metodou <strong>Query</strong>:</p>
+
+<pre>
+rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+</pre>
+
+<p>Výsledkem tohoto příkazu je buď objekt typu <strong>Rows</strong> nebo
+objekt obsahující informace o chybě, kterou bychom měli v&nbsp;každém případě
+zkontrolovat:</p>
+
+<pre>
+if err != nil {
+        log.Fatal(err)
+}
+</pre>
+
+<p>Objekt typu <strong>Rows</strong> představuje &bdquo;kurzor&ldquo; ukazující
+na výsledky dotazu. Zpočátku ukazuje <i>před</i> první výsledek; přesun na
+výsledek další zajistí metoda <strong>Next</strong>. Dále nesmíme zapomenout na
+to, že kurzor je zapotřebí uzavřít (ideálně v&nbsp;bloku
+<strong>defer</strong>), takže kostra zpracování všech výsledků dotazu by mohla
+vypadat například následovně:</p>
+
+<pre>
+defer rows.Close()
+&nbsp;
+for rows.Next() {
+&nbsp;
+    .... čtení jednotlivých záznamů
+&nbsp;
+}
+</pre>
+
+<p>Nejtěžší je samotné přečtení záznamů, které je prováděno metodou
+<strong>Rows.Scan</strong> a může vypadat takto:</p>
+
+<pre>
+var id int
+var name string
+var surname string
+var address string
+var country string
+var phone string
+&nbsp;
+if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+        log.Fatal(err)
+}
+fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", id, name, surname, address, country, phone)
+</pre>
+
+<p>Povšimněte si, jakým způsobem se explicitně načítají jednotlivé položky
+každého záznamu. Na rozdíl od JDBC a podobných knihoven je možné všechny
+položky načíst jediným zavoláním funkce <strong>Rows.Scan</strong>, které
+předáme ukazatele na proměnné, které se naplní načtenými daty (samozřejmě si
+musíme dát pozor na uspořádání položek za sebou; proto je vhodné v&nbsp;příkazu
+<strong>SELECT</strong> explicitně vyjmenovat všechny sloupce). Typy proměnných
+jsou testovány vůči typům sloupců čtené tabulky/tabulek, i když databázový
+ovladač dokáže provést některé konverze automaticky. V&nbsp;případě, že počet a
+typ položek není korektní, vrátí se informace o chybě.</p>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu vypadá
+následovně (jedná se o poměrně dlouhý příklad, zvláště když si uvědomíme, že
+pouze načte několik záznamů z&nbsp;jediné tabulky):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+func <strong>listOfCustomers</strong>(connections *sql.DB) {
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var id int
+                var name string
+                var surname string
+                var address string
+                var country string
+                var phone string
+&nbsp;
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+                        log.Fatal(err)
+                }
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", id, name, surname, address, country, phone)
+        }
+        if err := rows.Err(); err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+        listOfCustomers(connections)
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu by se měla zobrazit tabulka se
+všemi (pěti) záznamy přečtenými z&nbsp;tabulky <strong>customers</strong>:</p>
+
+<pre>
+2019/10/20 15:23:55 Connected to database &amp;{0 {./test.db 0xc0000a0020} 0 {0 0} [] map[] 0 0 0xc0000820c0 0xc0000aa120 false map[] map[] 0 0 0 &lt;nil&gt; 0 0 0 0x48bd80}
+ 0 Maria      Anders     Berlin       Germany      030-0074321
+ 1 Ana        Trujillo   México D.F.  Mexico       (5) 555-4729
+ 2 Antonio    Moreno     México D.F.  Mexico       (5) 555-3932
+ 3 Thomas     Hardy      London       UK           (171) 555-7788
+ 4 Christina  Berglund   Luleå        Sweden       0921-12 34 65
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Typové konverze a hlášení chyb ve chvíli, kdy konverzi nelze provést</h2>
+
+<p>Vyzkoušejme si nyní, co se stane v&nbsp;případě, že schválně změníme typy
+proměnných, do nichž se načítají jednotlivé záznamy z&nbsp;tabulky.
+Namísto:</p>
+
+<pre>
+var id <strong>int</strong>
+var name string
+var surname <strong>string</strong>
+var address string
+var country string
+var phone string
+</pre>
+
+<p>Napíšeme:</p>
+
+<pre>
+var id <strong>string</strong>
+var name string
+var surname <strong>int</strong>
+var address string
+var country string
+var phone string
+</pre>
+
+<p>Upravená (či možná lépe řečeno poškozená) varianta demonstračního příkladu
+bude vypadat takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+func <strong>listOfCustomers</strong>(connections *sql.DB) {
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var id string
+                var name string
+                var surname int
+                var address string
+                var country string
+                var phone string
+&nbsp;
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+                        log.Fatal(err)
+                }
+                fmt.Printf("%2s %-10s %d %-12s %-12s %s\n", id, name, surname, address, country, phone)
+        }
+        if err := rows.Err(); err != nil {
+                log.Fatal(err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+        listOfCustomers(connections)
+}
+</pre>
+
+<p>Po spuštění se ve chvíli, kdy se pokusíme zpracovat první záznam, objeví
+následující chyba:</p>
+
+<pre>
+2019/10/20 15:38:41 sql: Scan error on column index 2, name "surname": converting driver.Value type string ("Anders") to a int: invalid syntax
+exit status 1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že SQL subsystém neměl
+problém s&nbsp;tím, že ID načítáme do proměnné typu řetězec, protože tuto
+konverzi je možné bez problémů provést automaticky. Ovšem konverze řetězce
+&bdquo;Anders&ldquo; na celé číslo už pochopitelně možná není a proto byla
+detekována a vrácena chyba.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Datový typ <strong>Customer</strong></h2>
+
+<p>V&nbsp;praktických aplikacích většinou budeme chtít načíst data
+z&nbsp;tabulky (či ze spojených tabulek) do řezu datových struktur.
+V&nbsp;našem případě (tabulka <strong>customers</strong>) se bude jednat o
+strukturu, která je v&nbsp;programovacím jazyce Go definována následujícím
+způsobem:</p>
+
+<pre>
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že typ prvků této
+struktury přímo odpovídá struktuře tabulky, alespoň do té míry, do jaké to
+umožňuje SQL a typový systém programovacího jazyka Go:</div></p>
+
+<pre>
+create table <strong>customers</strong> (
+    ID            integer primary key asc,
+    name          text not null,
+    surname       text not null,
+    address       text not null,
+    country       text not null,
+    phone         text not null
+);
+</pre>
+
+<p>Nyní vytvoříme funkci určenou pro načtení a vrácení seznamu všech zákazníků.
+Tato funkce bude vracet řez (<i>slice</i>) s&nbsp;načtenými zákazníky
+popř.&nbsp;objekt s&nbsp;informacemi o chybě, která při práci s&nbsp;databází
+nastala:</p>
+
+<pre>
+func <strong>readListOfCustomers</strong>(connections *sql.DB) ([]Customer, error) {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Načtení a zpracování zákazníků bude probíhat naprosto stejným způsobem, jako
+tomu bylo v&nbsp;předchozích dvou demonstračních příkladech; pouze budeme
+načítaná data ukládat do datové struktury typu <strong>Customer</strong>,
+kterou posléze připojíme k&nbsp;vytvářenému řezu:</p>
+
+<pre>
+for rows.Next() {
+        var id int
+        var name string
+        var surname string
+        var address string
+        var country string
+        var phone string
+&nbsp;
+        if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+                return customers, err
+        }
+        customers = append(customers, Customer{id, name, surname, address, country, phone})
+}
+</pre>
+
+<p>Zajímavý trik použijeme po načtení všech záznamů &ndash; pomocí metody
+<strong>Rows.Err()</strong> zjistíme, zda v&nbsp;průběhu načítání nedošlo
+k&nbsp;chybě:</p>
+
+<pre>
+if err := rows.Err(); err != nil {
+        return customers, err
+}
+</pre>
+
+<p>Další postup je již snadný, takže si ukažme úplný zdrojový kód takto
+upraveného příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>readListOfCustomers</strong>(connections *sql.DB) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var id int
+                var name string
+                var surname string
+                var address string
+                var country string
+                var phone string
+&nbsp;
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, Customer{id, name, surname, address, country, phone})
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        customers, err := readListOfCustomers(connections)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+<p>Výsledek, který získáme po spuštění tohoto příkladu:</p>
+
+<pre>
+ 0 Maria      Anders     Berlin       Germany      030-0074321
+ 1 Ana        Trujillo   México D.F.  Mexico       (5) 555-4729
+ 2 Antonio    Moreno     México D.F.  Mexico       (5) 555-3932
+ 3 Thomas     Hardy      London       UK           (171) 555-7788
+ 4 Christina  Berglund   Luleå        Sweden       0921-12 34 65
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vylepšení předchozího příkladu &ndash; použití ukazatele na prvky datové struktury</h2>
+
+<p>Předchozí příklad byl ve skutečnosti zbytečně složitý, protože jsme
+v&nbsp;něm používali pomocné lokální proměnné použité pouze pro načtení
+jednotlivých záznamů a pro jejich následnou konverzi do datové struktury
+<strong>Customer</strong>:</p>
+
+<pre>
+var id int
+var name string
+var surname string
+var address string
+var country string
+var phone string
+&nbsp;
+if err := rows.Scan(&amp;id, &amp;name, &amp;surname, &amp;address, &amp;country, &amp;phone); err != nil {
+        return customers, err
+}
+customers = append(customers, Customer{id, name, surname, address, country, phone})
+</pre>
+
+<p>Ve skutečnosti není nutné tyto lokální proměnné používat, protože můžeme
+využít jedné poněkud méně známé vlastnosti programovacího jazyka Go (o které
+jsme se již v&nbsp;tomto seriálu zmínili) &ndash; v&nbsp;Go je totiž možné
+získat ukazatel na prvek datové struktury. A právě tento ukazatel (přesněji
+ukazatele) můžeme předat do metody <strong>Rows.Scan()</strong> a zjednodušit
+tak výše uvedené řádky na:</p>
+
+<pre>
+var customer Customer
+&nbsp;
+if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+        return customers, err
+}
+customers = append(customers, customer)
+</pre>
+
+<p>Upravený zdrojový kód příkladu je tedy o několik programových řádků
+kratší:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>readListOfCustomers</strong>(connections *sql.DB) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var customer Customer
+&nbsp;
+                if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, customer)
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        customers, err := readListOfCustomers(connections)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výsledek běhu tohoto příkladu je
+naprosto shodný s&nbsp;předchozím příkladem, takže si ho zde nebudeme
+uvádět.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Dotaz s&nbsp;parametry</h2>
+
+<p>Prozatím jsme používali velmi jednoduchou formu dotazu (<i>query</i>),
+v&nbsp;níž se nevyskytoval žádný parametr, takže se celý dotaz mohl vložit do
+řetězce (řetězcového literálu):</p>
+
+<pre>
+rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+</pre>
+
+<p>V&nbsp;praxi se ovšem pochopitelně setkáme s&nbsp;dotazy, v&nbsp;nichž se
+nějaký parametr vyskytuje. V&nbsp;takovém případě <strong>není</strong> vhodné
+a už vůbec ne bezpečné se snažit sestavit řetězec s&nbsp;dotazem programově (už
+jen z&nbsp;toho důvodu, že je nutné řešit &bdquo;escapování&ldquo; speciálních
+znaků, zabránit útokům typu <i>SQL injection</i> apod.). Namísto toho se do
+místa, v&nbsp;němž se má vyskytovat parametr, vloží znak otazníku a metoda
+<strong>Query</strong> se doplní o potřebný počet parametrů. Pokud například
+budeme potřebovat získat seznam zákazníků pouze z&nbsp;jediné země
+(<i>country</i>), může složení a spuštění dotazu vypadat následovně:</p>
+
+<pre>
+rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers WHERE country=? ORDER BY id", country)
+</pre>
+
+<p>Zbytek programu může zůstat nezměněn:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>customersFromCountry</strong>(connections *sql.DB, country string) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers WHERE country=? ORDER BY id", country)
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var customer Customer
+&nbsp;
+                if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, customer)
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        customers, err := customersFromCountry(connections, "Mexico")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+<p>Podobně můžeme vytvořit funkci vracející všechny výrobky, jejichž cena se
+pohybuje v&nbsp;zadaných mezích:</p>
+
+<pre>
+rows, err := connections.Query("SELECT id, name, description, price FROM products WHERE price between ? and ? ORDER BY id", min, max)
+</pre>
+
+<p>Celý příklad:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Product</strong> struct {
+        Id          int
+        Name        string
+        Description string
+        Price       float32
+}
+&nbsp;
+func <strong>productsWithPriceBetween</strong>(connections *sql.DB, min float32, max float32) ([]Product, error) {
+        products := []Product{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, description, price FROM products WHERE price between ? and ? ORDER BY id", min, max)
+        if err != nil {
+                return products, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var product Product
+&nbsp;
+                if err := rows.Scan(&amp;product.Id, &amp;product.Name, &amp;product.Description, &amp;product.Price); err != nil {
+                        return products, err
+                }
+                products = append(products, product)
+        }
+        if err := rows.Err(); err != nil {
+                return products, err
+        }
+        return products, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        products, err := productsWithPriceBetween(connections, 0.0, 2.0)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, product := range products {
+                fmt.Printf("%2d %-20s %-10s %f\n", product.Id, product.Name, product.Description, product.Price)
+        }
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Víceřádkové dotazy</h2>
+
+<p>Zápis dlouhých dotazů (<i>query</i>) na jediném řádku je většinou dosti
+nečitelný, což si můžeme ukázat na následujícím (vlastně stále velmi
+jednoduchém) dotazu:</p>
+
+<pre>
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers WHERE country=? ORDER BY id", country)
+</pre>
+
+<p>Výhodnější je v&nbsp;tomto případě použít takzvané &bdquo;raw&ldquo;
+řetězce, které jsou zapisovány do zpětných apostrofů a mohou obsahovat i konce
+řádků:</p>
+
+<pre>
+        rows, err := connections.Query(`
+SELECT id, name, surname, address, country, phone
+  FROM customers
+ WHERE country=?
+ ORDER BY id`, country)
+</pre>
+
+<p>Úprava příkladu používajícího &bdquo;raw&ldquo; řetězce je snadná a
+přímočará:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>customersFromCountry</strong>(connections *sql.DB, country string) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query(`
+SELECT id, name, surname, address, country, phone
+  FROM customers
+ WHERE country=?
+ ORDER BY id`, country)
+&nbsp;
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var customer Customer
+&nbsp;
+                if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, customer)
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        customers, err := customersFromCountry(connections, "Mexico")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výsledky si opět nemusíme uvádět,
+protože se neliší od předchozích kapitol.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Přidání nového zákazníka do databáze</h2>
+
+<p>Dotazy (<i>query</i>) se tvořily metodou <strong>DB.Query</strong>, ovšem
+pro manipulaci s&nbsp;daty (přidání, vymazání, úprava) se používá metoda
+<strong>DB.Prepare</strong>. I této metodě se předá řetězec s&nbsp;SQL
+příkazem, který opět může obsahovat měnitelné parametry:</p>
+
+<pre>
+statement, err := connections.Prepare("INSERT INTO customers(name, surname, address, country, phone) VALUES (?, ?, ?, ?, ?)")
+</pre>
+
+<p>Parametry (jejich konkrétní hodnoty) se příkazu předají při spuštění příkazu
+metodou <strong>Exec</strong>:</p>
+
+<pre>
+_, err = statement.Exec(customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+</pre>
+
+<p>V&nbsp;dalším demonstračním příkladu je použit výše uvedený SQL příkaz
+<strong>INSERT</strong> pro přidání nového zákazníka do databáze. Povšimněte
+si, že nemusíme specifikovat ID zákazníka, protože se jedná o automaticky
+generovaný primární klíč:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>addNewCustomer</strong>(connections *sql.DB, customer Customer) error {
+        statement, err := connections.Prepare("INSERT INTO customers(name, surname, address, country, phone) VALUES (?, ?, ?, ?, ?)")
+        if err != nil {
+                return err
+        }
+        defer statement.Close()
+&nbsp;
+        _, err = statement.Exec(customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        return err
+}
+&nbsp;
+func <strong>readListOfCustomers</strong>(connections *sql.DB) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var customer Customer
+&nbsp;
+                if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, customer)
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>printAllCustomers</strong>(connections *sql.DB) {
+        customers, err := readListOfCustomers(connections)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        fmt.Println("Original list")
+        printAllCustomers(connections)
+&nbsp;
+        addNewCustomer(connections, Customer{6, "Franta", "Vomáčka", "Horní dolní", "CR", "603 123 456"})
+&nbsp;
+        fmt.Println("\nNew list")
+        printAllCustomers(connections)
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Vymazání zákazníka z&nbsp;databáze</h2>
+
+<p>Prakticky stejným přístupem je možné zákazníka z&nbsp;databáze vymazat:</p>
+
+<pre>
+statement, err := connections.Prepare("DELETE FROM customers WHERE id=?")
+_, err = statement.Exec(id)
+</pre>
+
+<p>Povšimněte si, že v&nbsp;tomto případě zákazníka specifikujeme pomocí jeho
+ID, tedy primárního klíče.</p>
+
+<p>Operace <strong>UPDATE</strong> by vypadala podobně, jako obě popsané
+operace <strong>INSERT</strong> a <strong>DELETE</strong>, takže si ji zde
+nemusíme uvádět.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;praxi by se ovšem jednalo o
+složitější operaci, která by vyžadovala kaskádní vymazání objednávek
+atd.</div></p>
+
+<p>Celý příklad, po jehož spuštění se z&nbsp;databáze odstraní zákazník
+s&nbsp;ID=1:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "flag"
+        "fmt"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>addNewCustomer</strong>(connections *sql.DB, customer Customer) error {
+        statement, err := connections.Prepare("INSERT INTO customers(name, surname, address, country, phone) VALUES (?, ?, ?, ?, ?)")
+        if err != nil {
+                return err
+        }
+        defer statement.Close()
+&nbsp;
+        _, err = statement.Exec(customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        return err
+}
+&nbsp;
+func <strong>deleteCustomer</strong>(connections *sql.DB, id int) error {
+        statement, err := connections.Prepare("DELETE FROM customers WHERE id=?")
+        if err != nil {
+                return err
+        }
+        defer statement.Close()
+&nbsp;
+        _, err = statement.Exec(id)
+        return err
+}
+&nbsp;
+func <strong>readListOfCustomers</strong>(connections *sql.DB) ([]Customer, error) {
+        customers := []Customer{}
+&nbsp;
+        rows, err := connections.Query("SELECT id, name, surname, address, country, phone FROM customers ORDER BY id")
+        if err != nil {
+                return customers, err
+        }
+        defer rows.Close()
+&nbsp;
+        for rows.Next() {
+                var customer Customer
+&nbsp;
+                if err := rows.Scan(&amp;customer.Id, &amp;customer.Name, &amp;customer.Surname, &amp;customer.Address, &amp;customer.Country, &amp;customer.Phone); err != nil {
+                        return customers, err
+                }
+                customers = append(customers, customer)
+        }
+        if err := rows.Err(); err != nil {
+                return customers, err
+        }
+        return customers, nil
+}
+&nbsp;
+func <strong>printAllCustomers</strong>(connections *sql.DB) {
+        customers, err := readListOfCustomers(connections)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        connections, err := sql.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("Can not connect to data storage", err)
+        }
+        defer connections.Close()
+&nbsp;
+        log.Printf("Connected to database %v", connections)
+&nbsp;
+        fmt.Println("Original list")
+        printAllCustomers(connections)
+&nbsp;
+        deleteCustomer(connections, 1)
+&nbsp;
+        fmt.Println("\nNew list")
+        printAllCustomers(connections)
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. ORM v&nbsp;programovacím jazyce Go</h2>
+
+<p>Všechny výše uvedené demonstrační příklady jsou poměrně dlouhé, zvláště když
+si uvědomíme, že prováděné operace jsou ve skutečnosti značně primitivní. Je to
+způsobeno tím, že jsme použili přímo SQL dotazy/příkazy a namapování na datové
+struktury Go byly provedeny ručně. Existuje však &ndash; podobně jako
+v&nbsp;mnoha dalších programovacích jazycích &ndash; možnost automatického
+namapování datových struktur Go na záznamy uložené v&nbsp;databázi. Jedná se o
+známou technologii ORM, která je v&nbsp;případě Go implementována například
+v&nbsp;knihovně GORM. Tu je nutné nejprve nainstalovat příkazem:</p>
+
+<pre>
+$ <strong>go get -u github.com/jinzhu/gorm</strong>
+</pre>
+
+<p>Dnes si ukážeme jen základní možnosti použití této knihovny; podrobnosti a
+složitější příklady budou uvedeny příště.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Získání seznamu všech zákazníků</h2>
+
+<p>První příklad, v&nbsp;němž knihovnu GORM použijeme, po svém spuštění přečte
+seznam všech zákazníků a vypíše ho na standardní výstup. Rozdílů oproti
+předchozím příkladům je hned několik:</p>
+
+<ol>
+
+<li>Připojení k&nbsp;databázi je realizováno funkcí
+<strong>gorm.Open</strong>.</li>
+
+<li>Dále se zajistí automatické namapování datové struktury
+<strong>Customer</strong> na příslušnou databázovou tabulku.</li>
+
+<li>Nalezení všech zákazníků (bez dalších výběrových kritérií) zajišťuje metoda
+<strong>Find</strong>, které se předá řez, jenž bude naplněn načtenými
+daty.</li>
+
+</ol>
+
+<p>Další operace nejsou v&nbsp;tomto jednoduchém příkladu zapotřebí, takže se
+jedná o dosti citelné zkrácení zdrojového kódu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "github.com/jinzhu/gorm"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        db, err := gorm.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("failed to connect database")
+        }
+        defer db.Close()
+&nbsp;
+        db.AutoMigrate(&amp;Customer{})
+&nbsp;
+        var customers []Customer
+        db.Find(&amp;customers)
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Specifikace jména sloupce v&nbsp;databázové tabulce</h2>
+
+<p>Po spuštění předchozího příkladu jste si mohli všimnout, že se korektně
+nevyplnily údaje v&nbsp;položce <strong>Id</strong>, protože knihovna GORM
+nespárovala jméno položky v&nbsp;datové struktuře <strong>Customer</strong> a
+jméno sloupce v&nbsp;tabulce <strong>customers</strong>. Oba zmíněné
+identifikátory se mohou v&nbsp;praxi lišit, takže je nutné správné namapování
+zajistit explicitně. To se provede následovně:</p>
+
+<pre>
+type <strong>Customer</strong> struct {
+        Id      int <strong>`gorm:"Column:ID"`</strong>
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+</pre>
+
+<p>Zbytek zdrojového kódu příkladu již může zůstat beze změny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "github.com/jinzhu/gorm"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int `gorm:"Column:ID"`
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        db, err := gorm.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("failed to connect database")
+        }
+        defer db.Close()
+&nbsp;
+        db.AutoMigrate(&amp;Customer{})
+&nbsp;
+        var customers []Customer
+        db.Find(&amp;customers)
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Vytvoření nového zákazníka přes ORM</h2>
+
+<p>S&nbsp;využitím ORM velmi snadno vytvoříme nového zákazníka, a to pouze
+pomocí dvou programových řádků kódu:</p>
+
+<pre>
+customer := Customer{Name: "Franta", Surname: "Vomáčka", Address: "Horní dolní", Country: "CR", Phone: "603 123 456"}
+db.Create(&amp;customer)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět platí, že některé záznamy bude
+nutné vytvářet složitějším způsobem, protože se zápis bude provádět do několika
+tabulek. Ovšem prozatím nám bude dostačovat takto jednoduchá operace se zápisem
+do jediné tabulky.</div></p>
+
+<p>Ve skutečnosti však budeme muset příklad ještě nepatrně upravit, a to
+konkrétně tak, že specifikujeme, že položka Id je namapována na primární klíč
+tabulky a bude se tedy vytvářet automaticky:</p>
+
+<pre>
+type <strong>Customer</strong> struct {
+        Id      int `gorm:"Column:ID;<strong>PRIMARY_KEY</strong>"`
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+</pre>
+
+<p>Pokud tuto úpravu neprovedete, bude se při pokusu o vytvoření nového
+zákazníka vypisovat chyba, že Id není unikátní.</p>
+
+<p>Upravený demonstrační příklad může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "github.com/jinzhu/gorm"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int `gorm:"Column:ID;<strong>PRIMARY_KEY</strong>"`
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        db, err := gorm.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("failed to connect database")
+        }
+        defer db.Close()
+&nbsp;
+        db.AutoMigrate(&amp;Customer{})
+&nbsp;
+        customer := Customer{Name: "Franta", Surname: "Vomáčka", Address: "Horní dolní", Country: "CR", Phone: "603 123 456"}
+        db.Create(&amp;customer)
+&nbsp;
+        var customers []Customer
+        db.Find(&amp;customers)
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Vymazání zákazníka přes ORM</h2>
+
+<p>A konečně se podívejme na to, jak lze zákazníka z&nbsp;tabulky
+<strong>customers</strong> vymazat. Je to poměrně snadné, protože nám bude
+(alespoň v&nbsp;tomto případě) postačovat specifikovat pouze Id zákazníka:</p>
+
+<pre>
+customer := Customer{Id: 1}
+db.Delete(&amp;customer)
+</pre>
+
+<p>Tento přístup má jednu vážnou nevýhodu &ndash; pokud se pokusíme vymazat
+zákazníka s&nbsp;Id=0, dojde ve skutečnosti k&nbsp;vymazání celé tabulky. Je
+tomu tak z&nbsp;toho důvodu, že nula je &bdquo;nulovou hodnotou&ldquo; pro typ
+<strong>int</strong> a při použití <strong>db.Delete()</strong> má nulová
+hodnota stejný význam, jakoby atribut nebyl vůbec vyplněn &ndash; interně se
+totiž vůbec nepřidá do klauzule <strong>WHERE</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "github.com/jinzhu/gorm"
+        _ "github.com/mattn/go-sqlite3"
+        "log"
+)
+&nbsp;
+type <strong>Customer</strong> struct {
+        Id      int `gorm:"Column:ID;PRIMARY_KEY"`
+        Name    string
+        Surname string
+        Address string
+        Country string
+        Phone   string
+}
+&nbsp;
+func <strong>main</strong>() {
+        dbDriver := flag.String("dbdriver", "sqlite3", "database driver specification")
+        storageSpecification := flag.String("storage", "./test.db", "storage specification")
+        flag.Parse()
+&nbsp;
+        db, err := gorm.Open(*dbDriver, *storageSpecification)
+        if err != nil {
+                log.Fatal("failed to connect database")
+        }
+        defer db.Close()
+&nbsp;
+        db.AutoMigrate(&amp;Customer{})
+&nbsp;
+        customer := Customer{Id: 1}
+        db.Delete(&amp;customer)
+&nbsp;
+        var customers []Customer
+        db.Find(&amp;customers)
+        for _, customer := range customers {
+                fmt.Printf("%2d %-10s %-10s %-12s %-12s %s\n", customer.Id, customer.Name, customer.Surname, customer.Address, customer.Country, customer.Phone)
+        }
+}
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně čtyři megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_basic_connection.go</td><td>připojení k&nbsp;databázi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/01_basic_connection.go">https://github.com/tisnik/go-root/blob/master/article_39/01_basic_connection.go</a></td></tr>
+<tr><td> 2</td><td>02_connection_params.go</td><td>specifikace databázového ovladače a řetězce s&nbsp;připojovacími informacemi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/02_connection_params.go">https://github.com/tisnik/go-root/blob/master/article_39/02_connection_params.go</a></td></tr>
+<tr><td> 3</td><td>03_customers.go</td><td>získání seznamu zákazníků z&nbsp;databáze</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/03_customers.go">https://github.com/tisnik/go-root/blob/master/article_39/03_customers.go</a></td></tr>
+<tr><td> 4</td><td>04_type_checking.go</td><td>kontrola datových typů a datové konverze při načítání</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/04_type_checking.go">https://github.com/tisnik/go-root/blob/master/article_39/04_type_checking.go</a></td></tr>
+<tr><td> 5</td><td>05_customer_type.go</td><td>uživatelský datový typ <strong>Customer</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/05_customer_type.go">https://github.com/tisnik/go-root/blob/master/article_39/05_customer_type.go</a></td></tr>
+<tr><td> 6</td><td>06_pointer_to_struct_item.go</td><td>využití ukazatele na prvky struktury pro zjednodušení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/06_pointer_to_struct_item.go">https://github.com/tisnik/go-root/blob/master/article_39/06_pointer_to_struct_item.go</a></td></tr>
+<tr><td> 7</td><td>07_query_parameter.go</td><td>databázový dotaz s&nbsp;parametry, první varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/07_query_parameter.go">https://github.com/tisnik/go-root/blob/master/article_39/07_query_parameter.go</a></td></tr>
+<tr><td> 8</td><td>08_query_parameter_2.go</td><td>databázový dotaz s&nbsp;parametry, druhá varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/08_query_parameter_2.go">https://github.com/tisnik/go-root/blob/master/article_39/08_query_parameter_2.go</a></td></tr>
+<tr><td> 9</td><td>09_query_in_raw_string.go</td><td>použití takzvaných &bdquo;raw&ldquo; řetězců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/09_query_in_raw_string.go">https://github.com/tisnik/go-root/blob/master/article_39/09_query_in_raw_string.go</a></td></tr>
+<tr><td>10</td><td>10_insert_customer.go</td><td>přidání nového zákazníka do databáze</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/10_insert_customer.go">https://github.com/tisnik/go-root/blob/master/article_39/10_insert_customer.go</a></td></tr>
+<tr><td>11</td><td>11_delete_customer.go</td><td>vymazání zákazníka z&nbsp;databáze</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/11_delete_customer.go">https://github.com/tisnik/go-root/blob/master/article_39/11_delete_customer.go</a></td></tr>
+<tr><td>12</td><td>12_gorm_basics.go</td><td>základy použití knihovny GORM</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/12_gorm_basics.go">https://github.com/tisnik/go-root/blob/master/article_39/12_gorm_basics.go</a></td></tr>
+<tr><td>13</td><td>13_column_name.go</td><td>specifikace jména sloupce v&nbsp;databázové tabulce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/13_column_name.go">https://github.com/tisnik/go-root/blob/master/article_39/13_column_name.go</a></td></tr>
+<tr><td>14</td><td>14_create_customer_improper.go</td><td>přidání nového zákazníka přes ORM (GORM), nevalidní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/14_create_customer_improper.go">https://github.com/tisnik/go-root/blob/master/article_39/14_create_customer_improper.go</a></td></tr>
+<tr><td>15</td><td>15_create_customer_proper.go</td><td>přidání nového zákazníka přes ORM (GORM), validní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/15_create_customer_proper.go">https://github.com/tisnik/go-root/blob/master/article_39/15_create_customer_proper.go</a></td></tr>
+<tr><td>16</td><td>16_delete_customer.go</td><td>vymazání zákazníka přes ORM (GORM)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/16_delete_customer.go">https://github.com/tisnik/go-root/blob/master/article_39/16_delete_customer.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>17</td><td>create_database.sh</td><td>skript pro vytvoření testovací databáze</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/create_database.sh">https://github.com/tisnik/go-root/blob/master/article_39/create_database.sh</a></td></tr>
+<tr><td>18</td><td>schema.sql</td><td>schéma testovací databáze</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/schema.sql">https://github.com/tisnik/go-root/blob/master/article_39/schema.sql</a></td></tr>
+<tr><td>19</td><td>test_data.sql</td><td>vstupní data pro testovací databázi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_39/test_data.sql">https://github.com/tisnik/go-root/blob/master/article_39/test_data.sql</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
