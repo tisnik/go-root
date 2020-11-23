@@ -1,0 +1,2593 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Monitoring služeb a mikroslužeb psaných v Go nástrojem Prometheus</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Monitoring služeb a mikroslužeb psaných v Go nástrojem Prometheus</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešní části seriálu o jazyce Go si ukážeme, jakým způsobem lze zajistit zveřejnění různých metrik službami či mikroslužbami, které jsou naprogramovány právě v Go. Metriky mohou být zaznamenány a zpracovány systémem Prometheus a vizualizovány pomocí Grafany.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Monitoring služeb a mikroslužeb psaných v&nbsp;Go nástrojem Prometheus</a></p>
+<p><a href="#k02">2. Nástroj Prometheus</a></p>
+<p><a href="#k03">3. Dotazovací jazyk PromQL</a></p>
+<p><a href="#k04">4. Konfigurace dashboardů s&nbsp;výsledky monitoringu</a></p>
+<p><a href="#k05">5. Upozornění v&nbsp;případě, že se detekuje problém</a></p>
+<p><a href="#k06">6. Základní konfigurace služby poskytující standardní metriky</a></p>
+<p><a href="#k07">7. První varianta služby poskytující standardní metriky</a></p>
+<p><a href="#k08">8. Přidání čítače (counter) do množiny sledovaných metrik</a></p>
+<p><a href="#k09">9. Registrace nového čítače</a></p>
+<p><a href="#k10">10. Automatická registrace čítače</a></p>
+<p><a href="#k11">11. Metrika reprezentující libovolnou číselnou hodnotu</a></p>
+<p><a href="#k12">12. Metrika založená na sledování sekvence číselných hodnot</a></p>
+<p><a href="#k13">13. Kumulativní histogram</a></p>
+<p><a href="#k14">14. Intervaly s&nbsp;rozdílnou šířkou</a></p>
+<p><a href="#k15">15. Mapa čítačů a její použití pro sledování počtu přístupů na stránky</a></p>
+<p><a href="#k16">16. Výpočet doby trvání vytvoření odpovědi HTTP serveru</a></p>
+<p><a href="#k17">17. Komplikovanější příklad &ndash; HTTP server poskytující více metrik</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Monitoring služeb a mikroslužeb psaných v&nbsp;Go nástrojem Prometheus</h2>
+
+<p><i>&bdquo;Java is 20 years old, mature, and comes with unbeatable tooling
+and monitoring capabilities. At the very beginning, Java already incorporated
+microservice concepts with the Jini / JXTA frameworks mixed with no-SQL
+databases like e.g. JavaSpaces. As often -- Java was just 15 years too early.
+The market was not ready for the technology back then. However, all the design
+principles from 1999 still do apply today. We don't have re-invent the
+wheel.&ldquo;</i></p>
+
+<p>Ve třicáté sedmé části <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a> se seznámíme s&nbsp;některými možnostmi nabízenými
+balíčkem <strong>github.com/prometheus/client_golang/prometheus/</strong>. Již
+samotný název tohoto balíčku naznačuje, že se jedná o klienta určeného pro
+nástroj <i>Prometheus</i>, jenž se v&nbsp;současnosti velmi často používá pro
+sbírání metrik z&nbsp;běžících služeb, mikroslužeb atd. Tyto metriky (metrikou
+může být počet připojených klientů, aktuálně obsazená kapacita haldy &ndash;
+heapu, atd.) je následně možné filtrovat a analyzovat, přičemž výsledky mohou
+být vizualizovány například nástrojem <i>Grafana</i> (propojení
+<i>Prometheus</i> + <i>Grafana</i> je ostatně taktéž velmi časté). Jedno
+z&nbsp;typických použití Promethea je sledování (mikro)služby nasazené
+například v&nbsp;clusteru. Taková služba kromě své vlastní funkcionality nabízí
+jednoduché rozhraní REST API (HTTP/HTTPS) s&nbsp;typicky jediným koncovým bodem
+nazvaným <strong>/metrics</strong>. Nástroj Prometheus z&nbsp;tohoto koncového
+bodu metriky načítá a následně je nakonfigurovaným způsobem zpracovává.</p>
+
+<p>Samozřejmě je možné implementovat nabídku metrik pro výše zmíněný koncový
+bod <strong>/metrics</strong> ručně, přesněji řečeno explicitně naprogramovaným
+handlerem HTTP serveru, ovšem použití klienta
+<strong>github.com/prometheus/client_golang/prometheus/</strong> je mnohem
+jednodušší, umožňuje vytvářet histogramy a další složitější mechanismy a navíc
+je ve světě Go dnes již téměř idiomatické, takže zdrojovým kódům budou dobře
+rozumět i další vývojáři.</p>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je možná dobré upozornit
+na fakt, že samotný Prometheus je taktéž naprogramován v&nbsp;jazyku Go, o čemž
+se ostatně lze snadno přesvědčit <a
+href="https://github.com/prometheus/prometheus">z&nbsp;jeho zdrojových
+kódů</a>.</div></p>
+
+<img src="https://i.iinfo.cz/images/338/go-prometheus-1.png" class="image-393850" alt="&#160;" width="220" height="218" />
+<p><i>Obrázek 1: Logo nástroje Prometheus.</i></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Nástroj Prometheus</h2>
+
+<p>Systém <i>Prometheus</i> používá databázi, do které se ukládají prakticky
+libovolné (číselné) hodnoty, které jsou opatřeny časovým razítkem, kromě toho i
+jménem metriky (ta musí být unikátní, navíc by neměla obsahovat mezery) a
+návěštím (<i>label</i>) umožňujícím podrobnější dělení hodnot, například podle
+toho, v&nbsp;jakém prostředí je měření prováděno, jakého koncového bodu REST
+API se měření týká atd. To znamená, že pro zvolenou metriku, popř.&nbsp;pro
+metriku a návěští je možné získat celou časovou posloupnost s&nbsp;hodnotami,
+vracet se do minulosti, získat informace pro zvolené časové období apod.
+Samotné hodnoty jsou interně zpracovávány jako datový typ
+<i>double</i>/<i>float64</i> (konkrétní jednotka již záleží na interpretaci
+dat) a časová razítka mají milisekundovou přesnost, což by mělo být pro účely
+tohoto nástroje dostačující, už jen z&nbsp;toho důvodu, že samotné pořízení
+záznamu přes API klienta <i>Promethea</i> má určitou časovou složitost a
+zpoždění.</p>
+
+<p>Prometheus se od některých podobně koncipovaných nástrojů odlišuje zejména
+tím, že používá takzvaný PULL model: jednotlivé služby pouze vystavují své
+metriky na určeném a nakonfigurovaném koncovém bodě REST API (typicky se jedná
+o koncový bod <strong>/metrics</strong> zmíněný <a href="#k01">v&nbsp;úvodní
+kapitole</a>) a Prometheus sám aktivně tyto metriky čte. To je poměrně důležitá
+vlastnost, protože zjednodušuje tvorbu samotné aplikace &ndash; ta totiž může
+být pasivní, nemusí se jí v&nbsp;konfiguračním souboru nebo v&nbsp;proměnné
+prostředí předávat adresa Promethea, nemusí se řešit situace, kdy není
+Prometheus dostupný atd. Rozdíl mezi PUSH a PULL modelem jsou stručně popsány
+v&nbsp;článku <a
+href="https://www.opsdash.com/blog/golang-app-monitoring-statsd-expvar-prometheus.html">Go
+App Monitoring: expvar, Prometheus and StatsD</a>.</p>
+
+<p>Pro nástroj Prometheus v&nbsp;současnosti existují čtyři oficiálně
+podporovaní klienti:</p>
+
+<ol>
+<li>Go</li>
+<li>Java popř. Scala (a tím pádem i další jazyky nad JVM, včetně Clojure)</li>
+<li>Python</li>
+<li>Ruby</li>
+</ol>
+
+<p>Dnes se zaměříme na popis klienta určeného pro programovací jazyk Go.</p>
+
+<p>Kromě toho však existuje i velké množství sice oficiálně nepodporovaných,
+ale většinou plně funkčních klientů určených pro další programovací jazyky:</p>
+
+<ol>
+<li>BASH</li>
+<li>C++</li>
+<li>Common Lisp</li>
+<li>Elixir</li>
+<li>Erlang </li>
+<li>Haskell</li>
+<li>Lua</li>
+<li>.NET / C#</li>
+<li>Node.js</li>
+<li>Perl</li>
+<li>PHP</li>
+<li>Rust</li>
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: seznam je seřazen abecedně, ne podle
+preferencí autora.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Dotazovací jazyk PromQL</h2>
+
+<p>Důležitou součástí nástroje <i>Prometheus</i> je i <i>PromQL</i>, což je
+relativně snadno použitelný dotazovací jazyk určený pro získání potřebných
+metrik, agregaci výsledků přečtených z&nbsp;těchto metrik apod. Můžeme si
+ostatně uvést příklad jednoduchého dotazu vytvořeného v&nbsp;tomto jazyce,
+který vrátí časovou posloupnost hodnot trvání přípravy odpovědi na HTTP
+požadavky (předpokládejme, že jméno této metriky je
+&bdquo;http_requests_total&ldquo;):</p>
+
+<pre>
+http_requests_total
+</pre>
+
+<p>Celkovou dobu trvání všech požadavků a průměrnou dobu vytvoření jednoho
+požadavku získáme stejně snadno:</p>
+
+<pre>
+sum(http_requests_total)
+avg(http_requests_total)
+</pre>
+
+<p>V&nbsp;dotazu ovšem můžeme provést i jemnější dělení, například podle
+návěští:</p>
+
+<pre>
+http_requests_total{job="prometheus",group="canary"}
+</pre>
+
+<p>V&nbsp;jazyku <i>PromQL</i> je možné využívat například i regulární výrazy,
+což nám umožňuje získat časy odpovědí na HTTP dotazy typu GET, ovšem pouze pro
+zvolená prostředí (staging, testing, development):</p>
+
+<pre>
+http_requests_total{environment=~"staging|testing|development",method!="GET"}
+</pre>
+
+<p>Dotazovací jazyk <i>PromQL</i> je primárně určen pro práci s&nbsp;časovými
+řadami, takže nepřekvapí ani dobrá podpora specifikace časového období, pro
+které potřebujeme data získat. Výsledky trvání vyřízení HTTP dotazů typu GET za
+posledních pět minut by se získaly takto:</p>
+
+<pre>
+http_requests_total{job="prometheus"}[5m]
+</pre>
+
+<p>Výsledky za posledních třicet minut, ovšem s&nbsp;rozlišením jedné minuty,
+přečteme následujícím dotazem:</p>
+
+<pre>
+rate(http_requests_total[5m])[30m:1m]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pěkné shrnutí základních vlastností a
+možností jazyka PromQL naleznete na stránce <a
+href="https://timber.io/blog/promql-for-humans/">PromQL for Humans</a> a <a
+href="https://medium.com/@valyala/promql-tutorial-for-beginners-9ab455142085">PromQL
+tutorial for beginners and humans</a>. Další možnosti si ukážeme
+v&nbsp;samostatném článku věnovaném samotnému systému Promethea.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Konfigurace dashboardů s&nbsp;výsledky monitoringu</h2>
+
+<p>Kromě dotazů zapisovaných v&nbsp;jazyku <i>PromQL</i> je podporován již
+zmíněný výstup ve formě plně konfigurovatelných grafů, z&nbsp;nichž se posléze
+vytváří různé dashboardy, které sledují stav celého systému či jeho
+jednotlivých částí. Pro tento účel se používá <i>Grafana</i>. Pokud chcete
+vidět, jak může vypadat výstup z&nbsp;kombinace nástrojů Prometheus+Grafana,
+můžete se podívat například na obrázek na adrese <a
+href="https://prometheus.io/assets/grafana_prometheus.png">https://prometheus.io/assets/grafana_prometheus.png</a>
+popř.&nbsp;na celou galerii různých dashboardů na adrese <a
+href="https://duckduckgo.com/?q=grafana+board&t=ffab&iax=images&ia=images">https://duckduckgo.com/?q=grafana+board&t=ffab&iax=images&ia=images</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: možnosti Grafany si podrobněji popíšeme
+v&nbsp;samostatném článku.</div></p>
+
+<img src="https://i.iinfo.cz/images/338/go-prometheus-2.png" class="image-393851" alt="&#160;" width="240" height="220" />
+<p><i>Obrázek 2: Logo nástroje Grafana.</i></p>
+
+<p>Další podporovanou možností výstupu (reportu) představují standardní šablony
+Go (<a
+href="https://golang.org/pkg/text/template/">https://golang.org/pkg/text/template/</a>.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Upozornění v&nbsp;případě, že se detekuje problém</h2>
+
+<p>Možnost zobrazení záznamů (časových řad s&nbsp;hodnotami) je samozřejmě
+velmi užitečná, ovšem v&nbsp;praxi mnohdy potřebujeme, aby byli administrátoři
+nebo tým devops varováni ve chvíli, kdy dojde k&nbsp;určité události, například
+když klesne hodnota volné RAM, markantně se zvýší čas odezvy serveru atd. Pro
+tento účel používá systém <i>Prometheus</i> další komponentu nazvanou příhodně
+<i>Alertmanager</i>, kterou je možné nakonfigurovat takovým způsobem, aby na
+naprogramované události (či mnohem častěji na jejich souběh) nějakým vhodným
+způsobem reagovala. Samozřejmě je možné zvolit například poslání zprávy přes
+připravená rozhraní (Slack, HipChat, včetně běžného e-mailu) nebo lze
+nakonfigurovat poslání obecnějšího webhooku do prakticky libovolné služby.</p>
+
+<p><div class="rs-tip-major">I Alertmanager je, podobně jako samotný
+Prometheus, vyvinut v&nbsp;programovacím jazyce Go &ndash; viz též <a
+href="https://github.com/prometheus/alertmanager">repositář tohoto
+projektu</a>.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Základní konfigurace služby poskytující standardní metriky</h2>
+
+<p>Nyní se konečně podíváme na demonstrační příklady ukazující, jakým způsobem
+je možné metriky určené pro Prometheus nabídnout (vystavit) ze služby,
+resp.&nbsp;přesněji řečeno z&nbsp;libovolného procesu, vyvinutého
+v&nbsp;programovacím jazyce Go. Nejdříve je pochopitelně nutné získat samotný
+balíček, který nám umožní do služby přidat nový koncový bod REST API
+s&nbsp;metrikami. Instalaci tohoto balíčku zajistíme jednoduše příkazem:</p>
+
+<pre>
+$ <strong>go get -v github.com/prometheus/client_golang/prometheus</strong>
+&nbsp;
+github.com/golang/protobuf (download)
+github.com/prometheus/client_model (download)
+github.com/prometheus/common (download)
+github.com/matttproud/golang_protobuf_extensions (download)
+github.com/prometheus/procfs (download)
+github.com/beorn7/perks/quantile
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/golang/protobuf/proto
+github.com/prometheus/common/model
+github.com/prometheus/procfs/internal/fs
+github.com/prometheus/procfs/internal/util
+github.com/prometheus/procfs
+github.com/matttproud/golang_protobuf_extensions/pbutil
+github.com/prometheus/client_model/go
+github.com/prometheus/client_golang/prometheus/internal
+github.com/prometheus/common/expfmt
+github.com/prometheus/client_golang/prometheus
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak je z&nbsp;předchozího výpisu patrné,
+nainstalují se ve skutečnosti i balíčky samotného Promethea.</div></p>
+
+<p>Aplikace, která chce metriky nabízet, tento balíček nejdříve importuje:</p>
+
+<pre>
+import "github.com/prometheus/client_golang/prometheus/promhttp"
+</pre>
+
+<p>Následně je nutné zaregistrovat handler HTTP serveru, který bude obsluhovat
+dotazy posílané na koncový bod <strong>/metrics</strong>:</p>
+
+<pre>
+http.Handle("/metrics", promhttp.Handler())
+</pre>
+
+<p>A nakonec aplikace musí spustit samotný HTTP server, popř.&nbsp;zareagovat
+na situaci, kdy se server z&nbsp;nějakého důvodu nespustí:</p>
+
+<pre>
+err := http.ListenAndServe(":8080", nil)
+if err != nil {
+        fmt.Println(err)
+        os.Exit(2)
+}
+</pre>
+
+<p>Na zmíněném koncovém bodě nyní budou dostupné základní metriky automaticky
+poskytované klientem Promethea.</p>
+
+<p><div class="rs-tip-major">Poznámka: základními možnostmi nabízenými balíčkem
+<strong>http</strong> jsme se již zabývali v&nbsp;článku <a
+href="https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/#k09">Vývoj
+síťových aplikací v programovacím jazyku Go</a>. Dnes budeme pouze potřebovat
+spustit HTTP server na určeném portu a zaregistrovat handler či několik
+handlerů.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. První varianta služby poskytující standardní metriky</h2>
+
+<p>Nyní již máme k&nbsp;dispozici všechny informace potřebné pro to, abychom
+vytvořili triviální aplikaci, která na koncovém bodě <strong>/metrics</strong>
+bude nabízet metriky zpracovatelné (mj. i) nástrojem Prometheus. <a
+href="https://github.com/tisnik/go-root/blob/master/article_37/01_basic_metrics.go">Úplný
+zdrojový kód</a> této aplikace vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "net/http"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "os"
+)
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Aplikaci přeložíme a spustíme:</p>
+
+<pre>
+$ <strong>go run 01_basic_metrics.go</strong>
+</pre>
+
+<p>Aplikace by nyní pouze měla vypsat, že se inicializoval HTTP server. Ten
+naslouchá na portu 8080, takže z&nbsp;dalšího terminálu zkusíme načíst všechny
+metriky poskytované klientem Promethea. Použijeme přitom standardní nástroj
+<strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl localhost:8080/metrics</strong>
+</pre>
+
+<p>Na standardní výstup by se po spuštění tohoto příkazu mělo vypsat množství
+řádků s&nbsp;komentáři i jednotlivými metrikami. Tyto metriky se týkají
+především samotného běžícího procesu, práce automatického správce paměti atd.
+Povšimněte si, že se jedná o velmi jednoduchý a současně i relativně snadno
+parsovatelný formát:</p>
+
+<pre>
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0
+go_gc_duration_seconds{quantile="0.25"} 0
+go_gc_duration_seconds{quantile="0.5"} 0
+go_gc_duration_seconds{quantile="0.75"} 0
+go_gc_duration_seconds{quantile="1"} 0
+go_gc_duration_seconds_sum 0
+go_gc_duration_seconds_count 0
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 7
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.13"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 460480
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 460480
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 2724
+# HELP go_memstats_frees_total Total number of frees.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 95
+# HELP go_memstats_gc_cpu_fraction The fraction of this program's available CPU time used by the GC since the program started.
+# TYPE go_memstats_gc_cpu_fraction gauge
+go_memstats_gc_cpu_fraction 0
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 2.240512e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and still in use.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 460480
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 6.53312e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use.
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 1.35168e+06
+# HELP go_memstats_heap_objects Number of allocated objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 1760
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 6.53312e+07
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 6.668288e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 0
+# HELP go_memstats_lookups_total Total number of pointer lookups.
+# TYPE go_memstats_lookups_total counter
+go_memstats_lookups_total 0
+# HELP go_memstats_mallocs_total Total number of mallocs.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 1855
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 13888
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 16384
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 18632
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 32768
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.473924e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 789852
+# HELP go_memstats_stack_inuse_bytes Number of bytes in use by the stack allocator.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 425984
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 425984
+# HELP go_memstats_sys_bytes Number of bytes obtained from system.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.0191104e+07
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 8
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 10
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 8.06912e+06
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.57052836543e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 5.04848384e+08
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes -1
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 0
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotný formát je popsán na stránce <a
+href="https://prometheus.io/docs/instrumenting/exposition_formats/">Text-based
+format</a>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Přidání čítače (counter) do množiny sledovaných metrik</h2>
+
+<p>Nyní se pokusíme možnosti předchozí aplikace vylepšit. Přidáme do ní jeden
+čítač, který se bude postupně každou sekundu zvyšovat. Samotný čítač se vytvoří
+konstruktorem <strong>prometheus.NewCounter</strong>, kterému je nutné předat
+atributy čítače. Mezi základní atributy patří jméno metriky tak, jak ji bude
+vidět systém Prometheus. Nastavit můžeme i popis či nápovědu k&nbsp;dané
+metrice. I tuto nápovědu bude možné dále zpracovat:</p>
+
+<pre>
+var counter = prometheus.NewCounter(prometheus.CounterOpts{
+        Name: "number_of_ticks",
+        Help: "The total number of ticks since the app is started",
+})
+</pre>
+
+<p>Čítač, který je představován rozhraním <a
+href="https://godoc.org/github.com/prometheus/client_golang/prometheus#Counter">Counter</a>,
+podporuje pouze dvě metody:</p>
+
+<ol>
+<li><strong>Inc()</strong> &ndash; zvýšení čítače o jedničku</li>
+<li><strong>Add(float64)</strong> &ndash; zvýšení čítače o zadanou hodnotu (offset), změna musí být větší než nula</li>
+</ol>
+
+<p>Nově upravená aplikace by mohla vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var counter = prometheus.NewCounter(prometheus.CounterOpts{
+        Name: "number_of_ticks",
+        Help: "The total number of ticks since the app is started",
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                counter.Inc()
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Registrace nového čítače</h2>
+
+<p>Pokud upravenou aplikaci spustíme a pokusíme se nástrojem
+<strong>curl</strong> získat hodnotu čítače, nebudeme příliš úspěšní. Je tomu
+tak z&nbsp;jednoho prostého důvodu &ndash; samotné vytvoření čítače ještě
+neznamená, že hodnota tohoto čítače bude zveřejněna společně s&nbsp;ostatními
+metrikami. Aby tomu tak bylo, je nutné čítač zaregistrovat, a to například
+funkcí <strong>MustRegister</strong>:</p>
+
+<pre>
+func <strong>init</strong>() {
+        prometheus.MustRegister(counter)
+}
+</pre>
+
+<p>Povšimněte si, že jsme funkci <strong>MustRegister()</strong> zavolali
+z&nbsp;funkce <strong>init()</strong>, která je zavolána automaticky při
+inicializaci balíčku.</p>
+
+<p>Nová podoba aplikace, jejíž zdrojový kód naleznete <a
+href="https://github.com/tisnik/go-root/blob/master/article_37/03_registered_counter.go">zde</a>,
+již bude plně funkční:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var counter = prometheus.NewCounter(prometheus.CounterOpts{
+        Name: "number_of_ticks",
+        Help: "The total number of ticks since the app is started",
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                counter.Inc()
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>init</strong>() {
+        prometheus.MustRegister(counter)
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Pokud nyní aplikaci spustíme a kombinací nástrojů <strong>curl</strong> a
+<strong>grep</strong> vyfiltrujeme řádky obsahující řetězec
+&bdquo;number_of_ticks&ldquo;, zjistíme, že čítač pracuje bez problémů a jeho
+hodnota je začleněna do ostatních metrik:</p>
+
+<pre>
+# HELP number_of_ticks The total number of ticks since the app is started
+# TYPE number_of_ticks counter
+number_of_ticks 54
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Automatická registrace čítače</h2>
+
+<p>Aby se nezapomnělo na registraci nějaké metriky, existuje v&nbsp;balíčku
+<strong>github.com/prometheus/client_golang/prometheus/promauto</strong>
+několik funkcí, které nejenom že určitou metriku (čítač, měřítko, histogram
+atd.) vytvoří, ale současně ho i zaregistrují. Při použití tohoto balíčku je
+možné čítač vytvořit a zaregistrovat takto:</p>
+
+<pre>
+var counter = promauto.NewCounter(prometheus.CounterOpts{
+        Name: "number_of_ticks",
+        Help: "The total number of ticks since the app is started",
+})
+</pre>
+
+<p>Celá aplikace se zjednoduší, neboť se již nemusíme starat o registraci
+čítače ve funkci <strong>init()</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var counter = promauto.NewCounter(prometheus.CounterOpts{
+        Name: "number_of_ticks",
+        Help: "The total number of ticks since the app is started",
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                counter.Inc()
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Výsledky při běhu budou stejné, jako tomu bylo u předchozí varianty
+aplikace:</p>
+
+<pre>
+# HELP number_of_ticks The total number of ticks since the app is started
+# TYPE number_of_ticks counter
+number_of_ticks 100
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Metrika reprezentující libovolnou číselnou hodnotu</h2>
+
+<p>V&nbsp;předchozím textu jsme si řekli, že hodnotu čítače lze pouze zvyšovat,
+a to metodami <strong>Inc()</strong> a <strong>Add()</strong>. Velmi často
+ovšem musíme zveřejnit i informace o metrice, která může nabývat libovolné
+hodnoty (tedy může se i snižovat). Taková metrika je reprezentována objektem
+<strong>Gauge</strong> se šesti metodami určenými pro změnu hodnoty:</p>
+
+<ol>
+<li><strong>Inc()</strong> &ndash; zvýšení o jedničku</li>
+<li><strong>Dec()</strong> &ndash; snížení o jedničku</li>
+<li><strong>Set(float64)</strong> &ndash; nastavení na zadanou hodnotu</li>
+<li><strong>Add(float64)</strong> &ndash; změna o zadanou hodnotu</li>
+<li><strong>Sub(float64)</strong> &ndash; změna o zadanou hodnotu</li>
+<li><strong>SetToCurrentTime()</strong> &ndash; nastavení na Unix time (v&nbsp;sekundách)</li>
+</ol>
+
+<p>V&nbsp;dalším ukázkovém příkladu je <strong>Gauge</strong> použit pro
+poskytnutí informací o počtu aktuálně běžících gorutin. Tuto informaci získáme
+snadno s&nbsp;využitím funkce <strong>NumGoroutine()</strong> z&nbsp;balíčku
+<strong>runtime</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "net/http"
+        "os"
+        "runtime"
+        "time"
+)
+&nbsp;
+var goroutines = promauto.NewGauge(prometheus.GaugeOpts{
+        Name: "number_of_goroutines",
+        Help: "Number of goroutines in the process",
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                goroutines.Set(float64(runtime.NumGoroutine()))
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Výsledek poskytnutý aplikací přes <strong>/metrics</strong>:</p>
+
+<pre>
+# HELP number_of_goroutines Number of goroutines in the process
+# TYPE number_of_goroutines gauge
+number_of_goroutines 2
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Metrika založená na sledování sekvence číselných hodnot</h2>
+
+<p>Dalším užitečným typem metriky je metrika představovaná objektem nazvaným
+<strong>Summary</strong>. Tento objekt má jedinou metodu
+<strong>Observe()</strong>, které lze předat libovolnou číselnou hodnotu. Na
+základě postupně získávaných hodnot se vypočítají základní statistické
+informace &ndash; počet zaznamenaných hodnot, jejich průměr, kvantily (míra
+polohy rozdělení pravděpodobnosti měřené veličiny). Další demonstrační příklad
+bude dosti umělý, protože budeme zaznamenávat náhodná čísla generovaná funkcí
+<strong>rand.Float64()</strong> a nikoli reálnou měřenou hodnotu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "math/rand"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var durations = promauto.NewSummary(prometheus.SummaryOpts{
+        Name:       "request_durations",
+        Help:       "Durations of requests.",
+        Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                v := rand.Float64()
+                durations.Observe(v)
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Pokud po určité době (přibližně po čtvrt minutě) přečteme nástrojem
+<strong>curl</strong> metriky, můžeme získat následující údaje:</p>
+
+<pre>
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# HELP request_durations Durations of requests.
+# TYPE request_durations summary
+request_durations{quantile="0.5"} 0.4246374970712657
+request_durations{quantile="0.9"} 0.8136399609900968
+request_durations{quantile="0.99"} 0.9405090880450124
+request_durations_sum 7.089663510425493
+request_durations_count 16
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Kumulativní histogram</h2>
+
+<p>Posledním důležitým typem metriky je kumulativní histogram s&nbsp;volitelným
+počtem a šířkou intervalů. Histogram je představován objektem typu
+<strong>Histogram</strong>, který taktéž implementuje metodu
+<strong>Observe</strong>, které lze předat libovolnou číselnou hodnotu. Tato
+hodnota je do histogramu začleněna a celý histogram (počet hodnot, které padly
+do daného intervalu a intervalů nižších) je nabízen jako metrika. Podívejme se
+nejdříve na kód příkladu, posléze si vysvětlíme, proč se jedná o kumulativní
+histogram:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "math/rand"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var durations = promauto.NewHistogram(prometheus.HistogramOpts{
+        Name:    "request_durations",
+        Help:    "Durations of requests.",
+        Buckets: prometheus.LinearBuckets(0, 0.1, 10),
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                v := rand.Float64()
+                fmt.Println(v)
+                durations.Observe(v)
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Zajímavé budou výsledky. Povšimněte si, že se provedlo devatenáct zápisů do
+histogramu a že samotný histogram obsahuje jedenáct intervalů, přičemž každý
+interval obsahuje počet hodnot menších, než je mezní hodnota intervalu (tedy
+nejedná se o o interval &bdquo;od-do&ldquo;, ale jen &bdquo;do&ldquo;):</p>
+
+<pre>
+# HELP request_durations Durations of requests.
+# TYPE request_durations histogram
+request_durations_bucket{le="0"} 0
+request_durations_bucket{le="0.1"} 2
+request_durations_bucket{le="0.2"} 3
+request_durations_bucket{le="0.30000000000000004"} 6
+request_durations_bucket{le="0.4"} 9
+request_durations_bucket{le="0.5"} 12
+request_durations_bucket{le="0.6"} 13
+request_durations_bucket{le="0.7"} 17
+request_durations_bucket{le="0.7999999999999999"} 17
+request_durations_bucket{le="0.8999999999999999"} 18
+request_durations_bucket{le="+Inf"} 19
+request_durations_sum 8.34488419486297
+request_durations_count 19
+</pre>
+
+<p>Výsledek po dalších dvanácti měřeních:</p>
+
+<pre>
+# HELP request_durations Durations of requests.
+# TYPE request_durations histogram
+request_durations_bucket{le="0"} 0
+request_durations_bucket{le="0.1"} 2
+request_durations_bucket{le="0.2"} 3
+request_durations_bucket{le="0.30000000000000004"} 11
+request_durations_bucket{le="0.4"} 15
+request_durations_bucket{le="0.5"} 18
+request_durations_bucket{le="0.6"} 21
+request_durations_bucket{le="0.7"} 26
+request_durations_bucket{le="0.7999999999999999"} 27
+request_durations_bucket{le="0.8999999999999999"} 30
+request_durations_bucket{le="+Inf"} 31
+request_durations_sum 14.195887244852525
+request_durations_count 31
+</pre>
+
+<p>Možná se nyní ptáte, proč se používá kumulativní histogram. Jeho velkou
+výhodou je fakt, že je možné operativně (podle paměťových aj.&nbsp;nároků)
+zmenšit počet intervalů, aniž by došlo k&nbsp;degradaci ostatních
+resp.&nbsp;předchozích hodnot.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Intervaly s&nbsp;rozdílnou šířkou</h2>
+
+<p>Typické histogramy mají shodnou šířku všech intervalů (0.1, 0.2, 0.3, 0.4,
+...), což ovšem nemusí být pro všechny měřené veličiny ideální nastavení.
+Z&nbsp;tohoto důvodu je možné vytvořit i histogram, v&nbsp;němž se šířka
+intervalů postupně zvyšuje či naopak snižuje o určité měřítko. Podívejme se na
+následující příklad:</p>
+
+<pre>
+var durations = promauto.NewHistogram(prometheus.HistogramOpts{
+        Name:    "request_durations",
+        Help:    "Durations of requests.",
+        Buckets: prometheus.<strong>ExponentialBuckets(0.01, 2, 10)</strong>,
+})
+</pre>
+
+<p>Výsledkem budou intervaly 0.01, 0.02 (první vynásobený dvěma) atd.:</p>
+
+<pre>
+request_durations_bucket{le="0.01"} 0
+request_durations_bucket{le="0.02"} 0
+request_durations_bucket{le="0.04"} 0
+request_durations_bucket{le="0.08"} 0
+request_durations_bucket{le="0.16"} 0
+request_durations_bucket{le="0.32"} 0
+request_durations_bucket{le="0.64"} 1
+request_durations_bucket{le="1.28"} 1
+request_durations_bucket{le="2.56"} 1
+request_durations_bucket{le="5.12"} 1
+request_durations_bucket{le="+Inf"} 1
+request_durations_sum 0.6046602879796196
+request_durations_count 1
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "math/rand"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var durations = promauto.NewHistogram(prometheus.HistogramOpts{
+        Name:    "request_durations",
+        Help:    "Durations of requests.",
+        Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
+})
+&nbsp;
+func <strong>tick</strong>() {
+        for {
+                v := rand.Float64()
+                fmt.Println(v)
+                durations.Observe(v)
+                time.Sleep(time.Second)
+        }
+}
+&nbsp;
+func <strong>recordMetrics</strong>() {
+        fmt.Println("Starting recording metrics")
+        go tick()
+}
+&nbsp;
+func <strong>main</strong>() {
+        recordMetrics()
+        fmt.Println("Initializing HTTP server")
+        http.Handle("/metrics", promhttp.Handler())
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Další výsledky běhu tohoto příkladu se zveřejněnými metrikami:</p>
+
+<pre>
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# HELP request_durations Durations of requests.
+# TYPE request_durations histogram
+request_durations_bucket{le="0.01"} 0
+request_durations_bucket{le="0.02"} 0
+request_durations_bucket{le="0.04"} 0
+request_durations_bucket{le="0.08"} 1
+request_durations_bucket{le="0.16"} 2
+request_durations_bucket{le="0.32"} 2
+request_durations_bucket{le="0.64"} 5
+request_durations_bucket{le="1.28"} 8
+request_durations_bucket{le="2.56"} 8
+request_durations_bucket{le="5.12"} 8
+request_durations_bucket{le="+Inf"} 8
+request_durations_sum 3.9810604603187447
+request_durations_count 8
+</pre>
+
+<p>Výsledek po záznamu 133 náhodných hodnot:</p>
+
+<pre>
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# HELP request_durations Durations of requests.
+# TYPE request_durations histogram
+request_durations_bucket{le="0.01"} 3
+request_durations_bucket{le="0.02"} 3
+request_durations_bucket{le="0.04"} 7
+request_durations_bucket{le="0.08"} 11
+request_durations_bucket{le="0.16"} 19
+request_durations_bucket{le="0.32"} 46
+request_durations_bucket{le="0.64"} 88
+request_durations_bucket{le="1.28"} 133
+request_durations_bucket{le="2.56"} 133
+request_durations_bucket{le="5.12"} 133
+request_durations_bucket{le="+Inf"} 133
+request_durations_sum 65.22517940569107
+request_durations_count 133
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Mapa čítačů a její použití pro sledování počtu přístupů na stránky</h2>
+
+<p>Často se setkáme se situací, kdy potřebujeme vytvořit několik čítačů, které
+sice měří stejnou veličinu, ale pro různé stavy aplikace. Například budeme
+chtít spočítat přístupy k&nbsp;jednotlivým stránkám, která aplikace vytváří a
+posílá klientům. Řešením je použít takzvaný vektor čítačů, přičemž každý čítač
+bude uveden svým jménem (řetězec):</p>
+
+<pre>
+var pageRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "page_requests",
+        Help: "The total number page/URL requests",
+},
+        []string{"url"})
+</pre>
+
+<p>Aplikace již bude složitější, neboť se bude jednat o HTTP server
+s&nbsp;několika koncovými body (včetně <strong>/metrics</strong>). A pro každý
+koncový bod se zaznamená přístup následující funkcí (povšimněte si především
+určení konkrétního čítače):</p>
+
+<pre>
+func <strong>countEndpoint</strong>(request *http.Request) {
+        url := request.URL.String()
+        fmt.Printf("Request URL: %s\n", url)
+        pageRequests.With(prometheus.Labels{"url": url}).Inc()
+}
+</pre>
+
+<p>Funkci budeme volat ze všech handlerů, což v&nbsp;tom nejjednodušším (nikoli
+nejkratším) případě může vypadat následovně:</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>fooEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "FOO!\n")
+}
+&nbsp;
+func <strong>barEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "BAR!\n")
+}
+</pre>
+
+<p>Podívejme se nyní na úplný zdrojový kód této aplikace:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "io"
+        "net/http"
+        "os"
+)
+&nbsp;
+var pageRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "page_requests",
+        Help: "The total number page/URL requests",
+},
+        []string{"url"})
+&nbsp;
+func <strong>countEndpoint</strong>(request *http.Request) {
+        url := request.URL.String()
+        fmt.Printf("Request URL: %s\n", url)
+        pageRequests.With(prometheus.Labels{"url": url}).Inc()
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>fooEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "FOO!\n")
+}
+&nbsp;
+func <strong>barEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        countEndpoint(request)
+        io.WriteString(writer, "BAR!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("Initializing HTTP server")
+&nbsp;
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/foo", fooEndpoint)
+        http.HandleFunc("/bar", barEndpoint)
+        http.Handle("/metrics", promhttp.Handler())
+&nbsp;
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Aplikaci spustíme a po několika přístupech na jednotlivé stránky si
+zobrazíme metriky. Mezi nimi nalezneme i čítače stránek:</p>
+
+<pre>
+# HELP page_requests The total number page/URL requests
+# TYPE page_requests counter
+page_requests{url="/"} 10
+page_requests{url="/bar"} 1
+page_requests{url="/bardsgdfs"} 1
+page_requests{url="/foo"} 2
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výpočet doby trvání vytvoření odpovědi HTTP serveru</h2>
+
+<p>V&nbsp;dnešním posledním demonstračním příkladu budeme měřit dobu trvání
+vytváření odpovědi HTTP serveru. Pro jednoduchost se bude měřit jen doba
+strávená v&nbsp;handleru, ovšem ve skutečnosti je pochopitelně celková doba
+větší, protože musíme znát i čas odeslání posledního bajtu atd. atd. Ovšem pro
+základní ukázku bude postačovat jednoduché měření ve stylu:</p>
+
+<pre>
+func <strong>countEndpoint</strong>(request *http.Request, start time.Time) {
+        url := request.URL.String()
+        fmt.Printf("Request URL: %s\n", url)
+        duration := time.Since(start)
+        fmt.Printf("Time to serve the page: %s\n", duration)
+&nbsp;
+        <i>// uprava citacu stranek</i>
+        pageRequests.With(prometheus.Labels{"url": url}).Inc()
+&nbsp;
+        <i>// uprava histogramu</i>
+        histogram.With(prometheus.Labels{"url": url}).Observe(float64(duration.Microseconds()))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: časový interval v&nbsp;mikrosekundách je
+reprezentován celým číslem, které převedeme na hodnotu
+<strong>float64</strong>.</div></p>
+
+<p>Tuto funkci budeme volat na konci každého handleru a navíc jí budeme muset
+přidat i čas, kdy se do handleru vstoupilo:</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        start := time.Now()
+        io.WriteString(writer, "Hello world!\n")
+        countEndpoint(request, start)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Komplikovanější příklad &ndash; HTTP server poskytující více metrik</h2>
+
+<p>V&nbsp;příkladu budeme používat jak čítače přístupu na jednotlivé stránky,
+tak i histogram s&nbsp;dobami, které program stráví při generování
+odpovědí:</p>
+
+<pre>
+var pageRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "page_requests",
+        Help: "The total number page/URL requests",
+}, []string{"url"})
+&nbsp;
+var histogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+        Name:    "response_time",
+        Help:    "Response time",
+        Buckets: prometheus.LinearBuckets(0, 5, 20),
+}, []string{"url"})
+</pre>
+
+<p>Úplný zdrojový kód příkladu může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "io"
+        "net/http"
+        "os"
+        "time"
+)
+&nbsp;
+var pageRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "page_requests",
+        Help: "The total number page/URL requests",
+}, []string{"url"})
+&nbsp;
+var histogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+        Name:    "response_time",
+        Help:    "Response time",
+        Buckets: prometheus.LinearBuckets(0, 5, 20),
+}, []string{"url"})
+&nbsp;
+func <strong>countEndpoint</strong>(request *http.Request, start time.Time) {
+        url := request.URL.String()
+        fmt.Printf("Request URL: %s\n", url)
+        duration := time.Since(start)
+        fmt.Printf("Time to serve the page: %s\n", duration)
+&nbsp;
+        <i>// uprava citacu stranek</i>
+        pageRequests.With(prometheus.Labels{"url": url}).Inc()
+&nbsp;
+        <i>// uprava histogramu</i>
+        histogram.With(prometheus.Labels{"url": url}).Observe(float64(duration.Microseconds()))
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        start := time.Now()
+        io.WriteString(writer, "Hello world!\n")
+        countEndpoint(request, start)
+}
+&nbsp;
+func <strong>fooEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        start := time.Now()
+        countEndpoint(request, start)
+        io.WriteString(writer, "FOO!\n")
+}
+&nbsp;
+func <strong>barEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        start := time.Now()
+        io.WriteString(writer, "BAR!\n")
+        countEndpoint(request, start)
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("Initializing HTTP server")
+&nbsp;
+        http.HandleFunc("/", mainEndpoint)
+        http.HandleFunc("/foo", fooEndpoint)
+        http.HandleFunc("/bar", barEndpoint)
+        http.Handle("/metrics", promhttp.Handler())
+&nbsp;
+        err := http.ListenAndServe(":8080", nil)
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Výsledky &ndash; počet přístupů na stránku:</p>
+
+<pre>
+# HELP page_requests The total number page/URL requests
+# TYPE page_requests counter
+page_requests{url="/"} 10
+page_requests{url="/bar"} 1
+page_requests{url="/foo"} 2
+</pre>
+
+<p>A doby vytváření stránek (resp.&nbsp;přesněji řečeno odpovědí). Histogram je
+vytvořen pro každou stránku zvlášť, což je přesně stav, který potřebujeme:</p>
+
+<pre>
+# HELP response_time Response time
+# TYPE response_time histogram
+response_time_bucket{url="/",le="0"} 0
+response_time_bucket{url="/",le="5"} 0
+response_time_bucket{url="/",le="10"} 0
+response_time_bucket{url="/",le="15"} 6
+response_time_bucket{url="/",le="20"} 6
+response_time_bucket{url="/",le="25"} 6
+response_time_bucket{url="/",le="30"} 7
+response_time_bucket{url="/",le="35"} 8
+response_time_bucket{url="/",le="40"} 8
+response_time_bucket{url="/",le="45"} 9
+response_time_bucket{url="/",le="50"} 10
+response_time_bucket{url="/",le="55"} 10
+response_time_bucket{url="/",le="60"} 10
+response_time_bucket{url="/",le="65"} 10
+response_time_bucket{url="/",le="70"} 10
+response_time_bucket{url="/",le="75"} 10
+response_time_bucket{url="/",le="80"} 10
+response_time_bucket{url="/",le="85"} 10
+response_time_bucket{url="/",le="90"} 10
+response_time_bucket{url="/",le="95"} 10
+response_time_bucket{url="/",le="+Inf"} 10
+response_time_sum{url="/"} 228
+response_time_count{url="/"} 10
+response_time_bucket{url="/bar",le="0"} 0
+response_time_bucket{url="/bar",le="5"} 0
+response_time_bucket{url="/bar",le="10"} 0
+response_time_bucket{url="/bar",le="15"} 0
+response_time_bucket{url="/bar",le="20"} 0
+response_time_bucket{url="/bar",le="25"} 0
+response_time_bucket{url="/bar",le="30"} 1
+response_time_bucket{url="/bar",le="35"} 1
+response_time_bucket{url="/bar",le="40"} 1
+response_time_bucket{url="/bar",le="45"} 1
+response_time_bucket{url="/bar",le="50"} 1
+response_time_bucket{url="/bar",le="55"} 1
+response_time_bucket{url="/bar",le="60"} 1
+response_time_bucket{url="/bar",le="65"} 1
+response_time_bucket{url="/bar",le="70"} 1
+response_time_bucket{url="/bar",le="75"} 1
+response_time_bucket{url="/bar",le="80"} 1
+response_time_bucket{url="/bar",le="85"} 1
+response_time_bucket{url="/bar",le="90"} 1
+response_time_bucket{url="/bar",le="95"} 1
+response_time_bucket{url="/bar",le="+Inf"} 1
+response_time_sum{url="/bar"} 29
+response_time_count{url="/bar"} 1
+response_time_bucket{url="/foo",le="0"} 0
+response_time_bucket{url="/foo",le="5"} 0
+response_time_bucket{url="/foo",le="10"} 1
+response_time_bucket{url="/foo",le="15"} 2
+response_time_bucket{url="/foo",le="20"} 2
+response_time_bucket{url="/foo",le="25"} 2
+response_time_bucket{url="/foo",le="30"} 2
+response_time_bucket{url="/foo",le="35"} 2
+response_time_bucket{url="/foo",le="40"} 2
+response_time_bucket{url="/foo",le="45"} 2
+response_time_bucket{url="/foo",le="50"} 2
+response_time_bucket{url="/foo",le="55"} 2
+response_time_bucket{url="/foo",le="60"} 2
+response_time_bucket{url="/foo",le="65"} 2
+response_time_bucket{url="/foo",le="70"} 2
+response_time_bucket{url="/foo",le="75"} 2
+response_time_bucket{url="/foo",le="80"} 2
+response_time_bucket{url="/foo",le="85"} 2
+response_time_bucket{url="/foo",le="90"} 2
+response_time_bucket{url="/foo",le="95"} 2
+response_time_bucket{url="/foo",le="+Inf"} 2
+response_time_sum{url="/foo"} 23
+response_time_count{url="/foo"} 2
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně čtyři megabajty), můžete namísto toho použít odkazy na jednotlivé
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_basic_metrics.go</td><td>aplikace, která nabízí základní metriky definované přímo v&nbsp;klientovi Promethea</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/01_basic_metrics.go">https://github.com/tisnik/go-root/blob/master/article_37/01_basic_metrics.go</a></td></tr>
+<tr><td> 2</td><td>02_not_registered_counter.go</td><td>čítač (<i>counter</i>), který však není explicitně zaregistrován</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/02_not_registered_counter.go">https://github.com/tisnik/go-root/blob/master/article_37/02_not_registered_counter.go</a></td></tr>
+<tr><td> 3</td><td>03_registered_counter.go</td><td>čítač (<i>counter</i>), který je adekvátně zaregistrován a bude poskytován s&nbsp;ostatními metrikami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/03_registered_counter.go">https://github.com/tisnik/go-root/blob/master/article_37/03_registered_counter.go</a></td></tr>
+<tr><td> 4</td><td>04_automatic_registration.go</td><td>automatická registrace čítače při jeho vytvoření</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/04_automatic_registration.go">https://github.com/tisnik/go-root/blob/master/article_37/04_automatic_registration.go</a></td></tr>
+<tr><td> 5</td><td>05_gauge.go</td><td>automaticky zaregistrovaná metrika typu <i>gauge</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/05_gauge.go">https://github.com/tisnik/go-root/blob/master/article_37/05_gauge.go</a></td></tr>
+<tr><td> 6</td><td>06_summary.go</td><td>automaticky zaregistrovaná metrika typu <i>summary</i> a princip jejího použití</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/06_summary.go">https://github.com/tisnik/go-root/blob/master/article_37/06_summary.go</a></td></tr>
+<tr><td> 7</td><td>07_histogram.go</td><td>metrika prezentovaná formou kumulativního histogramu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/07_histogram.go">https://github.com/tisnik/go-root/blob/master/article_37/07_histogram.go</a></td></tr>
+<tr><td> 8</td><td>08_histogram_exp_buckets.go</td><td>změna intervalů (<i>buckets</i>) v&nbsp;histogramu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/08_histogram_exp_buckets.go">https://github.com/tisnik/go-root/blob/master/article_37/08_histogram_exp_buckets.go</a></td></tr>
+<tr><td> 9</td><td>09_counter_vec.go</td><td>jedna metrika obsahující větší množství pojmenovaných čítačů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/09_counter_vec.go">https://github.com/tisnik/go-root/blob/master/article_37/09_counter_vec.go</a></td></tr>
+<tr><td>10</td><td>10_histogram_vec.go</td><td>složitější příklad používající větší množství kumulativních histogramů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_37/10_histogram_vec.go">https://github.com/tisnik/go-root/blob/master/article_37/10_histogram_vec.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2019</small></p>
+</body>
+</html>
+
