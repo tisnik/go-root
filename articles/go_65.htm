@@ -1,0 +1,3295 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V poměrně velkém množství informačních systémů se setkáme s požadavkem na vytváření a export tabulek, které bude možné otevřít v tabulkovém procesoru (spreadsheetu). Pro jazyk Go vzniklo několik knihoven, které export do tabulkových procesorů umožňují. Dnes si stručně představíme dvě z nich.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Tvorba sešitů pro tabulkové procesory v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Tvorba tabulek ve formátu CSV</a></p>
+<p><a href="#k03">3. Vytvoření tabulky s&nbsp;vypočtenými hodnotami</a></p>
+<p><a href="#k04">4. Postupný výpočet hodnot do tabulky bez jejich meziuložení</a></p>
+<p><a href="#k05">5. Problematické rysy formátu CSV a jejich (ne)řešení balíčkem <strong>encoding/csv</strong></a></p>
+<p><a href="#k06">6. Vytvoření sešitů ve formátu Office Open XML Workbook (.xlsx)</a></p>
+<p><a href="#k07">7. Příklad, který se pokusí vytvořit prázdný sešit</a></p>
+<p><a href="#k08">8. Sešit s&nbsp;jedním prázdným listem</a></p>
+<p><a href="#k09">9. Sešit s&nbsp;větším množstvím listů</a></p>
+<p><a href="#k10">10. Přidání řádků a buněk do sešitu</a></p>
+<p><a href="#k11">11. Zjednodušené přidání buňky na řádek s&nbsp;naplněním hodnotou</a></p>
+<p><a href="#k12">12. Ukázka podporovaných formátů buněk</a></p>
+<p><a href="#k13">13. Podrobnější specifikace formátu zobrazení numerických hodnot</a></p>
+<p><a href="#k14">14. Přidání vzorců do sešitu</a></p>
+<p><a href="#k15">15. Buňky obsahující hypertextové odkazy</a></p>
+<p><a href="#k16">16. Základ práce se styly</a></p>
+<p><a href="#k17">17. Sdílení stylů mezi buňkami</a></p>
+<p><a href="#k18">18. Obsah navazujících článků</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Tvorba sešitů pro tabulkové procesory v&nbsp;programovacím jazyku Go</h2>
+
+<p>Jedním z&nbsp;relativně častých požadavků kladených na různé informační
+systémy je požadavek na to, aby bylo možné naměřená či vypočtená data
+vyexportovat v&nbsp;takovém formátu, který by byl zpracovatelný
+v&nbsp;tabulkových procesorech (<i>spreadsheet</i>), například
+v&nbsp;&bdquo;kancelářských&ldquo; aplikacích <i>Gnumeric</i>, <i>Microsoft
+Excel</i>, <i>LibreOffice Calc</i> či v&nbsp;některých tabulkových procesorech
+naprogramovaných a dostupných ve formě webových aplikací (<i>Google Doc</i>,
+<i>Ethercalc</i>). Jedná se o logický požadavek, protože v&nbsp;tabulkových
+procesorech je možné relativně snadno provádět další analýzy dat, interaktivně
+vytvářet grafy, provádět různé dotazy nad daty atd. Navíc data vyexportovaná do
+jednoho z&nbsp;podporovaných a (polo)standardizovaných formátů lze naimportovat
+například do <i>Jupyter Notebooku</i>, <i>Matlabu</i> atd. a následně je
+sofistikovaněji zpracovat v&nbsp;těchto prostředích.</p>
+
+<p>Existuje hned několik formátů, které jsou podporovány jak knihovnami
+určenými pro programovací jazyk Go, tak i tabulkovými procesory. Tyto formáty
+se od sebe odlišují svými vlastnostmi: některé formáty pouze dokážou ukládat
+tabulky s&nbsp;hodnotami jen několika datových typů (což způsobuje obecně známé
+problémy s&nbsp;reprezentací časových údajů či peněžních částek), další formáty
+již umožňují ukládat vzorce, formátování buněk, styly buněk a některé dokonce i
+tak složité objekty, jako jsou grafy. Z&nbsp;hlediska kompatibility mezi
+různými systémy je tak možné se rozhodnout například mezi následujícími
+formáty:</p>
+
+<ul>
+
+<li><i>CSV</i> neboli <i>Comma-Separated Values</i> [<a
+href="https://en.wikipedia.org/wiki/Comma-separated_values">1</a>] je jedním
+z&nbsp;nejčastěji používaných souborových formátů v&nbsp;této oblasti, a to
+přesto, že je export a import CSV v&nbsp;některých případech problematický
+(například některé české mutace Excelu namísto čárek používají středníky,
+problémy nastávají s&nbsp;buňkami obsahujícími znaky pro konec řádku atd.).
+Pokud máte při importu či exportu potíže se zpracováním CSV, můžete
+v&nbsp;naprosté většině tabulkových procesorů zvolit přesnou specifikaci, jak
+se má konverze (resp.&nbsp;přesněji řečeno import nebo export) provést.
+V&nbsp;dnešním článku si ukážeme použití balíčku <strong>encoding/csv</strong>,
+který pracuje s&nbsp;CSV podle <a
+href="https://tools.ietf.org/html/rfc4180">RFC 4180</a>. Tato de facto norma
+však zdaleka nepopisuje všechny varianty CSV, s&nbsp;nimiž se můžete
+v&nbsp;praxi setkat.</li>
+
+<li><i>TSV</i> neboli <i>Tab-Separated Values</i> [<a
+href="https://en.wikipedia.org/wiki/Tab-separated_values">2</a>] [<a
+href="http://jkorpela.fi/TSV.html">3</a>] je velmi podobným formátem, ovšem
+s&nbsp;tím rozdílem, že oddělovačem jednotlivých buněk je znak tabulátoru.
+Podobně jako v&nbsp;případě CSV i zde existuje několik voleb, které ovlivňují
+způsob importu (zda tabulka obsahuje hlavičky sloupců atd.).</li>
+
+<li>Existuje i mnoho aplikací, v&nbsp;nichž jsou tabulková data uložena ve
+formě běžných textových souborů s&nbsp;nějakými oddělovači odlišnými od výše
+zmíněného tabulátoru (relativně často se jedná o středníky, dvojtečky nebo o
+znak |). Buď se jedná o zobecnění formátů CSV a TSV [<a
+href="https://en.wikipedia.org/wiki/Delimiter-separated_values">4</a>], nebo
+může mít textový soubor podobu naformátovaných sloupců s&nbsp;pevnou délkou (a
+tedy bez problémů čitelných uživatelem). V&nbsp;tomto případě většinou musí
+tabulkové procesory soubor analyzovat a na základě této analýzy navrhnout, kde
+se nachází jednotlivé sloupce. Příkladem takového souboru je například <a
+href="https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt">https://www.cnb.cz/cs/financni_trhy/devizovy_trh/kurzy_devizoveho_trhu/denni_kurz.txt</a>,
+v&nbsp;němž se jako oddělovače používají právě znaky &bdquo;|&ldquo; a navíc
+&ndash; aby byl import ještě zajímavější &ndash; jsou v&nbsp;numerických
+hodnotách použity čárky namísto teček.</li>
+
+<li>Dalším velmi často používaným formátem pro přenos tabulek i celých sešitů
+(<i>sheet</i>) je formát nazvaný <i>Office Open XML Workbook</i>. Tento formát
+je součástí skupiny formátů známých též pod zkratkou <i>OOXML</i> (plným jménem
+<i>Office Open XML</i>) nebo též (z&nbsp;dnes již spíše historických důvodů)
+<i>Microsoft Open XML</i>. Práci s&nbsp;tímto formátem je věnována <a
+href="#k06">druhá část dnešního článku</a>.</li>
+
+<li>Podobně koncipovaný je i <i>Open Document Format for Office
+Applications</i> (ODF), známý též pod kratším jménem <i>OpenDocument</i>. Tímto
+formátem se dnes ještě nebudeme zabývat, i když je taktéž poměrně často
+používaný (i když se zdá, že souboj mezi ODF a OOXML je již rozhodnutý).</li>
+
+</ul>
+
+<p><div class="rs-tip-major">Poznámka: dnes se budeme zabývat pouze vytvářením
+souborů s&nbsp;tabulkami či s&nbsp; celými sešity. Druhým problémem &ndash; a
+to vlastně problémem obecně složitějším &ndash; je import takových sešitů do
+datových struktur programovacího jazyka Clojure. Na tuto problematiku se však
+zaměříme až v&nbsp;navazujících článcích.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Tvorba tabulek ve formátu CSV</h2>
+
+<p>Nejdříve se budeme zabývat způsobem tvorby tabulek (resp.&nbsp;přesněji
+řečeno souborů s&nbsp;tabulkami) založenými na formátu <i>CSV</i> neboli
+<i>Comma-Separated Values</i>. Jedná se o soubory, které obsahují čistá data
+bez dalších informací o formátování, vzorcích, bez možnosti vložení grafů atd.
+Pro mnoho účelů &ndash; zejména pro přenosy dat mezi heterogenními systémy
+&ndash; může být CSV poměrně dobrou volbou, navíc je jejich tvorba (pokud
+nebudeme brát v&nbsp;úvahu různé speciální varianty nebo mezní případy)
+relativně snadná a přímočará. I z&nbsp;tohoto důvodu se již ve standardní
+knihovně programovacího jazyka Go setkáme s&nbsp;balíčkem
+<strong>encoding/csv</strong>, jenž podporuje jak export dat do formátu CSV,
+tak i jejich import. Více info viz:</p>
+
+<pre>
+$ <strong>go doc encoding</strong>
+&nbsp;
+package encoding // import "encoding"
+&nbsp;
+Package encoding defines interfaces shared by other packages that convert
+data to and from byte-level and textual representations. Packages that check
+for these interfaces include encoding/gob, encoding/json, and encoding/xml.
+As a result, implementing an interface once can make a type useful in
+multiple encodings. Standard types that implement these interfaces include
+time.Time and net.IP. The interfaces come in pairs that produce and consume
+encoded data.
+&nbsp;
+type BinaryMarshaler interface{ ... }
+type BinaryUnmarshaler interface{ ... }
+type TextMarshaler interface{ ... }
+type TextUnmarshaler interface{ ... }
+</pre>
+
+<p>a:</p>
+
+<pre>
+$ <strong>go doc encoding/csv</strong>
+&nbsp;
+package csv // import "encoding/csv"
+&nbsp;
+Package csv reads and writes comma-separated values (CSV) files. There are
+many kinds of CSV files; this package supports the format described in RFC
+4180.
+&nbsp;
+A csv file contains zero or more records of one or more fields per record.
+Each record is separated by the newline character. The final record may
+optionally be followed by a newline character.
+&nbsp;
+    field1,field2,field3
+&nbsp;
+White space is considered part of a field.
+&nbsp;
+Carriage returns before newline characters are silently removed.
+&nbsp;
+Blank lines are ignored. A line with only whitespace characters (excluding
+the ending newline character) is not considered a blank line.
+&nbsp;
+Fields which start and stop with the quote character " are called
+quoted-fields. The beginning and ending quote are not part of the field.
+&nbsp;
+The source:
+&nbsp;
+    normal string,"quoted-field"
+&nbsp;
+results in the fields
+&nbsp;
+    {`normal string`, `quoted-field`}
+&nbsp;
+Within a quoted-field a quote character followed by a second quote character
+is considered a single quote.
+&nbsp;
+    "the ""word"" is true","a ""quoted-field"""
+&nbsp;
+results in
+&nbsp;
+    {`the "word" is true`, `a "quoted-field"`}
+&nbsp;
+Newlines and commas may be included in a quoted-field
+&nbsp;
+    "Multi-line
+    field","comma is ,"
+&nbsp;
+results in
+&nbsp;
+    {`Multi-line
+    field`, `comma is ,`}
+&nbsp;
+var ErrTrailingComma = errors.New("extra delimiter at end of line") ...
+type ParseError struct{ ... }
+type Reader struct{ ... }
+    func NewReader(r io.Reader) *Reader
+type Writer struct{ ... }
+    func NewWriter(w io.Writer) *Writer
+</pre>
+
+<p>Ovšem na druhou stranu má tento balíček taktéž několik omezení (například se
+orientuje jen na zápis řetězců), takže &ndash; což je možná trošku paradoxní
+&ndash; je práce s&nbsp;ním nepatrně komplikovanější než se soubory
+<i>xlsx</i>, s&nbsp;nimiž se setkáme <a href="#k06">ve druhé části dnešního
+článku</a>.</p>
+
+<p>Podívejme se nyní na typický demonstrační příklad, který ukazuje některé
+základní vlastnosti balíčku <strong>encoding/csv</strong>. Tento příklad by po
+svém spuštění měl vytvořit nový soubor nazvaný <strong>test1.csv</strong>,
+který bude obsahovat tabulku se třemi sloupci a čtyřmi řádky. Data jsou
+v&nbsp;tomto případě reprezentována dvourozměrnou datovou strukturou, konkrétně
+řezem, jehož prvky jsou řezy s&nbsp;řetězci. V&nbsp;příkladu se provede několik
+operací:</p>
+
+<ol>
+<li>Vytvoří se nový soubor určený pro zápis.</li>
+<li>Zkonstruuje se objekt typu <strong>csv.Writer</strong> určený pro zápis dat ve formátu CSV.</li>
+<li>Metodou <strong>Writer.Write()</strong> se postupně zapíšou jednotlivé řádky tabulky.</li>
+<li>Zavolá se metoda <strong>Writer.Flush()</strong> zajišťující vyprázdnění bufferu.</li>
+<li>Metodou <strong>Writer.Error()</strong> se otestuje, zda při zápisu či operaci <i>flush</i> nedošlo k&nbsp;žádné chybě.</li>
+</ol>
+
+<p>Celý zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "os"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test1.csv"
+&nbsp;
+func <strong>main</strong>() {
+        records := [][]string{
+                {"first_name", "last_name", "username"},
+                {"Rob", "Pike", "rob"},
+                {"Ken", "Thompson", "ken"},
+                {"Robert", "Griesemer", "gri"},
+        }
+&nbsp;
+        <i>// vytvoření výstupního souboru s tabulkou</i>
+        fout, err := os.Create(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zajištění, že se soubor s tabulkou uzavře při ukončení programu</i>
+        defer fout.Close()
+&nbsp;
+        <i>// konstrukce objektu pro postupné vytvoření tabulky</i>
+        writer := csv.NewWriter(fout)
+&nbsp;
+        for _, record := range records {
+                // vložení nového řádku (záznamu)
+                err := writer.Write(record)
+                if err != nil {
+                        panic(err)
+                }
+        }
+&nbsp;
+        <i>// pokus o uložení tabulky a vyprázdnění bufferu</i>
+        writer.Flush()
+&nbsp;
+        <i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+        err = writer.Error()
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu by se měl vytvořit soubor s&nbsp;následujícím
+obsahem:</p>
+
+<pre>
+first_name,last_name,username
+Rob,Pike,rob
+Ken,Thompson,ken
+Robert,Griesemer,gri
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se v&nbsp;tomto
+případě jako oddělovače použily skutečně čárky (někdy se ovšem může jednat o
+středníky) a že řetězcové hodnoty nejsou zapsány v&nbsp;uvozovkách.</div></p>
+
+<p>Ve skutečnosti je možné příklad zjednodušit, a to tak, že se namísto
+postupného zápisu jednotlivých řádků tabulky provede zápis celé tabulky. Pro
+tento účel se používá metoda <strong>Write.WriteAll</strong>, která navíc
+provede i operaci <strong>Flush</strong>. Povšimněte si, že tuto metodu je
+možné použít pouze v&nbsp;tom případě, že data jsou reprezentována jako řez
+řezů obsahujících řetězce (ty představují jednotlivé buňky tabulky):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "os"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test2.csv"
+&nbsp;
+func <strong>main</strong>() {
+        records := [][]string{
+                {"first_name", "last_name", "username"},
+                {"Rob", "Pike", "rob"},
+                {"Ken", "Thompson", "ken"},
+                {"Robert", "Griesemer", "gri"},
+        }
+&nbsp;
+        <i>// vytvoření výstupního souboru s tabulkou</i>
+        fout, err := os.Create(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zajištění, že se soubor s tabulkou uzavře při ukončení programu</i>
+        defer fout.Close()
+&nbsp;
+        <i>// konstrukce objektu pro postupné vytvoření tabulky</i>
+        writer := csv.NewWriter(fout)
+&nbsp;
+        <i>// uložení všech řádků (záznamu) a provedení operace Flush</i>
+        writer.WriteAll(records)
+&nbsp;
+        <i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+        err = writer.Error()
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Tento příklad, i když je strukturovaný odlišně od příkladu prvního, by měl
+vytvořit naprosto stejný výstupní soubor:</p>
+
+<pre>
+first_name,last_name,username
+Rob,Pike,rob
+Ken,Thompson,ken
+Robert,Griesemer,gri
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Vytvoření tabulky s&nbsp;vypočtenými hodnotami</h2>
+
+<p>V&nbsp;prvních dvou demonstračních příkladech jsme se soustředili na uložení
+tabulky, která je v&nbsp;aplikaci reprezentována již předem vytvořenou datovou
+strukturou kompatibilní s&nbsp;knihovnou <strong>encoding/csv</strong>,
+konkrétně řezem obsahujícím další řezy s&nbsp;jednotlivými řetězci. Ovšem
+mnohdy nemáme data připravena přesně v&nbsp;tomto formátu, někdy existují i
+situace, v&nbsp;nichž jsou data vytvářena průběžně (logování, sledování
+síťového provozu atd.). V&nbsp;těchto případech může být výhodnější použít
+&bdquo;streaming&ldquo;, tj.&nbsp;postupné přidávání dat buď do postupně
+vytvářené datové struktury (v&nbsp;případě programovacího jazyka Go řezu) nebo
+přímým zápisem dat (po řádcích) do výsledného souboru typu CSV.</p>
+
+<p>Příkladem může být tabulka s&nbsp;vypočtenými faktoriály:</p>
+
+<pre>
+n,n!
+0,1
+1,1
+2,2
+3,6
+4,24
+5,120
+6,720
+7,5040
+8,40320
+9,362880
+10,3628800
+11,39916800
+12,479001600
+13,6227020800
+14,87178291200
+15,1307674368000
+16,20922789888000
+17,355687428096000
+18,6402373705728000
+19,121645100408832000
+20,2432902008176640000
+</pre>
+
+<p>Ve třetím demonstračním příkladu je ukázáno, jakým způsobem je možné
+postupně vytvářet řez, který reprezentuje obsah tabulky jež má být posléze
+exportována do formátu CSV:</p>
+
+<pre>
+var records [][]string
+</pre>
+
+<p>Připomeňme si, že řez (<i>slice</i>) představuje v&nbsp;jazyce Go pohled
+(<i>view</i>) do pole s&nbsp;uloženými daty, přičemž v&nbsp;řezu je uložen
+offset prvního prvku, délka řezu a jeho kapacita. S&nbsp;využitím funkce
+<strong>append</strong> se do řezu přidávají další prvky, což interně znamená,
+že se pole, do kterého řez představuje pohled, musí v&nbsp;určitých okamžicích
+realokovat:</p>
+
+<pre>
+<i>// zápis ostatních řádků</i>
+for n := int64(0); n &lt;= 20; n++ {
+        <i>// výpočet faktoriálu</i>
+        f := factorial(n)
+&nbsp;
+        <i>// příprava dat pro zápis</i>
+        var record []string
+        record = append(record, strconv.FormatInt(n, 10))
+        record = append(record, strconv.FormatInt(f, 10))
+&nbsp;
+        <i>// připojení k výsledkům</i>
+        records = append(records, record)
+}
+</pre>
+
+<p>V&nbsp;demonstračním příkladu postupně takový řez vytváříme
+z&nbsp;vypočtených výsledků (funkce faktoriál). Povšimněte si, že je nutné
+zajistit konverzi dat, protože knihovna <strong>encoding/csv</strong> podporuje
+pouze práci s&nbsp;řetězci a nikoli s&nbsp;jinými datovými typy (na rozdíl od
+knihovny popsané ve druhé části dnešního článku).</p>
+
+<p>Následně je tento řez uložen jedinou operací do souboru typu CSV:</p>
+
+<pre>
+<i>// uložení všech řádků (záznamu) a provedení operace Flush</i>
+writer.WriteAll(records)
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "os"
+        "strconv"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test3.csv"
+&nbsp;
+func <strong>factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření výstupního souboru s tabulkou</i>
+        fout, err := os.Create(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zajištění, že se soubor s tabulkou uzavře při ukončení programu</i>
+        defer fout.Close()
+&nbsp;
+        <i>// konstrukce objektu pro postupné vytvoření tabulky</i>
+        writer := csv.NewWriter(fout)
+&nbsp;
+        <i>// zápis hlavičky</i>
+        header := []string{"n", "n!"}
+        err = writer.Write(header)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        var records [][]string
+&nbsp;
+        <i>// zápis ostatních řádků</i>
+        for n := int64(0); n &lt;= 20; n++ {
+                <i>// výpočet faktoriálu</i>
+                f := factorial(n)
+&nbsp;
+                <i>// příprava dat pro zápis</i>
+                var record []string
+                record = append(record, strconv.FormatInt(n, 10))
+                record = append(record, strconv.FormatInt(f, 10))
+&nbsp;
+                <i>// připojení k výsledkům</i>
+                records = append(records, record)
+        }
+&nbsp;
+        <i>// uložení všech řádků (záznamu) a provedení operace Flush</i>
+        writer.WriteAll(records)
+&nbsp;
+        <i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+        err = writer.Error()
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Postupný výpočet hodnot do tabulky bez jejich meziuložení</h2>
+
+<p>Vzhledem k&nbsp;tomu, že se hodnoty, které se mají do CSV uložit, vytváří
+postupně řádek po řádku, není nutné mít tyto hodnoty po celou dobu uloženy
+v&nbsp;operační paměti. Naopak &ndash; je možné, aby se každý řádek do CSV
+uložil samostatně, takže i pro velmi rozsáhlé tabulky nemusí mít generátor CSV
+velké paměťové nároky.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;minulosti jsme se mnohdy mohli
+setkat s&nbsp;tím, že některé tabulkové procesory dokázaly zpracovat tabulky
+omezené na 65535 či 65536 řádků. Toto omezení však dnes již v&nbsp;naprosté
+většině případů neplatí, takže se mnohdy můžeme setkat se skutečně obrovskými
+tabulkami.</div></p>
+
+<p>Podívejme se tedy na to, jakým způsobem je možné tabulku vytvářet postupně,
+tedy řádek po řádku. Nejprve zapíšeme hlavičku (první řádek tabulky):</p>
+
+<pre>
+<i>// zápis hlavičky</i>
+header := []string{"n", "n!"}
+err = writer.Write(header)
+if err != nil {
+        panic(err)
+}
+</pre>
+
+<p>Dále postupně vypočteme a ihned zapíšeme jednotlivé hodnoty:</p>
+
+<pre>
+<i>// zápis ostatních řádků</i>
+for n := int64(0); n &lt;= 20; n++ {
+        <i>// výpočet faktoriálu</i>
+        f := factorial(n)
+&nbsp;
+        <i>// příprava dat pro zápis</i>
+        var record [2]string
+        record[0] = strconv.FormatInt(n, 10)
+        record[1] = strconv.FormatInt(f, 10)
+&nbsp;
+        <i>// zápis řádku</i>
+        err = writer.Write(record[:])
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Poté je možné zápis dokončit, samozřejmě opět s&nbsp;testem na případné
+chyby:</p>
+
+<pre>
+<i>// pokus o uložení tabulky a vyprázdnění bufferu</i>
+writer.Flush()
+&nbsp;
+<i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+err = writer.Error()
+if err != nil {
+        panic(err)
+}
+</pre>
+
+<p>Následuje úplný zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "os"
+        "strconv"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test4.csv"
+&nbsp;
+func <strong>factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření výstupního souboru s tabulkou</i>
+        fout, err := os.Create(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zajištění, že se soubor s tabulkou uzavře při ukončení programu</i>
+        defer fout.Close()
+&nbsp;
+        <i>// konstrukce objektu pro postupné vytvoření tabulky</i>
+        writer := csv.NewWriter(fout)
+&nbsp;
+        <i>// zápis hlavičky</i>
+        header := []string{"n", "n!"}
+        err = writer.Write(header)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zápis ostatních řádků</i>
+        for n := int64(0); n &lt;= 20; n++ {
+                <i>// výpočet faktoriálu</i>
+                f := factorial(n)
+&nbsp;
+                <i>// příprava dat pro zápis</i>
+                var record [2]string
+                record[0] = strconv.FormatInt(n, 10)
+                record[1] = strconv.FormatInt(f, 10)
+&nbsp;
+                <i>// zápis řádku</i>
+                err = writer.Write(record[:])
+                if err != nil {
+                        panic(err)
+                }
+        }
+&nbsp;
+        <i>// pokus o uložení tabulky a vyprázdnění bufferu</i>
+        writer.Flush()
+&nbsp;
+        <i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+        err = writer.Error()
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Problematické rysy formátu CSV a jejich (ne)řešení balíčkem <strong>encoding/csv</strong></h2>
+
+<p>Na tomto místě je nutné poznamenat, že formát souborů CSV nebyl navržen
+příliš šťastně a navíc nebyl do všech podrobností standardizován. To se
+v&nbsp;praxi projevuje tím, že se můžeme setkat s&nbsp;CSV, které není možné
+v&nbsp;tabulkových procesorech otevřít popř.&nbsp;je sice otevřít možné je,
+ovšem dojde k&nbsp;poškození dat. Setkat se můžeme s&nbsp;CSV, v&nbsp;němž je
+oddělovačem středník a nikoli čárka, v&nbsp;nichž je čárka použita v&nbsp;roli
+desetinné čárky (namísto přece jen používanější tečky), problém mohou
+způsobovat uvozovky v&nbsp;buňkách, konec řádku v&nbsp;buňce (pokud je vůbec
+podporován), některé CSV mají unixové konce řádků, jiné DOSové atd. Tvůrci
+knihovny <strong>encoding/csv</strong> tento problém vyřešili způsobem typickým
+pro celý jazyk Go &ndash; explicitně prohlásili, že podporují pouze podmnožinu
+CSV specifikovanou v&nbsp;<a href="https://tools.ietf.org/html/rfc4180">RFC
+4180</a>. Zajímavé tedy bude zjistit, jak se tato knihovna vypořádá s&nbsp;tím,
+kdy do buněk (co jsou &bdquo;jen&ldquo; řetězce) vložíme některé speciální
+znaky:</p>
+
+<ul>
+<li>Apostrofy</li>
+<li>Uvozovky</li>
+<li>Konce řádků</li>
+<li>Znak tabulátoru</li>
+<li>Čárky v&nbsp;buňkách</li>
+</ul>
+
+<p>Všechny tyto speciální případy jsou použity v&nbsp;dnešním pátém
+demonstračním příkladu, jehož úplný zdrojový kód vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "os"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test5.csv"
+&nbsp;
+func <strong>main</strong>() {
+        records := [][]string{
+                {"first\nname", "last\nname", "username"},
+                {"'Rob'", "'Pike'", "rob"},
+                {"\"Ken\"", "\"Thompson\"", "ken"},
+                {"`Robert`", "`Griesemer`", "gri"},
+                {"A B", "C\tD", "\n"},
+                {"Foo,Bar", "Baz,,,", ","},
+        }
+&nbsp;
+        <i>// vytvoření výstupního souboru s tabulkou</i>
+        fout, err := os.Create(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zajištění, že se soubor s tabulkou uzavře při ukončení programu</i>
+        defer fout.Close()
+&nbsp;
+        <i>// konstrukce objektu pro postupné vytvoření tabulky</i>
+        writer := csv.NewWriter(fout)
+&nbsp;
+        for _, record := range records {
+                // vložení nového řádku (záznamu)
+                err := writer.Write(record)
+                if err != nil {
+                        panic(err)
+                }
+        }
+&nbsp;
+        <i>// pokus o uložení tabulky a vyprázdnění bufferu</i>
+        writer.Flush()
+&nbsp;
+        <i>// test, zda při Write() nebo Flush() došlo k nějaké chybě</i>
+        err = writer.Error()
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Podívejme se nyní na obsah souboru CSV, který vznikne po překladu a spuštění
+tohoto příkladu:</p>
+
+<pre>
+"first
+name","last
+name",username
+'Rob','Pike',rob
+"""Ken""","""Thompson""",ken
+`Robert`,`Griesemer`,gri
+A B,C   D,"
+"
+"Foo,Bar","Baz,,,",","
+</pre>
+
+<p>Tento soubor bude některými tabulkovými procesory zpracován nekorektně, což
+je ostatně patrné i z&nbsp;následujícího screenshotu:</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Vytvoření sešitů ve formátu Office Open XML Workbook (.xlsx)</h2>
+
+<p>Druhým velmi často používaným formátem pro přenos tabulek i celých sešitů
+(<i>sheet</i>) je formát nazvaný <i>Office Open XML Workbook</i>. Tento formát
+je součástí skupiny formátů známých též pod zkratkou <i>OOXML</i> (plným jménem
+<i>Office Open XML</i>) nebo též (z&nbsp;dnes již spíše historických důvodů)
+<i>Microsoft Open XML</i>. Tento formát byl po určitých peripetiích (které by
+si vyžádaly samostatný článek, viz například <a
+href="https://en.wikipedia.org/wiki/Standardization_of_Office_Open_XML">https://en.wikipedia.org/wiki/Standardization_of_Office_Open_XML</a>)
+standardizován, a to hned několikrát. Zejména se jedná o standard ECMA-376,
+ovšem důležitější je standard ISO/IEC 29500. Tento formát, který interně
+obsahuje adresářovou strukturu s&nbsp;několika soubory ve formátu XML, které
+jsou zazipovány, je podporován většinou důležitých tabulkových procesorů,
+zejména pak těmito aplikacemi:</p>
+
+<table>
+<tr><th>#</th><th>Systém</th></tr>
+<tr><td>1</td><td>Gnumeric</td></tr>
+<tr><td>2</td><td>LibreOffice Calc</td></tr>
+<tr><td>3</td><td>Microsoft Excel</td></tr>
+<tr><td>4</td><td>WPS Office</td></tr>
+<tr><td>5</td><td>Corel Wordperfect</td></tr>
+<tr><td>6</td><td>Google Sheets</td></tr>
+</table>
+
+<p>Soubory ve formátu Office Open XML Workbook, které mají typicky koncovku
+&bdquo;.xlsx&ldquo;, je možné vytvářet i v&nbsp;aplikacích naprogramovaných
+v&nbsp;jazyku Go. Lze k&nbsp;tomu použít knihovnu XLSX. Instalace této knihovny
+je snadná. Postačuje pouze vytvořit nový projekt příkazem <strong>go mod
+init</strong> a následně do souboru <strong>go.mod</strong> dopsat požadavek na
+knihovnu <i>včetně její verze</i>:</p>
+
+<pre>
+module test
+&nbsp;
+go 1.13
+&nbsp;
+require github.com/tealeg/xlsx/v3 v3.2.0
+</pre>
+
+<p>Následně je možné provést import této knihovny do projektu vytvářeného
+v&nbsp;Go a knihovnu začít používat:</p>
+
+<pre>
+import (
+        ...
+        ...
+        ...
+        "github.com/tealeg/xlsx/v3"
+        ...
+        ...
+        ...
+)
+</pre>
+
+<p>Lze si nechat zobrazit i nápovědu k&nbsp;právě nainstalované knihovně:</p>
+
+<pre>
+$ <strong>go doc xlsx</strong>
+&nbsp;
+&nbsp;
+package xlsx // import "github.com/tealeg/xlsx"
+&nbsp;
+const DataValidationTypeCustom ...
+const DataValidationOperatorBetween ...
+const MJD_0 float64 = 2400000.5 ...
+const TRUE = 0x01 ...
+const RichTextFontFamilyUnspecified RichTextFontFamily = -1 ...
+const Helvetica = "Helvetica" ...
+const RGB_Light_Green = "FFC6EFCE" ...
+const ColWidth = 9.5
+const Excel2006MaxRowCount = 1048576
+const Excel2006MaxRowIndex = Excel2006MaxRowCount - 1
+const NoRowLimit int = -1
+const Solid_Cell_Fill = "solid"
+const TEMPLATE_DOCPROPS_APP = ...
+const TEMPLATE_DOCPROPS_CORE = ...
+const TEMPLATE_XL_THEME_THEME = ...
+const TEMPLATE__RELS_DOT_RELS = ...
+var DefaultDateFormat = builtInNumFmt[14] ...
+var HSLModel = color.ModelFunc(hslModel)
+func ColIndexToLetters(n int) string
+func ColLettersToIndex(letters string) int
+func FileToSlice(path string, options ...FileOption) ([][][]string, error)
+...
+...
+...
+type WorkBookRels map[string]string
+type XLSXReaderError struct{ ... }
+type XLSXUnmarshaler interface{ ... }
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: Office Open XML není zdaleka jediným
+formátem (či množinou formátů) založenou na zazipované adresářové struktuře
+s&nbsp;XML. Podobný koncept můžeme vidět v&nbsp;konkurenční specifikaci
+<i>OpenDocument</i> neboli plným jménem <i>Open Document Format for Office
+Applications</i>. A například soubory používané <i>Gnumericem</i> mají taktéž
+formát XML, který je gzipovaný.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Příklad, který se pokusí vytvořit prázdný sešit</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu se pokusíme vytvořit prázdný sešit. To
+ve skutečnosti není možné, protože prakticky všechny tabulkové procesory
+vyžadují, aby sešit obsahoval alespoň jeden (i když zcela prázdný) list.
+Z&nbsp;tohoto důvodu následující zdrojový kód po svém spuštění vyhodí výjimku,
+ovšem tento příklad byl vytvořen z&nbsp;toho prostého důvodu, abychom viděli
+základní rozdíly mezi výše zmíněnou knihovnou <strong>encoding/csv</strong> a
+<strong>xlsx</strong>. Nejdříve se vytvoří nový sešit konstruktorem
+<strong>NewFile</strong>:</p>
+
+<pre>
+<i>// konstrukce struktury typu File</i>
+worksheet := xlsx.NewFile()
+</pre>
+
+<p>Tento sešit lze dále upravovat a na konci uložit metodou
+<strong>Save</strong>, samozřejmě s&nbsp;kontrolou, zda v&nbsp;průběhu ukládání
+nedošlo k&nbsp;nějaké chybě:</p>
+
+<pre>
+err := worksheet.Save(spreadsheetName)
+if err != nil {
+        panic(err)
+}
+</pre>
+
+<p>Úplný zdrojový kód tohoto (nefunkčního) demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test01.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err := worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Po jeho spuštění se nejdříve vypíše interní struktura uložená do proměnné
+<strong>worksheet</strong> a poté dojde (při ukládání) k&nbsp;výše zmíněné
+výjimce:</p>
+
+<pre>
+&amp;{map[] map[] &lt;nil&gt; false &lt;nil&gt; [] map[] &lt;nil&gt; [] 0x5e9f60 -1}
+panic: File.Save(test01.xlsx): File.Write: MarshallParts: MarshalParts: Workbook must contain at least one worksheet
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/ptisnovs/src/go-root/article_67/spreadsheet01.go:21 +0xe1
+exit status 2
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Sešit s&nbsp;jedním prázdným listem</h2>
+
+<p>Již <a href="#k07">v&nbsp;předchozí kapitole</a> jsme viděli, že sešit by
+měl obsahovat alespoň jeden list (i když ten může být prázdný). K&nbsp;přidání
+nového listu slouží metoda <strong>AddSheet</strong>, které se předá jméno
+listu. Existuje několik podmínek kladených na způsob pojmenování listu;
+z&nbsp;tohoto důvodu je důležité zkontrolovat i chybovou hodnotu, která se může
+z&nbsp;této metody vracet. Další demonstrační příklad po svém spuštění vytvoří
+plnohodnotný sešit, který lze otevřít v&nbsp;prakticky každém moderním
+tabulkovém procesoru:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test02.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Sešit s&nbsp;větším množstvím listů</h2>
+
+<p>Listů je možné v&nbsp;sešitu mít větší množství (například v&nbsp;Excelu je
+jejich maximální počet omezen jen dostupnou pamětí, nikoli nějakou umělou
+konstantou), takže si ukažme další jednoduchý demonstrační příklad, v&nbsp;němž
+jsou v&nbsp;sešitu vytvořeny tři listy pojmenované jednoduše
+&bdquo;Tabulka1&ldquo;, &bdquo;Tabulka2&ldquo; a &bdquo;Tabulka3&ldquo; Úplný
+zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test03.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání tří listů do sešitu</i>
+        names := []string{"Tabulka1", "Tabulka2", "Tabulka3"}
+        for _, name := range names {
+                <i>// pokus o přidání nového listu</i>
+                sheet, err := worksheet.AddSheet(name)
+                if err != nil {
+                        panic(err)
+                }
+&nbsp;
+                fmt.Println(sheet)
+        }
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err := worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek:</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Přidání řádků a buněk do sešitu</h2>
+
+<p>Sešity jsou v&nbsp;knihovně <i>xlsx</i> organizovány hierarchicky:</p>
+
+<ol>
+<li>sešit</li>
+<li>list</li>
+<li>řádek</li>
+<li>buňka (na řádku)</li>
+</ol>
+
+<p>To se projevuje i při přidávání řádků a buněk do sešitu. Přidání nového
+sešitu již známe:</p>
+
+<pre>
+sheet, err := worksheet.AddSheet("Tabulka1")
+if err != nil {
+        panic(err)
+}
+defer sheet.Close()
+</pre>
+
+<p>Do sešitu (struktury uložené do proměnné <strong>sheet</strong>) přidáme
+řádek následujícím způsobem &ndash; metodou <strong>AddRow</strong>:</p>
+
+<pre>
+<i>// přidání řádku do tabulky</i>
+row := sheet.AddRow()
+</pre>
+
+<p>Buňky se přidávají na konkrétní řádek listu, a to metodou
+<strong>AddCell</strong>:</p>
+
+<pre>
+<i>// přidání buňky na řádek</i>
+cell := row.AddCell()
+</pre>
+
+<p>Jakmile máme k&nbsp;dispozici strukturu reprezentující buňku, můžeme změnit
+její obsah:</p>
+
+<pre>
+<i>// naplnění buňky hodnotou</i>
+cell.SetString("Hello")
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test04.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek</i>
+        cell := row.AddCell()
+&nbsp;
+        <i>// naplnění buňky hodnotou</i>
+        cell.SetString("Hello")
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Zjednodušené přidání buňky na řádek s&nbsp;naplněním hodnotou</h2>
+
+<p>Předchozí demonstrační příklad přidával buňku relativně složitým způsobem
+&ndash; na několika programových řádcích. Tento kód je ovšem možné
+zjednodušit:</p>
+
+<pre>
+<i>// přidání buňky na řádek a naplnění hodnotou</i>
+row.AddCell().SetString("Hello")
+</pre>
+
+<p>Se stejným výsledkem, jako v&nbsp;příkladu předchozím:</p>
+
+<p>Opět si pro úplnost ukažme celý zdrojový kód takto upraveného demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test05.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        row.AddCell().SetString("Hello")
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Ukázka podporovaných formátů buněk</h2>
+
+<p>Buňky v&nbsp;sešitu uloženém ve formátu xlsx mohou obsahovat hodnoty různých
+typů, například řetězce, celá čísla, číslo s&nbsp;řádovou čárkou (naschvál
+nepíšu, že s&nbsp;plovoucí čárkou), pravdivostní hodnoty, datum, čas (velmi
+důležité typy), nebo může být buňka prázdná. Jednotlivé typy hodnot můžeme do
+tabulky vložit snadno, protože pro každý typ existuje zvláštní
+&bdquo;setter&ldquo; pojmenovaný podle daného typu:</p>
+
+<pre>
+row.AddCell().SetString("Hello")
+row.AddCell().SetInt(42)
+row.AddCell().SetInt64(1000 * 1000 * 1000 * 1000)
+row.AddCell().SetFloat(1 / 3.0)
+row.AddCell().SetBool(true)
+row.AddCell().SetBool(false)
+row.AddCell().SetDate(time.Now())
+row.AddCell().SetDateTime(time.Now())
+</pre>
+
+<p>Výsledný sešit bude vypadat následovně:</p>
+
+<p>Následuje výpis zdrojového kódu příkladu, který tento sešit vytvořil:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "time"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test06.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        row.AddCell().SetString("Hello")
+        row.AddCell().SetInt(42)
+        row.AddCell().SetInt64(1000 * 1000 * 1000 * 1000)
+        row.AddCell().SetFloat(1 / 3.0)
+        row.AddCell().SetBool(true)
+        row.AddCell().SetBool(false)
+        row.AddCell().SetDate(time.Now())
+        row.AddCell().SetDateTime(time.Now())
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Podrobnější specifikace formátu zobrazení numerických hodnot</h2>
+
+<p>Numerické hodnoty mohou být v&nbsp;tabulce zobrazeny různým způsobem.
+K&nbsp;tomu slouží specifikátory formátu, které naznačují, jak se hodnota
+zobrazí, kolik bude mít desetinných míst, zda nebudou záporné hodnoty zobrazeny
+červenou barvou atd. V&nbsp;dalším příkladu je ukázáno, co se stane ve chvíli,
+kdy stejnou hodnotu (1/3) zobrazíme pokaždé jiným způsobem:</p>
+
+<pre>
+row.AddCell().SetFloatWithFormat(1/3.0, "#0")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.0")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.00")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.000")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.0000")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.00000")
+row.AddCell().SetFloatWithFormat(1/3.0, "#0.000000")
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<p>Podrobnosti si vysvětlíme příště, ale již nyní si můžeme ukázat úplný
+demonstrační příklad:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test07.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.0")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.00")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.000")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.0000")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.00000")
+        row.AddCell().SetFloatWithFormat(1/3.0, "#0.000000")
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Přidání vzorců do sešitu</h2>
+
+<p>Zvláštním typem buňky je &bdquo;formula&ldquo; obsahující vzorec, který se
+může vypočítat. Tento vzorec se ovšem zadává bez znaku &bdquo;rovná se&ldquo;
+na začátku, tedy následovně:</p>
+
+<pre>
+row.AddCell().SetFormula("A1+B1")
+row.AddCell().SetFormula("100*C1")
+</pre>
+
+<p>Sešit se vzorci:</p>
+
+<p>Opět si ukažme zdrojový kód příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test08.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        row.AddCell().SetInt(10)
+        row.AddCell().SetInt(20)
+        row.AddCell().SetFormula("A1+B1")
+        row.AddCell().SetFormula("100*C1")
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Buňky obsahující hypertextové odkazy</h2>
+
+<p>Buňky v&nbsp;sešitu mohou obsahovat i hypertextové odkazy, které je možné
+považovat za speciální typ hodnot. Hypertextový odkaz se programově vytváří
+metodou <strong>SetHyperlink</strong>, které se předává trojice parametrů:
+samotný odkaz (URL), text zobrazený v&nbsp;buňce a taktéž obsah bublinové
+nápovědy, která se zobrazí ve chvíli, kdy uživatel přejede kurzorem myši nad
+buňkou s&nbsp;hypertextovým odkazem. Příklad použití:</p>
+
+<pre>
+<i>// přidání buňky na řádek a naplnění hodnotou</i>
+row.AddCell().SetHyperlink("https://www.root.cz", "Link na Root", " Informace nejen ze světa Linuxu. ISSN 1212-8309")
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<p>Opět si pochopitelně ukážeme úplný zdrojový kód tohoto demonstračního
+příkladu, který vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test09.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        row.AddCell().SetHyperlink("https://www.root.cz", "Link na Root", " Informace nejen ze světa Linuxu. ISSN 1212-8309")
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Základ práce se styly</h2>
+
+<p>V&nbsp;této kapitole si &ndash; prozatím ovšem ve stručnosti &ndash; ukážeme
+základy práce se styly buněk. Formát .xlsx se totiž od CSV odlišuje i
+v&nbsp;tom, že buňkám, z&nbsp;nichž se jednotlivé listy skládají, je možné
+přiřadit styl. Ten je reprezentován datovou strukturou, která vznikne
+konstruktorem:</p>
+
+<pre>
+style := xlsx.NewStyle()
+</pre>
+
+<p>Styly buněk jsou rozděleny podle své funkce do několika skupin: zarovnání,
+barva pozadí a popředí, font atd. Dnes se styly nebudeme zabývat do všech
+podrobností, takže si jen ukážeme přiřazení nového stylu buňce:</p>
+
+<pre>
+style.Alignment.Horizontal = "right"
+style.Fill.FgColor = "FFa0FFa0"
+style.Fill.PatternType = "solid"
+style.Font.Bold = true
+style.ApplyAlignment = true
+style.ApplyFill = true
+style.ApplyFont = true
+</pre>
+
+<p>Takto vytvořený styl přiřadíme buňce či několika buňkám:</p>
+
+<pre>
+cell := row.AddCell()
+&nbsp;
+<i>// nastavení stylu buňky</i>
+cell.SetStyle(style)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test10.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        style := xlsx.NewStyle()
+        style.Alignment.Horizontal = "right"
+        style.Fill.FgColor = "FFa0FFa0"
+        style.Fill.PatternType = "solid"
+        style.Font.Bold = true
+        style.ApplyAlignment = true
+        style.ApplyFill = true
+        style.ApplyFont = true
+&nbsp;
+        <i>// přidání buňky na řádek a naplnění hodnotou</i>
+        cell := row.AddCell()
+        cell.SetString("Test")
+&nbsp;
+        <i>// nastavení stylu buňky</i>
+        cell.SetStyle(style)
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Sdílení stylů mezi buňkami</h2>
+
+<p>V&nbsp;dnešním posledním demonstračním příkladu si ukážeme, co se stane ve
+chvíli, kdy styl přiřadíme dvěma buňkám, ovšem mezi přiřazením daný styl
+změníme. Nejprve se styl vytvoří a přiřadí první buňce, což pro nás není nic
+nového:</p>
+
+<pre>
+<i>// přidání první buňky na řádek a naplnění hodnotou</i>
+cell := row.AddCell()
+cell.SetString("Test #1")
+&nbsp;
+<i>// nastavení stylu buňky</i>
+cell.SetStyle(style)
+</pre>
+
+<p>Následně styl změníme, ovšem již bez jakýchkoli pokusů o modifikaci
+předchozí buňky:</p>
+
+<pre>
+style.Fill.FgColor = "ffffa0a0"
+style.Fill.PatternType = "solid"
+style.Font.Bold = false
+</pre>
+
+<p>A nakonec vytvoříme druhou buňku a přiřadíme jí upravený styl:</p>
+
+<pre>
+<i>// přidání druhé buňky na řádek a naplnění hodnotou</i>
+cell = row.AddCell()
+cell.SetString("Test #1")
+&nbsp;
+<i>// nastavení stylu buňky</i>
+cell.SetStyle(style)
+</pre>
+
+<p>Výsledek možná nemusí plně odpovídat našemu očekávání, protože styl bude u
+obou buněk totožný. Ve skutečnosti totiž buňky obsahují referenci na styl,
+takže pokud se styl změní, změní se automaticky i styl všech odpovídajících
+buněk:</p>
+
+<p>Úplný zdrojový kód dnešního posledního demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/tealeg/xlsx/v3"
+)
+&nbsp;
+<i>// jméno generovaného souboru</i>
+const spreadsheetName = "test11.xlsx"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce struktury typu File</i>
+        worksheet := xlsx.NewFile()
+&nbsp;
+        fmt.Println(worksheet)
+&nbsp;
+        <i>// přidání listu do sešitu</i>
+        sheet, err := worksheet.AddSheet("Tabulka1")
+        if err != nil {
+                panic(err)
+        }
+        defer sheet.Close()
+&nbsp;
+        fmt.Println(sheet)
+&nbsp;
+        <i>// přidání řádku do tabulky</i>
+        row := sheet.AddRow()
+&nbsp;
+        style := xlsx.NewStyle()
+        style.Alignment.Horizontal = "right"
+        style.Fill.FgColor = "ffa0ffa0"
+        style.Fill.PatternType = "solid"
+        style.Font.Bold = true
+        style.ApplyAlignment = true
+        style.ApplyFill = true
+        style.ApplyFont = true
+&nbsp;
+        <i>// přidání první buňky na řádek a naplnění hodnotou</i>
+        cell := row.AddCell()
+        cell.SetString("Test #1")
+&nbsp;
+        <i>// nastavení stylu buňky</i>
+        cell.SetStyle(style)
+&nbsp;
+        style.Fill.FgColor = "ffffa0a0"
+        style.Fill.PatternType = "solid"
+        style.Font.Bold = false
+&nbsp;
+        <i>// přidání druhé buňky na řádek a naplnění hodnotou</i>
+        cell = row.AddCell()
+        cell.SetString("Test #1")
+&nbsp;
+        <i>// nastavení stylu buňky</i>
+        cell.SetStyle(style)
+&nbsp;
+        <i>// pokus o uložení sešitu</i>
+        err = worksheet.Save(spreadsheetName)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Obsah navazujících článků</h2>
+
+<p>V&nbsp;dnešním článku jsme si popsali pouze některé možnosti nabízené
+formátem <i>Office Open XML Workbook</i> a tím pádem i knihovnou
+<strong>xlsx</strong>. Příště si ukážeme především podrobnější práci se styly,
+sdílení stylů mezi jednotlivými listy, vkládání složitějších typů objektů
+atd.</p>
+
+<p>Existuje ještě jeden zajímavý způsob, jak uživatelům zpřístupnit tabulková
+data, a to dokonce bez nutnosti jejich manuálního importu do tabulkového
+procesoru. Je totiž možné použít aplikační programové rozhraní tabulkových
+procesorů dostupných online, tedy ve formě webových aplikací. Mezi známé
+tabulkové procesory tohoto typu patří <i>Google Sheets</i> ze sady <i>Google
+Doc</i>. Přes API je možné tabulky (resp.&nbsp;přesněji řečeno sešity a jejich
+jednotlivé listy) číst či do nich zapisovat přímo z&nbsp;aplikací nebo služeb.
+Tomuto zajímavému konceptu bude věnován samostatný článek (zaměříme se přitom
+na použití <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacího jazyka
+Go</a> a taktéž na použití <a
+href="https://www.root.cz/n/python/">Pythonu</a>).</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>csv1.go</td><td>vytvoření jednoduché tabulky se čtyřmi řádky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/csv1.go">https://github.com/tisnik/go-root/blob/master/article_67/csv1.go</a></td></tr>
+<tr><td> 2</td><td>csv2.go</td><td>uložení celého obsahu tabulky jediným příkazem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/csv2.go">https://github.com/tisnik/go-root/blob/master/article_67/csv2.go</a></td></tr>
+<tr><td> 3</td><td>csv3.go</td><td>vytvoření tabulky s&nbsp;vypočtenými hodnotami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/csv3.go">https://github.com/tisnik/go-root/blob/master/article_67/csv3.go</a></td></tr>
+<tr><td> 4</td><td>csv4.go</td><td>alternativní přístup se &bdquo;streamováním&ldquo; výsledků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/csv4.go">https://github.com/tisnik/go-root/blob/master/article_67/csv4.go</a></td></tr>
+<tr><td> 5</td><td>csv5.go</td><td>ukázky omezení formátu CSV</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/csv5.go">https://github.com/tisnik/go-root/blob/master/article_67/csv5.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>spreadsheet01.go</td><td>příklad, který se pokusí vytvořit prázdný sešit ve formátu <i>Office Open XML Workbook</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet01.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet01.go</a></td></tr>
+<tr><td> 7</td><td>spreadsheet02.go</td><td>sešit s&nbsp;jedním prázdným listem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet02.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet02.go</a></td></tr>
+<tr><td> 8</td><td>spreadsheet03.go</td><td>sešit se třemi prázdnými listy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet03.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet03.go</a></td></tr>
+<tr><td> 9</td><td>spreadsheet04.go</td><td>přidání řádků a buněk do sešitu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet04.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet04.go</a></td></tr>
+<tr><td>10</td><td>spreadsheet05.go</td><td>zjednodušené přidání buňky na řádek s&nbsp;naplněním hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet05.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet05.go</a></td></tr>
+<tr><td>11</td><td>spreadsheet06.go</td><td>ukázka podporovaných formátů buněk</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet06.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet06.go</a></td></tr>
+<tr><td>12</td><td>spreadsheet07.go</td><td>podrobnější specifikace formátu zobrazení numerických hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet07.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet07.go</a></td></tr>
+<tr><td>13</td><td>spreadsheet08.go</td><td>přidání vzorců do sešitu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet08.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet08.go</a></td></tr>
+<tr><td>14</td><td>spreadsheet09.go</td><td>buňky obsahující hypertextové odkazy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet09.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet09.go</a></td></tr>
+<tr><td>15</td><td>spreadsheet10.go</td><td>základ práce se styly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet10.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet10.go</a></td></tr>
+<tr><td>16</td><td>spreadsheet11.go</td><td>sdílení stylů mezi buňkami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet11.go">https://github.com/tisnik/go-root/blob/master/article_67/spreadsheet11.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Spreadsheet<br />
+<a href="https://en.wikipedia.org/wiki/Spreadsheet">https://en.wikipedia.org/wiki/Spreadsheet</a>
+</li>
+
+<li>List of spreadsheet software<br />
+<a href="https://en.wikipedia.org/wiki/List_of_spreadsheet_software">https://en.wikipedia.org/wiki/List_of_spreadsheet_software</a>
+</li>
+
+<li>Processing spreadsheet data in Go<br />
+<a href="https://appliedgo.net/spreadsheet/">https://appliedgo.net/spreadsheet/</a>
+</li>
+
+<li>Package encoding/csv<br />
+<a href="https://golang.org/pkg/encoding/csv/#example_Writer">https://golang.org/pkg/encoding/csv/#example_Writer</a>
+</li>
+
+<li>Package sheets<br />
+<a href="https://godoc.org/google.golang.org/api/sheets/v4">https://godoc.org/google.golang.org/api/sheets/v4</a>
+</li>
+
+<li>Package xlsx<br />
+<a href="https://github.com/tealeg/xlsx">https://github.com/tealeg/xlsx</a>
+</li>
+
+<li>Comma-separated values<br />
+<a href="https://en.wikipedia.org/wiki/Comma-separated_values">https://en.wikipedia.org/wiki/Comma-separated_values</a>
+</li>
+
+<li>Common Format and MIME Type for Comma-Separated Values (CSV) Files<br />
+<a href="https://tools.ietf.org/html/rfc4180">https://tools.ietf.org/html/rfc4180</a>
+</li>
+
+<li>Tab-separated values<br />
+<a href="https://en.wikipedia.org/wiki/Tab-separated_values">https://en.wikipedia.org/wiki/Tab-separated_values</a>
+</li>
+
+<li>Office Open XML (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Office_Open_XML">https://en.wikipedia.org/wiki/Office_Open_XML</a>
+</li>
+
+<li>Standard ECMA-376: Office Open XML File Formats<br />
+<a href="https://www.ecma-international.org/publications/standards/Ecma-376.htm">https://www.ecma-international.org/publications/standards/Ecma-376.htm</a>
+</li>
+
+<li>Adventure for the Atari 2600 Video Game Console by Warren Robinett<br />
+<a href="http://www.warrenrobinett.com/adventure/index.html">http://www.warrenrobinett.com/adventure/index.html</a>
+</li>
+
+<li>Mapa hry Adventure<br />
+<a href="http://www.warrenrobinett.com/adventure/adv-map1.gif">http://www.warrenrobinett.com/adventure/adv-map1.gif</a>
+</li>
+
+<li>Integration Basics<br />
+<a href="https://gafferongames.com/post/integration_basics/">https://gafferongames.com/post/integration_basics/</a>
+</li>
+
+<li>Fix Your Timestep!<br />
+<a href="https://gafferongames.com/post/fix_your_timestep/">https://gafferongames.com/post/fix_your_timestep/</a>
+</li>
+
+<li>Handling variable frame rate in SDL2<br />
+<a href="https://gamedev.stackexchange.com/questions/151877/handling-variable-frame-rate-in-sdl2">https://gamedev.stackexchange.com/questions/151877/handling-variable-frame-rate-in-sdl2</a>
+</li>
+
+<li>Too Fast! (SDL fórum)<br />
+<a href="https://discourse.libsdl.org/t/too-fast/11128">https://discourse.libsdl.org/t/too-fast/11128</a>
+</li>
+
+<li>Performance tricks (SDL fórum)<br />
+<a href="https://discourse.libsdl.org/t/performance-tricks/6685">https://discourse.libsdl.org/t/performance-tricks/6685</a>
+</li>
+
+<li>Achieving a constant frame rate in SDL<br />
+<a href="https://stackoverflow.com/questions/2548541/achieving-a-constant-frame-rate-in-sdl">https://stackoverflow.com/questions/2548541/achieving-a-constant-frame-rate-in-sdl</a>
+</li>
+
+<li>Object’s speed control against different framerates<br />
+<a href="https://discourse.libsdl.org/t/objects-speed-control-against-different-framerates/14497/1">https://discourse.libsdl.org/t/objects-speed-control-against-different-framerates/14497/1</a>
+</li>
+
+<li>Stránky projektu SDL<br />
+<a href="http://www.libsdl.org/">http://www.libsdl.org/</a>
+</li>
+
+<li>Simple DirectMedia Layer (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Simple_DirectMedia_Layer">https://en.wikipedia.org/wiki/Simple_DirectMedia_Layer</a>
+</li>
+
+<li>SDL Language Bindings<br />
+<a href="http://www.libsdl.org/languages.php">http://www.libsdl.org/languages.php</a>
+</li>
+
+<li>SDL version 1.2.15<br />
+<a
+href="http://www.libsdl.org/download-1.2.php">http://www.libsdl.org/download-1.2.php</a>
+</li>
+
+<li>SDL version 2.0.1<br />
+<a href="http://www.libsdl.org/download-2.0.php">http://www.libsdl.org/download-2.0.php</a>
+</li>
+
+<li>Rozhraní go-sdl2<br />
+<a href="https://github.com/veandco/go-sdl2">https://github.com/veandco/go-sdl2</a>
+</li>
+
+<li>Dokumentace k&nbsp;rozhraní go-sdl2<br />
+<a href="https://godoc.org/github.com/veandco/go-sdl2">https://godoc.org/github.com/veandco/go-sdl2</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku sdl<br />
+<a href="https://godoc.org/github.com/veandco/go-sdl2/sdl">https://godoc.org/github.com/veandco/go-sdl2/sdl</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku gfx<br />
+<a href="https://godoc.org/github.com/veandco/go-sdl2/gfx">https://godoc.org/github.com/veandco/go-sdl2/gfx</a>
+</li>
+
+<li>Cross-platform games development (part 1)<br />
+<a href="http://renatoc.wait4.org/2010/02/04/cross-platform-games-development-part-1/">http://renatoc.wait4.org/2010/02/04/cross-platform-games-development-part-1/</a>
+</li>
+
+<li>Cross-platform games development (part 2)<br />
+<a href="http://renatoc.wait4.org/tag/sdljava/">http://renatoc.wait4.org/tag/sdljava/</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Formát BSON<br />
+<a href="http://bsonspec.org/">http://bsonspec.org/</a>
+</li>
+
+<li>Golang Guide: A List of Top Golang Frameworks, IDEs &amp; Tools<br />
+<a href="https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/">https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/</a>
+</li>
+
+<li>Tvorba univerzálních projevů<br />
+<a href="http://www.kyblsoft.cz/projevy">http://www.kyblsoft.cz/projevy</a>
+</li>
+
+<li>Repositář projektu Gift<br />
+<a href="https://github.com/disintegration/gift">https://github.com/disintegration/gift</a>
+</li>
+
+<li>Dokumentace k&nbsp;projektu Gift<br />
+<a href="https://godoc.org/github.com/disintegration/gift">https://godoc.org/github.com/disintegration/gift</a>
+</li>
+
+<li>Online x86 / x64 Assembler and Disassembler<br />
+<a href="https://defuse.ca/online-x86-assembler.htm#disassembly2">https://defuse.ca/online-x86-assembler.htm#disassembly2</a>
+</li>
+
+<li>The Design of the Go Assembler<br />
+<a href="https://talks.golang.org/2016/asm.slide#1">https://talks.golang.org/2016/asm.slide#1</a>
+</li>
+
+<li>A Quick Guide to Go's Assembler<br />
+<a href="https://golang.org/doc/asm">https://golang.org/doc/asm</a>
+</li>
+
+<li>AssemblyPolicy<br />
+<a href="https://github.com/golang/go/wiki/AssemblyPolicy">https://github.com/golang/go/wiki/AssemblyPolicy</a>
+</li>
+
+<li>Geohash in Golang Assembly<br />
+<a href="https://mmcloughlin.com/posts/geohash-assembly">https://mmcloughlin.com/posts/geohash-assembly</a>
+</li>
+
+<li>Command objdump<br />
+<a href="https://golang.org/cmd/objdump/">https://golang.org/cmd/objdump/</a>
+</li>
+
+<li>Assembly<br />
+<a href="https://goroutines.com/asm">https://goroutines.com/asm</a>
+</li>
+
+<li>Go &amp; Assembly<br />
+<a href="http://www.doxsey.net/blog/go-and-assembly">http://www.doxsey.net/blog/go-and-assembly</a>
+</li>
+
+<li>A Foray Into Go Assembly Programming<br />
+<a href="https://blog.sgmansfield.com/2017/04/a-foray-into-go-assembly-programming/">https://blog.sgmansfield.com/2017/04/a-foray-into-go-assembly-programming/</a>
+</li>
+
+<li>Golang Capturing log.Println And fmt.Println Output<br />
+<a href="https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4">https://medium.com/@hau12a1/golang-capturing-log-println-and-fmt-println-output-770209c791b4</a>
+</li>
+
+<li>Stránka projektu plotly<br />
+<a href="https://plot.ly/">https://plot.ly/</a>
+</li>
+
+<li>Plotly JavaScript Open Source Graphing Library<br />
+<a href="https://plot.ly/javascript/">https://plot.ly/javascript/</a>
+</li>
+
+<li>Domain coloring<br />
+<a href="https://en.wikipedia.org/wiki/Domain_coloring">https://en.wikipedia.org/wiki/Domain_coloring</a>
+</li>
+
+<li>Michael Fogleman's projects<br />
+<a href="https://www.michaelfogleman.com/projects/tagged/graphics/">https://www.michaelfogleman.com/projects/tagged/graphics/</a>
+</li>
+
+<li>Color Graphs of Complex Functions<br />
+<a href="https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html">https://web.archive.org/web/20120511021419/http://w.american.edu/cas/mathstat/lcrone/ComplexPlot.html</a>
+</li>
+
+<li>A Gallery of Complex Functions<br />
+<a href="http://wismuth.com/complex/gallery.html">http://wismuth.com/complex/gallery.html</a>
+</li>
+
+<li>package glot<br />
+<a href="https://godoc.org/github.com/Arafatk/glot">https://godoc.org/github.com/Arafatk/glot</a>
+</li>
+
+<li>Gnuplotting: Output terminals<br />
+<a href="http://www.gnuplotting.org/output-terminals/">http://www.gnuplotting.org/output-terminals/</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1">https://medium.com/@Arafat./introducing-glot-the-plotting-library-for-golang-3133399948a1</a>
+</li>
+
+<li>Introducing Glot the plotting library for Golang<br />
+<a href="https://blog.gopheracademy.com/advent-2018/introducing-glot/">https://blog.gopheracademy.com/advent-2018/introducing-glot/</a>
+</li>
+
+<li>Glot is a plotting library for Golang built on top of gnuplot<br />
+<a href="https://github.com/Arafatk/glot">https://github.com/Arafatk/glot</a>
+</li>
+
+<li>Example plots (gonum/plot)<br />
+<a href="https://github.com/gonum/plot/wiki/Example-plots">https://github.com/gonum/plot/wiki/Example-plots</a>
+</li>
+
+<li>A repository for plotting and visualizing data (gonum/plot)<br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>golang library to make https://chartjs.org/ plots<br />
+<a href="https://github.com/brentp/go-chartjs">https://github.com/brentp/go-chartjs</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>The Gonum Numerical Computing Package<br />
+<a href="https://www.gonum.org/post/introtogonum/">https://www.gonum.org/post/introtogonum/</a>
+</li>
+
+<li>Gomacro na GitHubu<br />
+<a href="https://github.com/cosmos72/gomacro">https://github.com/cosmos72/gomacro</a>
+</li>
+
+<li>gophernotes - Use Go in Jupyter notebooks and nteract<br />
+<a href="https://github.com/gopherdata/gophernotes">https://github.com/gopherdata/gophernotes</a>
+</li>
+
+<li>gonum<br />
+<a href="https://github.com/gonum">https://github.com/gonum</a>
+</li>
+
+<li>go-gota/gota -  DataFrames and data wrangling in Go (Golang)<br />
+<a href="https://porter.io/github.com/go-gota/gota">https://porter.io/github.com/go-gota/gota</a>
+</li>
+
+<li>A repository for plotting and visualizing data <br />
+<a href="https://github.com/gonum/plot">https://github.com/gonum/plot</a>
+</li>
+
+<li>Gonum Numerical Packages<br />
+<a href="https://www.gonum.org/">https://www.gonum.org/</a>
+</li>
+
+<li>Stránky projektu MinIO<br />
+<a href="https://min.io/">https://min.io/</a>
+</li>
+
+<li>MinIO Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-quickstart-guide.html">https://docs.min.io/docs/minio-quickstart-guide.html</a>
+</li>
+
+<li>MinIO Go Client API Reference<br />
+<a href="https://docs.min.io/docs/golang-client-api-reference">https://docs.min.io/docs/golang-client-api-reference</a>
+</li>
+
+<li>MinIO Python Client API Reference<br />
+<a href="https://docs.min.io/docs/python-client-api-reference.html">https://docs.min.io/docs/python-client-api-reference.html</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>MinIO Client Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-client-quickstart-guide.html">https://docs.min.io/docs/minio-client-quickstart-guide.html</a>
+</li>
+
+<li>Analýza kvality zdrojových kódů Minia<br />
+<a href="https://goreportcard.com/report/github.com/minio/minio">https://goreportcard.com/report/github.com/minio/minio</a>
+</li>
+
+<li>This is MinIO<br />
+<a href="https://www.youtube.com/watch?v=vF0lQh0XOCs">https://www.youtube.com/watch?v=vF0lQh0XOCs</a>
+</li>
+
+<li>Running MinIO Standalone<br />
+<a href="https://www.youtube.com/watch?v=dIQsPCHvHoM">https://www.youtube.com/watch?v=dIQsPCHvHoM</a>
+</li>
+
+<li>"Amazon S3 Compatible Storage in Kubernetes" - Rob Girard, Principal Tech Marketing Engineer, Minio<br />
+<a href="https://www.youtube.com/watch?v=wlpn8K0jJ4U">https://www.youtube.com/watch?v=wlpn8K0jJ4U</a>
+</li>
+
+<li>Ginkgo<br />
+<a href="http://onsi.github.io/ginkgo/">http://onsi.github.io/ginkgo/</a>
+</li>
+
+<li>Gomega<br />
+<a href="https://onsi.github.io/gomega/">https://onsi.github.io/gomega/</a>
+</li>
+
+<li>Ginkgo's Preferred Matcher Library na GitHubu<br />
+<a href="https://github.com/onsi/gomega/">https://github.com/onsi/gomega/</a>
+</li>
+
+<li>Provided Matchers<br />
+<a href="http://onsi.github.io/gomega/#provided-matchers">http://onsi.github.io/gomega/#provided-matchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku goexpect<br />
+<a href="https://godoc.org/github.com/google/goexpect">https://godoc.org/github.com/google/goexpect</a>
+</li>
+
+<li>Balíček goexpect<br />
+<a href="https://github.com/google/goexpect">https://github.com/google/goexpect</a>
+</li>
+
+<li>Balíček go-expect<br />
+<a href="https://github.com/Netflix/go-expect">https://github.com/Netflix/go-expect</a>
+</li>
+
+<li>Balíček gexpect<br />
+<a href="https://github.com/ThomasRooney/gexpect">https://github.com/ThomasRooney/gexpect</a>
+</li>
+
+<li>Expect (originál naprogramovaný v&nbsp;TCL)<br />
+<a href="https://core.tcl-lang.org/expect/index">https://core.tcl-lang.org/expect/index</a>
+</li>
+
+<li>Expect (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Expect">https://en.wikipedia.org/wiki/Expect</a>
+</li>
+
+<li>Pexpect<br />
+<a href="https://pexpect.readthedocs.io/en/stable/">https://pexpect.readthedocs.io/en/stable/</a>
+</li>
+
+<li>Golang SSH Client: Multiple Commands, Crypto &amp; Goexpect Examples<br />
+<a href="http://networkbit.ch/golang-ssh-client/">http://networkbit.ch/golang-ssh-client/</a>
+</li>
+
+<li>goblin na GitHubu<br />
+<a href="https://github.com/franela/goblin">https://github.com/franela/goblin</a>
+</li>
+
+<li>Mocha framework<br />
+<a href="https://mochajs.org/">https://mochajs.org/</a>
+</li>
+
+<li>frisby na GitHubu<br />
+<a href="https://github.com/verdverm/frisby">https://github.com/verdverm/frisby</a>
+</li>
+
+<li>package frisby<br />
+<a href="https://godoc.org/github.com/verdverm/frisby">https://godoc.org/github.com/verdverm/frisby</a>
+</li>
+
+<li>Frisby alternatives and similar packages (generováno)<br />
+<a href="https://go.libhunt.com/frisby-alternatives">https://go.libhunt.com/frisby-alternatives</a>
+</li>
+
+<li>Cucumber for golang<br />
+<a href="https://github.com/DATA-DOG/godog">https://github.com/DATA-DOG/godog</a>
+</li>
+
+<li>How to Use Godog for Behavior-driven Development in Go<br />
+<a href="https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go">https://semaphoreci.com/community/tutorials/how-to-use-godog-for-behavior-driven-development-in-go</a>
+</li>
+
+<li>Comparative Analysis Of GoLang Testing Frameworks<br />
+<a href="https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks">https://www.slideshare.net/DushyantBhalgami/comparative-analysis-of-golang-testing-frameworks</a>
+</li>
+
+<li>A Quick Guide to Testing in Golang<br />
+<a href="https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/">https://caitiem.com/2016/08/18/a-quick-guide-to-testing-in-golang/</a>
+</li>
+
+<li>Tom's Obvious, Minimal Language.<br />
+<a href="https://github.com/toml-lang/toml">https://github.com/toml-lang/toml</a>
+</li>
+
+<li>xml.org<br />
+<a href="http://www.xml.org/">http://www.xml.org/</a>
+</li>
+
+<li>Soubory .properties<br />
+<a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
+</li>
+
+<li>Soubory INI<br />
+<a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
+</li>
+
+<li>JSON to YAML<br />
+<a href="https://www.json2yaml.com/">https://www.json2yaml.com/</a>
+</li>
+
+<li>Data Format Converter<br />
+<a href="https://toolkit.site/format.html">https://toolkit.site/format.html</a>
+</li>
+
+<li>Viper na GitHubu<br />
+<a href="https://github.com/spf13/viper">https://github.com/spf13/viper</a>
+</li>
+
+<li>GoDotEnv na GitHubu<br />
+<a href="https://github.com/joho/godotenv">https://github.com/joho/godotenv</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>What is REPL?<br />
+<a href="https://pythonprogramminglanguage.com/repl/">https://pythonprogramminglanguage.com/repl/</a>
+</li>
+
+<li>What is a REPL?<br />
+<a href="https://codewith.mu/en/tutorials/1.0/repl">https://codewith.mu/en/tutorials/1.0/repl</a>
+</li>
+
+<li>Programming at the REPL: Introduction<br />
+<a href="https://clojure.org/guides/repl/introduction">https://clojure.org/guides/repl/introduction</a>
+</li>
+
+<li>What is REPL? (Quora)<br />
+<a href="https://www.quora.com/What-is-REPL">https://www.quora.com/What-is-REPL</a>
+</li>
+
+<li>Gorilla REPL: interaktivní prostředí pro programovací jazyk Clojure<br />
+<a href="https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/">https://www.root.cz/clanky/gorilla-repl-interaktivni-prostredi-pro-programovaci-jazyk-clojure/</a>
+</li>
+
+<li>Read-eval-print loop (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>Vim as a Go (Golang) IDE using LSP and vim-go<br />
+<a href="https://octetz.com/posts/vim-as-go-ide">https://octetz.com/posts/vim-as-go-ide</a>
+</li>
+
+<li>gopls<br />
+<a href="https://github.com/golang/go/wiki/gopls">https://github.com/golang/go/wiki/gopls</a>
+</li>
+
+<li>IDE Integration Guide<br />
+<a href="https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md">https://github.com/stamblerre/gocode/blob/master/docs/IDE_integration.md</a>
+</li>
+
+<li>How to instrument Go code with custom expvar metrics<br />
+<a href="https://sysdig.com/blog/golang-expvar-custom-metrics/">https://sysdig.com/blog/golang-expvar-custom-metrics/</a>
+</li>
+
+<li>Golang expvar metricset (Metricbeat Reference)<br />
+<a href="https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html">https://www.elastic.co/guide/en/beats/metricbeat/7.x/metricbeat-metricset-golang-expvar.html</a>
+</li>
+
+<li>Package expvar<br />
+<a href="https://golang.org/pkg/expvar/#NewInt">https://golang.org/pkg/expvar/#NewInt</a>
+</li>
+
+<li>Java Platform Debugger Architecture: Overview<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jpda/jpda.html</a>
+</li>
+
+<li>The JVM Tool Interface (JVM TI): How VM Agents Work<br />
+<a href="https://www.oracle.com/technetwork/articles/javase/index-140680.html">https://www.oracle.com/technetwork/articles/javase/index-140680.html</a>
+</li>
+
+<li>JVM Tool Interface Version 11.0<br />
+<a href="https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html">https://docs.oracle.com/en/java/javase/11/docs/specs/jvmti.html</a>
+</li>
+
+<li>Creating a Debugging and Profiling Agent with JVMTI<br />
+<a href="http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html">http://www.oracle.com/technetwork/articles/javase/jvmti-136367.html</a>
+</li>
+
+<li>JVM TI (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/JVM_TI">http://en.wikipedia.org/wiki/JVM_TI</a>
+</li>
+
+<li>IBM JVMTI extensions<br />
+<a href="http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html">http://publib.boulder.ibm.com/infocenter/realtime/v2r0/index.jsp?topic=%2Fcom.ibm.softrt.doc%2Fdiag%2Ftools%2Fjvmti_extensions.html</a>
+</li>
+
+<li>Go &amp; cgo: integrating existing C code with Go<br />
+<a href="http://akrennmair.github.io/golang-cgo-slides/#1">http://akrennmair.github.io/golang-cgo-slides/#1</a>
+</li>
+
+<li>Using cgo to call C code from within Go code<br />
+<a href="https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/">https://wenzr.wordpress.com/2018/06/07/using-cgo-to-call-c-code-from-within-go-code/</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>Introducing HTTP Tracing<br />
+<a href="https://blog.golang.org/http-tracing">https://blog.golang.org/http-tracing</a>
+</li>
+
+<li>Command trace<br />
+<a href="https://golang.org/cmd/trace/">https://golang.org/cmd/trace/</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Funkce vyššího řádu v knihovně Underscore<br />
+<a href="https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/">https://www.root.cz/clanky/funkce-vyssiho-radu-v-knihovne-underscore/</a>
+</li>
+
+<li>Delve: a debugger for the Go programming language.<br />
+<a href="https://github.com/go-delve/delve">https://github.com/go-delve/delve</a>
+</li>
+
+<li>Příkazy debuggeru Delve<br />
+<a href="https://github.com/go-delve/delve/tree/master/Documentation/cli">https://github.com/go-delve/delve/tree/master/Documentation/cli</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (2. část)<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-2-cast/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (3): Nemiver<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-3-nemiver/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (4): KDbg<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-4-kdbg/</a>
+</li>
+
+<li>Debuggery a jejich nadstavby v Linuxu (5): ladění aplikací v&nbsp;editorech Emacs a Vim<br />
+<a href="http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/">http://mojefedora.cz/debuggery-a-jejich-nadstavby-v-linuxu-5-ladeni-aplikaci-v-editorech-emacs-a-vim/</a>
+</li>
+
+<li>Debugging Go Code with GDB<br />
+<a href="https://golang.org/doc/gdb">https://golang.org/doc/gdb</a>
+</li>
+
+<li>Debugging Go (golang) programs with gdb <br />
+<a href="https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html">https://thornydev.blogspot.com/2014/01/debugging-go-golang-programs-with-gdb.html</a>
+</li>
+
+<li>GDB - Dokumentace<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/">http://sourceware.org/gdb/current/onlinedocs/gdb/</a>
+</li>
+
+<li>GDB - Supported Languages<br />
+<a href="http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages">http://sourceware.org/gdb/current/onlinedocs/gdb/Supported-Languages.html#Supported-Languages</a>
+</li>
+
+<li>GNU Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Debugger">https://en.wikipedia.org/wiki/GNU_Debugger</a>
+</li>
+
+<li>The LLDB Debugger<br />
+<a href="http://lldb.llvm.org/">http://lldb.llvm.org/</a>
+</li>
+
+<li>Debugger (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Debugger">https://en.wikipedia.org/wiki/Debugger</a>
+</li>
+
+<li>13 Linux Debuggers for C++ Reviewed<br />
+<a href="http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817">http://www.drdobbs.com/testing/13-linux-debuggers-for-c-reviewed/240156817</a>
+</li>
+
+<li>Go is on a Trajectory to Become the Next Enterprise Programming Language<br />
+<a href="https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e">https://hackernoon.com/go-is-on-a-trajectory-to-become-the-next-enterprise-programming-language-3b75d70544e</a>
+</li>
+
+<li>Go Proverbs: Simple, Poetic, Pithy<br />
+<a href="https://go-proverbs.github.io/">https://go-proverbs.github.io/</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>10 tools written in Go that every developer needs to know<br />
+<a href="https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/">https://gustavohenrique.net/en/2019/01/10-tools-written-in-go-that-every-dev-needs-to-know/</a>
+</li>
+
+<li>Hexadecimální prohlížeče a editory s textovým uživatelským rozhraním<br />
+<a href="https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/">https://www.root.cz/clanky/hexadecimalni-prohlizece-a-editory-s-textovym-uzivatelskym-rozhranim/</a>
+</li>
+
+<li>Hex dump<br />
+<a href="https://en.wikipedia.org/wiki/Hex_dump">https://en.wikipedia.org/wiki/Hex_dump</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>go-cron<br />
+<a href="https://github.com/rk/go-cron">https://github.com/rk/go-cron</a>
+</li>
+
+<li>gocron<br />
+<a href="https://github.com/jasonlvhit/gocron">https://github.com/jasonlvhit/gocron</a>
+</li>
+
+<li>clockwork<br />
+<a href="https://github.com/whiteShtef/clockwork">https://github.com/whiteShtef/clockwork</a>
+</li>
+
+<li>clockwerk<br />
+<a href="https://github.com/onatm/clockwerk">https://github.com/onatm/clockwerk</a>
+</li>
+
+<li>JobRunner<br />
+<a href="https://github.com/bamzi/jobrunner">https://github.com/bamzi/jobrunner</a>
+</li>
+
+<li>Rethinking Cron<br />
+<a href="https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/">https://adam.herokuapp.com/past/2010/4/13/rethinking_cron/</a>
+</li>
+
+<li>In the Beginning was the Command Line<br />
+<a href="https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html">https://web.archive.org/web/20180218045352/http://www.cryptonomicon.com/beginning.html</a>
+</li>
+
+<li>repl.it (REPL pro různé jazyky)<br />
+<a href="https://repl.it/languages">https://repl.it/languages</a>
+</li>
+
+<li>GOCUI - Go Console User Interface (celé uživatelské prostředí, nejenom input box)<br />
+<a href="https://github.com/jroimartin/gocui">https://github.com/jroimartin/gocui</a>
+</li>
+
+<li>Read–eval–print loop<br />
+<a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop</a>
+</li>
+
+<li>go-prompt<br />
+<a href="https://github.com/c-bata/go-prompt">https://github.com/c-bata/go-prompt</a>
+</li>
+
+<li>readline<br />
+<a href="https://github.com/chzyer/readline">https://github.com/chzyer/readline</a>
+</li>
+
+<li>A pure golang implementation for GNU-Readline kind library<br />
+<a href="https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/">https://golangexample.com/a-pure-golang-implementation-for-gnu-readline-kind-library/</a>
+</li>
+
+<li>go-readline<br />
+<a href="https://github.com/fiorix/go-readline">https://github.com/fiorix/go-readline</a>
+</li>
+
+<li>4 Python libraries for building great command-line user interfaces<br />
+<a href="https://opensource.com/article/17/5/4-practical-python-libraries">https://opensource.com/article/17/5/4-practical-python-libraries</a>
+</li>
+
+<li>prompt_toolkit 2.0.3 na PyPi<br />
+<a href="https://pypi.org/project/prompt_toolkit/">https://pypi.org/project/prompt_toolkit/</a>
+</li>
+
+<li>python-prompt-toolkit na GitHubu<br />
+<a href="https://github.com/jonathanslenders/python-prompt-toolkit">https://github.com/jonathanslenders/python-prompt-toolkit</a>
+</li>
+
+<li>The GNU Readline Library<br />
+<a href="https://tiswww.case.edu/php/chet/readline/rltop.html">https://tiswww.case.edu/php/chet/readline/rltop.html</a>
+</li>
+
+<li>GNU Readline (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GNU_Readline">https://en.wikipedia.org/wiki/GNU_Readline</a>
+</li>
+
+<li>readline — GNU readline interface (Python 3.x)<br />
+<a href="https://docs.python.org/3/library/readline.html">https://docs.python.org/3/library/readline.html</a>
+</li>
+
+<li>readline — GNU readline interface (Python 2.x)<br />
+<a href="https://docs.python.org/2/library/readline.html">https://docs.python.org/2/library/readline.html</a>
+</li>
+
+<li>GNU Readline Library - command line editing<br />
+<a href="https://tiswww.cwru.edu/php/chet/readline/readline.html">https://tiswww.cwru.edu/php/chet/readline/readline.html</a>
+</li>
+
+<li>gnureadline 6.3.8 na PyPi<br />
+<a href="https://pypi.org/project/gnureadline/">https://pypi.org/project/gnureadline/</a>
+</li>
+
+<li>Editline Library (libedit)<br />
+<a href="http://thrysoee.dk/editline/">http://thrysoee.dk/editline/</a>
+</li>
+
+<li>Comparing Python Command-Line Parsing Libraries – Argparse, Docopt, and Click<br />
+<a href="https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/">https://realpython.com/comparing-python-command-line-parsing-libraries-argparse-docopt-click/</a>
+</li>
+
+<li>libedit or editline<br />
+<a href="http://www.cs.utah.edu/~bigler/code/libedit.html">http://www.cs.utah.edu/~bigler/code/libedit.html</a>
+</li>
+
+<li>WinEditLine<br />
+<a href="http://mingweditline.sourceforge.net/">http://mingweditline.sourceforge.net/</a>
+</li>
+
+<li>rlcompleter — Completion function for GNU readline<br />
+<a href="https://docs.python.org/3/library/rlcompleter.html">https://docs.python.org/3/library/rlcompleter.html</a>
+</li>
+
+<li>rlwrap na GitHubu<br />
+<a href="https://github.com/hanslub42/rlwrap">https://github.com/hanslub42/rlwrap</a>
+</li>
+
+<li>rlwrap(1) - Linux man page<br />
+<a href="https://linux.die.net/man/1/rlwrap">https://linux.die.net/man/1/rlwrap</a>
+</li>
+
+<li>readline(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/readline">https://linux.die.net/man/3/readline</a>
+</li>
+
+<li>history(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/history">https://linux.die.net/man/3/history</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Afinní transformace<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic">https://cs.wikibooks.org/wiki/Geometrie/Afinn%C3%AD_transformace_sou%C5%99adnic</a>
+</li>
+
+<li>package gg<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>YAML<br />
+<a href="https://yaml.org/">https://yaml.org/</a>
+</li>
+
+<li>edn<br />
+<a href="https://github.com/edn-format/edn">https://github.com/edn-format/edn</a>
+</li>
+
+<li>Smile<br />
+<a href="https://github.com/FasterXML/smile-format-specification">https://github.com/FasterXML/smile-format-specification</a>
+</li>
+
+<li>Protocol-Buffers<br />
+<a href="https://developers.google.com/protocol-buffers/">https://developers.google.com/protocol-buffers/</a>
+</li>
+
+<li>Marshalling (computer science)<br />
+<a href="https://en.wikipedia.org/wiki/Marshalling_(computer_science)">https://en.wikipedia.org/wiki/Marshalling_(computer_science)</a>
+</li>
+
+<li>Unmarshalling<br />
+<a href="https://en.wikipedia.org/wiki/Unmarshalling">https://en.wikipedia.org/wiki/Unmarshalling</a>
+</li>
+
+<li>Introducing JSON<br />
+<a href="http://json.org/">http://json.org/</a>
+</li>
+
+<li>Package json<br />
+<a href="https://golang.org/pkg/encoding/json/">https://golang.org/pkg/encoding/json/</a>
+</li>
+
+<li>The Go Blog: JSON and Go<br />
+<a href="https://blog.golang.org/json-and-go">https://blog.golang.org/json-and-go</a>
+</li>
+
+<li>Go by Example: JSON<br />
+<a href="https://gobyexample.com/json">https://gobyexample.com/json</a>
+</li>
+
+<li>Writing Web Applications<br />
+<a href="https://golang.org/doc/articles/wiki/">https://golang.org/doc/articles/wiki/</a>
+</li>
+
+<li>Golang Web Apps<br />
+<a href="https://www.reinbach.com/blog/golang-webapps-1/">https://www.reinbach.com/blog/golang-webapps-1/</a>
+</li>
+
+<li>Build web application with Golang<br />
+<a href="https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details">https://legacy.gitbook.com/book/astaxie/build-web-application-with-golang/details</a>
+</li>
+
+<li>Golang Templates - Golang Web Pages<br />
+<a href="https://www.youtube.com/watch?v=TkNIETmF-RU">https://www.youtube.com/watch?v=TkNIETmF-RU</a>
+</li>
+
+<li>Simple Golang HTTPS/TLS Examples<br />
+<a href="https://github.com/denji/golang-tls">https://github.com/denji/golang-tls</a>
+</li>
+
+<li>Playing with images in HTTP response in golang<br />
+<a href="https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang">https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang</a>
+</li>
+
+<li>MIME Types List<br />
+<a href="https://www.freeformatter.com/mime-types-list.html">https://www.freeformatter.com/mime-types-list.html</a>
+</li>
+
+<li>Go Mutex Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-mutex-tutorial/">https://tutorialedge.net/golang/go-mutex-tutorial/</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>setbuf(3) - Linux man page<br />
+<a href="https://linux.die.net/man/3/setbuf">https://linux.die.net/man/3/setbuf</a>
+</li>
+
+<li>setvbuf(3) - Linux man page (stejný obsah jako předchozí stránka)<br />
+<a href="https://linux.die.net/man/3/setvbuf">https://linux.die.net/man/3/setvbuf</a>
+</li>
+
+<li>Select waits on a group of channels<br />
+<a href="https://yourbasic.org/golang/select-explained/">https://yourbasic.org/golang/select-explained/</a>
+</li>
+
+<li>Rob Pike: Simplicity is Complicated (video)<br />
+<a href="http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893">http://www.golang.to/posts/dotgo-2015-rob-pike-simplicity-is-complicated-youtube-16893</a>
+</li>
+
+<li>Algorithms to Go<br />
+<a href="https://yourbasic.org/">https://yourbasic.org/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů: vlastní filtry a lexery<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu-vlastni-filtry-a-lexery/</a>
+</li>
+
+<li>Go Defer Simplified with Practical Visuals<br />
+<a href="https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff">https://blog.learngoprogramming.com/golang-defer-simplified-77d3b2b817ff</a>
+</li>
+
+<li>5 More Gotchas of Defer in Go — Part II<br />
+<a href="https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa">https://blog.learngoprogramming.com/5-gotchas-of-defer-in-go-golang-part-ii-cc550f6ad9aa</a>
+</li>
+
+<li>The Go Blog: Defer, Panic, and Recover<br />
+<a href="https://blog.golang.org/defer-panic-and-recover">https://blog.golang.org/defer-panic-and-recover</a>
+</li>
+
+<li>The defer keyword in Swift 2: try/finally done right<br />
+<a href="https://www.hackingwithswift.com/new-syntax-swift-2-defer">https://www.hackingwithswift.com/new-syntax-swift-2-defer</a>
+</li>
+
+<li>Swift Defer Statement<br />
+<a href="https://andybargh.com/swift-defer-statement/">https://andybargh.com/swift-defer-statement/</a>
+</li>
+
+<li>Modulo operation (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Modulo_operation">https://en.wikipedia.org/wiki/Modulo_operation</a>
+</li>
+
+<li>Node.js vs Golang: Battle of the Next-Gen Languages<br />
+<a href="https://www.hostingadvice.com/blog/nodejs-vs-golang/">https://www.hostingadvice.com/blog/nodejs-vs-golang/</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>Package fmt<br />
+<a href="https://golang.org/pkg/fmt/">https://golang.org/pkg/fmt/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Rychle, rychleji až úplně nejrychleji s jazykem Go<br />
+<a href="https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/">https://www.root.cz/clanky/rychle-rychleji-az-uplne-nejrychleji-s-jazykem-go/</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2018)<br />
+<a href="https://insights.stackoverflow.com/survey/2018/#most-popular-technologies">https://insights.stackoverflow.com/survey/2018/#most-popular-technologies</a>
+</li>
+
+<li>Most Popular Technologies (Stack Overflow Survery 2017)<br />
+<a href="https://insights.stackoverflow.com/survey/2017#technology">https://insights.stackoverflow.com/survey/2017#technology</a>
+</li>
+
+<li>JavaScript vs. Golang for IoT: Is Gopher Winning?<br />
+<a href="https://www.iotforall.com/javascript-vs-golang-iot/">https://www.iotforall.com/javascript-vs-golang-iot/</a>
+</li>
+
+<li>The Go Programming Language: Release History<br />
+<a href="https://golang.org/doc/devel/release.html">https://golang.org/doc/devel/release.html</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes (tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes (i tato verze je stále používána)<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>Go on Fedora<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-installation.html">https://developer.fedoraproject.org/tech/languages/go/go-installation.html</a>
+</li>
+
+<li>Writing Go programs<br />
+<a href="https://developer.fedoraproject.org/tech/languages/go/go-programs.html">https://developer.fedoraproject.org/tech/languages/go/go-programs.html</a>
+</li>
+
+<li>The GOPATH environment variable<br />
+<a href="https://tip.golang.org/doc/code.html#GOPATH">https://tip.golang.org/doc/code.html#GOPATH</a>
+</li>
+
+<li>Command gofmt<br />
+<a href="https://tip.golang.org/cmd/gofmt/">https://tip.golang.org/cmd/gofmt/</a>
+</li>
+
+<li>The Go Blog: go fmt your code<br />
+<a href="https://blog.golang.org/go-fmt-your-code">https://blog.golang.org/go-fmt-your-code</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://blog.golang.org/c-go-cgo">https://blog.golang.org/c-go-cgo</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+<li>400,000 GitHub repositories, 1 billion files, 14 terabytes of code: Spaces or Tabs?<br />
+<a href="https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd">https://medium.com/@hoffa/400-000-github-repositories-1-billion-files-14-terabytes-of-code-spaces-or-tabs-7cfe0b5dd7fd</a>
+</li>
+
+<li>Gofmt No Longer Allows Spaces. Tabs Only<br />
+<a href="https://news.ycombinator.com/item?id=7914523">https://news.ycombinator.com/item?id=7914523</a>
+</li>
+
+<li>Why does Go "go fmt" uses tabs instead of whitespaces?<br />
+<a href="https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces">https://www.quora.com/Why-does-Go-go-fmt-uses-tabs-instead-of-whitespaces</a>
+</li>
+
+<li>Interactive: The Top Programming Languages 2018<br />
+<a href="https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018">https://spectrum.ieee.org/static/interactive-the-top-programming-languages-2018</a>
+</li>
+
+<li>Go vs. Python<br />
+<a href="https://www.peterbe.com/plog/govspy">https://www.peterbe.com/plog/govspy</a>
+</li>
+
+<li>PackageManagementTools<br />
+<a href="https://github.com/golang/go/wiki/PackageManagementTools">https://github.com/golang/go/wiki/PackageManagementTools</a>
+</li>
+
+<li>A Tour of Go: Type inference<br />
+<a href="https://tour.golang.org/basics/14">https://tour.golang.org/basics/14</a>
+</li>
+
+<li>Go Slices: usage and internals<br />
+<a href="https://blog.golang.org/go-slices-usage-and-internals">https://blog.golang.org/go-slices-usage-and-internals</a>
+</li>
+
+<li>Go by Example: Slices<br />
+<a href="https://gobyexample.com/slices">https://gobyexample.com/slices</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>Go-is-no-good (nelze brát doslova)<br />
+<a href="https://github.com/ksimka/go-is-not-good">https://github.com/ksimka/go-is-not-good</a>
+</li>
+
+<li>Rust vs. Go<br />
+<a href="https://news.ycombinator.com/item?id=13430108">https://news.ycombinator.com/item?id=13430108</a>
+</li>
+
+<li>Seriál Programovací jazyk Rust<br />
+<a href="https://www.root.cz/serialy/programovaci-jazyk-rust/">https://www.root.cz/serialy/programovaci-jazyk-rust/</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>Running GoLang on an STM32 MCU. A quick tutorial.<br />
+<a href="https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial">https://www.mickmake.com/post/running-golang-on-an-mcu-a-quick-tutorial</a>
+</li>
+
+<li>Go, Robot, Go! Golang Powered Robotics<br />
+<a href="https://gobot.io/">https://gobot.io/</a>
+</li>
+
+<li>Emgo: Bare metal Go (language for programming embedded systems)<br />
+<a href="https://github.com/ziutek/emgo">https://github.com/ziutek/emgo</a>
+</li>
+
+<li>UTF-8 history<br />
+<a href="https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt">https://www.cl.cam.ac.uk/~mgk25/ucs/utf-8-history.txt</a>
+</li>
+
+<li>Less is exponentially more<br />
+<a href="https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html">https://commandcenter.blogspot.com/2012/06/less-is-exponentially-more.html</a>
+</li>
+
+<li>Should I Rust, or Should I Go<br />
+<a href="https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9">https://codeburst.io/should-i-rust-or-should-i-go-59a298e00ea9</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://golang.org/doc/install/gccgo">https://golang.org/doc/install/gccgo</a>
+</li>
+
+<li>Elastic Tabstops<br />
+<a href="http://nickgravgaard.com/elastic-tabstops/">http://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>Strings, bytes, runes and characters in Go<br />
+<a href="https://blog.golang.org/strings">https://blog.golang.org/strings</a>
+</li>
+
+<li>Datový typ<br />
+<a href="https://cs.wikipedia.org/wiki/Datov%C3%BD_typ">https://cs.wikipedia.org/wiki/Datov%C3%BD_typ</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Základní (primitivní) datové typy<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09">https://www.root.cz/clanky/programovaci-jazyk-rust-nahrada-c-nebo-slepa-cesta/#k09</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Vytvoření „řezu“ z pole<br />
+<a href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06</a>
+</li>
+
+<li>Seriál o programovacím jazyku Rust: Řezy (slice) vektoru<br />
+<a href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05</a>
+</li>
+
+<li>Printf Format Strings<br />
+<a href="https://www.cprogramming.com/tutorial/printf-format-strings.html">https://www.cprogramming.com/tutorial/printf-format-strings.html</a>
+</li>
+
+<li>Java: String.format<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-">https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-</a>
+</li>
+
+<li>Java: format string syntax<br />
+<a href="https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax">https://docs.oracle.com/javase/8/docs/api/java/util/Formatter.html#syntax</a>
+</li>
+
+<li>Selectors<br />
+<a href="https://golang.org/ref/spec#Selectors">https://golang.org/ref/spec#Selectors</a>
+</li>
+
+<li>Calling Go code from Python code<br />
+<a href="http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/">http://savorywatt.com/2015/09/18/calling-go-code-from-python-code/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>Part 21: Goroutines<br />
+<a href="https://golangbot.com/goroutines/">https://golangbot.com/goroutines/</a>
+</li>
+
+<li>Part 22: Channels<br />
+<a href="https://golangbot.com/channels/">https://golangbot.com/channels/</a>
+</li>
+
+<li>[Go] Lightweight eventbus with async compatibility for Go<br />
+<a href="https://github.com/asaskevich/EventBus">https://github.com/asaskevich/EventBus</a>
+</li>
+
+<li>What about Trait support in Golang?<br />
+<a href="https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/">https://www.reddit.com/r/golang/comments/8mfykl/what_about_trait_support_in_golang/</a>
+</li>
+
+<li>Don't Get Bitten by Pointer vs Non-Pointer Method Receivers in Golang<br />
+<a href="https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/">https://nathanleclaire.com/blog/2014/08/09/dont-get-bitten-by-pointer-vs-non-pointer-method-receivers-in-golang/</a>
+</li>
+
+<li>Control Flow<br />
+<a href="https://en.wikipedia.org/wiki/Control_flow">https://en.wikipedia.org/wiki/Control_flow</a>
+</li>
+
+<li>Structured programming<br />
+<a href="https://en.wikipedia.org/wiki/Structured_programming">https://en.wikipedia.org/wiki/Structured_programming</a>
+</li>
+
+<li>Control Structures<br />
+<a href="https://www.golang-book.com/books/intro/5">https://www.golang-book.com/books/intro/5</a>
+</li>
+
+<li>Control structures - Go if else statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html">http://golangtutorials.blogspot.com/2011/06/control-structures-if-else-statement.html</a>
+</li>
+
+<li>Control structures - Go switch case statement<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-switch-case.html</a>
+</li>
+
+<li>Control structures - Go for loop, break, continue, range<br />
+<a href="http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html">http://golangtutorials.blogspot.com/2011/06/control-structures-go-for-loop-break.html</a>
+</li>
+
+<li>Goroutine IDs<br />
+<a href="https://blog.sgmansfield.com/2015/12/goroutine-ids/">https://blog.sgmansfield.com/2015/12/goroutine-ids/</a>
+</li>
+
+<li>Different ways to pass channels as arguments in function in go (golang)<br />
+<a href="https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang">https://stackoverflow.com/questions/24868859/different-ways-to-pass-channels-as-arguments-in-function-in-go-golang</a>
+</li>
+
+<li>justforfunc #22: using the Go execution tracer<br />
+<a href="https://www.youtube.com/watch?v=ySy3sR1LFCQ">https://www.youtube.com/watch?v=ySy3sR1LFCQ</a>
+</li>
+
+<li>Single Function Exit Point<br />
+<a href="http://wiki.c2.com/?SingleFunctionExitPoint">http://wiki.c2.com/?SingleFunctionExitPoint</a>
+</li>
+
+<li>Entry point<br />
+<a href="https://en.wikipedia.org/wiki/Entry_point">https://en.wikipedia.org/wiki/Entry_point</a>
+</li>
+
+<li>Why does Go have a GOTO statement?!<br />
+<a href="https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/">https://www.reddit.com/r/golang/comments/kag5q/why_does_go_have_a_goto_statement/</a>
+</li>
+
+<li>Effective Go<br />
+<a href="https://golang.org/doc/effective_go.html">https://golang.org/doc/effective_go.html</a>
+</li>
+
+<li>GoClipse: an Eclipse IDE for the Go programming language<br />
+<a href="http://goclipse.github.io/">http://goclipse.github.io/</a>
+</li>
+
+<li>GoClipse Installation<br />
+<a href="https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation">https://github.com/GoClipse/goclipse/blob/latest/documentation/Installation.md#installation</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2020</small></p>
+</body>
+</html>
+
