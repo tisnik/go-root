@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+# vim: set fileencoding=utf-8
+
 import os
 from glob import iglob
 from collections import defaultdict
