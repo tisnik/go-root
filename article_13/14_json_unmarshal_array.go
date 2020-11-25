@@ -17,18 +17,18 @@ import (
 )
 
 func main() {
-	input_json_as_bytes, err := ioutil.ReadFile("numbers.json")
+	inputJSONAsBytes, err := ioutil.ReadFile("numbers.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Input (bytes):")
-	fmt.Println(input_json_as_bytes)
+	fmt.Println(inputJSONAsBytes)
 
 	fmt.Println("\nInput (string):")
-	fmt.Println(string(input_json_as_bytes))
+	fmt.Println(string(inputJSONAsBytes))
 
 	var numbers []int
-	json.Unmarshal(input_json_as_bytes, &numbers)
+	json.Unmarshal(inputJSONAsBytes, &numbers)
 
 	fmt.Println("\nOutput:")
 	fmt.Println(numbers)
