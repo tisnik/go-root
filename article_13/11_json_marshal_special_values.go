@@ -61,6 +61,6 @@ func main() {
 	fmt.Println(string(ifaceJSON))
 
 	var f = func() {}
-	f_json, _ := json.Marshal(f)
-	fmt.Println(string(f_json))
+	fJSON, _ := json.Marshal(f)
+	fmt.Println(string(fJSON))
 }
