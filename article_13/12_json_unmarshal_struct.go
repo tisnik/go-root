@@ -22,15 +22,15 @@ type User struct {
 }
 
 func main() {
-	input_json := `{
+	inputJSON := `{
     "ID":1,
     "Name":"Pepek",
     "Surname":"Vyskoč"
 }`
 	fmt.Println("Input:")
-	fmt.Println(input_json)
+	fmt.Println(inputJSON)
 
-	bytes := []byte(input_json)
+	bytes := []byte(inputJSON)
 	var user User
 	json.Unmarshal(bytes, &user)
 
