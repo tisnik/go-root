@@ -18,7 +18,7 @@ import (
 
 // User je uživatelsky definovaná datová struktura s veřejnými atributy
 type User struct {
-	Id      uint32
+	ID      uint32
 	Name    string
 	Surname string
 }
@@ -41,7 +41,7 @@ func main() {
 	fmt.Println(user)
 
 	fmt.Println("\nFields:")
-	fmt.Printf("ID:      %d\n", user.Id)
+	fmt.Printf("ID:      %d\n", user.ID)
 	fmt.Printf("Name:    %s\n", user.Name)
 	fmt.Printf("Surname: %s\n", user.Surname)
 }
