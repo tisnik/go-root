@@ -24,18 +24,18 @@ type User struct {
 }
 
 func main() {
-	input_json_as_bytes, err := ioutil.ReadFile("users.json")
+	inputJSONAsBytes, err := ioutil.ReadFile("users.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Input (bytes):")
-	fmt.Println(input_json_as_bytes)
+	fmt.Println(inputJSONAsBytes)
 
 	fmt.Println("\nInput (string):")
-	fmt.Println(string(input_json_as_bytes))
+	fmt.Println(string(inputJSONAsBytes))
 
 	var users []User
-	json.Unmarshal(input_json_as_bytes, &users)
+	json.Unmarshal(inputJSONAsBytes, &users)
 
 	fmt.Println("\nOutput:")
 	fmt.Println(users)
