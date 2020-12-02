@@ -18,7 +18,7 @@ import (
 )
 
 const filename = "test_input_no_eoln.txt"
-const buffer_size = 16
+const bufferSize = 16
 
 func main() {
 	reader, err := os.Open(filename)
