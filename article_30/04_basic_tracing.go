@@ -19,7 +19,7 @@ func performLogin() {
 	log.Println("login")
 }
 
-func perform_logout() {
+func performLogout() {
 	log.Println("logout")
 }
 
@@ -46,5 +46,5 @@ func main() {
 	performLogin()
 	transaction("A")
 	transaction("B")
-	perform_logout()
+	performLogout()
 }
