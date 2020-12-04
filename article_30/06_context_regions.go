@@ -16,7 +16,7 @@ import (
 	"runtime/trace"
 )
 
-func perform_login() {
+func performLogin() {
 	log.Println("login")
 }
 
@@ -48,7 +48,7 @@ func main() {
 	ctx, task := trace.NewTask(ctx, "transactionTask")
 
 	region1 := trace.StartRegion(ctx, "login")
-	perform_login()
+	performLogin()
 	region1.End()
 
 	region2 := trace.StartRegion(ctx, "transactions")
