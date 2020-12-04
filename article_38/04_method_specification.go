@@ -18,6 +18,7 @@ import (
 	"sync"
 )
 
+// ADDRESS is a default address of HTTP server
 const ADDRESS = ":8080"
 
 var counter int
