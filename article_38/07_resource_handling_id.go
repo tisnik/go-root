@@ -16,6 +16,7 @@ import (
 	"strconv"
 )
 
+// ADDRESS is a default address of HTTP server
 const ADDRESS = ":8080"
 
 // Person structure represents information about person in IS
