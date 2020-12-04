@@ -17,6 +17,7 @@ import (
 
 const ADDRESS = ":8080"
 
+// Person structure represents information about person in IS
 type Person struct {
 	Firstname string `json:"firstname"`
 	Surname   string `json:"lastname"`
