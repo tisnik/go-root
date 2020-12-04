@@ -34,9 +34,9 @@ func getCounterEndpoint(writer http.ResponseWriter, request *http.Request) {
 	mutex.Unlock()
 }
 
-func setCounter(new_value int) {
+func setCounter(newValue int) {
 	mutex.Lock()
-	counter = new_value
+	counter = newValue
 	mutex.Unlock()
 }
 
