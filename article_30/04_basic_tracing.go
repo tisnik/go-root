@@ -15,7 +15,7 @@ import (
 	"runtime/trace"
 )
 
-func perform_login() {
+func performLogin() {
 	log.Println("login")
 }
 
@@ -43,7 +43,7 @@ func main() {
 	}
 	defer trace.Stop()
 
-	perform_login()
+	performLogin()
 	transaction("A")
 	transaction("B")
 	perform_logout()
