@@ -14,6 +14,7 @@ import (
 	"os"
 )
 
+// ADDRESS is a default address of HTTP server
 const ADDRESS = ":8080"
 
 func mainEndpoint(writer http.ResponseWriter, request *http.Request) {
