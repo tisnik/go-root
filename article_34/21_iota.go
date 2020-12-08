@@ -12,6 +12,7 @@ package main
 import "fmt"
 
 const (
+	// Pondeli is the 1st day of week in some countries
 	Pondeli = iota
 	Utery
 	Streda
