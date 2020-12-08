@@ -12,6 +12,7 @@ package main
 import "fmt"
 
 const (
+	// Pi is the classic math constant Pi
 	Pi float64 = 3.1415927
 	E          = 2.71828
 
