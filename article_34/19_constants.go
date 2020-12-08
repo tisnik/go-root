@@ -12,6 +12,8 @@ package main
 import "fmt"
 
 const Pi float64 = 3.1415927
+
+// E is the classic math constant "e"
 const E = 2.71828
 
 const z0 int = 0
