@@ -14,6 +14,7 @@ import (
 	"github.com/wesovilabs/koazee"
 )
 
+// User data type represents an user in (some) information system
 type User struct {
 	id      uint32
 	name    string
