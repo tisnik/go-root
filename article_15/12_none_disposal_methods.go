@@ -33,15 +33,14 @@ func CreateImage(width int, height int, imageIndex int) *image.Paletted {
 		draw.Draw(img, r2, &image.Uniform{palette[1]}, image.ZP, draw.Src)
 
 		return img
-	} else {
-		img := image.NewPaletted(image.Rect(imageIndex*60, 0, imageIndex*60+50, height), palette)
-
-		r2 := image.Rect(imageIndex*60, 0, imageIndex*60+50, height)
-		draw.Draw(img, r2, &image.Uniform{palette[1]}, image.ZP, draw.Src)
-
-		return img
 	}
+	// else
+	img := image.NewPaletted(image.Rect(imageIndex*60, 0, imageIndex*60+50, height), palette)
 
+	r2 := image.Rect(imageIndex*60, 0, imageIndex*60+50, height)
+	draw.Draw(img, r2, &image.Uniform{palette[1]}, image.ZP, draw.Src)
+
+	return img
 }
 
 func main() {
