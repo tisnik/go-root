@@ -14,6 +14,7 @@ import (
 	"sort"
 )
 
+// Role represents user role in some IS
 type Role struct {
 	name    string
 	surname string
