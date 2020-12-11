@@ -45,7 +45,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 		{Text: "quit", Description: "quit the application"},
 	}
 
-	user_s := []prompt.Suggest{
+	userS := []prompt.Suggest{
 		{Text: "add", Description: "add new user"},
 		{Text: "assign", Description: "assign a role to user"},
 		{Text: "del", Description: "delete user"},
@@ -63,7 +63,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 	if len(blocks) == 2 {
 		switch blocks[0] {
 		case "user":
-			return prompt.FilterHasPrefix(user_s, blocks[1], true)
+			return prompt.FilterHasPrefix(userS, blocks[1], true)
 		case "ls":
 			fallthrough
 		case "list":
