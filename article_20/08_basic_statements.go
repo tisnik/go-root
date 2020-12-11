@@ -115,9 +115,8 @@ func completer(in prompt.Document) []prompt.Suggest {
 	}
 	if in.GetWordBeforeCursor() == "" {
 		return nil
-	} else {
-		return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
 	}
+	return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
 }
 
 func main() {
