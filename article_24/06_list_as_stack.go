@@ -16,6 +16,7 @@ import (
 	"strings"
 )
 
+// Stack data structure that is based on List container
 type Stack list.List
 
 func printStack(l *list.List) {
