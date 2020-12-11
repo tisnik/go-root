@@ -116,9 +116,8 @@ func executor(t string) {
 func completer(in prompt.Document) []prompt.Suggest {
 	if in.GetWordBeforeCursor() == "" {
 		return nil
-	} else {
-		return prompt.FilterFuzzy(suggestions, in.GetWordBeforeCursor(), true)
 	}
+	return prompt.FilterFuzzy(suggestions, in.GetWordBeforeCursor(), true)
 }
 
 func main() {
