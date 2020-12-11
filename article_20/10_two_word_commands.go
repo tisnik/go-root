@@ -58,7 +58,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 		{Text: "computers", Description: "show list of all computers"},
 	}
 
-	empty_s := []prompt.Suggest{}
+	emptyS := []prompt.Suggest{}
 
 	if len(blocks) == 2 {
 		switch blocks[0] {
@@ -69,7 +69,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 		case "list":
 			return prompt.FilterHasPrefix(list_s, blocks[1], true)
 		default:
-			return empty_s
+			return emptyS
 		}
 	}
 	return prompt.FilterHasPrefix(s, blocks[0], true)
