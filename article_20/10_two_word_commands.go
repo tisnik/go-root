@@ -51,7 +51,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 		{Text: "del", Description: "delete user"},
 	}
 
-	list_s := []prompt.Suggest{
+	listS := []prompt.Suggest{
 		{Text: "users", Description: "show list of all users"},
 		{Text: "logs", Description: "show list of all logs"},
 		{Text: "storages", Description: "show list of all storages"},
@@ -67,7 +67,7 @@ func completer(in prompt.Document) []prompt.Suggest {
 		case "ls":
 			fallthrough
 		case "list":
-			return prompt.FilterHasPrefix(list_s, blocks[1], true)
+			return prompt.FilterHasPrefix(listS, blocks[1], true)
 		default:
 			return emptyS
 		}
