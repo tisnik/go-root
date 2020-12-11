@@ -14,6 +14,7 @@ import (
 	"fmt"
 )
 
+// StringHeap represents simple heap abstract data structure based on array
 type StringHeap []string
 
 func (h StringHeap) Len() int {
