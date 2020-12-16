@@ -16,12 +16,12 @@ import (
 )
 
 const inputString = "*** Hello world! ***"
-const buffer_size = 6
+const bufferSize = 6
 
 func main() {
 	reader := strings.NewReader(inputString)
 
-	buffer := make([]byte, buffer_size)
+	buffer := make([]byte, bufferSize)
 	reader.Seek(-10, io.SeekEnd)
 
 	for {
