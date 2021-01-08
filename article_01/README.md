@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Go: minimalistický a překvapivě výkonný programovací jazyk](https://www.root.cz/clanky/go-minimalisticky-a-prekvapive-vykonny-programovaci-jazyk/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [The simplest form of Hello world example](01_hello_world.go)
 1. [A slightly better form of Hello world example based on "fmt" package](02_better_hello_world.go)
 1. [Check for unused imports](03_unused_imports.go)
