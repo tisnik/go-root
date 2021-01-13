@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Datové typy v programovacím jazyku Go](https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Signed integer types](01_integer_signed_types.go)
 1. [Signed integer types checks](02_integer_signed_types_checks.go)
 1. [Unsigned integer types](03_integer_unsigned_types.go)
