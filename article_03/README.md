@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Datové typy v programovacím jazyku Go (2.část)](https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [User types declaration](01_user_types.go)
 1. [Passing user types to function](02_type_func_params.go)
 1. [Array with user type items](03_typed_array.go)
