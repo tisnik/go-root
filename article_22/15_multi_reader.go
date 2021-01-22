@@ -19,7 +19,7 @@ const input_string_1 = "Hello"
 const input_string_2 = "world"
 const input_string_3 = "!"
 
-const buffer_size = 4
+const bufferSize = 4
 
 func main() {
 	r1 := strings.NewReader(input_string_1)
@@ -27,7 +27,7 @@ func main() {
 	r3 := strings.NewReader(input_string_3)
 	r := io.MultiReader(r1, r2, r3)
 
-	buffer := make([]byte, buffer_size)
+	buffer := make([]byte, bufferSize)
 
 	for {
 		read, err := r.Read(buffer)
