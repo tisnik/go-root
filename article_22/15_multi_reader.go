@@ -15,14 +15,14 @@ import (
 	"strings"
 )
 
-const input_string_1 = "Hello"
+const inputString1 = "Hello"
 const input_string_2 = "world"
 const input_string_3 = "!"
 
 const bufferSize = 4
 
 func main() {
-	r1 := strings.NewReader(input_string_1)
+	r1 := strings.NewReader(inputString1)
 	r2 := strings.NewReader(input_string_2)
 	r3 := strings.NewReader(input_string_3)
 	r := io.MultiReader(r1, r2, r3)
