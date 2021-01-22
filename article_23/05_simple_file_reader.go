@@ -15,11 +15,11 @@ import (
 	"strings"
 )
 
-const input_string = "*** Hello world! ***"
+const inputString = "*** Hello world! ***"
 const bufferSize = 6
 
 func main() {
-	reader := strings.NewReader(input_string)
+	reader := strings.NewReader(inputString)
 
 	buffer := make([]byte, bufferSize)
 
