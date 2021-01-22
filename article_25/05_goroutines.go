@@ -21,7 +21,7 @@ func printChars() {
 	}
 }
 
-func print_dots() {
+func printDots() {
 	for i := 0; i < 30; i++ {
 		fmt.Print(".")
 		time.Sleep(200 * time.Millisecond)
@@ -39,7 +39,7 @@ func main() {
 	fmt.Println("main begin")
 	go printChars()
 	go print_spaces()
-	go print_dots()
+	go printDots()
 	time.Sleep(6 * time.Second)
 	fmt.Println("main end")
 }
