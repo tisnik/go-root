@@ -17,7 +17,7 @@ import (
 )
 
 const filename = "test_input.txt"
-const buffer_size = 16
+const bufferSize = 16
 
 func main() {
 	fin, err := os.Open(filename)
@@ -26,7 +26,7 @@ func main() {
 	}
 	defer fin.Close()
 
-	buffer := make([]byte, buffer_size)
+	buffer := make([]byte, bufferSize)
 
 	for {
 		read, err := fin.Read(buffer)
