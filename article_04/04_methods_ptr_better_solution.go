@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtvrtá část
 //    Rozhraní, metody, gorutiny a kanály v programovacím jazyku Go
