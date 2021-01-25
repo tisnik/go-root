@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Rozhraní, metody, gorutiny a kanály v programovacím jazyku Go](https://www.root.cz/clanky/rozhrani-metody-gorutiny-a-kanaly-v-programovacim-jazyku-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Method declaration and invocation](01_methods.go)
 1. [Names are not unique](01_B_unique_names.go)
 1. [Method without parameter, method with parameter](02_methods_with_parameters.go)
