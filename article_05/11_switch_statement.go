@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Pátá část
 //    Konstrukce pro řízení běhu programu v jazyce Go
