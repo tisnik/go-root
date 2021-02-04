@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Sedmá část
 //    Programovací jazyk Go: dokončení popisu vlastností samotného jazyka
