@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Osmá část
 //     Tvorba balíčků a pokročilejší operace s kanály v jazyce Go
