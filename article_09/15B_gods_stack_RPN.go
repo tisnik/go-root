@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Devátá část
 //     Užitečné balíčky pro každodenní použití jazyka Go
