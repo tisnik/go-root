@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Desátá část
 //     Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem
