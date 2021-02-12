@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Konstrukce pro řízení běhu programu v jazyce Go (dokončení)](https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go-dokonceni/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Syntax of goto statement](01_goto.go)
 1. [Use goto to jump from inner loop](02_goto_from_inner_loop.go)
 1. [Use goto to jump from switch statement](03_goto_from_switch.go)
