@@ -3,6 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/tisnik/go-root)](https://goreportcard.com/report/github.com/tisnik/go-root)
 
 Examples written in Golang that are used in articles about the Go language on https://www.root.cz
+All relevant articles about Golang: https://www.root.cz/serialy/programovaci-jazyk-go/
 
 List of examples used in articles:
 
