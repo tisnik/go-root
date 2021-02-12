@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Konstrukce pro řízení běhu programu v jazyce Go](https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Main function only](01_main_function_only.go)
 1. [Return statement](02_return_statement.go)
 1. [Code after return statement](03_return_statement_no_value.go)
