@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třináctá část
 //     Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)
