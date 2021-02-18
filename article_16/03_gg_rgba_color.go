@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Šestnáctá část
 //     Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG
