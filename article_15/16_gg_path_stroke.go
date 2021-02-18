@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Patnáctá část
 //     Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG
