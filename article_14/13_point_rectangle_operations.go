@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtrnáctá část
 //     Programovací jazyk Go a počítačová grafika (úvod)
