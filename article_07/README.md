@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Programovací jazyk Go: dokončení popisu vlastností samotného jazyka](https://www.root.cz/clanky/programovaci-jazyk-go-dokonceni-popisu-vlastnosti-samotneho-jazyka/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Bit operators](01_bit_operators.go)
 1. [Boolean/logical operators](02_boolean_operators.go)
 1. [Boolean/logical operators short circuit](02A_boolean_operators_short_circuit.go)
