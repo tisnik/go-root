@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Tvorba balíčků a pokročilejší operace s kanály v jazyce Go](https://www.root.cz/clanky/tvorba-balicku-a-pokrocilejsi-operace-s-kanaly-v-jazyce-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Enum with iota, 1st version](01_enum_with_iota.go)
 1. [Enum with iota, 2nd version with type checks](02_enum_with_iota_type_check.go)
 1. [Enum with iota, 3rd version with type checks, incorrect usage](03_enum_with_iota.go)
