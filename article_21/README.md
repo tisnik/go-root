@@ -1,5 +1,8 @@
 # Content of the subdirectory `article_21`
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [One simple task](clockwerk/jobs1.go)
 1. [Two different jobs](clockwerk/jobs2.go)
 1. [Usage of Duration](clockwerk/jobs3.go)
