@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem](https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-go-2-porovnani-vykonnosti-go-s-ceckem/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Working with command line parameters](01_cmdline_params.go)
 1. [Usage of flags library to work with parameters](02_flags.go)
 1. [Usage of flags library to work with parameters (shorthands)](03_flag_shorthands.go)
