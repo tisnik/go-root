@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG](https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-dalsi-uzitecne-funkce-poskytovane-knihovnou-gg/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Clear screen by Fill method](01_gg_clear_screen.go)
 1. [Clear screen by Clear method](02_gg_clear_screen.go)
 1. [Use RGB/RGBA for specifying draw color](03_gg_rgba_color.go)
