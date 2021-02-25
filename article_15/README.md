@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG](https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-tvorba-animovanych-gifu-graficka-knihovna-gg/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Blending using the standard draw package](01_blending.go)
 1. [Export RGBA image into GIF](02_gif_export_rgba.go)
 1. [Export small RGBA image 1x1 pixel into GIF](03_gif_1x1_rgba.go)
