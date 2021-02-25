@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Programovací jazyk Go a počítačová grafika (úvod)](https://www.root.cz/clanky/programovaci-jazyk-go-a-pocitacova-grafika-uvod/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Vytvoření rastrového obrázku s výchozími hodnotami pixelů (zcela průhledné černé pixely)](01_empty_image.go)
 1. [Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku](02_empty_image_rectangle.go)
 1. [Rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA](03_filled_image_setrgba.go)
