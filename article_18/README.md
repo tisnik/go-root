@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Knihovny určené pro tvorbu testů v programovacím jazyce Go](https://www.root.cz/clanky/knihovny-urcene-pro-tvorbu-testu-v-programovacim-jazyce-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Basic usage of the standard 'testing' package - code](01_factorial_testing/factorial.go)
 1. [Basic usage of the standard 'testing' package - test](01_factorial_testing/factorial_test.go)
 1. [Basic usage of the 'oglematchers' package - code](02_factorial_oglematchers/factorial.go)
