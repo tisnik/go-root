@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Vývoj síťových aplikací v programovacím jazyku Go](https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Simple socket client](01_simple_client.go)
 1. [Simple socket client, send headers](01B_simple_client_headers.go)
 1. [Simple socket server](02_simple_server.go)
