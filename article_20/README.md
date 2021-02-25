@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Jazyk Go a aplikace s vlastním příkazovým řádkem](https://www.root.cz/clanky/jazyk-go-a-aplikace-s-vlastnim-prikazovym-radkem/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Standard Scanln function](01_scanln.go)
 1. [Input via Reader](02_input_via_reader.go)
 1. [Simple input using go-prompt](03_simple_input.go)
