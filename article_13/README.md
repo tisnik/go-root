@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)](https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-prace-s-jsonem-a-rastrovymi-obrazky/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Marshalling basic signed types](01_json_marshal_basic_signed_types.go)
 1. [Marshalling basic unsigned types](02_json_marshal_basic_unsigned_types.go)
 1. [Complex numbers and its marshalling](03_json_marshal_basic_complex_types.go)
