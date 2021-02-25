@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Testování aplikací naprogramovaných v jazyce Go](https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Factorial function + its unit tests](factorial/factorial.go)
 1. [Factorial function + its unit tests](factorial/factorial_test.go)
 1. [Factorial function + behaviour tests](factorial_convey/behaviour_test.go)
