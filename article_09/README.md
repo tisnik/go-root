@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Užitečné balíčky pro každodenní použití jazyka Go](https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-jazyka-go/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Levenshtein distance measurement](01_levenshtein.go)
 1. [Parsing boolean values](02_string_parsing_bool.go)
 1. [Parsing integer values](03_string_parsing_int.go)
