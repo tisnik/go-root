@@ -3,6 +3,9 @@
   * Examples used in the following article
   [Vývoj síťových aplikací v programovacím jazyku Go (pokračování)](https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-pokracovani/)
 
+  * This article is part of the serie about Go programming language
+  [Programovací jazyk Go](https://www.root.cz/serialy/programovaci-jazyk-go/)
+
 1. [Simple HTTP server](01_simple_http_server.go)
 1. [Simple HTTP server](02_simple_http_server_write_bytes.go)
 1. [Specify Content-Type in HTTP response](03_specify_content_type.go)
