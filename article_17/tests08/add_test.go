@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Sedmnáctá část
 //     Testování aplikací naprogramovaných v jazyce Go
