@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá část
 //     Jazyk Go a aplikace s vlastním příkazovým řádkem
