@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá třetí část
 //     Pokročilejší použití vstupně-výstupních funkcí standardní knihovny jazyka Go
