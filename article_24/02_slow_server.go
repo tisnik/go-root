@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá čtvrtá část
 //     Kontejnery v základní knihovně programovacího jazyka Go
