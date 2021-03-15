@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvanáctá část
 //     Vývoj síťových aplikací v programovacím jazyku Go (pokračování)
