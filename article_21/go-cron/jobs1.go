@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá první část
 //     Knihovny pro Go umožňující naplánování a spouštění periodických úloh
