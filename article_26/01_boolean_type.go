@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá šestá část
 //    Problematika nulových hodnot v Go, aneb proč nil != nil
