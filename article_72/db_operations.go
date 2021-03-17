@@ -117,6 +117,83 @@ func displayAllRecords(connection *sql.DB) error {
 	return nil
 }
 
+// datová struktura odpovídající struktuře záznamu v databázi
+type Record struct {
+	Id      int
+	Name    string
+	Surname string
+}
+
+// funkce vracející data přečtená z databázové tabulky
+func readAllRecords(connection *sql.DB) ([]Record, error) {
+	results := make([]Record, 0)
+
+	// dotaz do databáze
+	query := "SELECT id, name, surname FROM persons"
+	rows, err := connection.Query(query)
+
+	// test, zda byl SQL příkaz proveden bez chyby
+	if err != nil {
+		return results, err
+	}
+
+	defer func() {
+		// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+		}
+	}()
+
+	// projít všemi vrácenými řádky
+	for rows.Next() {
+		var record Record
+
+		// přečtení dat z jednoho vráceného řádku
+		if err := rows.Scan(&record.Id, &record.Name, &record.Surname); err != nil {
+			return results, err
+		}
+
+		results = append(results, record)
+	}
+
+	return results, nil
+}
+
+// funkce vracející data přečtená z databázové tabulky
+func readRecordsWithName(connection *sql.DB, name string) ([]Record, error) {
+	results := make([]Record, 0)
+
+	// dotaz do databáze
+	query := "SELECT id, name, surname FROM persons WHERE name=$1"
+	rows, err := connection.Query(query, name)
+
+	// test, zda byl SQL příkaz proveden bez chyby
+	if err != nil {
+		return results, err
+	}
+
+	defer func() {
+		// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+		}
+	}()
+
+	// projít všemi vrácenými řádky
+	for rows.Next() {
+		var record Record
+
+		// přečtení dat z jednoho vráceného řádku
+		if err := rows.Scan(&record.Id, &record.Name, &record.Surname); err != nil {
+			return results, err
+		}
+
+		results = append(results, record)
+	}
+
+	return results, nil
+}
+
 // Vložení nového záznamu do tabulky "persons"
 func insertRecord(connection *sql.DB, name string, surname string) (int, error) {
 	// provedení SQL příkazu se dvěma parametry
@@ -183,6 +260,22 @@ func main() {
 		return
 	}
 
+	log.Info().Msg("Read all records")
+	// přečtení všech záznamů
+	results, err := readAllRecords(connection)
+	if err != nil {
+		log.Err(err).Msg(databaseOperationFailed)
+		return
+	}
+	// výpis získaných záznamů
+	for _, result := range results {
+		log.Info().Int("ID", result.Id).
+			Str("name", result.Name).
+			Str("surname", result.Surname).
+			Msg("Record")
+	}
+
+	log.Info().Msg("Display all records")
 	// přečtení všech záznamů z tabulky "persons"
 	err = displayAllRecords(connection)
 	if err != nil {
@@ -211,6 +304,21 @@ func main() {
 	if err != nil {
 		log.Err(err).Msg(databaseOperationFailed)
 		return
+	}
+
+	log.Info().Msg("Read records with name Přemysl")
+	// přečtení záznamů
+	results, err = readRecordsWithName(connection, "Přemysl")
+	if err != nil {
+		log.Err(err).Msg(databaseOperationFailed)
+		return
+	}
+	// výpis získaných záznamů
+	for _, result := range results {
+		log.Info().Int("ID", result.Id).
+			Str("name", result.Name).
+			Str("surname", result.Surname).
+			Msg("Record")
 	}
 
 	log.Debug().Msg("Finished")
