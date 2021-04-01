@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá sedmá část
 //    Skriptovací jazyk Lua v aplikacích naprogramovaných v Go
