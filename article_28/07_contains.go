@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá osmá část
 //    Datové struktury s líným vyhodnocováním v programovacím jazyce Go
