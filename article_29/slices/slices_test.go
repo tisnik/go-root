@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá devátá část
 //    Trasování a profilování aplikací naprogramovaných v Go
