@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třicátá první část
 //    Sledování vybraných metrik služeb naprogramovaných v jazyku Go
