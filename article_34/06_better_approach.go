@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třicátá čtvrtá část
 //    Programovací jazyk Go pro skalní céčkaře
