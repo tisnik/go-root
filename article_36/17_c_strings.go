@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třicátá šestá část
 //    Kooperace mezi kódem psaným v Go a C: cgo
