@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třicátá osmá část
 //    Tvorba webových aplikací v Go s využitím projektu Gorilla web toolkit
