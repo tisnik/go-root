@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Třicátá sedmá část
 //    Monitoring služeb a mikroslužeb psaných v Go nástrojem Prometheus
