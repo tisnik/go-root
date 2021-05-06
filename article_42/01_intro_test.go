@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá druhá část
 //    Testování aplikací psaných v Go s využitím knihoven Goblin a Frisby
