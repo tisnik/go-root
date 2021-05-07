@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá čtvrtá část
 //    Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem (dokončení)
