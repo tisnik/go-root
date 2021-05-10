@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá sedmá část
 //     Další možnosti nabízené projektem MinIO
