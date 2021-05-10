@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá šestá část
 //     Projekt MinIO: jedna z nejužitečnějších aplikací naprogramovaných v Go
