@@ -1,6 +1,9 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá osmá část
+//    Gophernotes: kombinace interaktivního prostředí Jupyteru s jazykem Go
+//    https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/
 //
 // Demonstrační příklad číslo 7:
 //     Transpozice matice.
