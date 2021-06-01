@@ -3,7 +3,7 @@
 //
 // Čtyřicátá šestá část
 //     Projekt MinIO: jedna z nejužitečnějších aplikací naprogramovaných v Go
-//     https://www.root.cz/clanky/projekt-minio-jedna-z-nejuzitecnejsich-aplikaci-naprogramovanych-v-go/#k19
+//     https://www.root.cz/clanky/projekt-minio-jedna-z-nejuzitecnejsich-aplikaci-naprogramovanych-v-go/
 //
 // Demonstrační příklad číslo 10:
 //     Kopie objektu v rámci Minia bez jejich přesunu na lokální počítač
