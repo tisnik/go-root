@@ -1,8 +1,11 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Čtyřicátá devátá část
+//    Popis vybraných balíčků nabízených projektem Gonum
+//    https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/
 //
-// Demonstrační příklad číslo 3:
+// Demonstrační příklad číslo 9:
 //
 
 package main
