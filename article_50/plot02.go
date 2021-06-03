@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Padesátá část
+//    Tvorba grafů v jazyce Go
+//    https://www.root.cz/clanky/tvorba-grafu-v-jazyce-go/
+
 package main
 
 import (
