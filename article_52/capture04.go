@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Padesátá druhá část
+//    Pomůcky při tvorbě jednotkových testů v jazyce Go
+//    https://www.root.cz/clanky/pomucky-pri-tvorbe-jednotkovych-testu-v-jazyce-go/
+
 package main
 
 import (
