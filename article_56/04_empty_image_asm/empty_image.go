@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Padesátá šestá část
+//    Programovací jazyk Go a assembler (3.část)
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/
+
 package main
 
 import (
