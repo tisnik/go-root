@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Šedesátá první část
+//    Programovací jazyk Go a 2D grafika
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika/
+
 package main
 
 import (
