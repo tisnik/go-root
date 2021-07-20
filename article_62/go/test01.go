@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Šedesátá druhá část
+//    Programovací jazyk Go a 2D grafika – moduly sdl a img
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika-moduly-sdl-a-img/
+
 package main
 
 import "github.com/veandco/go-sdl2/sdl"
