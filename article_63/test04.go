@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Šedesátá třetí část
+//    Programovací jazyk Go a 2D grafika – kostra jednoduché hry
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika-kostra-jednoduche-hry/
+
 package main
 
 import (
