@@ -1,3 +1,6 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+
 package main
 
 import (
