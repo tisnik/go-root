@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Šedesátá pátá část
+//    Použití databáze Redis v aplikacích naprogramovaných v Go
+//    https://www.root.cz/clanky/pouziti-databaze-redis-v-aplikacich-naprogramovanych-v-go/
+
 package main
 
 import (
