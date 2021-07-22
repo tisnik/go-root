@@ -1,4 +1,5 @@
 // Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Šedesátá osmá část
 //    Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory
