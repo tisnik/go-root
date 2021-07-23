@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Sedmdesátá část
+//    Vykreslení tabulek do terminálu v jazyce Go
+//    https://www.root.cz/clanky/vykresleni-tabulek-do-terminalu-v-jazyce-go/
+
 package main
 
 import (
