@@ -17,3 +17,6 @@ func main() {
 	fmt.Println("│ příλiš žλuťΩučký kůň│")
 	fmt.Println("╰─────────────────────╯")
 }
+λiš žλuťΩučký kůň│")
+	fmt.Println("╰─────────────────────╯")
+}
