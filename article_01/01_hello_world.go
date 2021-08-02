@@ -13,3 +13,10 @@ package main
 func main() {
 	println("Hello world!")
 }
+ https://tisnik.github.io/go-root/article_01/01_hello_world.go
+
+package main
+
+func main() {
+	println("Hello world!")
+}
