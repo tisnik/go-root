@@ -27,3 +27,15 @@ func main() {
 	c = nil
 	fmt.Println(c)
 }
+llo"
+	fmt.Println(b)
+	c := true
+	fmt.Println(c)
+
+	a = "world"
+	fmt.Println(a)
+	b = 0
+	fmt.Println(b)
+	c = nil
+	fmt.Println(c)
+}
