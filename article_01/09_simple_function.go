@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Deklarace uživatelské funkce
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/09_simple_function.go
 
 package main
 
