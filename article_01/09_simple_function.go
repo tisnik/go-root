@@ -19,3 +19,16 @@ func printHello() {
 func main() {
 	printHello()
 }
+function.go
+
+package main
+
+import "fmt"
+
+func printHello() {
+	fmt.Println("Hello world!")
+}
+
+func main() {
+	printHello()
+}
