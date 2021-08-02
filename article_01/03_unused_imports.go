@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Nepoužitý importovaný modul "fmt"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/03_unused_imports.go
 
 package main
 
