@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Vylepšený program typu "Hello world!"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/02_better_hello_world.go
 
 package main
 
