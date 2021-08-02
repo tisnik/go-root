@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Deklarace uživatelské funkce s jedním parametrem
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/10_function_with_params.go
 
 package main
 
