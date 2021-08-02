@@ -15,3 +15,12 @@ import "fmt"
 func main() {
 	println("Hello world!")
 }
+k.github.io/go-root/article_01/03_unused_imports.go
+
+package main
+
+import "fmt"
+
+func main() {
+	println("Hello world!")
+}
