@@ -15,3 +15,12 @@ import "fmt"
 func main() {
 	fmt.Println("Hello world!")
 }
+thub.io/go-root/article_01/02_better_hello_world.go
+
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello world!")
+}
