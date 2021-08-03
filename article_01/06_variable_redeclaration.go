@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Pokus o opětovnou deklaraci proměnných
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/06_variable_redeclaration.go
 
 package main
 
@@ -16,18 +19,6 @@ func main() {
 	a := 10
 	fmt.Println(a)
 	b := "hello"
-	fmt.Println(b)
-	c := true
-	fmt.Println(c)
-
-	a := 20
-	fmt.Println(a)
-	b := "world"
-	fmt.Println(b)
-	c := false
-	fmt.Println(c)
-}
-
 	fmt.Println(b)
 	c := true
 	fmt.Println(c)
