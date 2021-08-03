@@ -7,15 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Nepoužitý importovaný modul "fmt"
-
-package main
-
-import "fmt"
-
-func main() {
-	println("Hello world!")
-}
-k.github.io/go-root/article_01/03_unused_imports.go
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/03_unused_imports.go
 
 package main
 
