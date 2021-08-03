@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Špatný typ hodnoty přiřazený do proměnných
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/08_no_true_dynamic_type.go
 
 package main
 
@@ -16,18 +19,6 @@ func main() {
 	a := 10
 	fmt.Println(a)
 	b := "hello"
-	fmt.Println(b)
-	c := true
-	fmt.Println(c)
-
-	a = "world"
-	fmt.Println(a)
-	b = 0
-	fmt.Println(b)
-	c = nil
-	fmt.Println(c)
-}
-llo"
 	fmt.Println(b)
 	c := true
 	fmt.Println(c)
