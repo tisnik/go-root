@@ -7,13 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Program typu "Hello world!"
-
-package main
-
-func main() {
-	println("Hello world!")
-}
- https://tisnik.github.io/go-root/article_01/01_hello_world.go
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/01_hello_world.go
 
 package main
 
