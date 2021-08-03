@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Změna hodnoty již existující proměnné
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/07_variable_reassign.go
 
 package main
 
@@ -17,17 +20,6 @@ func main() {
 	fmt.Println(a)
 	b := "hello"
 	fmt.Println(b)
-	c := true
-	fmt.Println(c)
-
-	a = 20
-	fmt.Println(a)
-	b = "world"
-	fmt.Println(b)
-	c = false
-	fmt.Println(c)
-}
-fmt.Println(b)
 	c := true
 	fmt.Println(c)
 
