@@ -7,15 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Vylepšený program typu "Hello world!"
-
-package main
-
-import "fmt"
-
-func main() {
-	fmt.Println("Hello world!")
-}
-thub.io/go-root/article_01/02_better_hello_world.go
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/02_better_hello_world.go
 
 package main
 
