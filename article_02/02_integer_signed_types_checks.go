@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Kontrola celočíselných konstant
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/02_integer_signed_types_checks.html
 
 package main
 
