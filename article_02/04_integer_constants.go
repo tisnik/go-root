@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Celočíselné konstanty reprezentované v různých číselných soustavách
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/04_integer_constants.html
 
 package main
 
