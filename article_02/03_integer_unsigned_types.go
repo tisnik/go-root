@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Celočíselné datové typy bez znaménka
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/03_integer_unsigned_types.html
 
 package main
 
