@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Základní formátování celočíselných hodnot na výstupu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/09_formatting_output.html
 
 package main
 
