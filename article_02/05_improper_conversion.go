@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Přiřazení uint8 -> uint16
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/05_improper_conversion.html
 
 package main
 
