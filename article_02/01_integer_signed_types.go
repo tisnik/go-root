@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Celočíselné datové typy se znaménkem
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/01_integer_signed_types.html
 
 package main
 
