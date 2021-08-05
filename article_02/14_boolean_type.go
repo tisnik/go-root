@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14
 //    Datový typ Boolean
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/14_boolean_type.html
 
 package main
 
