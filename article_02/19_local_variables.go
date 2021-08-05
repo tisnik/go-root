@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19
 //    Lokální proměnné
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/19_local_variables.html
 
 package main
 
