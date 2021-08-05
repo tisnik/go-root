@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13
 //    Datové typy reprezentující hodnoty s plovoucí řádovou čárkou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/13_complex_types.html
 
 package main
 
