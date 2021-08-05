@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15
 //    Datový typ Boolean - kontroly při překladu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/15_boolean_type_checks.html
 
 package main
 
