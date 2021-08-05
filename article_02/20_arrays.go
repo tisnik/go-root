@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20
 //    Základní operace s poli
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/20_arrays.html
 
 package main
 
