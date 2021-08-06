@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21
 //    Kopie polí
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/21_array_copy.html
 
 package main
 
