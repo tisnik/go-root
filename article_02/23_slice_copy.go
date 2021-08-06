@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 23
 //    Kopie řezů polí
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/23_slice_copy.html
 
 package main
 
