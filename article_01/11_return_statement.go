@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Deklarace uživatelské funkce s návratovou hodnotou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/11_return_statement.html
 
 package main
 
