@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Použití pojmenovaného návratového parametru
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/12_named_return_variable.html
 
 package main
 
