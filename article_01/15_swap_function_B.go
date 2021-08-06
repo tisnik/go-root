@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Funkce se dvěma parametry a dvěma návratovými hodnotami
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/15_swap_function_B.html
 
 package main
 
