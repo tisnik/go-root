@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Funkce se dvěma parametry
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_01/13_sum_function.html
 
 package main
 
