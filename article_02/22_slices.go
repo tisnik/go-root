@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 22
 //    Řezy polí
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_02/22_slices.html
 
 package main
 
