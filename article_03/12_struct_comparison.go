@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Porovnání struktur.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/12_struct_comparison.html
 
 package main
 
