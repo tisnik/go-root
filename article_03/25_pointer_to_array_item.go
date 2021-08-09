@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 25:
 //    Ukazatel na prvek pole.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/25_pointer_to_array_item.html
 
 package main
 
