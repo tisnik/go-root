@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 24:
 //    Ukazatel na položku struktury.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/24_pointer_to_struct_item.html
 
 package main
 
