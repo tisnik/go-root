@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //    Mapa struktur.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/18_map_and_struct.html
 
 package main
 
