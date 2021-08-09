@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Uživatelsky definovaná struktura.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/09_struct.html
 
 package main
 
