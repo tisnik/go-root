@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 28:
 //    Kontroly při překladu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/28_improper_func_type.html
 
 package main
 
