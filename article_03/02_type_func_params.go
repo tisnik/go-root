@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Kontrola parametrů funkcí.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/02_type_func_params.html
 
 package main
 
