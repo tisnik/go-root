@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 27:
 //    Datový typ "funkce s parametry"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/27_func_type_2.html
 
 package main
 
