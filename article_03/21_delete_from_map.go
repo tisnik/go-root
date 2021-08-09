@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //    Odstranění položek z mapy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/21_delete_from_map.html
 
 package main
 
