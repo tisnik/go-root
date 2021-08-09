@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 26:
 //    Datový typ "funkce"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/26_func_type.html
 
 package main
 
