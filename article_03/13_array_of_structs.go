@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Pole struktur.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/13_array_of_structs.html
 
 package main
 
