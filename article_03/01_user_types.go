@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Uživatelsky definované typy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/01_user_types.html
 
 package main
 
