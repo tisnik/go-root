@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Uživatelsky definovaná struktura a její inicializace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/11_better_struct_init.html
 
 package main
 
