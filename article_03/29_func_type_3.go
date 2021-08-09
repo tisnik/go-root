@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 29:
 //    Datový typ "funkce s návratovou hodnotou"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/29_func_type_3.html
 
 package main
 
