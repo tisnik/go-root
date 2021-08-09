@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20:
 //    Čtení hodnot z mapy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/20_reading_from_maps.html
 
 package main
 
