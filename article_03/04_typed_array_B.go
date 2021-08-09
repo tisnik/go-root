@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Pole s prvky definovaného typu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/04_typed_array_B.html
 
 package main
 
