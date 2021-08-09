@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Mapa bez inicializace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/15_uninitialized_map.html
 
 package main
 
