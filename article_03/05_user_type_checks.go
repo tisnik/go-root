@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Kontrola uživatelsky definovaných typů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/05_user_type_checks.html
 
 package main
 
