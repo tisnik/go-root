@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 22:
 //    Základní práce s ukazateli.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/22_basic_pointers.html
 
 package main
 
