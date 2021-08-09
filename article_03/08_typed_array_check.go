@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Pole s prvky definovaného typu + kontrola typů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_03/08_typed_array_check.html
 
 package main
 
