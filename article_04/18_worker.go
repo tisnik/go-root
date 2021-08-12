@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //    Jednoduchá implementace workerů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/18_worker.html
 
 package main
 
