@@ -9,7 +9,7 @@
 //    Nepoužitý importovaný modul "fmt"
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/03_unused_imports.go
+//    https://tisnik.github.io/go-root/article_01/03_unused_imports.html
 
 package main
 
