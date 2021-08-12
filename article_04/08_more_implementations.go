@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Několikanásobná implementace rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/08_more_implementations.html
 
 package main
 
