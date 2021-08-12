@@ -9,7 +9,7 @@
 //    Program typu "Hello world!"
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/01_hello_world.go
+//    https://tisnik.github.io/go-root/article_01/01_hello_world.html
 
 package main
 
