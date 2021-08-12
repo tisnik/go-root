@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Zavolání funkce v gorutině.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/13_simple_goroutine.html
 
 package main
 
