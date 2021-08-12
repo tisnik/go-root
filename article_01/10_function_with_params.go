@@ -9,7 +9,7 @@
 //    Deklarace uživatelské funkce s jedním parametrem
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/10_function_with_params.go
+//    https://tisnik.github.io/go-root/article_01/10_function_with_params.html
 
 package main
 
