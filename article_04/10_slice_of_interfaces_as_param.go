@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Řez s objekty implementující rozhraní předané jako parametr.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/10_slice_of_interfaces_as_param.html
 
 package main
 
