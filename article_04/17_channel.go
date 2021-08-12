@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Kanál pro komunikaci a synchronizaci mezi gorutinami.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/17_channel.html
 
 package main
 
