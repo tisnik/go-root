@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //    Zavolání další gorutiny z jiné gorutiny.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/16_goroutine_from_goroutine.html
 
 package main
 
