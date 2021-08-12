@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Metoda bez parametrů a metoda s parametry.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/02_methods_with_parameters.html
 
 package main
 
