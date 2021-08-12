@@ -9,7 +9,7 @@
 //    Pokus o opětovnou deklaraci proměnných
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/06_variable_redeclaration.go
+//    https://tisnik.github.io/go-root/article_01/06_variable_redeclaration.html
 
 package main
 
