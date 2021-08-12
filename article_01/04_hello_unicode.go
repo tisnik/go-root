@@ -9,7 +9,7 @@
 //    Použití Unicode ve zdrojovém kódu
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/04_hello_unicode.go
+//    https://tisnik.github.io/go-root/article_01/04_hello_unicode.html
 
 package main
 
