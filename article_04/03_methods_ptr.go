@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Metody s parametry, předání struktury odkazem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/03_methods_ptr.html
 
 package main
 
