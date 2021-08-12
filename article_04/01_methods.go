@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Definice a zavolání metody navázané na strukturu Line.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/01_methods.html
 
 package main
 
