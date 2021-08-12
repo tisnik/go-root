@@ -9,7 +9,7 @@
 //    Deklarace proměnné s její inicializací
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/05_basic_type_inference.go
+//    https://tisnik.github.io/go-root/article_01/05_basic_type_inference.html
 
 package main
 
