@@ -9,7 +9,7 @@
 //    Špatný typ hodnoty přiřazený do proměnných
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/08_no_true_dynamic_type.go
+//    https://tisnik.github.io/go-root/article_01/08_no_true_dynamic_type.html
 
 package main
 
