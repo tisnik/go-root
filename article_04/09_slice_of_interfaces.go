@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Řez s objekty implementující rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/09_slice_of_interfaces.html
 
 package main
 
