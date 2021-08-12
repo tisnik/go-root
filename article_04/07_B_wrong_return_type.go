@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/07_B_wrong_return_type.html
 
 package main
 
