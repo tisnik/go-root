@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Definice trojice jednoduchých rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/05_interface.html
 
 package main
 
