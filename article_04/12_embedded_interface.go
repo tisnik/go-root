@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Typ implementující dvě rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/12_embedded_interface.html
 
 package main
 
