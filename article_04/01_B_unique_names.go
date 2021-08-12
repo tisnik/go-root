@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1B:
 //    Unikátní jména metod.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/01_B_unique_names.html
 
 package main
 
