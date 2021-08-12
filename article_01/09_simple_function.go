@@ -9,7 +9,7 @@
 //    Deklarace uživatelské funkce
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_01/09_simple_function.go
+//    https://tisnik.github.io/go-root/article_01/09_simple_function.html
 
 package main
 
