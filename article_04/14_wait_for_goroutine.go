@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //    Zavolání funkce v gorutině, počkání na dokončení.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/14_wait_for_goroutine.html
 
 package main
 
