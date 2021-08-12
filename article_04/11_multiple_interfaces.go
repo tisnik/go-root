@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Typ implementující dvě rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/11_multiple_interfaces.html
 
 package main
 
