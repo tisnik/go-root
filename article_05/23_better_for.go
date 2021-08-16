@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 23:
 //    Zjednodušená forma programové smyčky for odvozené od C.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/23_better_for.html
 
 package main
 
