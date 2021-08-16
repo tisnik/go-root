@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19:
 //    Základní forma programové smyčky for.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/19_simplest_for_loop.html
 
 package main
 
