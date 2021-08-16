@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Řídicí konstrukce if a hodnoty, které nejsou typu boolean.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/08_if_statement_nil.html
 
 package main
 
