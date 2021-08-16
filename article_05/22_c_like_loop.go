@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 22:
 //    Programová smyčka for odvozená od C.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/22_c_like_loop.html
 
 package main
 
