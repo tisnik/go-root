@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20:
 //    Deadlock.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_04/20_workers_deadlock.html
 
 package main
 
