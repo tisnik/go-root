@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 29:
 //    Dvojice vnořených smyček for.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/29_nested_loops.html
 
 package main
 
