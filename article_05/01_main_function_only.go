@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Funkce main() jako jediný uživatelsky definovaný prvek aplikace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/01_main_function_only.html
 
 package main
 
