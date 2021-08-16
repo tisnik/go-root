@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Příklady špatné syntaxe konstrukce if-else.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/10_bad_syntax.html
 
 package main
 
