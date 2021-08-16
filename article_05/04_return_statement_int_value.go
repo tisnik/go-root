@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Příkaz return ve funkci s návratovou hodnotou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/04_return_statement_int_value.html
 
 package main
 
