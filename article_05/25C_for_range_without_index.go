@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 25:
 //    For s range.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/25C_for_range_without_index.html
 
 package main
 
