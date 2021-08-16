@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Řídicí konstrukce switch: kombinace podmínek a fallthrough.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/17_switch_combinations.html
 
 package main
 
