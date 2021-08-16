@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Řídicí konstrukce switch s vyhodnocovaným výrazem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/13_variables_in_switch.html
 
 package main
 
