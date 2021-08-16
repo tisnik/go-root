@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Řídicí konstrukce if-else.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/09_if_else_construct.html
 
 package main
 
