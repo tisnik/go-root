@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Příkaz return ve funkci bez návratové hodnoty
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/03_return_statement_no_value.html
 
 package main
 
