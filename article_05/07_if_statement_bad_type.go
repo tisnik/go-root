@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Řídicí konstrukce if a hodnoty, které nejsou typu boolean.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/07_if_statement_bad_type.html
 
 package main
 
