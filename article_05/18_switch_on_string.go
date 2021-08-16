@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //    Řídicí konstrukce switch s vyhodnocovaným výrazem typu string.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/18_switch_on_string.html
 
 package main
 
