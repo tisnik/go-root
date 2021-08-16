@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //    Řídicí konstrukce switch s výrazy ve větvích case.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/14_conditions_in_switch.html
 
 package main
 
