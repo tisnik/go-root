@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Příkaz return.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/02_return_statement.html
 
 package main
 
