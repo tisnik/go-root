@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 30:
 //    Dvojice vnořených smyček for a příkaz break.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/30_break_from_inner_loop.html
 
 package main
 
