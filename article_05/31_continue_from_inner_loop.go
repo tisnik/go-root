@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 31:
 //    Dvojice vnořených smyček for a příkaz continue.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/31_continue_from_inner_loop.html
 
 package main
 
