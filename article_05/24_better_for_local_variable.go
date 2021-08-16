@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 24:
 //    Zjednodušená forma programové smyčky for odvozené od C.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/24_better_for_local_variable.html
 
 package main
 
