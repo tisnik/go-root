@@ -6,6 +6,9 @@
 //    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/
 //
 // Příkaz zapsaný za klíčovým slovem if.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/10B_statement_in_if.html
 
 package main
 
