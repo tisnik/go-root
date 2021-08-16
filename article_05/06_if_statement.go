@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Řídicí konstrukce if.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/06_if_statement.html
 
 package main
 
