@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 25:
 //    Varianta s nepoužitým indexem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/25B_for_range_without_index.html
 
 package main
 
