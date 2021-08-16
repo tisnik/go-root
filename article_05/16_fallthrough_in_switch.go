@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //    Řídicí konstrukce switch - simulace chování C.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/16_fallthrough_in_switch.html
 
 package main
 
