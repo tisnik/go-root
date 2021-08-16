@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 27:
 //    Příkaz break.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/27_break_statement.html
 
 package main
 
