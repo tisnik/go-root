@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Řídicí konstrukce switch - pracuje jinak než v C!
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/15_no_fallthrough_in_switch.html
 
 package main
 
