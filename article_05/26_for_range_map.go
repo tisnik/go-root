@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 26:
 //    For s range prováděným nad mapou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/26_for_range_map.html
 
 package main
 
