@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //    Základní forma programové smyčky for s podmínkou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_05/21_for_loop_with_condition.html
 
 package main
 
