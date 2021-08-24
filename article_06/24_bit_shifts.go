@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 24:
 //    Bitové posuny.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/24_bit_shifts.html
 
 package main
 
