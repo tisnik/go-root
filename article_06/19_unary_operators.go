@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19:
 //    Všechny unární operátory jazyka Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/19_unary_operators.html
 
 package main
 
