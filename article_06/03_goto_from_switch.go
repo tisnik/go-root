@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Výskok z příkazu switch pomocí goto.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/03_goto_from_switch.html
 
 package main
 
