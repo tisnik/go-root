@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6B:
 //    Špatné použití příkazu goto.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/06_goto_bad_usage_D.html
 
 package main
 
