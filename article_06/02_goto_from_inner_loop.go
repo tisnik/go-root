@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Dvojice vnořených smyček for a příkaz goto pro jejich opuštění.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/02_goto_from_inner_loop.html
 
 package main
 
