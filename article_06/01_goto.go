@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Použití příkazu goto.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/01_goto.html
 
 package main
 
