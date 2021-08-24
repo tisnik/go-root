@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 25:
 //    Bitové posuny zkombinované s přiřazením.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/25_bit_shift_assignment.html
 
 package main
 
