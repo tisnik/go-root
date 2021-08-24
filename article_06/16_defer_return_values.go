@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //    Modifikace návratové hodnoty funkce v sekci defer.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/16_defer_return_values.html
 
 package main
 
