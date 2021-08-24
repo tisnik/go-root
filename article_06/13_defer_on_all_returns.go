@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Defer a příkaz return.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/13_defer_on_all_returns.html
 
 package main
 
