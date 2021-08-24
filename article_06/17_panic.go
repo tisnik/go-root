@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Praktické použití konstrukce defer a panic.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/17_panic.html
 
 package main
 
