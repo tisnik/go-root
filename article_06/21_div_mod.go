@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //    Dělení a zbytek po dělení.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/21_div_mod.html
 
 package main
 
