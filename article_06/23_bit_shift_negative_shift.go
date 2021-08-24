@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 23:
 //    Bitové posuny s negativním druhým operandem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/23_bit_shift_negative_shift.html
 
 package main
 
