@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 22:
 //    Dělení a zbytek po dělení.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/22_div_by_zero.html
 
 package main
 
