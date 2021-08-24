@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Praktické použití konstrukce defer.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/15_defer_practical_usage.html
 
 package main
 
