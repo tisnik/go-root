@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Zjištění pořadí volání funkcí deklarovaných v defer().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/10_more_defers.html
 
 package main
 
