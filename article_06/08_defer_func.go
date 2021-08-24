@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Použití příkazu defer.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/08_defer_func.html
 
 package main
 
