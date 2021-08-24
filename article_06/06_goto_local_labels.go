@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6C:
 //    Lokální návěští.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/06_goto_local_labels.html
 
 package main
 
