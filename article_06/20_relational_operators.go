@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20:
 //    Relační operátory.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/20_relational_operators.html
 
 package main
 
