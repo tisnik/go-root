@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Zjištění, kdy se vyhodnocují výraz pro volání funkce v defer().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/12_defer_arguments_evaluation.html
 
 package main
 
