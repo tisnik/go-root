@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //    Praktické použití konstrukce defer, panic a recover.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_06/18_panic_recover.html
 
 package main
 
