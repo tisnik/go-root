@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Nekorektní použití operátorů ++ a --.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/05_inc_dec_bad_usage.html
 
 package main
 
