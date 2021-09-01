@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Konstanty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/12_constants.html
 
 package main
 
