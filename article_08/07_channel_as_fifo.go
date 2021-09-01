@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Kanál s definovanou kapacitou, který se chová jako FIFO.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/07_channel_as_fifo.html
 
 package main
 
