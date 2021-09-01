@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Čtení ze zavřeného kanálu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/10_read_from_closed_channel.html
 
 package main
 
