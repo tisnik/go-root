@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Logické operátory.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/02C_boolean_operators_improper_usage.html
 
 package main
 
