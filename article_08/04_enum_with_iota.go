@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Převod "výčtu" na řetězec.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/04_enum_with_iota.html
 
 package main
 
