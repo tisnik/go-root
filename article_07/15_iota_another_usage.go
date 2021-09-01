@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Konstanty a identifikátor iota.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/15_iota_another_usage.html
 
 package main
 
