@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Výčet jako datový typ.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/05_enum_as_type.html
 
 package main
 
