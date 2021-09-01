@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Operátory ++ a --.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/03_inc_dec.html
 
 package main
 
