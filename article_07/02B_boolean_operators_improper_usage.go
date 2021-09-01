@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2B:
 //    Nekorektní použití operátorů na pravdivostní hodnoty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/02B_boolean_operators_improper_usage.html
 
 package main
 
