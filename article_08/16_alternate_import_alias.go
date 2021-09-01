@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //    Alternativní způsob importu balíčku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/16_alternate_import_alias.html
 
 package main
 
