@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 23:
 //    Inicializace balíčku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/23_package_init.html
 
 package main
 
