@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Logické operátory.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/02A_boolean_operators_short_circuit.html
 
 package main
 
