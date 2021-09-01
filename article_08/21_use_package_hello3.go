@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //    Import vlastního balíčku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/21_use_package_hello3.html
 
 package main
 
