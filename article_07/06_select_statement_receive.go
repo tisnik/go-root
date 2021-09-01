@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Použití příkazu select pro čtení z kanálů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/06_select_statement_receive.html
 
 package main
 
