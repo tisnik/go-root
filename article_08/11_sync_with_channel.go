@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Kanál ve funkci synchronizační struktury.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/11_sync_with_channel.html
 
 package main
 
