@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Kanál s definovanou kapacitou, příkaz range.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/08_channel_and_range.html
 
 package main
 
