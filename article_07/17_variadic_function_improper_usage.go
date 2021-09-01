@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Variadické funkce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/17_variadic_function_improper_usage.html
 
 package main
 
