@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Bitové operátory.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/01_bit_operators.html
 
 package main
 
