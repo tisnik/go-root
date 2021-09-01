@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Výčet jako datový typ: nemožnost použití operátoru ++.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/06_enum_as_type.html
 
 package main
 
