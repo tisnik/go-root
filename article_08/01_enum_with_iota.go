@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Náhrada za enum: běžné konstanty a identifikátor iota.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_07/01_enum_with_iota.html
 
 package main
 
