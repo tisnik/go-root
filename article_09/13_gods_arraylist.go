@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Datová struktura arraylist z knihovny GoDS.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/13_gods_arraylist.html
 
 package main
 
