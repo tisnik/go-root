@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Základní funkce pro formátování řetězců: FormatFloat.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/09_string_format_ftoa.html
 
 package main
 
