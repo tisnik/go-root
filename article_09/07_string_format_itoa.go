@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Základní funkce pro formátování řetězců: Itoa.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/07_string_format_itoa.html
 
 package main
 
