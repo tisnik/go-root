@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //    Použití množin z knihovny GoDS.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/16_gods_set.html
 
 package main
 
