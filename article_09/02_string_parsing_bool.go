@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Základní funkce pro parsing řetězců: ParseBool.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/02_string_parsing_bool.html
 
 package main
 
