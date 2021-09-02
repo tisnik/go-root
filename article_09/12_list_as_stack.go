@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Použití obousměrně vázaného seznamu ve funkci zásobníku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/12_list_as_stack.html
 
 package main
 
