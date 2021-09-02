@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Základní funkce pro formátování řetězců: Sprintf.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/10_string_format_sprintf.html
 
 package main
 
