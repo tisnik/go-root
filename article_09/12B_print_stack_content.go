@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12B:
 //    Použití obousměrně vázaného seznamu ve funkci zásobníku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/12B_print_stack_content.html
 
 package main
 
