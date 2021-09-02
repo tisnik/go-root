@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Základní funkce pro parsing řetězců: parseFloat.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/06_string_parsing_float.html
 
 package main
 
