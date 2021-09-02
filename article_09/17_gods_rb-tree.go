@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Datová struktura Red-Black tree.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/17_gods_rb-tree.html
 
 package main
 
