@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Použití zásobníku implementovaného polem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/15_gods_stack_RPN.html
 
 package main
 
