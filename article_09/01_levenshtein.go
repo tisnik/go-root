@@ -8,6 +8,9 @@
 // Demonstrační příklad číslo 1:
 //    Import nainstalovaného balíčku.
 //    Výpočet Levenštejnovy vzdálenosti dvou řetězců.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/01_levenshtein.html
 
 package main
 
