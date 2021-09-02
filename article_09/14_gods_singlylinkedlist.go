@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //    Datová struktura singlylinkedlist z knihovny GoDS.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/14_gods_singlylinkedlist.html
 
 package main
 
