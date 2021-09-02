@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15B:
 //    Použití zásobníku implementovaného seznamem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/15B_gods_stack_RPN.html
 
 package main
 
