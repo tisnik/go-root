@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Základní funkce pro formátování řetězců: FormatInt.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/08_string_format_int.html
 
 package main
 
