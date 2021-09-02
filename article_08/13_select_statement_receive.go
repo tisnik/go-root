@@ -9,7 +9,7 @@
 //    Použití příkazu select pro čtení z kanálů s timeoutem.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/13_select_statement_receive.html
+//    https://tisnik.github.io/go-root/article_08/13_select_statement_receive.html
 
 package main
 

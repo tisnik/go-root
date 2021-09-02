@@ -9,7 +9,7 @@
 //    Výčet jako datový typ: nemožnost použití operátoru ++.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/06_enum_as_type.html
+//    https://tisnik.github.io/go-root/article_08/06_enum_as_type.html
 
 package main
 

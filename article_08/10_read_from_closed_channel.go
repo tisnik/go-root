@@ -9,7 +9,7 @@
 //    Čtení ze zavřeného kanálu.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/10_read_from_closed_channel.html
+//    https://tisnik.github.io/go-root/article_08/10_read_from_closed_channel.html
 
 package main
 

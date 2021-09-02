@@ -9,7 +9,7 @@
 //    Výčet jako datový typ.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/05_enum_as_type.html
+//    https://tisnik.github.io/go-root/article_08/05_enum_as_type.html
 
 package main
 

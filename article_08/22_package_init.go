@@ -9,7 +9,7 @@
 //    Inicializace balíčku.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/22_package_init.html
+//    https://tisnik.github.io/go-root/article_08/22_package_init.html
 
 package main
 

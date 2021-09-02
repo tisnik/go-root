@@ -9,7 +9,7 @@
 //    Kanál s definovanou kapacitou, příkaz range.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/09_channel_and_range.html
+//    https://tisnik.github.io/go-root/article_08/09_channel_and_range.html
 
 package main
 

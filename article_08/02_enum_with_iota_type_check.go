@@ -9,7 +9,7 @@
 //    Náhrada za enum: běžné konstanty a identifikátor iota.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/02_enum_with_iota_type_check.html
+//    https://tisnik.github.io/go-root/article_08/02_enum_with_iota_type_check.html
 
 package main
 

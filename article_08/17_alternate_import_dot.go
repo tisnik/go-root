@@ -9,7 +9,7 @@
 //    Alternativní způsob importu balíčku.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_07/17_alternate_import_dot.html
+//    https://tisnik.github.io/go-root/article_08/17_alternate_import_dot.html
 
 package main
 
