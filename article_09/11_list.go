@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Použití standardního balíčku "container/list"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/11_list.html
 
 package main
 
