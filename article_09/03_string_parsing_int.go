@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Základní funkce pro parsing řetězců: ParseInt.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/03_string_parsing_int.html
 
 package main
 
