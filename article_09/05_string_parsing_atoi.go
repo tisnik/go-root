@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Základní funkce pro parsing řetězců: Atoi.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_09/05_string_parsing_atoi.html
 
 package main
 
