@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //     Překlad doménového jména na IP adresy
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/07_lookup.html
 
 package main
 
