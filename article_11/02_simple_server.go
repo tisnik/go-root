@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //     Jednoduchý server posílající jediný bajt klientovi
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/02_simple_server.html
 
 package main
 
