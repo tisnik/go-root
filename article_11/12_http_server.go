@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //     Nejjednodušší HTTP server s jediným endpointem
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/12_http_server.html
 
 package main
 
