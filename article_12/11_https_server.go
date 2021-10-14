@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //     Jednoduchý HTTPS server
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/11_https_server.html
 
 package main
 
