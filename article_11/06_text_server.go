@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //     Server posílající klientovi textová data
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/06_text_server.html
 
 package main
 
