@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Použití balíčku big pro výpočet faktoriálu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/05_factorial.html
 
 package main
 
