@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Použití HTTP metody GET
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/10_http_get.html
 
 package main
 
