@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1B:
 //    Upravený klient, který vytiskne místní i vzdálenou adresu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/01B_simple_client_headers.html
 
 package main
 
