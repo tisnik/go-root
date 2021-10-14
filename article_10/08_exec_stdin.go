@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    Použití balíčku exec, spuštění externí utility s předáním dat.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/08_exec_stdin.html
 
 package main
 
