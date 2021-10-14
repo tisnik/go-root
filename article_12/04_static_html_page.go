@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //     Server, který vrací statické HTML stránky načtené ze souborů
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/04_static_html_page.html
 
 package main
 
