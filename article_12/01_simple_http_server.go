@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Jednoduchý HTTP server
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/01_simple_http_server.html
 
 package main
 
