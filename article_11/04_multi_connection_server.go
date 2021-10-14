@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //     Server, který dokáže obsloužit více klientů současně
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/04_multi_connection_server.html
 
 package main
 
