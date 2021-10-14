@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //     Kombinace předchozích možností
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/16_custom_server.html
 
 package main
 
