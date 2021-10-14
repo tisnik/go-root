@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //     HTTP server se stavovou proměnnou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/13_http_server_with_state.html
 
 package main
 
