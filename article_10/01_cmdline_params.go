@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Přečtení argumentů předaných na příkazovém řádku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/01_cmdline_params.html
 
 package main
 
