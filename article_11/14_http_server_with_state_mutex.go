@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //     Korektní práce se stavovou proměnnou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/14_http_server_with_state_mutex.html
 
 package main
 
