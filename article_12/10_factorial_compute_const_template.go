@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Neměnná šablona stránky
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/10_factorial_compute_const_template.html
 
 package main
 
