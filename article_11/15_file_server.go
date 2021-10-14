@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //     HTTP server vracející statický obsah
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/15_file_server.html
 
 package main
 
