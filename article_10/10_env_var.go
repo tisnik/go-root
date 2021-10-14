@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Přístup k proměnným prostředí.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/10_env_var.html
 
 package main
 
