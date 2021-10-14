@@ -1,7 +1,7 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
-// Šedesátá šestá část
+// Šedesátá sedmá část
 //    Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go
 //    https://www.root.cz/clanky/tvorba-sesitu-pro-tabulkove-procesory-v-programovacim-jazyku-go/
 
