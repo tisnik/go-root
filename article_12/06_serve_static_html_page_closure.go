@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Využití uzávěrů pro zápis kratšího kódu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/06_serve_static_html_page_closure.html
 
 package main
 
