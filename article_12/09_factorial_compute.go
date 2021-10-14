@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //    Druhá varianta webové aplikace pro výpočet faktoriálu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/09_factorial_compute.html
 
 package main
 
