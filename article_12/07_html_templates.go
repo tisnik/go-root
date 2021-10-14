@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Základní použití šablon
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/07_html_templates.html
 
 package main
 
