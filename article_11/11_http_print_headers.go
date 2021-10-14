@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Vytištění hlavičky HTTP odpovědi
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/11_http_print_headers.html
 
 package main
 
