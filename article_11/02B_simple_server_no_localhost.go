@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2B:
 //     Úprava adresy v předchozím příkladu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/02B_simple_server_no_localhost.html
 
 package main
 
