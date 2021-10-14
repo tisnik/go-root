@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //     HTTP server se specifikací MIME typu odpovědí
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/03_specify_content_type.html
 
 package main
 
