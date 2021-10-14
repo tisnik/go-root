@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //     	Jednoduchý klient akceptující celý textový řádek
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/05_text_client.html
 
 package main
 
