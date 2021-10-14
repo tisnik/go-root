@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Získání základních informací o procesu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/11_process_info.html
 
 package main
 
