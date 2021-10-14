@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //    Použití balíčku big, typ Float.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/06_bigfloat.html
 
 package main
 
