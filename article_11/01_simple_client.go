@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Klient, který přečte ze serveru sekvenci bajtů
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/01_simple_client.html
 
 package main
 
