@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Vylepšené přečtení argumentů předaných na příkazovém řádku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/02_flags.html
 
 package main
 
