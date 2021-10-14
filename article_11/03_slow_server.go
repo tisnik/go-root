@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //     Server odpovídající klientovi opožděně
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/03_slow_server.html
 
 package main
 
