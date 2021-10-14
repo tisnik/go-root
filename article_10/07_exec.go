@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Použití balíčku exec, spuštění externí utility.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/07_exec.html
 
 package main
 
