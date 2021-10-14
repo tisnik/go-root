@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Úprava předchozího příkladu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_12/05_static_html_page.html
 
 package main
 
