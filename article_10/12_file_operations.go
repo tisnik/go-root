@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Základní operace se soubory.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/12_file_operations.html
 
 package main
 
