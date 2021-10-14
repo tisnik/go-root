@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Použití balíčku big, typ Int.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_10/04_bigint.html
 
 package main
 
