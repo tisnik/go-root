@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //     Konstruktor adresy typu IPv4
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_11/09_ipv4_constructor.html
 
 package main
 
