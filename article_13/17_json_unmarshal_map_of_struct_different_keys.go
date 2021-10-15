@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //     Unmarshalling mapy struktur, specifikace klíčů
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/17_json_unmarshal_map_of_struct_different_keys.html
 
 package main
 
