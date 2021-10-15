@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //     Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/02_empty_image_rectangle.html
 
 package main
 
