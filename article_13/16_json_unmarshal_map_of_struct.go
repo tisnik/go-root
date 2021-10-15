@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //     Unmarshalling mapy struktur
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/16_json_unmarshal_map_of_struct.html
 
 package main
 
