@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //     Unmarshalling pole z JSONu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/14_json_unmarshal_array.html
 
 package main
 
