@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //     Interní struktura záznamu s informacemi o obrázku
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/08_image_internals.html
 
 package main
 
