@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //     Export rastrového obrázku do formátu JPEG s ovlivněním kvality
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/21_jpeg_output_low_quality.html
 
 package main
 
