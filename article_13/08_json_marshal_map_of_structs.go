@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //     Marshalling map struktur/záznamů do JSONu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/08_json_marshal_map_of_structs.html
 
 package main
 
