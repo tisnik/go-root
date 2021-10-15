@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //     Přímý přístup k jednotlivým pixelům; třetí varianta
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/11_raw_pixels3.html
 
 package main
 
