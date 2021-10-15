@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19:
 //     Blending v Go (opět rastrové operace)
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/19_blending.html
 
 package main
 
