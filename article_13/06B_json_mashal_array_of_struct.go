@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6B:
 //     Marshalling pole struktur/záznamů do JSONu, privátní prvky struktury
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/06B_json_mashal_array_of_struct.html
 
 package main
 
