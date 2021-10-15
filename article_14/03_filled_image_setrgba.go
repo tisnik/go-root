@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //     Rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/03_filled_image_setrgba.html
 
 package main
 
