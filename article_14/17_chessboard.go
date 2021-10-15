@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //     Využití balíčku draw pro vykreslení šachovnice (rastrové operace)
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/17_chessboard.html
 
 package main
 
