@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //     Obrázek, v němž mají pixely různou průhlednost (nekorektní varianta)
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/05_filled_image_alpha.html
 
 package main
 
