@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Změna názvů klíčů pri marshallingu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/10_json_different_keys.html
 
 package main
 
