@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //     Marshalling jednorozměrných i dvourozměrných polí do JSONu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/04_json_marshal_arrays.html
 
 package main
 
