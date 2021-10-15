@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //     Datové struktury Point a Rectangle
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/12_point_rectangle.html
 
 package main
 
