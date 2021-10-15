@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3B:
 //     Pokus o marshalling komplexních čísel do JSONu, kontrola převodu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/03B_json_marshal_basic_complex_types_err.html
 
 package main
 
