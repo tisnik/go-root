@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //     Unmarshalling pole struktur
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/15_json_unmarshal_array_of_struct.html
 
 package main
 
