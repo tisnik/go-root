@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //     Pokus o marshalling speciálních hodnot
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/11_json_marshal_special_values.html
 
 package main
 
