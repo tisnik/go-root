@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //     Základní vlastnosti barvového prostoru RGBA
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/14_rgba_images.html
 
 package main
 
