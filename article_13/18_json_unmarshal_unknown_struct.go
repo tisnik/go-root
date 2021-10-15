@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //     Pokus o unmarshalling struktury s obecnými daty
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/18_json_unmarshal_unknown_struct.html
 
 package main
 
