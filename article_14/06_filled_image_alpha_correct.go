@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //     Korektní varianta předchozího příkladu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/06_filled_image_alpha_correct.html
 
 package main
 
