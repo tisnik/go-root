@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20:
 //     Export rastrového obrázku do formátu JPEG
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/20_jpeg_output.html
 
 package main
 
