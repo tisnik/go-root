@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //     Marshalling celých čísel se znaménkem do JSONu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_13/01_json_marshal_basic_signed_types.html
 
 package main
 
