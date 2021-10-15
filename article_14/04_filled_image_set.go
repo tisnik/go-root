@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //     Rastrový obrázek vyplněný konstantní barvou, použití metody Set
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/04_filled_image_set.html
 
 package main
 
