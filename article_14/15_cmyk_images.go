@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //     Základní vlastnosti barvového prostoru CMYK
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/15_cmyk_images.html
 
 package main
 
