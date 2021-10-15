@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //     Implementace Bresenhamova algoritmu pro vykreslení úsečky
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_14/18_bresenham_algorithm.html
 
 package main
 
