@@ -6,6 +6,9 @@
 //
 // Demonstrační příklad číslo 20:
 //     Specifikace stylu vykreslovaných cest
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/20_gg_set_dash.html
 
 package main
 
