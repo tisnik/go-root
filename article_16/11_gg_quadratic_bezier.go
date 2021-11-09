@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //     Kvadratická Bézierova křivka.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/11_gg_quadratic_bezier.html
 
 package main
 
