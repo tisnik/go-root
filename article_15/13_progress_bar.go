@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 13:
 //     Animace progress baru vytvořená jako animovaný GIF
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/13_progress_bar.html
 
 package main
 
