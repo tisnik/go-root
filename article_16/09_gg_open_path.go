@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //     Otevřená cesta (open path).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/09_gg_open_path.html
 
 package main
 
