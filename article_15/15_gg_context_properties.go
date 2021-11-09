@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //     Použití kontextu a nastavení vlastností kreslení
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/15_gg_context_properties.html
 
 package main
 
