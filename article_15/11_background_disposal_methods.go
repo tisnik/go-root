@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 11:
 //     Nastavení metody přepínání snímků: vykreslení pozadí
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/11_background_disposal_methods.html
 
 package main
 
