@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 23:
 //     Vykreslení vycentrovaného textu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/23_gg_text_centered.html
 
 package main
 
