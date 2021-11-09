@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //     Vymazání obrazovky.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/01_gg_clear_screen.html
 
 package main
 
