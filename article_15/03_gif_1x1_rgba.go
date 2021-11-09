@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //     Export obrázku o rozlišení 1×1 pixel s 256 barvovou paletou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/03_gif_1x1_rgba.html
 
 package main
 
