@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //     Transformace (rotace).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/17_gg_transformation_rotate.html
 
 package main
 
