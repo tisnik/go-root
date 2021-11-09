@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 20:
 //     Transformace (posun).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/20_gg_translate.html
 
 package main
 
