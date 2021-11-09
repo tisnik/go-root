@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 4:
 //     Alfa kanál v barvovém prostoru RGBA.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/04_gg_alpha_component.html
 
 package main
 
