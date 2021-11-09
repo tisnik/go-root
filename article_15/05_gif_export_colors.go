@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 5:
 //     Export se specifikací počtu barev v paletě
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/05_gif_export_colors.html
 
 package main
 
