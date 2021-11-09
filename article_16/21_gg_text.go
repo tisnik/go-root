@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 21:
 //     Vykreslení textu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/21_gg_text.html
 
 package main
 
