@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //     Základní způsob použití knihovny GG
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/14_gg_basic.html
 
 package main
 
