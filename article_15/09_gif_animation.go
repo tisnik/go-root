@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 9:
 //     Složitější animace pohybující se šachovnice
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/09_gif_animation.html
 
 package main
 
