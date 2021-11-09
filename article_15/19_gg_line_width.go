@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19:
 //     Specifikace šířky vykreslovaných cest
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/19_gg_line_width.html
 
 package main
 
