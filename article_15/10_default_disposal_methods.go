@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Výchozí hodnota metody použité při přepínání snímků
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/10_default_disposal_methods.html
 
 package main
 
