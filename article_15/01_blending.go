@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //     Ukázka blendingu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/01_blending.html
 
 package main
 
