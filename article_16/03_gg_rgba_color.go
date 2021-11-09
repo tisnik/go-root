@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 3:
 //     Barvový prostor RGB a RGBA.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/03_gg_rgba_color.html
 
 package main
 
