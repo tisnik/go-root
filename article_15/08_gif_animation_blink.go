@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //     Jednoduchá animace se dvěma snímky o velikosti 32×32 pixelů
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/08_gif_animation_blink.html
 
 package main
 
