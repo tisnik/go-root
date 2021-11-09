@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 15:
 //     Rotace vykreslovaných objektů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/15_gg_rotation.html
 
 package main
 
