@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //     Převod obrázku z prostoru RGBA do prostoru s paletou se snižováním počtu barev
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/07_rgba_to_palette.html
 
 package main
 
