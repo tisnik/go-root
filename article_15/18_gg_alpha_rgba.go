@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 18:
 //     Specifikace alfa kanálu (průhlednosti)
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/18_gg_alpha_rgba.html
 
 package main
 
