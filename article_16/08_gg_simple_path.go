@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 8:
 //     Práce s cestou (path).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/08_gg_simple_path.html
 
 package main
 
