@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 12:
 //     Kvadratická Bézierova křivka s řídicími body.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/12_gg_quadratic_bezier_control_points.html
 
 package main
 
