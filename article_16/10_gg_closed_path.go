@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Uzavřená cesta (closed path).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/10_gg_closed_path.html
 
 package main
 
