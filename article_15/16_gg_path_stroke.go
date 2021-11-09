@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 16:
 //     Vykreslení cesty
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/16_gg_path_stroke.html
 
 package main
 
