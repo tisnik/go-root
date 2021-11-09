@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 14:
 //     Kubická Bézierova křivka s řídicími body.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/14_gg_cubic_bezier_control_points.html
 
 package main
 
