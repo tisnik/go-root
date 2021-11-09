@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //     Šachovnice vykreslená s dvoubarevnou paletou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/06_gif_export_palette.html
 
 package main
 
