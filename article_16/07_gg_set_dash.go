@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 7:
 //     Nastavení stylu vykreslovaných úseček.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/07_gg_set_dash.html
 
 package main
 
