@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 19:
 //     Transformace (změna měřítka okolo zvoleného bodu).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_16/19_gg_scale_about.html
 
 package main
 
