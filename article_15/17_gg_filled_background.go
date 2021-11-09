@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 17:
 //     Vyplnění pozadí konstantní barvou
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_15/17_gg_filled_background.html
 
 package main
 
