@@ -7,6 +7,10 @@
 //
 // Demonstrační příklad číslo 1:
 //     Načtení řetězců ze standardního vstupu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_20/01_scanln.html
+//
 
 package main
 
