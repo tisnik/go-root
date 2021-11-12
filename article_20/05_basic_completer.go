@@ -8,6 +8,10 @@
 // Demonstrační příklad číslo 5:
 //     Go-prompt: vstup s nápovědou.
 //
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_20/05_basic_completer.html
+//
 
 package main
 
