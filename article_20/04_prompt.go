@@ -7,6 +7,10 @@
 //
 // Demonstrační příklad číslo 4:
 //     Go-prompt: vstup s nápovědou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_20/04_prompt.html
+//
 
 package main
 
