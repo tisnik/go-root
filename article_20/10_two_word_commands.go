@@ -7,6 +7,10 @@
 //
 // Demonstrační příklad číslo 10:
 //     Víceslovní příkazy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_20/10_two_word_commands.html
+//
 
 package main
 
