@@ -7,6 +7,10 @@
 //
 // Demonstrační příklad číslo 8:
 //     Zápis příkazů Atari BASICu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_20/08_basic_statements.html
+//
 
 package main
 
