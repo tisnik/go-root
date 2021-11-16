@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 2:
 //     Testovaný balíček.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_17/test02/add.html
 
 package main
 
