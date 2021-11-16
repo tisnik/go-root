@@ -6,6 +6,10 @@
 //     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
 //
 // Přístup k tabulce kurzů a použití kurzů při výpočtu převodu měn.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_17/mocking/kurzy.html
+//
 
 package main
 
