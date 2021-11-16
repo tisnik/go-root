@@ -6,6 +6,9 @@
 //     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
 //
 // Balíček s funkcí pro výpočet faktoriálu
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_17/factorial/factorial.html
 
 package factorial
 
