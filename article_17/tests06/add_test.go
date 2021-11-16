@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 6:
 //     Implementace jednotkových testů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_17/test06/add_test.html
 
 package main
 
