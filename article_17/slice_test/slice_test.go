@@ -6,6 +6,9 @@
 //     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
 //
 // Test práce s řezy (slices).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_17/slice_test/slice_test.html
 
 package slices
 
