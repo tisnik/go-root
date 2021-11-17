@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 10:
 //     Testy pro balíček.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_18/10_factorial_convey2/behaviour_test.html
 
 package factorial
 
