@@ -7,6 +7,9 @@
 //
 // Demonstrační příklad číslo 1:
 //     Testovaný balíček.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_18/01_factorial_testing/factorial.html
 
 package factorial
 
