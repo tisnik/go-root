@@ -4,6 +4,9 @@
 // Padesátá část
 //    Tvorba grafů v jazyce Go
 //    https://www.root.cz/clanky/tvorba-grafu-v-jazyce-go/
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_50/glot16.html
 
 package main
 
