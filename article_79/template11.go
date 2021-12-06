@@ -7,16 +7,16 @@ import (
 
 const (
 	templateName   = "test"
-	templateFormat = `Jméno {{.Name}} {{.Surname}}
-Popularita {{.Popularity}}
+	templateFormat = `Jméno {{.name}} {{.surname}}
+Popularita {{.popularity}}
 
 `
 )
 
 type Role struct {
-	Name       string
-	Surname    string
-	Popularity int
+	name       string
+	surname    string
+	popularity int
 }
 
 func main() {

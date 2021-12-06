@@ -7,16 +7,13 @@ import (
 
 const (
 	templateName   = "test"
-	templateFormat = `Jméno {{.Name}} {{.Surname}}
-Popularita {{.Popularity}}
-
-`
+	templateFormat = "Součet {{.X}} + {{.Y}} = {{.Z}}"
 )
 
-type Role struct {
-	Name       string
-	Surname    string
-	Popularity int
+type User struct {
+	FirstName string
+	Surname   string
+	Born      string
 }
 
 func main() {
@@ -24,21 +21,15 @@ func main() {
 	tmpl := template.Must(template.New(templateName).Parse(templateFormat))
 
 	// tyto hodnoty budou použity při aplikaci šablony
-	roles := []Role{
-		Role{"Eliška", "Najbrtová", 4},
-		Role{"Jenny", "Suk", 3},
-		Role{"Anička", "Šafářová", 1},
-		Role{"Sváťa", "Pulec", 3},
-		Role{"Blažej", "Motyčka", 8},
-		Role{"Eda", "Wasserfall", 3},
-		Role{"Přemysl", "Hájek", 10},
+	user := User{
+		FirstName: "Jára",
+		Surname:   "Cimrman",
+		Born:      "Böhmen",
 	}
 
 	// aplikace šablony - přepis hodnot
-	for _, role := range roles {
-		err := tmpl.Execute(os.Stdout, role)
-		if err != nil {
-			panic(err)
-		}
+	err := tmpl.Execute(os.Stdout, user)
+	if err != nil {
+		panic(err)
 	}
 }

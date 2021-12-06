@@ -7,10 +7,8 @@ import (
 
 const (
 	templateName   = "test"
-	templateFormat = `Jméno {{.Name}} {{.Surname}}
-Popularita {{.Popularity}}
-
-`
+	templateFormat = `{{range .}}Jméno {{.Name}} {{.Surname}} Popularita {{.Popularity}}
+{{end}}`
 )
 
 type Role struct {
@@ -35,10 +33,8 @@ func main() {
 	}
 
 	// aplikace šablony - přepis hodnot
-	for _, role := range roles {
-		err := tmpl.Execute(os.Stdout, role)
-		if err != nil {
-			panic(err)
-		}
+	err := tmpl.Execute(os.Stdout, roles)
+	if err != nil {
+		panic(err)
 	}
 }
