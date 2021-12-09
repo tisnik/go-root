@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Sedmdesátá šestá část:
+//    Jazyk Go a textový terminál ve funkci základního prvku uživatelského rozhraní
+//    https://www.root.cz/clanky/jazyk-go-a-textovy-terminal-ve-funkci-zakladniho-prvku-uzivatelskeho-rozhrani/
+
 package main
 
 import (
