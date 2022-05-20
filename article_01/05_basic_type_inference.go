@@ -5,6 +5,9 @@
 //    Go: minimalistický a překvapivě výkonný programovací jazyk
 //    https://www.root.cz/clanky/go-minimalisticky-a-prekvapive-vykonny-programovaci-jazyk/
 //
+// Seznam příkladů z první části:
+//    https://github.com/tisnik/go-root/blob/master/article_01/README.md
+//
 // Demonstrační příklad číslo 5:
 //    Deklarace proměnné s její inicializací
 //
