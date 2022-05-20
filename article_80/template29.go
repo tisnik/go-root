@@ -1,3 +1,13 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Osmdesátá část:
+//    Standardní šablonovací systém jazyka Go a šablony HTML stránek
+//    https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go-a-sablony-html-stranek/
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_80/template29.html
+
 package main
 
 import (
