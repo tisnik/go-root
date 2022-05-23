@@ -5,6 +5,9 @@
 //    Datové typy v programovacím jazyku Go
 //    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go/
 //
+// Seznam příkladů z druhé části:
+//    https://github.com/tisnik/go-root/blob/master/article_02/README.md
+//
 // Demonstrační příklad číslo 5:
 //    Přiřazení uint8 -> uint16
 //
