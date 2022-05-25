@@ -5,6 +5,9 @@
 //    Konstrukce pro řízení běhu programu v jazyce Go
 //    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/
 //
+// Seznam příkladů z páté části:
+//    https://github.com/tisnik/go-root/blob/master/article_05/README.md
+//
 // Demonstrační příklad číslo 13:
 //    Řídicí konstrukce switch s vyhodnocovaným výrazem.
 //
