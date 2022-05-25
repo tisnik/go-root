@@ -5,6 +5,9 @@
 //    Rozhraní, metody, gorutiny a kanály v programovacím jazyku Go
 //    https://www.root.cz/clanky/rozhrani-metody-gorutiny-a-kanaly-v-programovacim-jazyku-go/
 //
+// Seznam příkladů ze čtvrté části:
+//    https://github.com/tisnik/go-root/blob/master/article_04/README.md
+//
 // Demonstrační příklad číslo 7:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
 //
