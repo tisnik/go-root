@@ -5,6 +5,9 @@
 //    Konstrukce pro řízení běhu programu v jazyce Go (dokončení)
 //    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go-dokonceni/
 //
+// Seznam příkladů ze šesté části:
+//    https://github.com/tisnik/go-root/blob/master/article_06/README.md
+//
 // Demonstrační příklad číslo 19:
 //    Všechny unární operátory jazyka Go.
 //
