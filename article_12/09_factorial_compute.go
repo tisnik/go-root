@@ -5,6 +5,9 @@
 //     Vývoj síťových aplikací v programovacím jazyku Go (pokračování)
 //     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-pokracovani/
 //
+// Seznam příkladů z dvanácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_12/README.md
+//
 // Demonstrační příklad číslo 9:
 //    Druhá varianta webové aplikace pro výpočet faktoriálu
 //
