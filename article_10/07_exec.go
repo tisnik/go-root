@@ -5,6 +5,9 @@
 //     Užitečné balíčky pro každodenní použití Go (2), porovnání výkonnosti Go s céčkem
 //     https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-go-2-porovnani-vykonnosti-go-s-ceckem/
 //
+// Seznam příkladů z desáté části:
+//    https://github.com/tisnik/go-root/blob/master/article_10/README.md
+//
 // Demonstrační příklad číslo 7:
 //    Použití balíčku exec, spuštění externí utility.
 //
