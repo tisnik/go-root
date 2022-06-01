@@ -5,6 +5,9 @@
 //     Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)
 //     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-prace-s-jsonem-a-rastrovymi-obrazky/
 //
+// Seznam příkladů z třinácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_13/README.md
+//
 // Demonstrační příklad číslo 16:
 //     Unmarshalling mapy struktur
 //
