@@ -5,6 +5,9 @@
 //     Vývoj síťových aplikací v programovacím jazyku Go
 //     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go/
 //
+// Seznam příkladů z jedenácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_11/README.md
+//
 // Demonstrační příklad číslo 8:
 //     Parsing IPv4 a IPv6 adresy
 //
