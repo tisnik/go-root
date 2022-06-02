@@ -5,6 +5,9 @@
 //     Programovací jazyk Go a grafika: tvorba animovaných GIFů, grafická knihovna GG
 //     https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-tvorba-animovanych-gifu-graficka-knihovna-gg/
 //
+// Seznam příkladů z patnácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_15/README.md
+//
 // Demonstrační příklad číslo 18:
 //     Specifikace alfa kanálu (průhlednosti)
 //
