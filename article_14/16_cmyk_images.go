@@ -5,6 +5,9 @@
 //     Programovací jazyk Go a počítačová grafika (úvod)
 //     https://www.root.cz/clanky/programovaci-jazyk-go-a-pocitacova-grafika-uvod/
 //
+// Seznam příkladů ze čtrnácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_14/README.md
+//
 // Demonstrační příklad číslo 16:
 //     Základní vlastnosti barvového prostoru CMYK
 //
