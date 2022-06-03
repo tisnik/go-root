@@ -5,6 +5,9 @@
 //     Testování aplikací naprogramovaných v jazyce Go
 //     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
 //
+// Seznam příkladů ze sedmnácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_17/README.md
+//
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/factorial_convey/behaviour_test.html
 //
