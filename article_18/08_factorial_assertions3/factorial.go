@@ -5,6 +5,9 @@
 //     Knihovny určené pro tvorbu testů v programovacím jazyce Go
 //     https://www.root.cz/clanky/knihovny-urcene-pro-tvorbu-testu-v-programovacim-jazyce-go/
 //
+// Seznam příkladů z osmnácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_18/README.md
+//
 // Demonstrační příklad číslo 8:
 //     Testovaný balíček.
 //
