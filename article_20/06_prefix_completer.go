@@ -5,6 +5,9 @@
 //     Jazyk Go a aplikace s vlastním příkazovým řádkem
 //     https://www.root.cz/clanky/jazyk-go-a-aplikace-s-vlastnim-prikazovym-radkem/
 //
+// Seznam příkladů z dvacáté části:
+//    https://github.com/tisnik/go-root/blob/master/article_20/README.md
+//
 // Demonstrační příklad číslo 6:
 //     Go-prompt: vstup s nápovědou, reakce na zadaný příkaz.
 //
