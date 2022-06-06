@@ -5,6 +5,9 @@
 //     Knihovny pro Go umožňující naplánování a spouštění periodických úloh
 //     https://www.root.cz/clanky/knihovny-pro-go-umoznujici-naplanovani-a-spousteni-periodickych-uloh/
 //
+// Seznam příkladů z dvacáté první části:
+//    https://github.com/tisnik/go-root/blob/master/article_21/README.md
+//
 // Demonstrační příklad číslo 1:
 //     Úloha vytvořená nástrojem go-cron.
 
