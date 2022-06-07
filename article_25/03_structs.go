@@ -5,6 +5,9 @@
 //     Ladění aplikací v Go s využitím GNU Debuggeru a debuggeru Delve
 //     https://www.root.cz/clanky/ladeni-aplikaci-v-go-s-vyuzitim-gnu-debuggeru-a-debuggeru-delve/
 //
+// Seznam příkladů z dvacáté páté části:
+//    https://github.com/tisnik/go-root/blob/master/article_25/README.md
+//
 // Demonstrační příklad číslo 3:
 //     Práce se strukturami (záznamy)
 
