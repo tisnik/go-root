@@ -5,6 +5,9 @@
 //    Trasování a profilování aplikací naprogramovaných v Go (dokončení
 //    https://www.root.cz/clanky/trasovani-a-profilovani-aplikaci-naprogramovanych-v-go-dokonceni/
 //
+// Seznam příkladů ze třicáté části:
+//    https://github.com/tisnik/go-root/blob/master/article_30/README.md
+//
 // Demonstrační příklad číslo 1:
 //    HTTP server, který generuje rastrové obrázky.
 
