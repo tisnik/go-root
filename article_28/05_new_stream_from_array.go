@@ -5,6 +5,9 @@
 //    Datové struktury s líným vyhodnocováním v programovacím jazyce Go
 //    https://www.root.cz/clanky/datove-struktury-s-linym-vyhodnocovanim-v-programovacim-jazyce-go/
 //
+// Seznam příkladů z dvacáté osmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_28/README.md
+//
 // Demonstrační příklad číslo 5:
 //    Nový stream vytvořený z pole.
 
