@@ -4,6 +4,9 @@
 // Dvacátá devátá část
 //    Trasování a profilování aplikací naprogramovaných v Go
 //    https://www.root.cz/clanky/trasovani-a-profilovani-aplikaci-naprogramovanych-v-go/
+//
+// Seznam příkladů z dvacáté deváté části:
+//    https://github.com/tisnik/go-root/blob/master/article_29/README.md
 
 package slices
 
