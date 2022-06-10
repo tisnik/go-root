@@ -5,6 +5,9 @@
 //    Sledování vybraných metrik služeb naprogramovaných v jazyku Go
 //    https://www.root.cz/clanky/sledovani-vybranych-metrik-sluzeb-naprogramovanych-v-jazyku-go/
 //
+// Seznam příkladů ze třicáté první části:
+//    https://github.com/tisnik/go-root/blob/master/article_31/README.md
+//
 // Demonstrační příklad číslo 1:
 //    HTTP server, který vrací HTML stránku s generovaným obrázkem.
 
