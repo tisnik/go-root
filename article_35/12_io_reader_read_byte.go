@@ -4,6 +4,9 @@
 // Třicátá pátá část
 //    Programovací jazyk Go pro skalní céčkaře (2.část)
 //    https://www.root.cz/clanky/programovaci-jazyk-go-pro-skalni-ceckare-2-cast/
+//
+// Seznam příkladů ze třicáté páté části:
+//    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 
 package main
 
