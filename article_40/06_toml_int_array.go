@@ -4,6 +4,9 @@
 // Čtyřicátá část
 //    Zpracování konfiguračních souborů v Go s využitím knihovny Viper
 //    https://www.root.cz/clanky/zpracovani-konfiguracnich-souboru-v-go-s-vyuzitim-knihovny-viper/
+//
+// Seznam příkladů ze čtyřicáté části:
+//    https://github.com/tisnik/go-root/blob/master/article_40/README.md
 
 package main
 
