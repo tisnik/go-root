@@ -4,6 +4,9 @@
 // Třicátá osmá část
 //    Tvorba webových aplikací v Go s využitím projektu Gorilla web toolkit
 //    https://www.root.cz/clanky/tvorba-webovych-aplikaci-v-go-s-vyuzitim-projektu-gorilla-web-toolkit/
+//
+// Seznam příkladů ze třicáté osmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_38/README.md
 
 package main
 
