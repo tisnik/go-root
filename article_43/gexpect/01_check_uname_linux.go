@@ -4,6 +4,9 @@
 // Čtyřicátá třetí část
 //    Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem
 //    https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem/
+//
+// Seznam příkladů ze čtyřicáté třetí části:
+//    https://github.com/tisnik/go-root/blob/master/article_43/README.md
 
 package main
 
