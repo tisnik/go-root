@@ -5,6 +5,9 @@
 //     Projekt MinIO: jedna z nejužitečnějších aplikací naprogramovaných v Go
 //     https://www.root.cz/clanky/projekt-minio-jedna-z-nejuzitecnejsich-aplikaci-naprogramovanych-v-go/
 //
+// Seznam příkladů ze čtyřicáté šesté části:
+//    https://github.com/tisnik/go-root/blob/master/article_46/README.md
+//
 // Demonstrační příklad číslo 2:
 //     Zadání parametrů připojení z příkazového řádku
 
