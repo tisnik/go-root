@@ -5,6 +5,9 @@
 //     Další možnosti nabízené projektem MinIO
 //     https://www.root.cz/clanky/dalsi-moznosti-nabizene-projektem-minio/
 //
+// Seznam příkladů ze čtyřicáté sedmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_47/README.md
+//
 // Demonstrační příklad číslo 16:
 //     Použití metody GetBucketLifecycle
 
