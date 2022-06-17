@@ -5,6 +5,9 @@
 //    Popis vybraných balíčků nabízených projektem Gonum
 //    https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/
 //
+// Seznam příkladů ze čtyřicáté deváté části:
+//    https://github.com/tisnik/go-root/blob/master/article_49/README.md
+//
 // Demonstrační příklad číslo 6:
 //
 
