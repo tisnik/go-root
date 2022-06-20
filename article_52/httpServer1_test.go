@@ -4,6 +4,9 @@
 // Padesátá druhá část
 //    Pomůcky při tvorbě jednotkových testů v jazyce Go
 //    https://www.root.cz/clanky/pomucky-pri-tvorbe-jednotkovych-testu-v-jazyce-go/
+//
+// Seznam příkladů z padesáté druhé části:
+//    https://github.com/tisnik/go-root/blob/master/article_52/README.md
 
 package main
 
