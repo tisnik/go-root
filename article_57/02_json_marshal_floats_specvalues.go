@@ -4,6 +4,9 @@
 // Padesátá sedmá část
 //    Serializace a deserializace datových struktur v programovacím jazyce Go
 //    https://www.root.cz/clanky/serializace-a-deserializace-datovych-struktur-v-programovacim-jazyce-go/
+//
+// Seznam příkladů z padesáté sedmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_57/README.md
 
 // https://stackoverflow.com/questions/1423081/json-left-out-infinity-and-nan-json-status-in-ecmascript
 
