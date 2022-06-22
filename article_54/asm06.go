@@ -4,6 +4,9 @@
 // Padesátá čtvrtá část
 //    Programovací jazyk Go a assembler (2.část)
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-2-cast/
+//
+// Seznam příkladů z padesáté čtvrté části:
+//    https://github.com/tisnik/go-root/blob/master/article_54/README.md
 
 package main
 
