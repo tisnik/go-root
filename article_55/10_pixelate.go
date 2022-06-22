@@ -4,6 +4,9 @@
 // Padesátá pátá část
 //    Knihovna Gift pro zpracování rastrových obrázků v Go
 //    https://www.root.cz/clanky/knihovna-gift-pro-zpracovani-rastrovych-obrazku-v-go/
+//
+// Seznam příkladů z padesáté páté části:
+//    https://github.com/tisnik/go-root/blob/master/article_55/README.md
 
 package main
 
