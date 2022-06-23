@@ -4,6 +4,9 @@
 // Padesátá osmá část
 //    Serializace a deserializace datových struktur v programovacím jazyce Go (2.část)
 //    https://www.root.cz/clanky/serializace-a-deserializace-datovych-struktur-v-programovacim-jazyce-go-2-cast/
+//
+// Seznam příkladů z padesáté osmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_58/README.md
 
 package main
 
