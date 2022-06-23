@@ -4,6 +4,9 @@
 // Šedesátá první část
 //    Programovací jazyk Go a 2D grafika
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika/
+//
+// Seznam příkladů z šedesáté první části:
+//    https://github.com/tisnik/go-root/blob/master/article_61/README.md
 
 package main
 
