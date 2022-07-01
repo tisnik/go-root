@@ -5,6 +5,9 @@
 //    Tvorba sešitů pro tabulkové procesory v programovacím jazyku Go
 //    https://www.root.cz/clanky/tvorba-sesitu-pro-tabulkove-procesory-v-programovacim-jazyku-go/
 //
+// Seznam příkladů z šedesáté sedmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_67/README.md
+//
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_67/csv3.html
 
