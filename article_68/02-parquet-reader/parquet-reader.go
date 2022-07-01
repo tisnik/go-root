@@ -4,6 +4,9 @@
 // Šedesátá osmá část
 //    Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory
 //    https://www.root.cz/clanky/komunikace-se-sloupcovymi-databazemi-z-jazyka-go-parquet-soubory/
+//
+// Seznam příkladů z šedesáté osmé části:
+//    https://github.com/tisnik/go-root/blob/master/article_68/README.md
 
 // This tool is able to read all records stored in selected Parquet file.
 // Currently, only records with the structure `Record` is read correctly. Name
