@@ -1,3 +1,10 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Sedmdesátá první část
+//    Formátovaný tisk obsahu tabulek a dalších datových struktur v Go
+//    https://www.root.cz/clanky/formatovany-tisk-obsahu-tabulek-a-dalsich-datovych-struktur-v-go/
+
 package main
 
 import (
