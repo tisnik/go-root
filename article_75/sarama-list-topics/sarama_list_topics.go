@@ -1,3 +1,6 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+
 // Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou
 // Sarama: výpis informací o tématech.
 
