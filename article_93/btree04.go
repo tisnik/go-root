@@ -1,5 +1,8 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Seznam příkladů ze devadesáté třetí části:
+//    https://github.com/tisnik/go-root/blob/master/article_93/README.md
 
 package main
 
