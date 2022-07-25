@@ -5,6 +5,9 @@
 //    Standardní šablonovací systém jazyka Go a šablony HTML stránek
 //    https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go-a-sablony-html-stranek/
 //
+// Seznam příkladů z osmdesáté části:
+//    https://github.com/tisnik/go-root/blob/master/article_80/README.md
+//
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_80/template17.html
 
