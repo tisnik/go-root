@@ -49,7 +49,7 @@ func BenchmarkLinkedHashMapPut(b *testing.B) {
 	filledMapCheck(b, m)
 }
 
-func BenchmarkLinkedTreeMapPut(b *testing.B) {
+func BenchmarkTreeMapPut(b *testing.B) {
 	m := treemap.NewWithIntComparator[int]()
 	for i := 0; i < b.N; i++ {
 		m.Put(i, i)
@@ -110,7 +110,7 @@ func BenchmarkLinkedHashMapGet(b *testing.B) {
 	getFromMap(b, m, max)
 }
 
-func BenchmarkLinkedTreeMapGet(b *testing.B) {
+func BenchmarkTreeMapGet(b *testing.B) {
 	m := treemap.NewWithIntComparator[int]()
 
 	fillInMap(m, max)
