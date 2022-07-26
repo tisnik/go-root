@@ -1,6 +1,10 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
+// Devadesátá čtvrtá část
+//    Knihovny s implementací generických datových typů pro programovací jazyk Go (3)
+//    https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go-3/
+//
 // Seznam příkladů ze devadesáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_94/README.md
 
