@@ -5,7 +5,7 @@
 //    Knihovny s implementací generických datových typů pro programovací jazyk Go (3)
 //    https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go-3/
 //
-// Seznam příkladů ze devadesáté čtvrté části:
+// Seznam příkladů z devadesáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_94/README.md
 
 package main
