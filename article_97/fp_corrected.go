@@ -1,6 +1,5 @@
 package main
 
-import "unsafe"
 import "math"
 import "fmt"
 
@@ -86,11 +85,6 @@ func main() {
 		}
 	}
 	return
-}
-
-// c4goUnsafeConvert_float64 : created by c4go
-func c4goUnsafeConvert_float64(c4go_name *float64) []float64 {
-	return (*[1000000]float64)(unsafe.Pointer(c4go_name))[:]
 }
 
 // finito
