@@ -22,7 +22,7 @@ func insert_new_node(root [][]Node, value []byte) {
 	var cmp int32
 	if len(root[0]) == 0 {
 		root[0] = make([]Node, 1)
-		(root[0])[0].value = make([]byte, noarch.Strlen(value))
+		(root[0])[0].value = make([]byte, 1+noarch.Strlen(value))
 		noarch.Strcpy((root[0])[0].value, value)
 		(root[0])[0].left = nil
 		(root[0])[0].right = nil
