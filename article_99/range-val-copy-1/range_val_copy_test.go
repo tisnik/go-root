@@ -1,0 +1,64 @@
+package main
+
+import (
+	"testing"
+)
+
+const PAYLOAD_SIZE = 100
+
+type item struct {
+	value   int
+	payload [PAYLOAD_SIZE]byte
+}
+
+const MAX_ITEMS = 10000
+
+func BenchmarkCountValues1(b *testing.B) {
+	b.StopTimer()
+
+	var items [MAX_ITEMS]item
+
+	for i := 0; i < len(items); i++ {
+		items[i].value = i
+		items[i].payload = [PAYLOAD_SIZE]byte{}
+	}
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		sum := 0
+
+		for _, item := range items {
+			sum += item.value
+		}
+
+		if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+			b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+		}
+	}
+}
+
+func BenchmarkCountValues2(b *testing.B) {
+	b.StopTimer()
+
+	var items [MAX_ITEMS]item
+
+	for i := 0; i < len(items); i++ {
+		items[i].value = i
+		items[i].payload = [PAYLOAD_SIZE]byte{}
+	}
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		sum := 0
+
+		for j := 0; j < len(items); j++ {
+			sum += items[j].value
+		}
+
+		if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+			b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+		}
+	}
+}
