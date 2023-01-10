@@ -5,7 +5,10 @@
 //    Datové typy v programovacím jazyku Go (2.část)
 //    https://www.root.cz/clanky/datove-typy-v-programovacim-jazyku-go-2-cast/
 //
-// Seznam příkladů ze třetí části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze třetí části:
 //    https://github.com/tisnik/go-root/blob/master/article_03/README.md
 //
 // Demonstrační příklad číslo 21:
