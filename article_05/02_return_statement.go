@@ -5,7 +5,10 @@
 //    Konstrukce pro řízení běhu programu v jazyce Go
 //    https://www.root.cz/clanky/konstrukce-pro-rizeni-behu-programu-v-jazyce-go/
 //
-// Seznam příkladů z páté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 2:
