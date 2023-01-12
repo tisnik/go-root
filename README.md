@@ -37,3 +37,6 @@ List of examples used in articles:
 1. [Datové struktury s líným vyhodnocováním v programovacím jazyce Go](article_28/README.md)
 1. [Trasování a profilování aplikací naprogramovaných v Go](article_29/README.md)
 1. [Trasování a profilování aplikací naprogramovaných v Go (dokončení)](article_30/README.md)
+1. [Sledování vybraných metrik služeb naprogramovaných v jazyku Go](article_31/README.md)
+1. [Užitečné nástroje pro Go: automatické doplňování kódu, plnohodnotná smyčka REPL a integrace s Vimem](article_32/README.md)
+1. [Systém modulů v programovacím jazyce Go](article_33/README.md)
