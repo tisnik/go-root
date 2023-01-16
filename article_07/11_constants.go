@@ -5,7 +5,10 @@
 //    Programovací jazyk Go: dokončení popisu vlastností samotného jazyka
 //    https://www.root.cz/clanky/programovaci-jazyk-go-dokonceni-popisu-vlastnosti-samotneho-jazyka/
 //
-// Seznam příkladů ze sedmé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 11:
