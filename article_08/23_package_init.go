@@ -5,7 +5,10 @@
 //     Tvorba balíčků a pokročilejší operace s kanály v jazyce Go
 //     https://www.root.cz/clanky/tvorba-balicku-a-pokrocilejsi-operace-s-kanaly-v-jazyce-go/
 //
-// Seznam příkladů z osmé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 23:
