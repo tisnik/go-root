@@ -5,7 +5,10 @@
 //     Užitečné balíčky pro každodenní použití jazyka Go
 //     https://www.root.cz/clanky/uzitecne-balicky-pro-kazdodenni-pouziti-jazyka-go/
 //
-// Seznam příkladů z deváté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z deváté části:
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 12B:
