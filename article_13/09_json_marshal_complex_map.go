@@ -5,7 +5,10 @@
 //     Vývoj síťových aplikací v programovacím jazyku Go (práce s JSONem a rastrovými obrázky)
 //     https://www.root.cz/clanky/vyvoj-sitovych-aplikaci-v-programovacim-jazyku-go-prace-s-jsonem-a-rastrovymi-obrazky/
 //
-// Seznam příkladů ze třinácté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze třinácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 9:
