@@ -5,7 +5,10 @@
 //     Programovací jazyk Go a grafika: další užitečné funkce poskytované knihovnou GG
 //     https://www.root.cz/clanky/programovaci-jazyk-go-a-grafika-dalsi-uzitecne-funkce-poskytovane-knihovnou-gg/
 //
-// Seznam příkladů ze šestnácté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze šestnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 15:
