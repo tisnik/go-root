@@ -5,7 +5,10 @@
 //     Testování aplikací naprogramovaných v jazyce Go
 //     https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/
 //
-// Seznam příkladů ze sedmnácté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
 // Demonstrační příklad číslo 8:
@@ -14,6 +17,7 @@
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/test08/add_fast_test.html
 
+//go:build fast
 // +build fast
 
 package main
