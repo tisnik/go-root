@@ -5,7 +5,10 @@
 //     Pokročilejší použití vstupně-výstupních funkcí standardní knihovny jazyka Go
 //     https://www.root.cz/clanky/pokrocilejsi-pouziti-vstupne-vystupnich-funkci-standardni-knihovny-jazyka-go/
 //
-// Seznam příkladů z dvacáté třetí části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z dvacáté třetí části:
 //    https://github.com/tisnik/go-root/blob/master/article_23/README.md
 //
 // Demonstrační příklad číslo 4:
