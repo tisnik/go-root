@@ -14,7 +14,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Fatalf("error closing file: %v\n", err)
+		}
+	}()
 
 	r, err := npyio.NewReader(f)
 	if err != nil {
@@ -35,9 +40,4 @@ func main() {
 
 	m := mat.NewDense(shape[0], shape[1], v)
 	fmt.Printf("converted matrix =\n%v\n", mat.Formatted(m))
-
-	err = f.Close()
-	if err != nil {
-		log.Fatalf("error closing file: %v\n", err)
-	}
 }
