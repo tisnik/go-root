@@ -13,7 +13,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Fatalf("error closing file: %v\n", err)
+		}
+	}()
 
 	m := mat.NewDense(3, 4, []float64{
 		1, 2, 3,
@@ -24,10 +29,5 @@ func main() {
 	err = npyio.Write(f, m)
 	if err != nil {
 		log.Fatalf("error writing to file: %v\n", err)
-	}
-
-	err = f.Close()
-	if err != nil {
-		log.Fatalf("error closing file: %v\n", err)
 	}
 }
