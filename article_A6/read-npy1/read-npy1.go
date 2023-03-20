@@ -13,7 +13,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Fatalf("error closing file: %v\n", err)
+		}
+	}()
 
 	var m []int8
 	err = npyio.Read(f, &m)
@@ -22,9 +27,4 @@ func main() {
 	}
 
 	fmt.Printf("loaded vector = %v\n", m)
-
-	err = f.Close()
-	if err != nil {
-		log.Fatalf("error closing file: %v\n", err)
-	}
 }
