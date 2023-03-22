@@ -5,7 +5,10 @@
 //    Problematika nulových hodnot v Go, aneb proč nil != nil
 //    https://www.root.cz/clanky/problematika-nulovych-hodnot-v-go-aneb-proc-nil-nil/
 //
-// Seznam příkladů z dvacáté šesté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z dvacáté šesté části:
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 21:
