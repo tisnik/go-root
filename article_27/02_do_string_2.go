@@ -5,7 +5,10 @@
 //    Skriptovací jazyk Lua v aplikacích naprogramovaných v Go
 //    https://www.root.cz/clanky/skriptovaci-jazyk-lua-v-aplikacich-naprogramovanych-v-go/
 //
-// Seznam příkladů z dvacáté sedmé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z dvacáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_27/README.md
 //
 // Demonstrační příklad číslo 2:
