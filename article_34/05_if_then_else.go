@@ -5,7 +5,10 @@
 //    Programovací jazyk Go pro skalní céčkaře
 //    https://www.root.cz/clanky/programovaci-jazyk-go-pro-skalni-ceckare/
 //
-// Seznam příkladů ze třicáté čtvrté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze třicáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_34/README.md
 //
 // Demonstrační příklad číslo 5:
