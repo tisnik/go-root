@@ -5,7 +5,10 @@
 //    Sledování vybraných metrik služeb naprogramovaných v jazyku Go
 //    https://www.root.cz/clanky/sledovani-vybranych-metrik-sluzeb-naprogramovanych-v-jazyku-go/
 //
-// Seznam příkladů ze třicáté první části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze třicáté první části:
 //    https://github.com/tisnik/go-root/blob/master/article_31/README.md
 //
 // Demonstrační příklad číslo 5:
