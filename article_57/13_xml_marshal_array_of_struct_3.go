@@ -30,15 +30,15 @@ type Users struct {
 func main() {
 	var users Users = Users{
 		List: []User{
-			User{
+			{
 				Id:      1,
 				Name:    "Pepek",
 				Surname: "Vyskoč"},
-			User{
+			{
 				Id:      2,
 				Name:    "Pepek",
 				Surname: "Vyskoč"},
-			User{
+			{
 				Id:      3,
 				Name:    "Josef",
 				Surname: "Vyskočil"},
