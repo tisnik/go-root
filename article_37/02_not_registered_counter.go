@@ -5,7 +5,10 @@
 //    Monitoring služeb a mikroslužeb psaných v Go nástrojem Prometheus
 //    https://www.root.cz/clanky/monitoring-sluzeb-a-mikrosluzeb-psanych-v-go-nastrojem-prometheus/
 //
-// Seznam příkladů ze třicáté sedmé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze třicáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_37/README.md
 
 package main
