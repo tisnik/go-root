@@ -205,7 +205,7 @@ func readRecordsWithName(connection *sql.DB, name string) ([]Record, error) {
 }
 
 // Vložení nového záznamu do tabulky "persons"
-func insertRecord(connection *sql.DB, name string, surname string) (int, error) {
+func insertRecord(connection *sql.DB, name, surname string) (int, error) {
 	// provedení SQL příkazu se dvěma parametry
 	sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
 	result, err := connection.Exec(sqlStatement, name, surname)
