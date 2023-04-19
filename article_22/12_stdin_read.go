@@ -22,10 +22,10 @@ import (
 	"os"
 )
 
-const buffer_size = 16
+const bufferSize = 16
 
 func main() {
-	buffer := make([]byte, buffer_size)
+	buffer := make([]byte, bufferSize)
 
 	for {
 		read, err := os.Stdin.Read(buffer)
