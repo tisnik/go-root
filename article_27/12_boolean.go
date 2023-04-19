@@ -21,6 +21,7 @@ import (
 	"log"
 )
 
+// LuaSource contains name of file containing Lua script
 const LuaSource = "compare.lua"
 
 func compareNumbers(a int, b int) {
