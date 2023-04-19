@@ -23,6 +23,7 @@ import (
 
 const LuaSource = "go_from_lua.lua"
 
+// Hello function is called from Lua script
 func Hello(L *lua.LState) int {
 	log.Println("Hello from Go!")
 	return 0
