@@ -21,6 +21,7 @@ import (
 	"log"
 )
 
+// LuaSource contains name of file containing Lua script
 const LuaSource = "hello.lua"
 
 func main() {
