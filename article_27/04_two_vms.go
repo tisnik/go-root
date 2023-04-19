@@ -23,6 +23,8 @@ import (
 
 const LuaSource1 = "v1.lua"
 const LuaSource2 = "v2.lua"
+
+// LuaSource contains name of file containing Lua script
 const LuaSource3 = "v3.lua"
 
 func main() {
