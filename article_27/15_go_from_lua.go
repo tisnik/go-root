@@ -21,6 +21,7 @@ import (
 	"log"
 )
 
+// LuaSource contains name of file containing Lua script
 const LuaSource = "go_from_lua.lua"
 
 // Hello function is called from Lua script
