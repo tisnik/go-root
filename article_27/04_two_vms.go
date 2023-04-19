@@ -21,6 +21,7 @@ import (
 	"log"
 )
 
+// LuaSource contains name of file containing Lua script
 const LuaSource1 = "v1.lua"
 
 // LuaSource contains name of file containing Lua script
