@@ -19,7 +19,7 @@ func main() {
 		z.Add(&z, &y)
 
 		numerator := z.Num()
-		denominator := z.Num()
+		denominator := z.Denom()
 		fmt.Println(numerator, denominator)
 	}
 
