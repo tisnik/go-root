@@ -9,7 +9,7 @@ func main() {
 	result := big.NewFloat(2.0)
 
 	one := big.NewInt(1)
-	limit := big.NewInt(200)
+	limit := big.NewInt(10000)
 
 	for n := big.NewInt(1); n.Cmp(limit) <= 0; n.Add(n, one) {
 		m := big.NewInt(4)
