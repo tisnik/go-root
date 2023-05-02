@@ -7,6 +7,9 @@ import (
 )
 
 func processRequest(connection net.Conn, cnt *byte) {
+	log.Println("Handling connection")
+	time.Sleep(5 * time.Second)
+
 	defer func() {
 		log.Println("Closing connection")
 		err := connection.Close()
@@ -46,8 +49,7 @@ func main() {
 			log.Println("Connection refused!")
 		} else {
 			log.Println("Connection accepted")
-			time.Sleep(2 * time.Second)
-			processRequest(connection, &cnt)
+			go processRequest(connection, &cnt)
 		}
 	}
 }
