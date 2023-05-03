@@ -5,7 +5,10 @@
 //    Testování aplikací psaných v Go s využitím knihoven Goblin a Frisby
 //    https://www.root.cz/clanky/testovani-aplikaci-psanych-v-go-s-vyuzitim-knihoven-goblin-a-frisby/
 //
-// Seznam příkladů ze čtyřicáté druhé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze čtyřicáté druhé části:
 //    https://github.com/tisnik/go-root/blob/master/article_42/README.md
 
 package main
