@@ -5,7 +5,10 @@
 //    Použití Go pro automatizaci práce s aplikacemi s interaktivním příkazovým řádkem (dokončení)
 //    https://www.root.cz/clanky/pouziti-go-pro-automatizaci-prace-s-aplikacemi-s-interaktivnim-prikazovym-radkem-dokonceni/
 //
-// Seznam příkladů ze čtyřicáté čtvrté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze čtyřicáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_44/README.md
 
 package main
