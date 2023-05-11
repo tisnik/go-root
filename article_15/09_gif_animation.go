@@ -38,11 +38,11 @@ func CreateChessboard(width int, height int, board_size int, xoffset int, yoffse
 	img := image.NewPaletted(image.Rect(0, 0, width, height), palette)
 
 	index_color := 0
-	hor_block := int(width / board_size)
+	horBlock := int(width / board_size)
 	ver_block := int(height / board_size)
 
 	x_from := 0
-	x_to := hor_block
+	x_to := horBlock
 	for x := 0; x < board_size+step_size; x++ {
 		y_from := 0
 		y_to := ver_block
@@ -54,7 +54,7 @@ func CreateChessboard(width int, height int, board_size int, xoffset int, yoffse
 			index_color = 1 - index_color
 		}
 		x_from = x_to
-		x_to += hor_block
+		x_to += horBlock
 		index_color = 1 - index_color
 	}
 	return img
