@@ -42,19 +42,19 @@ func CreateChessboard(width int, height int, board_size int, xoffset int, yoffse
 	ver_block := int(height / board_size)
 
 	x_from := 0
-	x_to := horBlock
+	xTo := horBlock
 	for x := 0; x < board_size+step_size; x++ {
 		y_from := 0
 		y_to := ver_block
 		for y := 0; y < board_size+step_size; y++ {
-			r := image.Rect(x_from+xoffset, y_from+yoffset, x_to+xoffset, y_to+yoffset)
+			r := image.Rect(x_from+xoffset, y_from+yoffset, xTo+xoffset, y_to+yoffset)
 			draw.Draw(img, r, &image.Uniform{palette[index_color]}, image.ZP, draw.Src)
 			y_from = y_to
 			y_to += ver_block
 			index_color = 1 - index_color
 		}
-		x_from = x_to
-		x_to += horBlock
+		x_from = xTo
+		xTo += horBlock
 		index_color = 1 - index_color
 	}
 	return img
