@@ -29,7 +29,7 @@ import (
 
 const BoardSize = 8
 
-func CreateChessboard(width int, height int, board_size int, xoffset int, yoffset int, step_size int) *image.Paletted {
+func CreateChessboard(width int, height int, board_size int, xoffset int, yoffset int, stepSize int) *image.Paletted {
 	var palette = []color.Color{
 		color.RGBA{150, 205, 50, 255},
 		color.RGBA{0, 100, 0, 255},
@@ -43,10 +43,10 @@ func CreateChessboard(width int, height int, board_size int, xoffset int, yoffse
 
 	xFrom := 0
 	xTo := horBlock
-	for x := 0; x < board_size+step_size; x++ {
+	for x := 0; x < board_size+stepSize; x++ {
 		yFrom := 0
 		yTo := verBlock
-		for y := 0; y < board_size+step_size; y++ {
+		for y := 0; y < board_size+stepSize; y++ {
 			r := image.Rect(xFrom+xoffset, yFrom+yoffset, xTo+xoffset, yTo+yoffset)
 			draw.Draw(img, r, &image.Uniform{palette[indexColor]}, image.ZP, draw.Src)
 			yFrom = yTo
