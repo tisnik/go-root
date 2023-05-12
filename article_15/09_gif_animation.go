@@ -27,6 +27,7 @@ import (
 	"os"
 )
 
+// BoardSize represents size of chessboard being rendered
 const BoardSize = 8
 
 func CreateChessboard(width int, height int, boardSize int, xoffset int, yoffset int, stepSize int) *image.Paletted {
