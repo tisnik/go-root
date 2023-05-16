@@ -5,7 +5,10 @@
 //     Testování Go aplikací s využitím knihovny GΩmega a frameworku Ginkgo
 //     https://www.root.cz/clanky/testovani-go-aplikaci-s-vyuzitim-knihovny-gomega-mega-a-frameworku-ginkgo/
 //
-// Seznam příkladů ze čtyřicáté páté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze čtyřicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_45/README.md
 
 package factorial_test
