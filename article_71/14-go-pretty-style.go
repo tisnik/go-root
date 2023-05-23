@@ -25,13 +25,13 @@ type Role struct {
 
 func main() {
 	roles := []Role{
-		Role{"Eliška", "Najbrtová", 4},
-		Role{"Jenny", "Suk", 3},
-		Role{"Anička", "Šafářová", 1},
-		Role{"Sváťa", "Pulec", 3},
-		Role{"Blažej", "Motyčka", 8},
-		Role{"Eda", "Wasserfall", 3},
-		Role{"Přemysl", "Hájek", 10},
+		{"Eliška", "Najbrtová", 4},
+		{"Jenny", "Suk", 3},
+		{"Anička", "Šafářová", 1},
+		{"Sváťa", "Pulec", 3},
+		{"Blažej", "Motyčka", 8},
+		{"Eda", "Wasserfall", 3},
+		{"Přemysl", "Hájek", 10},
 	}
 
 	t := table.NewWriter()
