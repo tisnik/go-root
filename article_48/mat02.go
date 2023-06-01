@@ -5,7 +5,10 @@
 //    Gophernotes: kombinace interaktivního prostředí Jupyteru s jazykem Go
 //    https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/
 //
-// Seznam příkladů ze čtyřicáté osmé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze čtyřicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_48/README.md
 //
 // Demonstrační příklad číslo 2:
