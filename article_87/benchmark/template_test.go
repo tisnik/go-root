@@ -16,13 +16,13 @@ func BenchmarkReadTemplate(b *testing.B) {
 func BenchmarkApplyTemplate(b *testing.B) {
 	// tyto hodnoty budou použity při aplikaci šablony
 	roles := []Role{
-		Role{"Eliška", "Najbrtová", 4},
-		Role{"Jenny", "Suk", 3},
-		Role{"Anička", "Šafářová", 0},
-		Role{"Sváťa", "Pulec", 3},
-		Role{"Blažej", "Motyčka", 8},
-		Role{"Eda", "Wasserfall", 0},
-		Role{"Přemysl", "Hájek", 10},
+		{"Eliška", "Najbrtová", 4},
+		{"Jenny", "Suk", 3},
+		{"Anička", "Šafářová", 0},
+		{"Sváťa", "Pulec", 3},
+		{"Blažej", "Motyčka", 8},
+		{"Eda", "Wasserfall", 0},
+		{"Přemysl", "Hájek", 10},
 	}
 
 	tmpl := readTemplate("./html_template05.htm")
@@ -38,13 +38,13 @@ func BenchmarkApplyTemplate(b *testing.B) {
 func BenchmarkReadAndApplyTemplate(b *testing.B) {
 	// tyto hodnoty budou použity při aplikaci šablony
 	roles := []Role{
-		Role{"Eliška", "Najbrtová", 4},
-		Role{"Jenny", "Suk", 3},
-		Role{"Anička", "Šafářová", 0},
-		Role{"Sváťa", "Pulec", 3},
-		Role{"Blažej", "Motyčka", 8},
-		Role{"Eda", "Wasserfall", 0},
-		Role{"Přemysl", "Hájek", 10},
+		{"Eliška", "Najbrtová", 4},
+		{"Jenny", "Suk", 3},
+		{"Anička", "Šafářová", 0},
+		{"Sváťa", "Pulec", 3},
+		{"Blažej", "Motyčka", 8},
+		{"Eda", "Wasserfall", 0},
+		{"Přemysl", "Hájek", 10},
 	}
 
 	for i := 0; i < b.N; i++ {
