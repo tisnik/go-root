@@ -5,7 +5,10 @@
 //    Tvorba grafů v jazyce Go
 //    https://www.root.cz/clanky/tvorba-grafu-v-jazyce-go/
 //
-// Seznam příkladů z padesáté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z padesáté části:
 //    https://github.com/tisnik/go-root/blob/master/article_50/README.md
 //
 // Dokumentace ve stylu "literate programming":
