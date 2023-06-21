@@ -5,7 +5,10 @@
 //    Programovací jazyk Go a assembler (3.část)
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/
 //
-// Seznam příkladů z padesáté šesté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z padesáté šesté části:
 //    https://github.com/tisnik/go-root/blob/master/article_56/README.md
 
 package main
