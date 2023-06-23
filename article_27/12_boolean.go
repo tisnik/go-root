@@ -24,7 +24,7 @@ import (
 // LuaSource contains name of file containing Lua script
 const LuaSource = "compare.lua"
 
-func compareNumbers(a int, b int) {
+func compareNumbers(a, b int) {
 	luaVM := lua.NewState()
 	log.Println("Lua VM has been initialized")
 
