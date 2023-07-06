@@ -5,7 +5,10 @@
 //    Generické datové typy v jazyce Go?
 //    https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/
 //
-// Seznam příkladů z padesáté deváté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z padesáté deváté části:
 //    https://github.com/tisnik/go-root/blob/master/article_59/README.md
 
 package adder
