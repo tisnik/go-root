@@ -34,11 +34,11 @@ func funkce2() int {
 	return -1
 }
 
-func funkce3(x int, y int) int {
+func funkce3(x, y int) int {
 	return x + y
 }
 
-func funkce4(x int, y int) int {
+func funkce4(x, y int) int {
 	return x * y
 }
 
