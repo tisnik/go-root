@@ -25,7 +25,7 @@ func funkce1(x int) int {
 	return 2 * x
 }
 
-func funkce2(x int, y int) int {
+func funkce2(x, y int) int {
 	return x * y
 }
 
