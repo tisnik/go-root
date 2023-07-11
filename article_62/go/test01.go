@@ -5,7 +5,10 @@
 //    Programovací jazyk Go a 2D grafika – moduly sdl a img
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika-moduly-sdl-a-img/
 //
-// Seznam příkladů z šedesáté druhé části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z šedesáté druhé části:
 //    https://github.com/tisnik/go-root/blob/master/article_62/README.md
 
 package main
