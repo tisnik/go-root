@@ -30,7 +30,7 @@ const width = 256
 const height = 256
 
 // DrawHorizontalLine function draws horizontal line from [x1, y] to [x2, y] into the given image
-func DrawHorizontalLine(img *image.RGBA, lineColor color.Color, x1 int, x2 int, y int) {
+func DrawHorizontalLine(img *image.RGBA, lineColor color.Color, x1, x2, y int) {
 	if x1 > x2 {
 		x1, x2 = x2, x1
 	}
@@ -40,7 +40,7 @@ func DrawHorizontalLine(img *image.RGBA, lineColor color.Color, x1 int, x2 int, 
 }
 
 // DrawVerticalLine function draws vertical line from [x, y1] to [x, y2] into the given image
-func DrawVerticalLine(img *image.RGBA, lineColor color.Color, x int, y1 int, y2 int) {
+func DrawVerticalLine(img *image.RGBA, lineColor color.Color, x, y1, y2 int) {
 	if y1 > y2 {
 		y1, y2 = y2, y1
 	}
@@ -69,7 +69,7 @@ func Step(v1 int, v2 int) int {
 }
 
 // DrawLine function draws line from [x1, y1] to [x2, y2] into the given image
-func DrawLine(img *image.RGBA, lineColor color.Color, x1 int, y1 int, x2 int, y2 int) {
+func DrawLine(img *image.RGBA, lineColor color.Color, x1, y1, x2, y2 int) {
 	// specialni pripad - svisla usecka
 	if x1 == x2 {
 		DrawVerticalLine(img, lineColor, x1, y1, y2)
