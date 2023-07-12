@@ -30,22 +30,22 @@ const width = 256
 const height = 256
 
 // DrawHorizontalLine function draws horizontal line from [x1, y] to [x2, y] into the given image
-func DrawHorizontalLine(img *image.RGBA, color color.Color, x1 int, x2 int, y int) {
+func DrawHorizontalLine(img *image.RGBA, lineColor color.Color, x1 int, x2 int, y int) {
 	if x1 > x2 {
 		x1, x2 = x2, x1
 	}
 	for x := x1; x < x2; x++ {
-		img.Set(x, y, color)
+		img.Set(x, y, lineColor)
 	}
 }
 
 // DrawVerticalLine function draws vertical line from [x, y1] to [x, y2] into the given image
-func DrawVerticalLine(img *image.RGBA, color color.Color, x int, y1 int, y2 int) {
+func DrawVerticalLine(img *image.RGBA, lineColor color.Color, x int, y1 int, y2 int) {
 	if y1 > y2 {
 		y1, y2 = y2, y1
 	}
 	for y := y1; y < y2; y++ {
-		img.Set(x, y, color)
+		img.Set(x, y, lineColor)
 	}
 }
 
@@ -69,16 +69,16 @@ func Step(v1 int, v2 int) int {
 }
 
 // DrawLine function draws line from [x1, y1] to [x2, y2] into the given image
-func DrawLine(img *image.RGBA, color color.Color, x1 int, y1 int, x2 int, y2 int) {
+func DrawLine(img *image.RGBA, lineColor color.Color, x1 int, y1 int, x2 int, y2 int) {
 	// specialni pripad - svisla usecka
 	if x1 == x2 {
-		DrawVerticalLine(img, color, x1, y1, y2)
+		DrawVerticalLine(img, lineColor, x1, y1, y2)
 		return
 	}
 
 	// specialni pripad - vodorovna usecka
 	if y1 == y2 {
-		DrawHorizontalLine(img, color, x1, x2, y1)
+		DrawHorizontalLine(img, lineColor, x1, x2, y1)
 		return
 	}
 
@@ -102,7 +102,7 @@ func DrawLine(img *image.RGBA, color color.Color, x1 int, y1 int, x2 int, y2 int
 
 	// vse je pripraveno k vlastnimu vykresleni usecky
 	for {
-		img.Set(x, y, color)
+		img.Set(x, y, lineColor)
 		// test, zda se jiz doslo k poslednimu bodu
 		if x == x2 && y == y2 {
 			break
