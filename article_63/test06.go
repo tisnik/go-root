@@ -5,7 +5,10 @@
 //    Programovací jazyk Go a 2D grafika – kostra jednoduché hry
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika-kostra-jednoduche-hry/
 //
-// Seznam příkladů z šedesáté třetí části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z šedesáté třetí části:
 //    https://github.com/tisnik/go-root/blob/master/article_63/README.md
 
 package main
