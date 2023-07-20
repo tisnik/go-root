@@ -48,7 +48,7 @@ func sendMessages(stop chan bool) {
 	println("Publisher finished")
 }
 
-func receiveMessages(subscribed chan bool, stop chan bool) {
+func receiveMessages(subscribed, stop chan bool) {
 	defer func() {
 		stop <- true
 	}()
