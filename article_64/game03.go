@@ -1,7 +1,11 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
-// Seznam příkladů z šedesáté čtvrté části:
+// Šedesátá čtvrtá část
+//    Programovací jazyk Go a 2D grafika – kostra jednoduché hry
+//    https://www.root.cz/clanky/programovaci-jazyk-go-a-2d-grafika-kostra-jednoduche-hry/
+//
+// Seznam demonstračních příkladů z šedesáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_64/README.md
 
 package main
