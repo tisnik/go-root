@@ -44,7 +44,7 @@ const (
 )
 
 // Inicializace připojení k databázi
-func initDatabaseConnection(configuration StorageConfiguration) (*sql.DB, error) {
+func initDatabaseConnection(configuration *StorageConfiguration) (*sql.DB, error) {
 	driverName := configuration.Driver
 	dataSource := ""
 	log.Info().Str("driverName", configuration.Driver).Msg("DB connection configuration")
@@ -328,7 +328,7 @@ func main() {
 	log.Debug().Msg("Started")
 
 	// inicializace připojení k databázi
-	connection, err := initDatabaseConnection(config)
+	connection, err := initDatabaseConnection(&config)
 	if err != nil {
 		log.Err(err).Msg(connectionToDBNotEstablished)
 		return
