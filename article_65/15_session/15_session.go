@@ -5,7 +5,10 @@
 //    Použití databáze Redis v aplikacích naprogramovaných v Go
 //    https://www.root.cz/clanky/pouziti-databaze-redis-v-aplikacich-naprogramovanych-v-go/
 //
-// Seznam příkladů z šedesáté páté části:
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů z šedesáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_65/README.md
 
 package main
