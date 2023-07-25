@@ -14,6 +14,6 @@ type Foo struct {
 var loremIpsum Foo
 
 func main() {
-	// pouziti retezce
+	// pouziti struktury
 	fmt.Println(loremIpsum)
 }
