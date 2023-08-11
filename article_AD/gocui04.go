@@ -1,0 +1,61 @@
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/jroimartin/gocui"
+)
+
+func layoutManager(gui *gocui.Gui) error {
+	view1, err := gui.SetView("view1", 10, 5, 20, 10)
+	if err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(view1, "view1")
+	}
+
+	view2, err := gui.SetView("view2", 20, 15, 30, 20)
+	if err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(view2, "view2")
+	}
+
+	view3, err := gui.SetView("view3", 15, 25, 30, 30)
+	if err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(view3, "view3")
+	}
+	return nil
+}
+
+func quitEvent(g *gocui.Gui, v *gocui.View) error {
+	return gocui.ErrQuit
+}
+
+func main() {
+	gui, err := gocui.NewGui(gocui.OutputNormal)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gui.Close()
+
+	gui.SetManagerFunc(layoutManager)
+
+	err = gui.SetKeybinding("", 'q', gocui.ModNone, quitEvent)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gui.SetCurrentView("")
+
+	err = gui.MainLoop()
+	if err != nil && err != gocui.ErrQuit {
+		log.Fatal(err)
+	}
+}
