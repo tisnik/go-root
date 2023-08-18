@@ -99,7 +99,7 @@ func main() {
 
 		switch ev := event.(type) {
 		case *tcell.EventResize:
-			//screen.Sync()
+			// screen.Sync()
 			screen.Clear()
 			drawBoxAroundScreen(screen, boxStyle)
 		case *tcell.EventKey:
