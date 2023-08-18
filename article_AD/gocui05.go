@@ -50,13 +50,15 @@ func main() {
 
 	err = gui.SetKeybinding("", 'q', gocui.ModNone, quitEvent)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return
 	}
 
 	gui.SetCurrentView("")
 
 	err = gui.MainLoop()
 	if err != nil && err != gocui.ErrQuit {
-		log.Fatal(err)
+		log.Print(err)
+		return
 	}
 }
