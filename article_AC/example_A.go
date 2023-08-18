@@ -35,9 +35,7 @@ func main() {
 			screen.Sync()
 		case *tcell.EventKey:
 			switch ev.Key() {
-			case tcell.KeyEscape:
-				fallthrough
-			case tcell.KeyCtrlC:
+			case tcell.KeyEscape, tcell.KeyCtrlC:
 				return
 			}
 			switch ev.Rune() {
