@@ -62,8 +62,7 @@ func main() {
 
 		// příprava dat pro zápis
 		var record []string
-		record = append(record, strconv.FormatInt(n, 10))
-		record = append(record, strconv.FormatInt(f, 10))
+		record = append(record, strconv.FormatInt(n, 10), strconv.FormatInt(f, 10))
 
 		// připojení k výsledkům
 		records = append(records, record)
