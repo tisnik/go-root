@@ -5,6 +5,9 @@
 //    Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory
 //    https://www.root.cz/clanky/komunikace-se-sloupcovymi-databazemi-z-jazyka-go-parquet-soubory/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Seznam příkladů z šedesáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_68/README.md
 
