@@ -5,6 +5,9 @@
 //    Vykreslení tabulek do terminálu v jazyce Go
 //    https://www.root.cz/clanky/vykresleni-tabulek-do-terminalu-v-jazyce-go/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Seznam příkladů ze sedmdesáté části:
 //    https://github.com/tisnik/go-root/blob/master/article_70/README.md
 
