@@ -5,6 +5,9 @@
 //    Formátovaný tisk obsahu tabulek a dalších datových struktur v Go
 //    https://www.root.cz/clanky/formatovany-tisk-obsahu-tabulek-a-dalsich-datovych-struktur-v-go/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Seznam příkladů ze sedmdesáté první části:
 //    https://github.com/tisnik/go-root/blob/master/article_71/README.md
 
