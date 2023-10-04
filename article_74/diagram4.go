@@ -1,6 +1,9 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Seznam příkladů ze sedmdesáté čtvrté části:
 //    https://github.com/tisnik/go-root/blob/master/article_74/README.md
 
