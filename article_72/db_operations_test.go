@@ -5,6 +5,9 @@
 //    Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím
 //    https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Seznam příkladů ze sedmdesáté druhé části:
 //    https://github.com/tisnik/go-root/blob/master/article_72/README.md
 
