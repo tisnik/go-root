@@ -1,3 +1,9 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 package main
 
 import (
