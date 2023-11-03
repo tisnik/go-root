@@ -1,6 +1,9 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Sedmdesátá osmá část:
 //    Jazyk Go a vyhodnocování výrazů v době běhu aplikace
 //    https://www.root.cz/clanky/jazyk-go-a-vyhodnocovani-vyrazu-v-dobe-behu-aplikace/
