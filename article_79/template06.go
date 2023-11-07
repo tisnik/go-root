@@ -1,6 +1,9 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
 // Sedmdesátá devátá část:
 //    Standardní šablonovací systém jazyka Go
 //    https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go/
