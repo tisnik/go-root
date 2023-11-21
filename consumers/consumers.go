@@ -1,3 +1,28 @@
+/*
+
+The interface and struct hierarchies:
+
+Consumer [interface]
+    └── KafkaConsumer [struct]
+        ├── OCPRulesConsumer [value]
+        └── DVOConsumer [value]
+
+MessageProcessor [interface]
+    ├── OCPRulesProcessor [struct]
+    └── DVOProcessor [struct]
+
+OCPRulesProcessor satisfies MessageProcessor
+DVOProcessor satisfies MessageProcessor
+	ProcessMessage(consumer *KafkaConsumer, msg *sarama.ConsumerMessage)
+	- please see that all required info is passed to this method
+	- and it does not need the "true" OOP-like hierarchy of Consumers
+
+OCPRulesConsumer is instance of KafkaConsumer
+	- owns OCPRulesProcessor
+DVOConsumer is instance of KafkaConsumer
+	- owns DVOProcessor
+*/
+
 package main
 
 import (
