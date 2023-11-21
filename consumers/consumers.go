@@ -18,6 +18,7 @@ type Consumer interface {
 type KafkaConsumer struct {
 	ConsumerGroup                        sarama.ConsumerGroup
 	topic                                string
+	group                                string
 	numberOfSuccessfullyConsumedMessages uint64
 	numberOfErrorsConsumingMessages      uint64
 	ready                                chan bool
@@ -122,12 +123,12 @@ func (consumer *KafkaConsumer) GetNumberOfErrorsConsumingMessages() uint64 {
 
 func (consumer *KafkaConsumer) HandleMessage(msg *sarama.ConsumerMessage) error {
 	log.Info().Msg("KafkaConsumer: handle message")
-	consumer.messageProcessor.ProcessMessage()
+	consumer.messageProcessor.ProcessMessage(consumer, msg)
 	return nil
 }
 
 type MessageProcessor interface {
-	ProcessMessage()
+	ProcessMessage(consumer *KafkaConsumer, msg *sarama.ConsumerMessage)
 }
 
 // OCPRulesProcessor satisfies MessageProcessor interface
@@ -138,12 +139,14 @@ type OCPRulesProcessor struct {
 type DVOProcessor struct {
 }
 
-func (OCPRulesProcessor) ProcessMessage() {
+func (OCPRulesProcessor) ProcessMessage(consumer *KafkaConsumer, msg *sarama.ConsumerMessage) {
 	log.Info().Msg("OCPRulesProcessor: process message")
+	log.Info().Int("offset", int(msg.Offset)).Str("topic", consumer.topic).Str("group", consumer.group).Msg("Consumed")
 }
 
-func (DVOProcessor) ProcessMessage() {
+func (DVOProcessor) ProcessMessage(consumer *KafkaConsumer, msg *sarama.ConsumerMessage) {
 	log.Info().Msg("DVOProcessor: process message")
+	log.Info().Int("offset", int(msg.Offset)).Str("topic", consumer.topic).Str("group", consumer.group).Msg("Consumed")
 }
 
 func NewKafkaConsumer(address string, topic string, group string, messageProcessor MessageProcessor) (*KafkaConsumer, error) {
@@ -158,6 +161,7 @@ func NewKafkaConsumer(address string, topic string, group string, messageProcess
 	consumer := &KafkaConsumer{
 		ConsumerGroup:                        consumerGroup,
 		topic:                                topic,
+		group:                                group,
 		numberOfSuccessfullyConsumedMessages: 0,
 		numberOfErrorsConsumingMessages:      0,
 		ready:                                make(chan bool),
