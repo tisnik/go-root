@@ -14,6 +14,7 @@ type Consumer interface {
 	HandleMessage(msg *sarama.ConsumerMessage) error
 }
 
+// KafkaConsumer is the only needed implementation of Consumer interface
 type KafkaConsumer struct {
 	ConsumerGroup                        sarama.ConsumerGroup
 	topic                                string
@@ -21,14 +22,7 @@ type KafkaConsumer struct {
 	numberOfErrorsConsumingMessages      uint64
 	ready                                chan bool
 	cancel                               context.CancelFunc
-}
-
-type OCPRulesConsumer struct {
-	KafkaConsumer
-}
-
-type DVOConsumer struct {
-	KafkaConsumer
+	messageProcessor                     MessageProcessor
 }
 
 func (consumer *KafkaConsumer) Serve() {
@@ -115,23 +109,44 @@ func (consumer *KafkaConsumer) Close() error {
 }
 
 // GetNumberOfSuccessfullyConsumedMessages returns number of consumed messages
-// since creating OCPRulesConsumer obj
+// since creating consumer object
 func (consumer *KafkaConsumer) GetNumberOfSuccessfullyConsumedMessages() uint64 {
 	return consumer.numberOfSuccessfullyConsumedMessages
 }
 
 // GetNumberOfErrorsConsumingMessages returns number of errors during consuming messages
-// since creating OCPRulesConsumer obj
+// since creating consumer object
 func (consumer *KafkaConsumer) GetNumberOfErrorsConsumingMessages() uint64 {
 	return consumer.numberOfErrorsConsumingMessages
 }
 
 func (consumer *KafkaConsumer) HandleMessage(msg *sarama.ConsumerMessage) error {
 	log.Info().Msg("KafkaConsumer: handle message")
+	consumer.messageProcessor.ProcessMessage()
 	return nil
 }
 
-func NewKafkaConsumer(address string, topic string, group string) (*KafkaConsumer, error) {
+type MessageProcessor interface {
+	ProcessMessage()
+}
+
+// OCPRulesProcessor satisfies MessageProcessor interface
+type OCPRulesProcessor struct {
+}
+
+// DVOProcessor satisfies MessageProcessor interface
+type DVOProcessor struct {
+}
+
+func (OCPRulesProcessor) ProcessMessage() {
+	log.Info().Msg("OCPRulesProcessor: process message")
+}
+
+func (DVOProcessor) ProcessMessage() {
+	log.Info().Msg("DVOProcessor: process message")
+}
+
+func NewKafkaConsumer(address string, topic string, group string, messageProcessor MessageProcessor) (*KafkaConsumer, error) {
 	log.Print("New Kafka consumer")
 
 	consumerGroup, err := sarama.NewConsumerGroup([]string{address}, group, sarama.NewConfig())
@@ -146,43 +161,35 @@ func NewKafkaConsumer(address string, topic string, group string) (*KafkaConsume
 		numberOfSuccessfullyConsumedMessages: 0,
 		numberOfErrorsConsumingMessages:      0,
 		ready:                                make(chan bool),
+		messageProcessor:                     messageProcessor,
 	}
 	return consumer, nil
 }
 
-func NewOCPRulesConsumer(address string, topic string, group string) (*OCPRulesConsumer, error) {
+func NewOCPRulesConsumer(address string, topic string, group string) (*KafkaConsumer, error) {
 	log.Info().Msg("New OCP rules consumer")
 
-	kafkaConsumer, err := NewKafkaConsumer(address, topic, group)
+	consumer, err := NewKafkaConsumer(address, topic, group, OCPRulesProcessor{})
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to create Kafka consumer")
 		return nil, err
 	}
 
-	consumer := &OCPRulesConsumer{
-		KafkaConsumer: *kafkaConsumer,
-	}
 	return consumer, nil
 }
 
-func NewDVOConsumer(address string, topic string, group string) (*DVOConsumer, error) {
+// very similar to previous one, but we probably will need to "tune" it later so let's keep it separated
+
+func NewDVOConsumer(address string, topic string, group string) (*KafkaConsumer, error) {
 	log.Info().Msg("New DVO consumer")
 
-	kafkaConsumer, err := NewKafkaConsumer(address, topic, group)
+	consumer, err := NewKafkaConsumer(address, topic, group, DVOProcessor{})
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to create Kafka consumer")
 		return nil, err
 	}
 
-	consumer := &DVOConsumer{
-		KafkaConsumer: *kafkaConsumer,
-	}
 	return consumer, nil
-}
-
-func (consumer *OCPRulesConsumer) HandleMessage(msg *sarama.ConsumerMessage) error {
-	log.Info().Msg("OCPRulesConsumer: handle message")
-	return nil
 }
 
 func main() {
@@ -194,6 +201,7 @@ func main() {
 
 	consumer2, _ := NewDVOConsumer("localhost:9092", "topic2", "group2")
 	println(consumer2)
+	consumer2.Serve()
 
 	log.Info().Msg("Finishing")
 }
