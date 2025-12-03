@@ -1,3 +1,12 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam příkladů z osmdesáté šesté části:
+//    https://github.com/tisnik/go-root/blob/master/article_86/README.md
+
 package main
 
 // #include <stdlib.h>
