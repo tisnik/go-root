@@ -19,18 +19,18 @@ func displaySegments(bits []bool) {
 }
 
 func main() {
-	c1 := machine.Pin(machine.GP5)
+	c1 := machine.GP5
 	c1.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	c1.High()
 
-	pins[0] = machine.Pin(machine.GP11)
-	pins[1] = machine.Pin(machine.GP9)
-	pins[2] = machine.Pin(machine.GP13)
-	pins[3] = machine.Pin(machine.GP15)
-	pins[4] = machine.Pin(machine.GP16)
-	pins[5] = machine.Pin(machine.GP10)
-	pins[6] = machine.Pin(machine.GP12)
-	pins[7] = machine.Pin(machine.GP14)
+	pins[0] = machine.GP11
+	pins[1] = machine.GP9
+	pins[2] = machine.GP13
+	pins[3] = machine.GP15
+	pins[4] = machine.GP16
+	pins[5] = machine.GP10
+	pins[6] = machine.GP12
+	pins[7] = machine.GP14
 
 	for _, pin := range pins {
 		pin.Configure(machine.PinConfig{Mode: machine.PinOutput})
