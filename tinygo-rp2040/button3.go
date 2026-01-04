@@ -8,10 +8,10 @@ const InputPin = machine.GP0
 const OutputPin = machine.GP2
 
 func main() {
-	led := machine.Pin(OutputPin)
+	led := OutputPin
 	led.Configure(machine.PinConfig{Mode: machine.PinOutput})
 
-	button := machine.Pin(InputPin)
+	button := InputPin
 	button.Configure(machine.PinConfig{Mode: machine.PinInput})
 
 	for {
