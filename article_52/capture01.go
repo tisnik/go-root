@@ -10,6 +10,9 @@
 //
 // Seznam demonstračních příkladů z padesáté druhé části:
 //    https://github.com/tisnik/go-root/blob/master/article_52/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_52/capture01.html
 
 package main
 
