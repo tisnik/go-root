@@ -10,6 +10,9 @@
 //
 // Seznam demonstračních příkladů z padesáté třetí části:
 //    https://github.com/tisnik/go-root/blob/master/article_53/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_53/add02.html
 
 package main
 
