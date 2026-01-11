@@ -26,22 +26,25 @@ func main() {
 		colsData.Low()
 		colsClock.High()
 		colsData.High()
-		for x := range 32 {
-			for y := range 8 {
+
+		for range 32 {
+			for range 8 {
 				rowsData.Set(true)
 				rowsClock.Low()
 				time.Sleep(1 * time.Millisecond)
 				rowsClock.High()
 			}
-			colsClock.High()
-			time.Sleep(1 * time.Millisecond)
-			colsClock.Low()
-			colsLatch.High()
-			time.Sleep(1 * time.Millisecond)
-			colsLatch.Low()
 			rowsLatch.High()
 			time.Sleep(1 * time.Millisecond)
 			rowsLatch.Low()
+
+			colsClock.High()
+			time.Sleep(1 * time.Millisecond)
+			colsClock.Low()
+
+			colsLatch.High()
+			time.Sleep(1 * time.Millisecond)
+			colsLatch.Low()
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
