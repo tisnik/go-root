@@ -11,7 +11,8 @@
 // Seznam demonstračních příkladů z páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
-// Příkaz zapsaný za klíčovým slovem if, hodnota není viditelná za if.
+// Demonstrační příklad číslo 10C:
+//    Příkaz zapsaný za klíčovým slovem if, hodnota není viditelná za if.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/10C_statement_in_if_not_visible.html
