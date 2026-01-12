@@ -1,4 +1,5 @@
-// Seznam demonstračních příkladů uložených v tomto adresáři:
+// Seznam zdrojových kódů v tomto podadresáři
+// ------------------------------------------
 //
 // 01_hello_world.go:
 //    Program typu "Hello world!"
