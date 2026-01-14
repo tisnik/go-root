@@ -1,11 +1,11 @@
 // Seznam zdrojových kódů v tomto podadresáři
 // ------------------------------------------
 //
-// 01_B_unique_names.go:
-//    Unikátní jména metod.
-//
 // 01_methods.go:
 //    Definice a zavolání metody navázané na strukturu Line.
+//
+// 01_B_unique_names.go:
+//    Unikátní jména metod.
 //
 // 02_methods_with_parameters.go:
 //    Metoda bez parametrů a metoda s parametry.
@@ -22,10 +22,10 @@
 // 06_interface_implementation.go:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape.
 //
-// 07_B_wrong_return_type.go:
+// 07_interface_implementation_with_method.go:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
 //
-// 07_interface_implementation_with_method.go:
+// 07_B_wrong_return_type.go:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
 //
 // 08_more_implementations.go:
