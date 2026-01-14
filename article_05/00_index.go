@@ -28,14 +28,14 @@
 // 09_if_else_construct.go:
 //    Řídicí konstrukce if-else.
 //
+// 10_bad_syntax.go:
+//    Příklady špatné syntaxe konstrukce if-else.
+//
 // 10B_statement_in_if.go:
 //    Příkaz zapsaný za klíčovým slovem if.
 //
 // 10C_statement_in_if_not_visible.go:
 //    Příkaz zapsaný za klíčovým slovem if, hodnota není viditelná za if.
-//
-// 10_bad_syntax.go:
-//    Příklady špatné syntaxe konstrukce if-else.
 //
 // 11_switch_statement.go:
 //    Řídicí konstrukce switch bez vyhodnocovaného výrazu.
@@ -79,13 +79,13 @@
 // 24_better_for_local_variable.go:
 //    Zjednodušená forma programové smyčky for odvozené od C.
 //
+// 25_for_range.go:
+//    For s range.
+//
 // 25B_for_range_without_index.go:
 //    Varianta s nepoužitým indexem.
 //
 // 25C_for_range_without_index.go:
-//    For s range.
-//
-// 25_for_range.go:
 //    For s range.
 //
 // 26_for_range_map.go:
