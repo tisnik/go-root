@@ -12,6 +12,6 @@ for file in files:
                 if title:
                     print(line)
                     break
-                if line.startswith("// Demonstrační příklad "):
+                if line.startswith("// Demonstrační příklad"):
                     title = True
         print("//")
