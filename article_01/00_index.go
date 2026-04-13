@@ -2,10 +2,10 @@
 // ------------------------------------------
 //
 // 01_hello_world.go:
-//    Program typu "Hello world!"
+//    Program typu "Hello world!" naprogramovaný v jazyce Go.
 //
 // 02_better_hello_world.go:
-//    Vylepšený program typu "Hello world!"
+//    Vylepšený program typu "Hello world!" naprogramovaný v jazyce Go
 //
 // 03_unused_imports.go:
 //    Nepoužitý importovaný modul "fmt"
@@ -14,7 +14,7 @@
 //    Použití Unicode ve zdrojovém kódu
 //
 // 05_basic_type_inference.go:
-//    Deklarace proměnné s její inicializací
+//    Deklarace proměnné s její inicializací, typová inference
 //
 // 06_variable_redeclaration.go:
 //    Pokus o opětovnou deklaraci proměnných
@@ -26,7 +26,7 @@
 //    Špatný typ hodnoty přiřazený do proměnných
 //
 // 09_simple_function.go:
-//    Deklarace uživatelské funkce
+//    Deklarace uživatelské funkce bez parametrů a bez návratové hodnoty
 //
 // 10_function_with_params.go:
 //    Deklarace uživatelské funkce s jedním parametrem
@@ -35,7 +35,7 @@
 //    Deklarace uživatelské funkce s návratovou hodnotou
 //
 // 12_named_return_variable.go:
-//    Použití pojmenovaného návratového parametru
+//    Použití pojmenovaného návratového parametru v definici funkce
 //
 // 13_sum_function.go:
 //    Funkce se dvěma parametry
@@ -44,7 +44,7 @@
 //    Funkce se dvěma parametry a dvěma návratovými hodnotami
 //
 // 15_swap_function_B.go:
-//    Funkce se dvěma parametry a dvěma návratovými hodnotami
+//    Funkce se dvěma parametry a dvěma návratovými hodnotami, využití typové inference
 //
 // 16_return_at_the_end_of_function.go:
 //    Chybný pokus o deklaraci proměnné za příkazem return
