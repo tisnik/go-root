@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Deklarace proměnné s její inicializací
+//    Deklarace proměnné s její inicializací, typová inference
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/05_basic_type_inference.html
