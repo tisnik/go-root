@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 23
-//    Kopie řezů polí
+//    Kopie řezů polí, modifikace obsahu pole i řezu
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/23_slice_copy.html
