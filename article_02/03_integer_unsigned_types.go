@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 3:
-//    Celočíselné datové typy bez znaménka
+//    Celočíselné datové typy bez znaménka (unsigned integers)
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/03_integer_unsigned_types.html
