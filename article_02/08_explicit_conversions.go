@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 8
-//    Konverze mezi základními datovými typy
+//    Explicitní konverze mezi základními datovými typy
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/08_explicit_conversions.html
