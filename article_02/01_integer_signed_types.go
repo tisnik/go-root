@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 1:
-//    Celočíselné datové typy se znaménkem
+//    Všechny celočíselné datové typy se znaménkem (signed integers)
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/01_integer_signed_types.html
@@ -25,7 +25,7 @@ func main() {
 	var a int8 = -10
 	var b int16 = -1000
 	var c int32 = -10000
-	var d int32 = -1000000
+	var d int64 = -1000000
 
 	var r1 rune = 'a'
 	var r2 rune = '\x40'
