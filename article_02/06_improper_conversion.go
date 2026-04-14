@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Přiřazení uint16 -> uint8
+//    Přiřazení uint16 -> uint8 ve zdrojovém kódu
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/06_improper_conversion.html
