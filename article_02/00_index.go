@@ -2,28 +2,28 @@
 // ------------------------------------------
 //
 // 01_integer_signed_types.go:
-//    Celočíselné datové typy se znaménkem
+//    Všechny celočíselné datové typy se znaménkem (signed integers)
 //
 // 02_integer_signed_types_checks.go:
-//    Kontrola celočíselných konstant
+//    Kontrola celočíselných konstant překladačem
 //
 // 03_integer_unsigned_types.go:
-//    Celočíselné datové typy bez znaménka
+//    Celočíselné datové typy bez znaménka (unsigned integers)
 //
 // 04_integer_constants.go:
 //    Celočíselné konstanty reprezentované v různých číselných soustavách
 //
 // 05_improper_conversion.go:
-//    Přiřazení uint8 -> uint16
+//    Přiřazení uint8 -> uint16 ve zdrojovém kódu
 //
 // 06_improper_conversion.go:
-//    Přiřazení uint16 -> uint8
+//    Přiřazení uint16 -> uint8 ve zdrojovém kódu
 //
 // 07_improper_conversion_int_uint.go:
 //    Přiřazení uint8 -> int8 a naopak
 //
 // 08_explicit_conversions.go:
-//    Konverze mezi základními datovými typy
+//    Explicitní konverze mezi základními datovými typy
 //
 // 09_formatting_output.go:
 //    Základní formátování celočíselných hodnot na výstupu
@@ -68,7 +68,7 @@
 //    Řezy polí
 //
 // 23_slice_copy.go:
-//    Kopie řezů polí
+//    Kopie řezů polí, modifikace obsahu pole i řezu
 //
 // 24_slice_from_slice.go:
 //    Kopie řezů polí
