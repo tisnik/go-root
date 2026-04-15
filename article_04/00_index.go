@@ -5,25 +5,25 @@
 //    Definice a zavolání metody navázané na strukturu Line.
 //
 // 01_B_unique_names.go:
-//    Unikátní jména metod.
+//    Unikátní jména metod i pro různé struktury.
 //
 // 02_methods_with_parameters.go:
 //    Metoda bez parametrů a metoda s parametry.
 //
 // 03_methods_ptr.go:
-//    Metody s parametry, předání struktury odkazem.
+//    Metody s parametry, předání struktury do metody odkazem.
 //
 // 04_methods_ptr_better_solution.go:
-//    Metody s parametry, předání struktury odkazem, lepší řešení.
+//    Metody s parametry, předání struktury do metody odkazem, lepší řešení.
 //
 // 05_interface.go:
-//    Definice trojice jednoduchých rozhraní.
+//    Definice trojice jednoduchých rozhraní (interface).
 //
 // 06_interface_implementation.go:
-//    Implementace jednoduchého rozhraní nazvaného OpenShape.
+//    Implementace jednoduchého rozhraní (interface) nazvaného OpenShape.
 //
 // 07_interface_implementation_with_method.go:
-//    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
+//    Implementace jednoduchého rozhraní (interface) nazvaného OpenShape metodou.
 //
 // 07_B_wrong_return_type.go:
 //    Implementace jednoduchého rozhraní nazvaného OpenShape metodou.
@@ -38,16 +38,16 @@
 //    Řez s objekty implementující rozhraní předané jako parametr.
 //
 // 11_multiple_interfaces.go:
-//    Typ implementující dvě rozhraní.
+//    Uživatelský datový typ implementující dvě rozhraní.
 //
 // 12_embedded_interface.go:
-//    Typ implementující dvě rozhraní.
+//    Uživatelsky datový typ implementující dvě rozhraní.
 //
 // 13_simple_goroutine.go:
-//    Zavolání funkce v gorutině.
+//    Zavolání funkce v nové gorutině.
 //
 // 14_wait_for_goroutine.go:
-//    Zavolání funkce v gorutině, počkání na dokončení.
+//    Zavolání funkce v nové gorutině, počkání na dokončení funkce.
 //
 // 15_multiple_goroutines.go:
 //    Zavolání funkcí v gorutinách, počkání na dokončení.
@@ -56,14 +56,14 @@
 //    Zavolání další gorutiny z jiné gorutiny.
 //
 // 17_channel.go:
-//    Kanál pro komunikaci a synchronizaci mezi gorutinami.
+//    Kanál použitý pro komunikaci a synchronizaci mezi gorutinami.
 //
 // 18_worker.go:
-//    Jednoduchá implementace workerů.
+//    Jednoduchá implementace workerů s využitím gorutin a kanálů.
 //
 // 19_more_workers.go:
-//    Jednoduchá implementace workerů.
+//    Jednoduchá implementace workerů s využitím gorutin a kanálů.
 //
 // 20_workers_deadlock.go:
-//    Deadlock.
+//    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
