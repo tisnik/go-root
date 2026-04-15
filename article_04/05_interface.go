@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Definice trojice jednoduchých rozhraní.
+//    Definice trojice jednoduchých rozhraní (interface).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/05_interface.html
