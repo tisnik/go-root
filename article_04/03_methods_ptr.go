@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 3:
-//    Metody s parametry, předání struktury odkazem.
+//    Metody s parametry, předání struktury do metody odkazem.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/03_methods_ptr.html
