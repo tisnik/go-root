@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 1B:
-//    Unikátní jména metod.
+//    Unikátní jména metod i pro různé struktury.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/01_B_unique_names.html
