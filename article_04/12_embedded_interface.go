@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 12:
-//    Typ implementující dvě rozhraní.
+//    Uživatelsky datový typ implementující dvě rozhraní.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/12_embedded_interface.html
