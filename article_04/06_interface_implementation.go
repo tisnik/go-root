@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Implementace jednoduchého rozhraní nazvaného OpenShape.
+//    Implementace jednoduchého rozhraní (interface) nazvaného OpenShape.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/06_interface_implementation.html
