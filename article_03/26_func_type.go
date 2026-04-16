@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_03/README.md
 //
 // Demonstrační příklad číslo 26:
-//    Datový typ "funkce"
+//    Datový typ "funkce".
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_03/26_func_type.html
