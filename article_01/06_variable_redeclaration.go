@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Pokus o opětovnou deklaraci proměnných
+//    Pokus o opětovnou deklaraci proměnných.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/06_variable_redeclaration.html

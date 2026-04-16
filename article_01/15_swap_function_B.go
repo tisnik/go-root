@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 15:
-//    Funkce se dvěma parametry a dvěma návratovými hodnotami, využití typové inference
+//    Funkce se dvěma parametry a dvěma návratovými hodnotami, využití typové inference.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/15_swap_function_B.html

@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 12:
-//    Použití pojmenovaného návratového parametru v definici funkce
+//    Použití pojmenovaného návratového parametru v definici funkce.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/12_named_return_variable.html

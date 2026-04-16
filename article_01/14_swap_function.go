@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 14:
-//    Funkce se dvěma parametry a dvěma návratovými hodnotami
+//    Funkce se dvěma parametry a dvěma návratovými hodnotami.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/14_swap_function.html

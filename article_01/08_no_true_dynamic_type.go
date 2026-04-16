@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 8:
-//    Špatný typ hodnoty přiřazený do proměnných
+//    Špatný typ hodnoty přiřazený do proměnných.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/08_no_true_dynamic_type.html

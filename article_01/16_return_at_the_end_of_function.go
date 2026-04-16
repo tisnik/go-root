@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_01/README.md
 //
 // Demonstrační příklad číslo 16:
-//    Chybný pokus o deklaraci proměnné za příkazem return
+//    Chybný pokus o deklaraci proměnné za příkazem return.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_01/16_return_at_the_end_of_function.html
