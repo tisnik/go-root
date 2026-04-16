@@ -5,47 +5,47 @@
 //    Program typu "Hello world!" naprogramovaný v jazyce Go.
 //
 // 02_better_hello_world.go:
-//    Vylepšený program typu "Hello world!" naprogramovaný v jazyce Go
+//    Vylepšený program typu "Hello world!" naprogramovaný v jazyce Go.
 //
 // 03_unused_imports.go:
-//    Nepoužitý importovaný modul "fmt"
+//    Nepoužitý importovaný modul "fmt".
 //
 // 04_hello_unicode.go:
-//    Použití Unicode ve zdrojovém kódu
+//    Použití Unicode ve zdrojovém kódu.
 //
 // 05_basic_type_inference.go:
-//    Deklarace proměnné s její inicializací, typová inference
+//    Deklarace proměnné s její inicializací, typová inference.
 //
 // 06_variable_redeclaration.go:
-//    Pokus o opětovnou deklaraci proměnných
+//    Pokus o opětovnou deklaraci proměnných.
 //
 // 07_variable_reassign.go:
-//    Změna hodnoty již existující proměnné
+//    Změna hodnoty již existující proměnné.
 //
 // 08_no_true_dynamic_type.go:
-//    Špatný typ hodnoty přiřazený do proměnných
+//    Špatný typ hodnoty přiřazený do proměnných.
 //
 // 09_simple_function.go:
-//    Deklarace uživatelské funkce bez parametrů a bez návratové hodnoty
+//    Deklarace uživatelské funkce bez parametrů a bez návratové hodnoty.
 //
 // 10_function_with_params.go:
-//    Deklarace uživatelské funkce s jedním parametrem
+//    Deklarace uživatelské funkce s jedním parametrem.
 //
 // 11_return_statement.go:
-//    Deklarace uživatelské funkce s návratovou hodnotou
+//    Deklarace uživatelské funkce s návratovou hodnotou.
 //
 // 12_named_return_variable.go:
-//    Použití pojmenovaného návratového parametru v definici funkce
+//    Použití pojmenovaného návratového parametru v definici funkce.
 //
 // 13_sum_function.go:
-//    Funkce se dvěma parametry
+//    Funkce se dvěma parametry.
 //
 // 14_swap_function.go:
-//    Funkce se dvěma parametry a dvěma návratovými hodnotami
+//    Funkce se dvěma parametry a dvěma návratovými hodnotami.
 //
 // 15_swap_function_B.go:
-//    Funkce se dvěma parametry a dvěma návratovými hodnotami, využití typové inference
+//    Funkce se dvěma parametry a dvěma návratovými hodnotami, využití typové inference.
 //
 // 16_return_at_the_end_of_function.go:
-//    Chybný pokus o deklaraci proměnné za příkazem return
+//    Chybný pokus o deklaraci proměnné za příkazem return.
 //
