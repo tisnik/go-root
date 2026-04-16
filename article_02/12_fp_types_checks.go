@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 12
-//    Datové typy reprezentující hodnoty s plovoucí řádovou čárkou, kontrola rozsahu
+//    Datové typy reprezentující hodnoty s plovoucí řádovou čárkou, kontrola rozsahu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/12_fp_types_checks.html

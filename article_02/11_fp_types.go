@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 11
-//    Datové typy reprezentující hodnoty s plovoucí řádovou čárkou
+//    Datové typy reprezentující hodnoty s plovoucí řádovou čárkou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/11_fp_types.html

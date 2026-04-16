@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 10:
-//    Základní formátování celočíselných hodnot na výstupu
+//    Základní formátování celočíselných hodnot na výstupu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/10_formatting_output.html

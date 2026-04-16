@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 18
-//    Datový typ řetězec a jeho obsah
+//    Datový typ řetězec a jeho obsah.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/18_string_content.html

@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_02/README.md
 //
 // Demonstrační příklad číslo 1:
-//    Všechny celočíselné datové typy se znaménkem (signed integers)
+//    Všechny celočíselné datové typy se znaménkem (signed integers).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_02/01_integer_signed_types.html
