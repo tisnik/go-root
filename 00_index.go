@@ -208,19 +208,19 @@
 //    Ukazatel na prvek pole.
 //
 // 26_func_type.go:
-//    Datový typ "funkce"
+//    Datový typ "funkce".
 //
 // 27_func_type_2.go:
-//    Datový typ "funkce s parametry"
+//    Datový typ "funkce s parametry".
 //
 // 28_improper_func_type.go:
 //    Kontroly při překladu.
 //
 // 29_func_type_3.go:
-//    Datový typ "funkce s návratovou hodnotou"
+//    Datový typ "funkce s návratovou hodnotou".
 //
 // 30_func_type_alt_block.go:
-//    Datový typ "funkce s návratovou hodnotou"
+//    Datový typ "funkce s návratovou hodnotou".
 //
 
 
