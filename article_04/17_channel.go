@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 17:
-//    Kanál pro komunikaci a synchronizaci mezi gorutinami.
+//    Kanál použitý pro komunikaci a synchronizaci mezi gorutinami.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/17_channel.html
