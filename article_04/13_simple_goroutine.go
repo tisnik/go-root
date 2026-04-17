@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 13:
-//    Zavolání funkce v gorutině.
+//    Zavolání funkce v nové gorutině.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/13_simple_goroutine.html
