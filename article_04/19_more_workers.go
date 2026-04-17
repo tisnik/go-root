@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 19:
-//    Jednoduchá implementace workerů.
+//    Jednoduchá implementace workerů s využitím gorutin a kanálů.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/19_more_workers.html
