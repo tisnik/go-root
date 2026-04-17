@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 3:
-//    Příkaz return ve funkci bez návratové hodnoty
+//    Příkaz return ve funkci bez návratové hodnoty, korektní použití.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/03_return_statement_no_value.html
