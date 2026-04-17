@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 14:
-//    Zavolání funkce v gorutině, počkání na dokončení.
+//    Zavolání funkce v nové gorutině, počkání na dokončení funkce.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/14_wait_for_goroutine.html
