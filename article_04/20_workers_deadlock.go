@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_04/README.md
 //
 // Demonstrační příklad číslo 20:
-//    Deadlock.
+//    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_04/20_workers_deadlock.html
