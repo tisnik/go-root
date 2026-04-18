@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 19:
-//    Základní forma programové smyčky for.
+//    Základní forma programové smyčky typu for.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/19_simplest_for_loop.html
