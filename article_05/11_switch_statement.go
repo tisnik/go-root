@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 11:
-//    Řídicí konstrukce switch bez vyhodnocovaného výrazu.
+//    Řídicí konstrukce typu switch bez vyhodnocovaného výrazu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/11_switch_statement.html
