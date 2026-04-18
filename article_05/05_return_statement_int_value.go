@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Příkaz return ve funkci s návratovou hodnotou.
+//    Příkaz return ve funkci s návratovou hodnotou, korektní použití.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/05_return_statement_int_value.html
