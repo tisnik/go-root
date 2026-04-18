@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 14:
-//    Řídicí konstrukce switch s výrazy ve větvích case.
+//    Řídicí konstrukce typu switch s výrazy ve větvích case.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/14_conditions_in_switch.html
