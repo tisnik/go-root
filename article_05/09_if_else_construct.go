@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 9:
-//    Řídicí konstrukce if-else.
+//    Řídicí konstrukce typu if-else.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/09_if_else_construct.html
