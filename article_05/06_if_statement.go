@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Řídicí konstrukce if.
+//    Řídicí konstrukce typu if.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/06_if_statement.html
