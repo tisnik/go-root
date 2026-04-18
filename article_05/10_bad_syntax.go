@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 10:
-//    Příklady špatné syntaxe konstrukce if-else.
+//    Příklady špatné syntaxe konstrukce typu if-else.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/10_bad_syntax.html
