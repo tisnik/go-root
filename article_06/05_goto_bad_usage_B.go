@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - skok do programového bloku.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/05_goto_bad_usage_B.html
