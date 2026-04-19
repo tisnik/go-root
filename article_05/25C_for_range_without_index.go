@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 25:
-//    For s range.
+//    Smyčka for s range.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/25C_for_range_without_index.html
