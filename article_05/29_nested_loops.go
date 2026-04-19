@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_05/README.md
 //
 // Demonstrační příklad číslo 29:
-//    Dvojice vnořených smyček for.
+//    Dvojice vnořených programových smyček for.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_05/29_nested_loops.html
