@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 4:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - přeskakuje se deklarace proměnné.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/04_goto_bad_usage_A.html
