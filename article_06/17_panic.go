@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 17:
-//    Praktické použití konstrukce defer a panic.
+//    Praktické použití konstrukce defer a funkce panic.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/17_panic.html
