@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 8:
-//    Použití příkazu defer.
+//    Použití příkazu defer - odložené volání anonymní funkce.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/08_defer_func.html
