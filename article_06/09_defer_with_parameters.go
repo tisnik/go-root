@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 9:
-//    Použití příkazu defer, zavolání funkce s parametrem.
+//    Použití příkazu defer, odložené zavolání funkce s parametrem.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/09_defer_with_parameters.html
