@@ -51,6 +51,8 @@
 //    Chybný pokus o deklaraci proměnné za příkazem return.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_02
 // ----------------------------------------------------
@@ -127,6 +129,8 @@
 // 24_slice_from_slice.go:
 //    Kopie řezů polí.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_03
@@ -295,6 +299,8 @@
 // 20_workers_deadlock.go:
 //    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_05
