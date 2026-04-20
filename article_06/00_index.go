@@ -11,28 +11,28 @@
 //    Výskok z příkazu switch pomocí goto.
 //
 // 04_goto_bad_usage_A.go:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - přeskakuje se deklarace proměnné.
 //
 // 05_goto_bad_usage_B.go:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - skok do programového bloku.
 //
 // 06_goto_bad_usage_C.go:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - skok do programové smyčky.
 //
 // 06_goto_bad_usage_D.go:
-//    Špatné použití příkazu goto.
+//    Špatné použití příkazu goto - skok do jiné funkce.
 //
 // 06_goto_local_labels.go:
-//    Lokální návěští.
+//    Lokální návěští použité v příkazu goto.
 //
 // 07_defer.go:
-//    Použití příkazu defer.
+//    Použití příkazu defer - odložené volání funkce.
 //
 // 08_defer_func.go:
-//    Použití příkazu defer.
+//    Použití příkazu defer - odložené volání anonymní funkce.
 //
 // 09_defer_with_parameters.go:
-//    Použití příkazu defer, zavolání funkce s parametrem.
+//    Použití příkazu defer, odložené zavolání funkce s parametrem.
 //
 // 10_more_defers.go:
 //    Zjištění pořadí volání funkcí deklarovaných v defer().
@@ -56,10 +56,10 @@
 //    Modifikace návratové hodnoty funkce v sekci defer.
 //
 // 17_panic.go:
-//    Praktické použití konstrukce defer a panic.
+//    Praktické použití konstrukce defer a funkce panic.
 //
 // 18_panic_recover.go:
-//    Praktické použití konstrukce defer, panic a recover.
+//    Praktické použití konstrukce defer a funkcí panic i recover.
 //
 // 19_unary_operators.go:
 //    Všechny unární operátory jazyka Go.
@@ -71,7 +71,7 @@
 //    Dělení a zbytek po dělení.
 //
 // 22_div_by_zero.go:
-//    Dělení a zbytek po dělení.
+//    Dělení nulou a zbytek po dělení nulou.
 //
 // 23_bit_shift_negative_shift.go:
 //    Bitové posuny s negativním druhým operandem.
@@ -83,5 +83,5 @@
 //    Bitové posuny zkombinované s přiřazením.
 //
 // 26_bit_operators.go:
-//    Bitové operátory.
+//    Bitové operátory se dvěma operandy.
 //
