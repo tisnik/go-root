@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_06/README.md
 //
 // Demonstrační příklad číslo 22:
-//    Dělení a zbytek po dělení.
+//    Dělení nulou a zbytek po dělení nulou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_06/22_div_by_zero.html
