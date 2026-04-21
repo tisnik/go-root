@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Použití příkazu select pro čtení z kanálů.
+//    Použití příkazu select pro čtení hodnot z kanálů.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/06_select_statement_receive.html
