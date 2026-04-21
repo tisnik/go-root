@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Nekorektní použití operátorů ++ a --.
+//    Nekorektní použití operátorů ++ a -- (inkrementace a dekrementace).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/05_inc_dec_bad_usage.html
