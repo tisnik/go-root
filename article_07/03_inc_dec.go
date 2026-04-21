@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 3:
-//    Operátory ++ a --.
+//    Operátory ++ a -- (inkrementace a dekrementace).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/03_inc_dec.html
