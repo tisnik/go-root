@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 2:
-//    Logické operátory.
+//    Logické operátory, nekorektní použití.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/02_boolean_operators.html
