@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 12:
-//    Konstanty.
+//    Deklarace globálních konstant.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/12_constants.html
