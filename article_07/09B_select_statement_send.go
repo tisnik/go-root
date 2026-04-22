@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 9:
-//    Použití příkazu select pro zápis do kanálu.
+//    Použití příkazu select pro zápis hodnot do kanálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/09B_select_statement_send.html
