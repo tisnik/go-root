@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_07/README.md
 //
 // Demonstrační příklad číslo 15:
-//    Konstanty a identifikátor iota.
+//    Konstanty a identifikátor iota, komplikovanější příklady.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_07/15_iota_another_usage.html
