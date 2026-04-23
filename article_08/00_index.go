@@ -2,58 +2,58 @@
 // ------------------------------------------
 //
 // 01_enum_with_iota.go:
-//    Náhrada za enum: běžné konstanty a identifikátor iota.
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
 //
 // 02_enum_with_iota_type_check.go:
-//    Náhrada za enum: běžné konstanty a identifikátor iota.
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
 //
 // 03_enum_with_iota.go:
-//    Náhrada za enum: běžné konstanty a identifikátor iota.
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
 //
 // 04_enum_with_iota.go:
 //    Převod "výčtu" na řetězec.
 //
 // 05_enum_as_type.go:
-//    Výčet jako datový typ.
+//    Výčet jako datový typ v jazyku Go.
 //
 // 06_enum_as_type.go:
 //    Výčet jako datový typ: nemožnost použití operátoru ++.
 //
 // 07_channel_as_fifo.go:
-//    Kanál s definovanou kapacitou, který se chová jako FIFO.
+//    Kanál s definovanou kapacitou, který se v runtime chová jako FIFO.
 //
 // 08_channel_and_range.go:
-//    Kanál s definovanou kapacitou, příkaz range.
+//    Kanál s definovanou kapacitou, příkaz range pro čtení z kanálu.
 //
 // 09_channel_and_range.go:
-//    Kanál s definovanou kapacitou, příkaz range.
+//    Kanál s definovanou kapacitou, příkaz range pro čtení z kanálu.
 //
 // 10_read_from_closed_channel.go:
-//    Čtení ze zavřeného kanálu.
+//    Pokus o čtení ze zavřeného kanálu.
 //
 // 11_sync_with_channel.go:
 //    Kanál ve funkci synchronizační struktury.
 //
 // 12_select_statement_receive.go:
-//    Použití příkazu select pro čtení z kanálů s timeoutem.
+//    Použití příkazu select pro čtení z většího množství kanálů s timeoutem.
 //
 // 13_select_statement_receive.go:
-//    Použití příkazu select pro čtení z kanálů s timeoutem.
+//    Použití příkazu select pro čtení z většího množství kanálů s timeoutem.
 //
 // 14_select_statement_receive.go:
 //    Použití příkazu select pro čtení z kanálů s timeoutem + větev default.
 //
 // 15_alternate_import_alias.go:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, zápis na jednom řádku.
 //
 // 16_alternate_import_alias.go:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, zápis do bloku.
 //
 // 17_alternate_import_dot.go:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, tečka na místě výchozího jmenného prostoru.
 //
 // 18_alternate_import_dot.go:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, tečka na místě výchozího jmenného prostoru.
 //
 // 19_use_package_hello1.go:
 //    Import vlastního balíčku.
@@ -68,5 +68,5 @@
 //    Inicializace balíčku.
 //
 // 23_package_init.go:
-//    Inicializace balíčku.
+//    Inicializace balíčku, implicitně a automaticky se volá funkce init.
 //
