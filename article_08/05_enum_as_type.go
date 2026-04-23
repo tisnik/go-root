@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Výčet jako datový typ.
+//    Výčet jako datový typ v jazyku Go.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/05_enum_as_type.html
