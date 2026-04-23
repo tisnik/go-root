@@ -502,3 +502,152 @@
 // 26_bit_operators.go:
 //    Bitové operátory se dvěma operandy.
 //
+
+
+
+// ----------------------------------------------------
+// Adresář: article_07
+// ----------------------------------------------------
+//
+// 01_bit_operators.go:
+//    Bitové operátory.
+//
+// 02_boolean_operators.go:
+//    Logické operátory, korektní použití.
+//
+// 02A_boolean_operators_short_circuit.go:
+//    Logické operátory, zkrácené vyhodnocování výrazů.
+//
+// 02B_boolean_operators_improper_usage.go:
+//    Nekorektní použití operátorů na pravdivostní hodnoty.
+//
+// 02C_boolean_operators_improper_usage.go:
+//    Logické operátory, nekorektní použití.
+//
+// 03_inc_dec.go:
+//    Operátory ++ a -- (inkrementace a dekrementace).
+//
+// 04_inc_dec_bad_usage.go:
+//    Nekorektní použití operátorů ++ a -- (inkrementace a dekrementace).
+//
+// 05_inc_dec_bad_usage.go:
+//    Nekorektní použití operátorů ++ a -- (inkrementace a dekrementace).
+//
+// 06_select_statement_receive.go:
+//    Použití příkazu select pro čtení hodnot z kanálů.
+//
+// 07_select_statement_receive_default.go:
+//    Použití příkazu select pro čtení hodnot z kanálů.
+//
+// 08_select_statement_send.go:
+//    Použití příkazu select pro zápis hodnot do kanálu.
+//
+// 09_select_statement_send.go:
+//    Použití příkazu select pro zápis hodnot do kanálu.
+//
+// 09B_select_statement_send.go:
+//    Použití příkazu select pro zápis hodnot do kanálu.
+//
+// 10_select_statement_send_receive.go:
+//    Použití příkazu select pro zápis hodnot do kanálu i pro čtení hodnot z kanálu.
+//
+// 11_constants.go:
+//    Deklarace globálních konstant.
+//
+// 12_constants.go:
+//    Deklarace globálních konstant.
+//
+// 13_iota.go:
+//    Konstanty a identifikátor iota.
+//
+// 14_iota_better_usage.go:
+//    Konstanty a identifikátor iota, lepší způsob využití.
+//
+// 15_iota_another_usage.go:
+//    Konstanty a identifikátor iota, komplikovanější příklady.
+//
+// 16_variadic_function.go:
+//    Variadické funkce.
+//
+// 17_variadic_function_improper_usage.go:
+//    Variadické funkce.
+//
+// 18_variadic_function_improper_usage.go:
+//    Variadické funkce.
+//
+
+
+
+// ----------------------------------------------------
+// Adresář: article_08
+// ----------------------------------------------------
+//
+// 01_enum_with_iota.go:
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
+//
+// 02_enum_with_iota_type_check.go:
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
+//
+// 03_enum_with_iota.go:
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
+//
+// 04_enum_with_iota.go:
+//    Převod "výčtu" na řetězec.
+//
+// 05_enum_as_type.go:
+//    Výčet jako datový typ v jazyku Go.
+//
+// 06_enum_as_type.go:
+//    Výčet jako datový typ: nemožnost použití operátoru ++.
+//
+// 07_channel_as_fifo.go:
+//    Kanál s definovanou kapacitou, který se v runtime chová jako FIFO.
+//
+// 08_channel_and_range.go:
+//    Kanál s definovanou kapacitou, příkaz range pro čtení z kanálu.
+//
+// 09_channel_and_range.go:
+//    Kanál s definovanou kapacitou, příkaz range pro čtení z kanálu.
+//
+// 10_read_from_closed_channel.go:
+//    Pokus o čtení ze zavřeného kanálu.
+//
+// 11_sync_with_channel.go:
+//    Kanál ve funkci synchronizační struktury.
+//
+// 12_select_statement_receive.go:
+//    Použití příkazu select pro čtení z většího množství kanálů s timeoutem.
+//
+// 13_select_statement_receive.go:
+//    Použití příkazu select pro čtení z většího množství kanálů s timeoutem.
+//
+// 14_select_statement_receive.go:
+//    Použití příkazu select pro čtení z kanálů s timeoutem + větev default.
+//
+// 15_alternate_import_alias.go:
+//    Alternativní způsob importu balíčku, zápis na jednom řádku.
+//
+// 16_alternate_import_alias.go:
+//    Alternativní způsob importu balíčku, zápis do bloku.
+//
+// 17_alternate_import_dot.go:
+//    Alternativní způsob importu balíčku, tečka na místě výchozího jmenného prostoru.
+//
+// 18_alternate_import_dot.go:
+//    Alternativní způsob importu balíčku, tečka na místě výchozího jmenného prostoru.
+//
+// 19_use_package_hello1.go:
+//    Import vlastního balíčku.
+//
+// 20_use_package_hello2.go:
+//    Import vlastního balíčku.
+//
+// 21_use_package_hello3.go:
+//    Import vlastního balíčku.
+//
+// 22_package_init.go:
+//    Inicializace balíčku.
+//
+// 23_package_init.go:
+//    Inicializace balíčku, implicitně a automaticky se volá funkce init.
+//
