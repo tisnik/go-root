@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 9:
-//    Kanál s definovanou kapacitou, příkaz range.
+//    Kanál s definovanou kapacitou, příkaz range pro čtení z kanálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/09_channel_and_range.html
