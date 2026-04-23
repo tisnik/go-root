@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 3:
-//    Náhrada za enum: běžné konstanty a identifikátor iota.
+//    Náhrada za enum z jazyka C: běžné konstanty a identifikátor iota.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/03_enum_with_iota.html
