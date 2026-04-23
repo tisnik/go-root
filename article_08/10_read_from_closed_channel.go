@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 10:
-//    Čtení ze zavřeného kanálu.
+//    Pokus o čtení ze zavřeného kanálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/10_read_from_closed_channel.html
