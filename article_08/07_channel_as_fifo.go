@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 7:
-//    Kanál s definovanou kapacitou, který se chová jako FIFO.
+//    Kanál s definovanou kapacitou, který se v runtime chová jako FIFO.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/07_channel_as_fifo.html
