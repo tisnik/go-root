@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 17:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, tečka na místě výchozího jmenného prostoru.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/17_alternate_import_dot.html
