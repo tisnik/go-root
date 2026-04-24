@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 12:
-//    Použití příkazu select pro čtení z kanálů s timeoutem.
+//    Použití příkazu select pro čtení z většího množství kanálů s timeoutem.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/12_select_statement_receive.html
