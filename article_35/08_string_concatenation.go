@@ -10,6 +10,9 @@
 //
 // Seznam demonstračních příkladů ze třicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
+//
+// Demonstrační příklad číslo 8:
+//     Spojení řetězců.
 
 package main
 
