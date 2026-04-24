@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 15:
-//    Alternativní způsob importu balíčku.
+//    Alternativní způsob importu balíčku, zápis na jednom řádku.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/15_alternate_import_alias.html
