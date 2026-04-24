@@ -1,3 +1,10 @@
+// Článek:
+//    Formát EDN: extensible data notation 
+//    https://www.root.cz/clanky/format-edn-extensible-data-notation/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+
 package main
 
 import (
