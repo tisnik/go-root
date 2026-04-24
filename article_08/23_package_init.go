@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_08/README.md
 //
 // Demonstrační příklad číslo 23:
-//    Inicializace balíčku.
+//    Inicializace balíčku, implicitně a automaticky se volá funkce init.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_08/23_package_init.html
