@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 5:
+//    Použití základního balíčku strconv.
 //    Základní funkce pro parsing řetězců: Atoi.
 //
 // Dokumentace ve stylu "literate programming":
