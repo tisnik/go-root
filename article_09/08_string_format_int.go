@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 8:
+//    Použití základního balíčku strconv.
 //    Základní funkce pro formátování řetězců: FormatInt.
 //
 // Dokumentace ve stylu "literate programming":
