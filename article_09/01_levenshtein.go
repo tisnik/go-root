@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 1:
-//    Import nainstalovaného balíčku.
+//    Import nainstalovaného externího balíčku.
 //    Výpočet Levenštejnovy vzdálenosti dvou řetězců.
 //
 // Dokumentace ve stylu "literate programming":
