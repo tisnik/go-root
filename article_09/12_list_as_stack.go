@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 12:
-//    Použití obousměrně vázaného seznamu ve funkci zásobníku.
+//    Použití standardního balíčku "container/list"
+//    Obousměrně vázaný seznam ve funkci zásobníku.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_09/12_list_as_stack.html
