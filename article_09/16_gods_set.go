@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 16:
-//    Použití množin z knihovny GoDS.
+//    Použití balíčku "gods"
+//    Zákadní práce s množinami.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_09/16_gods_set.html
