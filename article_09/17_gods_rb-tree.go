@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 17:
+//    Použití balíčku "gods"
 //    Datová struktura Red-Black tree.
 //
 // Dokumentace ve stylu "literate programming":
