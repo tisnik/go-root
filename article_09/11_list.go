@@ -13,6 +13,7 @@
 //
 // Demonstrační příklad číslo 11:
 //    Použití standardního balíčku "container/list"
+//    Vytvoření seznamu, základní operace se seznamem.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_09/11_list.html
