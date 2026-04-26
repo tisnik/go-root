@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 13:
+//    Použití balíčku "gods"
 //    Datová struktura arraylist z knihovny GoDS.
 //
 // Dokumentace ve stylu "literate programming":
