@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_09/README.md
 //
 // Demonstrační příklad číslo 15B:
-//    Použití zásobníku implementovaného seznamem.
+//    Použití balíčku "gods"
+//    Zásobník implementovaný seznamem.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_09/15B_gods_stack_RPN.html
