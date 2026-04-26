@@ -2,59 +2,59 @@
 // ------------------------------------------
 //
 // 01_levenshtein.go:
-//    Import nainstalovaného balíčku.
+//    Import nainstalovaného externího balíčku.
 //
 // 02_string_parsing_bool.go:
-//    Základní funkce pro parsing řetězců: ParseBool.
+//    Použití základního balíčku strconv.
 //
 // 03_string_parsing_int.go:
-//    Základní funkce pro parsing řetězců: ParseInt.
+//    Použití základního balíčku strconv.
 //
 // 04_string_parsing_uint.go:
-//    Základní funkce pro parsing řetězců: ParseUInt.
+//    Použití základního balíčku strconv.
 //
 // 05_string_parsing_atoi.go:
-//    Základní funkce pro parsing řetězců: Atoi.
+//    Použití základního balíčku strconv.
 //
 // 06_string_parsing_float.go:
-//    Základní funkce pro parsing řetězců: parseFloat.
+//    Použití základního balíčku strconv.
 //
 // 07_string_format_itoa.go:
-//    Základní funkce pro formátování řetězců: Itoa.
+//    Použití základního balíčku strconv.
 //
 // 08_string_format_int.go:
-//    Základní funkce pro formátování řetězců: FormatInt.
+//    Použití základního balíčku strconv.
 //
 // 09_string_format_ftoa.go:
-//    Základní funkce pro formátování řetězců: FormatFloat.
+//    Použití základního balíčku strconv.
 //
 // 10_string_format_sprintf.go:
-//    Základní funkce pro formátování řetězců: Sprintf.
+//    Použití základního balíčku strconv.
 //
 // 11_list.go:
 //    Použití standardního balíčku "container/list"
 //
 // 12_list_as_stack.go:
-//    Použití obousměrně vázaného seznamu ve funkci zásobníku.
+//    Použití standardního balíčku "container/list"
 //
 // 12B_print_stack_content.go:
-//    Použití obousměrně vázaného seznamu ve funkci zásobníku.
+//    Použití standardního balíčku "container/list"
 //
 // 13_gods_arraylist.go:
-//    Datová struktura arraylist z knihovny GoDS.
+//    Použití balíčku "gods"
 //
 // 14_gods_singlylinkedlist.go:
-//    Datová struktura singlylinkedlist z knihovny GoDS.
+//    Použití balíčku "gods"
 //
 // 15_gods_stack_RPN.go:
-//    Použití zásobníku implementovaného polem.
+//    Použití balíčku "gods"
 //
 // 15B_gods_stack_RPN.go:
-//    Použití zásobníku implementovaného seznamem.
+//    Použití balíčku "gods"
 //
 // 16_gods_set.go:
-//    Použití množin z knihovny GoDS.
+//    Použití balíčku "gods"
 //
 // 17_gods_rb-tree.go:
-//    Datová struktura Red-Black tree.
+//    Použití balíčku "gods"
 //
