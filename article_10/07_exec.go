@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 7:
-//    Použití balíčku exec, spuštění externí utility.
+//    Použití balíčku os/exec.
+//    Spuštění externí utility.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_10/07_exec.html
