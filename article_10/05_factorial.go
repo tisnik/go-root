@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Použití balíčku big pro výpočet faktoriálu.
+//    Použití balíčku big a typu Int pro výpočet faktoriálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_10/05_factorial.html
