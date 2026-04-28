@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 8:
-//    Použití balíčku exec, spuštění externí utility s předáním dat.
+//    Použití balíčku os/exec.
+//    Spuštění externí utility s předáním dat.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_10/08_exec_stdin.html
