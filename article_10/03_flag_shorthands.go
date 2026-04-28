@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 3:
+//    Využití standardního balíčku "flag".
 //    Vylepšené přečtení argumentů předaných na příkazovém řádku.
 //
 // Dokumentace ve stylu "literate programming":
