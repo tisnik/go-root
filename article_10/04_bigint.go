@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 4:
-//    Použití balíčku big, typ Int.
+//    Použití balíčku big, konkrétně typu Int.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_10/04_bigint.html
