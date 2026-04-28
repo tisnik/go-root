@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Použití balíčku big, typ Float.
+//    Použití balíčku big, konkrétně typu Float.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_10/06_bigfloat.html
