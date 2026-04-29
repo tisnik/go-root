@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 12:
+//    Použití balíčku os.
 //    Základní operace se soubory.
 //
 // Dokumentace ve stylu "literate programming":
