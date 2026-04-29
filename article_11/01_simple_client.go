@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 1:
+//    Standardní balíček "net".
 //    Klient, který přečte ze serveru sekvenci bajtů
 //
 // Dokumentace ve stylu "literate programming":
