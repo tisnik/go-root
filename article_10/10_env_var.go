@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_10/README.md
 //
 // Demonstrační příklad číslo 10:
+//    Použití balíčku os.
 //    Přístup k proměnným prostředí.
 //
 // Dokumentace ve stylu "literate programming":
