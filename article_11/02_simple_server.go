@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Jednoduchý server posílající jediný bajt klientovi
+//    Standardní balíček "net".
+//    Jednoduchý server posílající jediný bajt klientovi
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/02_simple_server.html
