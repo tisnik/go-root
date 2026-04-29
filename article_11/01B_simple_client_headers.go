@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 1B:
+//    Standardní balíček "net".
 //    Upravený klient, který vytiskne místní i vzdálenou adresu
 //
 // Dokumentace ve stylu "literate programming":
