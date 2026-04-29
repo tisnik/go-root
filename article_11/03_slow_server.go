@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Server odpovídající klientovi opožděně
+//    Standardní balíček "net".
+//    Server odpovídající klientovi opožděně
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/03_slow_server.html
