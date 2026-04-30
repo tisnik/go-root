@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 10:
-//     Použití HTTP metody GET
+//    Standardní balíček "net".
+//    Použití HTTP metody GET
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/10_http_get.html
