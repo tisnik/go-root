@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 11:
+//    Standardní balíček "net".
 //    Vytištění hlavičky HTTP odpovědi
 //
 // Dokumentace ve stylu "literate programming":
