@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 8:
-//     Parsing IPv4 a IPv6 adresy
+//    Standardní balíček "net".
+//    Parsing IPv4 a IPv6 adresy
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/08_parse_ip.html
