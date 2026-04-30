@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 6B:
-//     	Vylepšený server posílající klientovi textová data
+//    Standardní balíček "net".
+//    Vylepšený server posílající klientovi textová data
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/06B_better_text_server.html
