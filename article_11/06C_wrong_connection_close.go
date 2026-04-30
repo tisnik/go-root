@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 6C:
-//     Připojení je nutné ukončit v gorutině, ne mimo ni
+//    Standardní balíček "net".
+//    Připojení je nutné ukončit v gorutině, ne mimo ni
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/06C_wrong_connection_close.html
