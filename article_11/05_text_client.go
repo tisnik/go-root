@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 5:
-//     	Jednoduchý klient akceptující celý textový řádek
+//    Standardní balíček "net".
+//    Jednoduchý klient akceptující celý textový řádek
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/05_text_client.html
