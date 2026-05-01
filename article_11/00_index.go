@@ -54,30 +54,30 @@
 //    Konstruktor adresy typu IPv4
 //
 // 10_http_get.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    Použití HTTP metody GET
 //
 // 11_http_print_headers.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    Vytištění hlavičky HTTP odpovědi
 //
 // 12_http_server.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    Nejjednodušší HTTP server s jediným endpointem
 //
 // 13_http_server_with_state.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    HTTP server se stavovou proměnnou
 //
 // 14_http_server_with_state_mutex.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    Korektní práce se stavovou proměnnou
 //
 // 15_file_server.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    HTTP server vracející statický obsah
 //
 // 16_custom_server.go:
-//    Standardní balíček "net".
+//    Standardní balíček "net/http".
 //    Kombinace předchozích možností
 //
