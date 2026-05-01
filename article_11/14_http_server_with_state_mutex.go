@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 14:
-//     Korektní práce se stavovou proměnnou
+//    Standardní balíček "net/http".
+//    Korektní práce se stavovou proměnnou
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/14_http_server_with_state_mutex.html
