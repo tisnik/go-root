@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 16:
-//     Kombinace předchozích možností
+//    Standardní balíček "net/http".
+//    Kombinace předchozích možností
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/16_custom_server.html
