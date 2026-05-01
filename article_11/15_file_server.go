@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_11/README.md
 //
 // Demonstrační příklad číslo 15:
-//     HTTP server vracející statický obsah
+//    Standardní balíček "net/http".
+//    HTTP server vracející statický obsah
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_11/15_file_server.html
