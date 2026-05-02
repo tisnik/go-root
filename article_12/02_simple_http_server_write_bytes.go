@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 2:
-//    Alternativní způsob vytvoření sekvence bajtů z řetězce
+//    Standardní balíček "net/http".
+//    Alternativní způsob vytvoření sekvence bajtů z řetězce.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/02_simple_http_server_write_bytes.html
