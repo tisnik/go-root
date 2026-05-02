@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 3:
-//     HTTP server se specifikací MIME typu odpovědí
+//    Standardní balíček "net/http".
+//    HTTP server se specifikací MIME typu odpovědí.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/03_specify_content_type.html
