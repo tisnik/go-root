@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Úprava předchozího příkladu
+//    Standardní balíček "net/http".
+//    Server, který vrací statické HTML stránky načtené ze souborů.
+//    Úprava předchozího demonstračního příkladu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/05_serve_static_html_page.html
