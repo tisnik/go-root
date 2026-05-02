@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 7:
-//    Základní použití šablon
+//    Standardní balíček "net/http".
+//    Standardní balíček "html/template".
+//    Základní použití šablon.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/07_html_templates.html
