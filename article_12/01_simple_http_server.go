@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 1:
-//    Jednoduchý HTTP server
+//    Standardní balíček "net/http".
+//    Jednoduchý HTTP server.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/01_simple_http_server.html
