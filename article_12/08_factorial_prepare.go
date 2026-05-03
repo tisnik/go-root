@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 8:
-//    Webová aplikace pro výpočet faktoriálu (příprava)
+//    Standardní balíček "net/http".
+//    Standardní balíček "html/template".
+//    Webová aplikace pro výpočet faktoriálu (příprava).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/08_factorial_prepare.html
