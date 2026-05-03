@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 10:
-//     Neměnná šablona stránky
+//    Standardní balíček "net/http".
+//    Standardní balíček "html/template".
+//    Neměnná šablona stránky.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/10_factorial_compute_const_template.html
