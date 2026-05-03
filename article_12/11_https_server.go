@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_12/README.md
 //
 // Demonstrační příklad číslo 11:
-//     Jednoduchý HTTPS server
+//    Standardní balíček "net/http".
+//    Standardní balíček "html/template".
+//    Jednoduchý HTTPS server.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_12/11_https_server.html
