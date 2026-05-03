@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 3B:
-//     Pokus o marshalling komplexních čísel do JSONu, kontrola převodu
+//     Standardní balíček "encoding/json".
+//     Pokus o marshalling komplexních čísel do JSONu, kontrola převodu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/03B_json_marshal_basic_complex_types_err.html
