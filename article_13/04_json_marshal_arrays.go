@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Marshalling jednorozměrných i dvourozměrných polí do JSONu
+//     Standardní balíček "encoding/json".
+//     Marshalling jednorozměrných i dvourozměrných polí do JSONu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/04_json_marshal_arrays.html
