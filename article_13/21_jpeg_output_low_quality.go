@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 21:
-//     Export rastrového obrázku do formátu JPEG s ovlivněním kvality
+//     Standardní balíček "image" a "image/jpeg.
+//     Export rastrového obrázku do formátu JPEG s ovlivněním kvality.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/21_jpeg_output_low_quality.html
