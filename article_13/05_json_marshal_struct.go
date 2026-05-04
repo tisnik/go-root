@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Marshalling struktury/záznamu do JSONu
+//     Standardní balíček "encoding/json".
+//     Marshalling struktury/záznamu do JSONu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/05_json_marshal_struct.html
