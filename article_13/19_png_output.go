@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 19:
-//     Export rastrového obrázku do formátu PNG
+//     Standardní balíček "image" a "image/png.
+//     Export rastrového obrázku do formátu PNG.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/19_png_output.html
