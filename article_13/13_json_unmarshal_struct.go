@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 13:
-//     Unmarshalling struktury z JSONu
+//     Standardní balíček "encoding/json".
+//     Unmarshalling struktury z JSONu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/13_json_unmarshal_struct.html
