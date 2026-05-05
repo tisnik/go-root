@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 14:
-//     Unmarshalling pole z JSONu
+//     Standardní balíček "encoding/json".
+//     Unmarshalling pole z JSONu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/14_json_unmarshal_array.html
