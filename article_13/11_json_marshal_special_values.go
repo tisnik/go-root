@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 11:
-//     Pokus o marshalling speciálních hodnot
+//     Standardní balíček "encoding/json".
+//     Pokus o marshalling speciálních hodnot.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/11_json_marshal_special_values.html
