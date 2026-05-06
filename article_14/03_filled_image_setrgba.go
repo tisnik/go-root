@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA
+//     Standardní balíčky image, image/color a image/png.
+//     Rastrový obrázek vyplněný konstantní barvou, použití metody SetRGBA.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/03_filled_image_setrgba.html
