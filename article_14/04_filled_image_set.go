@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Rastrový obrázek vyplněný konstantní barvou, použití metody Set
+//     Standardní balíčky image, image/color a image/png.
+//     Rastrový obrázek vyplněný konstantní barvou, použití metody Set.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/04_filled_image_set.html
