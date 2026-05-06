@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Vytvoření rastrového obrázku s výchozími hodnotami pixelů (zcela průhledné černé pixely)
+//     Standardní balíčky image a image/png.
+//     Vytvoření rastrového obrázku s výchozími hodnotami pixelů (zcela průhledné černé pixely).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/01_empty_image.html
