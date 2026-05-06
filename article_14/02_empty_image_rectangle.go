@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku
+//     Standardní balíčky image a image/png.
+//     Alternativní způsob vytvoření obdélníku pro určení rozměrů obrázku.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/02_empty_image_rectangle.html
