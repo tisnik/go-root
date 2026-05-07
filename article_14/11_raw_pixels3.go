@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 11:
-//     Přímý přístup k jednotlivým pixelům; třetí varianta
+//     Standardní balíčky image a image/png.
+//     Přímý přístup k jednotlivým pixelům; třetí varianta.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/11_raw_pixels3.html
