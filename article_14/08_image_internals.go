@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 8:
-//     Interní struktura záznamu s informacemi o obrázku
+//     Standardní balíček image.
+//     Interní struktura záznamu s informacemi o obrázku.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/08_image_internals.html
