@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 13:
-//     Základní operace s obdélníky a body
+//     Standardní balíček image.
+//     Základní operace s obdélníky a body.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/13_point_rectangle_operations.html
