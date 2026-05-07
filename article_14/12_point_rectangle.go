@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 12:
-//     Datové struktury Point a Rectangle
+//     Standardní balíček image.
+//     Datové struktury Point a Rectangle.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/12_point_rectangle.html
