@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Export obrázku o rozlišení 1×1 pixel s dvoubarevnou paletou
+//     Standardní balíčky image a image/gif.
+//     Export obrázku o rozlišení 1×1 pixel s dvoubarevnou paletou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/04_gif_1x1_palette.html
