@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Export se specifikací počtu barev v paletě
+//     Standardní balíčky image, image/draw a image/gif.
+//     Export se specifikací počtu barev v paletě.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/05_gif_export_colors.html
