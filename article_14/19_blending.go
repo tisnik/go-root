@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 19:
-//     Blending v Go (opět rastrové operace)
+//     Standardní balíčky image, image/color, image/draw a image/png.
+//     Blending v Go (opět rastrové operace).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/19_blending.html
