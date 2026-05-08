@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 18:
-//     Implementace Bresenhamova algoritmu pro vykreslení úsečky
+//     Standardní balíčky image, image/color a image/png.
+//     Implementace Bresenhamova algoritmu pro vykreslení úsečky.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/18_bresenham_algorithm.html
