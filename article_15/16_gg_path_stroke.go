@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 16:
-//     Vykreslení cesty
+//     Balíček gg.
+//     Vykreslení cesty.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/16_gg_path_stroke.html
