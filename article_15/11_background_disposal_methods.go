@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 11:
-//     Nastavení metody přepínání snímků: vykreslení pozadí
+//     Standardní balíčky image, image/color a image/gif.
+//     Nastavení metody přepínání snímků: vykreslení pozadí.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/11_background_disposal_methods.html
