@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 9:
-//     Složitější animace pohybující se šachovnice
+//     Standardní balíčky image, image/color a image/gif.
+//     Složitější animace pohybující se šachovnice.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/09_gif_animation.html
