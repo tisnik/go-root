@@ -12,6 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 1:
+//     Balíček gg.
 //     Vymazání obrazovky.
 //
 // Dokumentace ve stylu "literate programming":
