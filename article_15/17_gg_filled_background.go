@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 17:
-//     Vyplnění pozadí konstantní barvou
+//     Balíček gg.
+//     Vyplnění pozadí konstantní barvou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/17_gg_filled_background.html
