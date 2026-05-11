@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Nastavení šířky čáry.
+//    Balíček gg.
+//    Nastavení šířky čáry.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/05_gg_line_width.html
