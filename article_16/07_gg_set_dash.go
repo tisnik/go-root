@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 7:
-//     Nastavení stylu vykreslovaných úseček.
+//    Balíček gg.
+//    Nastavení stylu vykreslovaných úseček.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/07_gg_set_dash.html
