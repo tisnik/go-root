@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 10:
-//     Uzavřená cesta (closed path).
+//    Balíček gg.
+//    Uzavřená cesta (closed path).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/10_gg_closed_path.html
