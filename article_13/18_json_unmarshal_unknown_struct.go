@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 18:
-//     Standardní balíček "encoding/json".
-//     Pokus o unmarshalling struktury s obecnými daty.
+//    Standardní balíček "encoding/json".
+//    Pokus o unmarshalling struktury s obecnými daty.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/18_json_unmarshal_unknown_struct.html

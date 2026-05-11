@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 10:
-//     Standardní balíček "encoding/json".
-//     Změna názvů klíčů pri marshallingu.
+//    Standardní balíček "encoding/json".
+//    Změna názvů klíčů pri marshallingu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/10_json_different_keys.html

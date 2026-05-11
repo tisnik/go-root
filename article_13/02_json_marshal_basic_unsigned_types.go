@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Standardní balíček "encoding/json".
-//     Marshalling celých čísel bez znaménka do JSONu.
+//    Standardní balíček "encoding/json".
+//    Marshalling celých čísel bez znaménka do JSONu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/02_json_marshal_basic_unsigned_types.html

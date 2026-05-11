@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_13/README.md
 //
 // Demonstrační příklad číslo 15:
-//     Standardní balíček "encoding/json".
-//     Unmarshalling pole struktur.
+//    Standardní balíček "encoding/json".
+//    Unmarshalling pole struktur.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_13/15_json_unmarshal_array_of_struct.html
