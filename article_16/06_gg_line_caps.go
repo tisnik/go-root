@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Nastavení stylu konců úseček.
+//    Balíček gg.
+//    Nastavení stylu konců úseček.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/06_gg_line_caps.html
