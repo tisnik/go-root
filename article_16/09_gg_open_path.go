@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 9:
-//     Otevřená cesta (open path).
+//    Balíček gg.
+//    Otevřená cesta (open path).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/09_gg_open_path.html
