@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 8:
-//     Práce s cestou (path).
+//    Balíček gg.
+//    Práce s cestou (path).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/08_gg_simple_path.html
