@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Balíček gg.
-//     Barvový prostor RGB a RGBA.
+//    Balíček gg.
+//    Barvový prostor RGB a RGBA.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/03_gg_rgba_color.html
