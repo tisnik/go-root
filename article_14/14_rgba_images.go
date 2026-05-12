@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 14:
-//     Standardní balíčky image, image/color a image/png.
-//     Základní vlastnosti barvového prostoru RGBA.
+//    Standardní balíčky image, image/color a image/png.
+//    Základní vlastnosti barvového prostoru RGBA.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/14_rgba_images.html

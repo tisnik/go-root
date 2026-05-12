@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 17:
-//     Standardní balíčky image, image/color, image/draw a image/png.
-//     Využití balíčku draw pro vykreslení šachovnice (rastrové operace).
+//    Standardní balíčky image, image/color, image/draw a image/png.
+//    Využití balíčku draw pro vykreslení šachovnice (rastrové operace).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/17_chessboard.html

@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 15:
-//     Standardní balíčky image, image/color a image/png.
-//     Základní vlastnosti barvového prostoru CMYK.
+//    Standardní balíčky image, image/color a image/png.
+//    Základní vlastnosti barvového prostoru CMYK.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/15_cmyk_images.html

@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Standardní balíčky image, image/color a image/png.
-//     Obrázek, v němž mají pixely různou průhlednost (nekorektní varianta).
+//    Standardní balíčky image, image/color a image/png.
+//    Obrázek, v němž mají pixely různou průhlednost (nekorektní varianta).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/05_filled_image_alpha.html

@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_14/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Standardní balíčky image, image/color a image/png.
-//     Korektní varianta předchozího příkladu.
+//    Standardní balíčky image, image/color a image/png.
+//    Korektní varianta předchozího příkladu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_14/06_filled_image_alpha_correct.html
