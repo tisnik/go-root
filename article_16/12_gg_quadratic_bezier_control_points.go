@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 12:
-//     Kvadratická Bézierova křivka s řídicími body.
+//    Balíček gg.
+//    Kvadratická Bézierova křivka s řídicími body.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/12_gg_quadratic_bezier_control_points.html
