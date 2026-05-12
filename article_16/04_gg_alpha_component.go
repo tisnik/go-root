@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Balíček gg.
-//     Alfa kanál v barvovém prostoru RGBA.
+//    Balíček gg.
+//    Alfa kanál v barvovém prostoru RGBA.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/04_gg_alpha_component.html
