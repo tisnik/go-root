@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 13:
-//     Kubická Bézierova křivka.
+//    Balíček gg.
+//    Kubická Bézierova křivka.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/13_gg_cubic_bezier.html
