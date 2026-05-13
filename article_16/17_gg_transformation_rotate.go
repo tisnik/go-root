@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 17:
-//     Transformace (rotace).
+//    Balíček gg.
+//    Transformace (rotace).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/17_gg_transformation_rotate.html
