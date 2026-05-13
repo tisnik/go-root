@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 18:
-//     Transformace (rotace okolo zvoleného bodu).
+//    Balíček gg.
+//    Transformace (rotace okolo zvoleného bodu).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/18_gg_transformation_rotate_about.html
