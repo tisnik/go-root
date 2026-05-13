@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 19:
-//     Transformace (změna měřítka okolo zvoleného bodu).
+//    Balíček gg.
+//    Transformace (změna měřítka okolo zvoleného bodu).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/19_gg_scale_about.html
