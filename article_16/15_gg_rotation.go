@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 15:
-//     Rotace vykreslovaných objektů.
+//    Balíček gg.
+//    Rotace vykreslovaných objektů.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/15_gg_rotation.html
