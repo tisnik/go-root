@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 15:
-//     Balíček gg.
-//     Použití kontextu a nastavení vlastností kreslení.
+//    Balíček gg.
+//    Použití kontextu a nastavení vlastností kreslení.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/15_gg_context_properties.html

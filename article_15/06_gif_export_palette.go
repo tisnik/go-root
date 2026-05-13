@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Standardní balíčky image, image/draw a image/gif.
-//     Šachovnice vykreslená s dvoubarevnou paletou.
+//    Standardní balíčky image, image/draw a image/gif.
+//    Šachovnice vykreslená s dvoubarevnou paletou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/06_gif_export_palette.html

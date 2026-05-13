@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 10:
-//     Standardní balíčky image, image/color a image/gif.
-//     Výchozí hodnota metody použité při přepínání snímků.
+//    Standardní balíčky image, image/color a image/gif.
+//    Výchozí hodnota metody použité při přepínání snímků.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/10_default_disposal_methods.html

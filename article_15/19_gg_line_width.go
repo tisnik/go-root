@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 19:
-//     Balíče. gg.
-//     Specifikace šířky vykreslovaných cest.
+//    Balíček gg.
+//    Specifikace šířky vykreslovaných cest.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/19_gg_line_width.html

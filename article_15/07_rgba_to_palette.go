@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 7:
-//     Standardní balíčky image, image/color a image/gif.
-//     Převod obrázku z prostoru RGBA do prostoru s paletou se snižováním počtu barev.
+//    Standardní balíčky image, image/color a image/gif.
+//    Převod obrázku z prostoru RGBA do prostoru s paletou se snižováním počtu barev.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/07_rgba_to_palette.html

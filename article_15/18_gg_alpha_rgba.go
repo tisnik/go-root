@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 18:
-//     Balíček gg.
-//     Specifikace alfa kanálu (průhlednosti).
+//    Balíček gg.
+//    Specifikace alfa kanálu (průhlednosti).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/18_gg_alpha_rgba.html

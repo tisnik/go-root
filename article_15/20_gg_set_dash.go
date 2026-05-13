@@ -11,8 +11,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 20:
-//     Balíček gg.
-//     Specifikace stylu vykreslovaných cest.
+//    Balíček gg.
+//    Specifikace stylu vykreslovaných cest.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/20_gg_set_dash.html

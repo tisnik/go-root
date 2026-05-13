@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 13:
-//     Standardní balíčky image, image/color a image/gif.
-//     Animace progress baru vytvořená jako animovaný GIF.
+//    Standardní balíčky image, image/color a image/gif.
+//    Animace progress baru vytvořená jako animovaný GIF.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/13_progress_bar.html

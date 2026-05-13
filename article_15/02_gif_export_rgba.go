@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_15/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Standardní balíčky image, image/draw a image/gif.
-//     Export obrázku šachovnice do formátu GIF.
+//    Standardní balíčky image, image/draw a image/gif.
+//    Export obrázku šachovnice do formátu GIF.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_15/02_gif_export_rgba.html
