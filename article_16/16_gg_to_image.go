@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_16/README.md
 //
 // Demonstrační příklad číslo 16:
-//     Rasterizace do zvoleného rastrového formátu.
+//    Balíček gg.
+//    Rasterizace do zvoleného rastrového formátu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_16/16_gg_to_image.html
