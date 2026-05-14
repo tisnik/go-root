@@ -11,7 +11,8 @@
 // Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
-// Balíček s funkcí pro výpočet faktoriálu
+// Demonstrační příklad číslo 10:
+//    Balíček s funkcí pro výpočet faktoriálu
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/factorial_convey/factorial_test.html
