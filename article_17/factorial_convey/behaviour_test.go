@@ -11,6 +11,9 @@
 // Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
+// Demonstrační příklad číslo 10:
+//    BDD testy.
+//
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/factorial_convey/behaviour_test.html
 //
