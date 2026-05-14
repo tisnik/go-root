@@ -11,7 +11,8 @@
 // Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
-// Přístup k tabulce kurzů a použití kurzů při výpočtu převodu měn.
+// Demonstrační příklad číslo 10:
+//    Přístup k tabulce kurzů a použití kurzů při výpočtu převodu měn.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/mocking/kurzy.html
