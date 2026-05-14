@@ -11,7 +11,8 @@
 // Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
-// Jednotkové testy pro výpočet faktoriálu.
+// Demonstrační příklad číslo 9:
+//    Jednotkové testy pro výpočet faktoriálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/factorial/factorial_test.html
