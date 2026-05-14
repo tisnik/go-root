@@ -11,7 +11,8 @@
 // Seznam demonstračních příkladů ze sedmnácté části:
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
-// Test práce s řezy (slices).
+// Demonstrační příklad číslo 12:
+//    Test práce s řezy (slices).
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/slice_test/slice_test.html
