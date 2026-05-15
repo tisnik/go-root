@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_18/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Testy pro balíček.
+//    Testy pro balíček s implementací výpočtu faktoriálu.
+//    Testy jsou založeny na standardním balíčku testing.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_18/01_factorial_testing/factorial_test.html
