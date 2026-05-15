@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Testovaný balíček.
+//    Testovaný balíček.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/test05/add.html

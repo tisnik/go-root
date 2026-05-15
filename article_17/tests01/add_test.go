@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_17/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Implementace jednotkových testů.
+//    Implementace jednotkových testů.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_17/test01/add_test.html
