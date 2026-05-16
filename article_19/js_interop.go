@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_19/README.md
 //
 // Demonstrační příklad:
-//     Rozhraní mezi jazyky Go a JavaScript.
+//    Standardní balíček syscall/js.
+//    Rozhraní mezi jazyky Go a JavaScript.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_19/js_interop.html
 
 package main
 
