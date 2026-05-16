@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_19/README.md
 //
 // Demonstrační příklad:
-//     Manipulace s DOMem z jazyka Go.
+//    Standardní balíček syscall/js.
+//    Manipulace s DOMem z jazyka Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_19/dom_manipulation.html
 
 package main
 
