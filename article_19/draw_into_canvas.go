@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_19/README.md
 //
 // Demonstrační příklad:
-//     Kreslení na Canvas.
+//    Standardní balíček syscall/js.
+//    Kreslení na Canvas.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_19/draw_into_canvas.html
 
 package main
 
