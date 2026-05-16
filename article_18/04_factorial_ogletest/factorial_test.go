@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_18/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Testy pro balíček.
+//    Testy pro balíček s implementací výpočtu faktoriálu.
+//    Testy využívají balíčky jacobsa/oglematchers a jacobsa/ogletest.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_18/04_factorial_ogletest/factorial_test.html

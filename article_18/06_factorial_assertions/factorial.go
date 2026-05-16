@@ -12,7 +12,7 @@
 //    https://github.com/tisnik/go-root/blob/master/article_18/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Testovaný balíček.
+//    Testovaný balíček s výpočtem faktoriálu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_18/06_factorial_assertions/factorial.html

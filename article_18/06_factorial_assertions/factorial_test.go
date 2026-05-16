@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_18/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Testy pro balíček.
+//    Testy pro balíček s implementací výpočtu faktoriálu.
+//    Testy využívají balíček smartystreets/assertions.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_18/06_factorial_assertions/factorial_test.html
