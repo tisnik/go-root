@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_19/README.md
 //
 // Demonstrační příklad:
-//     HTTP server vracející statický obsah
+//    HTTP server vracející statický obsah
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_19/file_server.html
 
 package main
 
