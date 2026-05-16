@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_19/README.md
 //
 // Demonstrační příklad:
-//     Typický program typu "Hello world"
+//    Typický program typu "Hello world"
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_19/hello.html
 
 package main
 
