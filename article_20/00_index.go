@@ -2,32 +2,44 @@
 // ------------------------------------------
 //
 // 01_scanln.go:
-//     Načtení řetězců ze standardního vstupu.
+//    Standardní balíček fmt.
+//    Načtení řetězců ze standardního vstupu.
 //
 // 02_input_via_reader.go:
-//     Použití metody Reader.ReadString pro načítání ze standardního vstupu.
+//    Standardní balíčky bufio a os.
+//    Použití metody Reader.ReadString pro načítání ze standardního vstupu.
 //
 // 03_simple_input.go:
-//     Go-prompt: vstup dat.
+//    Balíček go-prompt.
+//    Realizace vstupu dat.
 //
 // 04_prompt.go:
-//     Go-prompt: vstup s nápovědou.
+//    Balíček go-prompt.
+//    Vstup s nápovědou.
 //
 // 05_basic_completer.go:
-//     Go-prompt: vstup s nápovědou.
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
 //
 // 06_prefix_completer.go:
-//     Go-prompt: vstup s nápovědou, reakce na zadaný příkaz.
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//    Reakce na zadaný příkaz.
 //
 // 07_completion_description.go:
-//     Go-prompt: vylepšená nápověda.
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//    Vylepšená nápověda.
 //
 // 08_basic_statements.go:
-//     Zápis příkazů Atari BASICu.
+//    Balíček go-prompt.
+//    Zápis příkazů Atari BASICu.
 //
 // 09_fuzzy_filter.go:
-//     Vylepšení zápisu příkazů Atari BASICu.
+//    Balíček go-prompt.
+//    Vylepšení zápisu příkazů Atari BASICu.
 //
 // 10_two_word_commands.go:
-//     Víceslovní příkazy.
+//    Balíček go-prompt.
+//    Víceslovní příkazy.
 //
