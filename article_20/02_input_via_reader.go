@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Použití metody Reader.ReadString pro načítání ze standardního vstupu.
+//    Standardní balíčky bufio a os.
+//    Použití metody Reader.ReadString pro načítání ze standardního vstupu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/02_input_via_reader.html
