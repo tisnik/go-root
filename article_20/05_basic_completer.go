@@ -12,8 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Go-prompt: vstup s nápovědou.
-//
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/05_basic_completer.html
