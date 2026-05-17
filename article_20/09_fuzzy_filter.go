@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 9:
-//     Vylepšení zápisu příkazů Atari BASICu.
+//    Balíček go-prompt.
+//    Vylepšení zápisu příkazů Atari BASICu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/09_fuzzy_filter.html
