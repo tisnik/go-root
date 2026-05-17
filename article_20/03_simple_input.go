@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Go-prompt: vstup dat.
+//    Balíček go-prompt.
+//    Realizace vstupu dat.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/03_simple_input.html
