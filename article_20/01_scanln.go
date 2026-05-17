@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Načtení řetězců ze standardního vstupu.
+//    Standardní balíček fmt.
+//    Načtení řetězců ze standardního vstupu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/01_scanln.html
