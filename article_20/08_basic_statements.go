@@ -12,7 +12,8 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 8:
-//     Zápis příkazů Atari BASICu.
+//    Balíček go-prompt.
+//    Zápis příkazů Atari BASICu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/08_basic_statements.html
