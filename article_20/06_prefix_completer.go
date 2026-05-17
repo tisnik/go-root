@@ -12,7 +12,9 @@
 //    https://github.com/tisnik/go-root/blob/master/article_20/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Go-prompt: vstup s nápovědou, reakce na zadaný příkaz.
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//    Reakce na zadaný příkaz.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_20/06_prefix_completer.html
