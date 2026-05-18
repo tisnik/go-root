@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_21/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Práce s objektem typu Duration.
+//    Práce s objektem typu Duration.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_21/duration/duration4.html
+//
 
 package main
 
