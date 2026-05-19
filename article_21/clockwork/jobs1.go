@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_21/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Úloha vytvořená nástrojem clockwork.
+//    Úloha vytvořená nástrojem clockwork.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_21/clockwork/jobs1.html
+//
 
 package main
 
