@@ -51,8 +51,6 @@
 //    Chybný pokus o deklaraci proměnné za příkazem return.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_02
 // ----------------------------------------------------
@@ -129,8 +127,6 @@
 // 24_slice_from_slice.go:
 //    Kopie řezů polí.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_03
@@ -227,8 +223,6 @@
 //    Datový typ "funkce s návratovou hodnotou".
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_04
 // ----------------------------------------------------
@@ -299,8 +293,6 @@
 // 20_workers_deadlock.go:
 //    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_05
@@ -412,8 +404,6 @@
 //    Dvojice vnořených smyček for a příkaz continue.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_06
 // ----------------------------------------------------
@@ -503,8 +493,6 @@
 //    Bitové operátory se dvěma operandy.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_07
 // ----------------------------------------------------
@@ -575,8 +563,6 @@
 // 18_variadic_function_improper_usage.go:
 //    Variadické funkce.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_08
@@ -651,8 +637,6 @@
 // 23_package_init.go:
 //    Inicializace balíčku, implicitně a automaticky se volá funkce init.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_09
@@ -735,8 +719,6 @@
 //    Datová struktura Red-Black tree.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_10
 // ----------------------------------------------------
@@ -786,8 +768,6 @@
 //    Použití balíčku os.
 //    Základní operace se soubory.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_11
@@ -874,8 +854,6 @@
 //    Kombinace předchozích možností
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_12
 // ----------------------------------------------------
@@ -939,8 +917,6 @@
 //    Standardní balíček "html/template".
 //    Jednoduchý HTTPS server.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_13
@@ -1039,8 +1015,6 @@
 //    Export rastrového obrázku do formátu JPEG s ovlivněním kvality.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_14
 // ----------------------------------------------------
@@ -1121,8 +1095,6 @@
 //    Standardní balíčky image, image/color, image/draw a image/png.
 //    Blending v Go (opět rastrové operace).
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_15
@@ -1208,8 +1180,6 @@
 //    Balíček gg.
 //    Specifikace stylu vykreslovaných cest.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_16
@@ -1308,8 +1278,6 @@
 //    Vykreslení vycentrovaného textu.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_17
 // ----------------------------------------------------
@@ -1387,8 +1355,6 @@
 //    Implementace jednotkových testů.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_18
 // ----------------------------------------------------
@@ -1464,8 +1430,6 @@
 //    Testovaný balíček s výpočtem faktoriálu.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_19
 // ----------------------------------------------------
@@ -1491,4 +1455,51 @@
 // js_interop.go:
 //    Standardní balíček syscall/js.
 //    Rozhraní mezi jazyky Go a JavaScript.
+//
+
+// ----------------------------------------------------
+// Adresář: article_20
+// ----------------------------------------------------
+//
+// 01_scanln.go:
+//    Standardní balíček fmt.
+//    Načtení řetězců ze standardního vstupu.
+//
+// 02_input_via_reader.go:
+//    Standardní balíčky bufio a os.
+//    Použití metody Reader.ReadString pro načítání ze standardního vstupu.
+//
+// 03_simple_input.go:
+//    Balíček go-prompt.
+//    Realizace vstupu dat.
+//
+// 04_prompt.go:
+//    Balíček go-prompt.
+//    Vstup s nápovědou.
+//
+// 05_basic_completer.go:
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//
+// 06_prefix_completer.go:
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//    Reakce na zadaný příkaz.
+//
+// 07_completion_description.go:
+//    Balíček go-prompt.
+//    Vstup dat s nápovědou.
+//    Vylepšená nápověda.
+//
+// 08_basic_statements.go:
+//    Balíček go-prompt.
+//    Zápis příkazů Atari BASICu.
+//
+// 09_fuzzy_filter.go:
+//    Balíček go-prompt.
+//    Vylepšení zápisu příkazů Atari BASICu.
+//
+// 10_two_word_commands.go:
+//    Balíček go-prompt.
+//    Víceslovní příkazy.
 //
