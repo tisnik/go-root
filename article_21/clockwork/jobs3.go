@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_21/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Tři úlohy vytvořené nástrojem clockwork.
+//    Tři úlohy vytvořené nástrojem clockwork.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_21/clockwork/jobs3.html
+//
 
 package main
 
