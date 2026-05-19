@@ -12,13 +12,18 @@
 //    https://github.com/tisnik/go-root/blob/master/article_21/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Dvě úlohy vytvořené nástrojem clockwerk.
+//    Dvě úlohy vytvořené nástrojem clockwerk.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_21/clockwerk/jobs2.html
+//
 
 package main
 
 import (
-	"github.com/onatm/clockwerk"
 	"time"
+
+	"github.com/onatm/clockwerk"
 )
 
 type Task1 struct{}
