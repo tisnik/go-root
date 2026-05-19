@@ -12,13 +12,18 @@
 //    https://github.com/tisnik/go-root/blob/master/article_21/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Úloha vytvořená nástrojem go-cron.
+//    Úloha vytvořená nástrojem go-cron.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_21/go-cron/jobs1.html
+//
 
 package main
 
 import (
-	"github.com/rk/go-cron"
 	"time"
+
+	"github.com/rk/go-cron"
 )
 
 func task(t time.Time) {
