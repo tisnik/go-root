@@ -51,6 +51,8 @@
 //    Chybný pokus o deklaraci proměnné za příkazem return.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_02
 // ----------------------------------------------------
@@ -127,6 +129,8 @@
 // 24_slice_from_slice.go:
 //    Kopie řezů polí.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_03
@@ -223,6 +227,8 @@
 //    Datový typ "funkce s návratovou hodnotou".
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_04
 // ----------------------------------------------------
@@ -293,6 +299,8 @@
 // 20_workers_deadlock.go:
 //    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_05
@@ -404,6 +412,8 @@
 //    Dvojice vnořených smyček for a příkaz continue.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_06
 // ----------------------------------------------------
@@ -493,6 +503,8 @@
 //    Bitové operátory se dvěma operandy.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_07
 // ----------------------------------------------------
@@ -563,6 +575,8 @@
 // 18_variadic_function_improper_usage.go:
 //    Variadické funkce.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_08
@@ -637,6 +651,8 @@
 // 23_package_init.go:
 //    Inicializace balíčku, implicitně a automaticky se volá funkce init.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_09
@@ -719,6 +735,8 @@
 //    Datová struktura Red-Black tree.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_10
 // ----------------------------------------------------
@@ -768,6 +786,8 @@
 //    Použití balíčku os.
 //    Základní operace se soubory.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_11
@@ -854,6 +874,8 @@
 //    Kombinace předchozích možností
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_12
 // ----------------------------------------------------
@@ -917,6 +939,8 @@
 //    Standardní balíček "html/template".
 //    Jednoduchý HTTPS server.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_13
@@ -1015,6 +1039,8 @@
 //    Export rastrového obrázku do formátu JPEG s ovlivněním kvality.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_14
 // ----------------------------------------------------
@@ -1095,6 +1121,8 @@
 //    Standardní balíčky image, image/color, image/draw a image/png.
 //    Blending v Go (opět rastrové operace).
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_15
@@ -1180,6 +1208,8 @@
 //    Balíček gg.
 //    Specifikace stylu vykreslovaných cest.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_16
@@ -1278,6 +1308,8 @@
 //    Vykreslení vycentrovaného textu.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_17
 // ----------------------------------------------------
@@ -1355,6 +1387,8 @@
 //    Implementace jednotkových testů.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_18
 // ----------------------------------------------------
@@ -1430,6 +1464,8 @@
 //    Testovaný balíček s výpočtem faktoriálu.
 //
 
+
+
 // ----------------------------------------------------
 // Adresář: article_19
 // ----------------------------------------------------
@@ -1456,6 +1492,8 @@
 //    Standardní balíček syscall/js.
 //    Rozhraní mezi jazyky Go a JavaScript.
 //
+
+
 
 // ----------------------------------------------------
 // Adresář: article_20
@@ -1502,4 +1540,71 @@
 // 10_two_word_commands.go:
 //    Balíček go-prompt.
 //    Víceslovní příkazy.
+//
+
+
+
+// ----------------------------------------------------
+// Adresář: article_21
+// ----------------------------------------------------
+//
+// clockwerk/jobs1.go:
+//    Úloha vytvořená nástrojem clockwerk.
+//
+// clockwerk/jobs2.go:
+//    Dvě úlohy vytvořené nástrojem clockwerk.
+//
+// clockwerk/jobs3.go:
+//    Vylepšená úloha vytvořená nástrojem clockwerk.
+//
+// clockwerk/jobs4.go:
+//    Vylepšené úlohy vytvořené nástrojem clockwerk.
+//
+// clockwork/jobs1.go:
+//    Úloha vytvořená nástrojem clockwork.
+//
+// clockwork/jobs2.go:
+//    Úloha vytvořená nástrojem clockwork.
+//
+// clockwork/jobs3.go:
+//    Tři úlohy vytvořené nástrojem clockwork.
+//
+// clockwork/jobs4.go:
+//    Tři úlohy vytvořené nástrojem clockwork.
+//
+// clockwork/jobs5.go:
+//    Osm naplánovaných úloh vytvořených nástrojem clockwork.
+//
+// duration/duration1.go:
+//    Práce s objektem typu Duration.
+//
+// duration/duration2.go:
+//    Práce s objektem typu Duration.
+//
+// duration/duration3.go:
+//    Práce s objektem typu Duration.
+//
+// duration/duration4.go:
+//    Práce s objektem typu Duration.
+//
+// duration/duration5.go:
+//    Práce s objektem typu Duration.
+//
+// duration/duration6.go:
+//    Práce s objektem typu Duration.
+//
+// go-cron/jobs1.go:
+//    Úloha vytvořená nástrojem go-cron.
+//
+// go-cron/jobs2.go:
+//    Úloha vytvořená nástrojem go-cron.
+//
+// go-cron/jobs3.go:
+//    Tři úlohy vytvořené nástrojem go-cron.
+//
+// go-cron/jobs4.go:
+//    Tři úlohy vytvořené nástrojem go-cron.
+//
+// go-cron/jobs5.go:
+//    Tři úlohy vytvořené nástrojem go-cron.
 //
