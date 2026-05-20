@@ -2,8 +2,8 @@
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
 // Dvacátá druhá část
-//     Vstupně-výstupní funkce standardní knihovny programovacího jazyka Go
-//     https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/
+//    Vstupně-výstupní funkce standardní knihovny programovacího jazyka Go
+//    https://www.root.cz/clanky/vstupne-vystupni-funkce-standardni-knihovny-programovaciho-jazyka-go/
 //
 // Repositář:
 //    https://github.com/tisnik/go-root/
@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_22/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Postupné načtení bajtů z řetězce.
+//    Struktura splňující rozhraní Reader.
+//    Postupné načtení bajtů z řetězce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_22/01_read_byte.html
 
 package main
 
