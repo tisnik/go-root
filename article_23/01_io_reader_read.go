@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_23/README.md
 //
 // Demonstrační příklad číslo 1:
-//     	Čtení dat ze souboru s využitím metody Read z rozhraní Reader.
+//    Čtení dat ze souboru s využitím metody Read z rozhraní Reader.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_23/01_io_reader_read.html
 
 package main
 
