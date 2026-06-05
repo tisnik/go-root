@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_23/README.md
 //
 // Demonstrační příklad číslo 18:
-//     Přečtení zkomprimovaných dat zpět.
+//    Přečtení zkomprimovaných dat zpět.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_23/01_io_reader_read.html
 
 package main
 
