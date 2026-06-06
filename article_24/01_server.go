@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 1:
-//     	Jednoduchý HTTP server posílající dynamicky generovaný obsah
+//    Balíček net/http.
+//    Jednoduchý HTTP server posílající dynamicky generovaný obsah.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/01_server.html
 
 package main
 
