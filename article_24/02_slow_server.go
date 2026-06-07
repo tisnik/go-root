@@ -13,7 +13,7 @@
 //
 // Demonstrační příklad číslo 2:
 //    Balíček net/http.
-//    Zpomalení generování jednotlivých bloků generovaného obsahu
+//    Zpomalení generování jednotlivých bloků generovaného obsahu.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_24/02_slow_server.html
