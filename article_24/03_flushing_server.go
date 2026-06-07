@@ -13,7 +13,7 @@
 //
 // Demonstrační příklad číslo 3:
 //    Balíček net/http.
-//    Využití metody Flush z rozhraní Flusher
+//    Využití metody Flush z rozhraní Flusher.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_24/03_flushing_server.html
