@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 7:
-//     	Vylepšení předchozího příkladu
+//    Balíček container/list.
+//    Vylepšení předchozího příkladu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/07_print_stack_content.html
 
 package main
 
