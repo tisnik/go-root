@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 6:
-//     	Použití seznamu ve funkci zásobníku
+//    Balíček container/list.
+//    Použití seznamu ve funkci zásobníku.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/06_list_as_stack.html
 
 package main
 
