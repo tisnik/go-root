@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 4:
-//     	Test, zda klient neukončil spojení
+//    Balíček net/http.
+//    Test, zda klient neukončil spojení.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/04_close_detector.html
 
 package main
 
