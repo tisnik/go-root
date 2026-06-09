@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 5:
-//     	Operace nad seznamem
+//    Balíček container/list.
+//    Operace nad seznamem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/05_list.html
 
 package main
 
