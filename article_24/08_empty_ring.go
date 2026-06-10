@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 8:
-//     	Prázdná cyklická fronta
+//    Balíček container/ring.
+//    Prázdná cyklická fronta.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/08_empty_ring.html
 
 package main
 
