@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 9:
-//     	Cyklická fronta s naplněnými prvky
+//    Balíček container/ring.
+//    Cyklická fronta s naplněnými prvky.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/09_filled_ring.html
 
 package main
 
