@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 11:
-//     	Iterace nad prvky cyklické fronty
+//    Balíček container/ring.
+//    Iterace nad prvky cyklické fronty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/11_ring_do_iterator.html
 
 package main
 
