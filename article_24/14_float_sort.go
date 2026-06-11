@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 14:
-//     	Seřazení sekvence čísel s plovoucí řádovou čárkou
+//    Balíček math a sort.
+//    Seřazení sekvence čísel s plovoucí řádovou čárkou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/14_float_sort.html
 
 package main
 
