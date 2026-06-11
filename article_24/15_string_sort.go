@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 15:
-//     	Načtení textového souboru s jeho rozdělením na slova a seřazením
+//    Kooperace mezi standardními balíčky.
+//    Načtení textového souboru s jeho rozdělením na slova a seřazením.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/15_string_sort.html
 
 package main
 
