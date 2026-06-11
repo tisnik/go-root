@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 13:
-//     	Seřazení sekvence celých čísel
+//    Balíček math/rand a sort.
+//    Seřazení sekvence celých čísel.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/13_integer_sort.html
 
 package main
 
