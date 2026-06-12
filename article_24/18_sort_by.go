@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 18:
-//     	Seřazení sekvence uživatelských datových struktur
+//    Seřazení sekvence uživatelských datových struktur.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/18_sort_by.html
 
 package main
 
