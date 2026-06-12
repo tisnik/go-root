@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 16:
-//     	Opačně seřazení sekvence/řezu
+//    Balíček math/rand a sort.
+//    Opačně seřazení sekvence/řezu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/16_reverse_sort.html
 
 package main
 
