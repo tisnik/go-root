@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 19:
-//     	Základní způsob využití datového typu halda
+//    Balíček container/heap.
+//    Základní způsob využití datového typu halda.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/19_heap.html
 
 package main
 
