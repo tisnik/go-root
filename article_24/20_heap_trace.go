@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 20:
-//     	Úprava předchozího příkladu, aby zobrazoval prováděné operace
+//    Balíček container/heap.
+//    Úprava předchozího příkladu, aby zobrazoval prováděné operace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/20_heap_trace.html
 
 package main
 
