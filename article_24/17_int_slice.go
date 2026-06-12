@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_24/README.md
 //
 // Demonstrační příklad číslo 17:
-//     	Použití datového typu IntSlice
+//    Balíček math/rand a sort.
+//    Použití datového typu IntSlice.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_24/17_int_slice.html
 
 package main
 
