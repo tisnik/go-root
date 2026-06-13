@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Jednoduchý program, který sečte dvojici celočíselných hodnot
+//    Jednoduchý program, který sečte dvojici celočíselných hodnot.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/01_add.html
 
 package main
 
