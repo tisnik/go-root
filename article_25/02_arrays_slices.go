@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Základní operace s poli a s řezy
+//    Základní operace s poli a s řezy.
+//    Získání řezu z pole a řezu z jiného řezu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/02_arrays_slices.html
 
 package main
 
