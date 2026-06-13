@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Rekurzivní výpočet faktoriálu
+//    Rekurzivní výpočet faktoriálu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/04_factorial.html
 
 package main
 
