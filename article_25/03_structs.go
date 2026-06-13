@@ -12,7 +12,12 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 3:
-//     Práce se strukturami (záznamy)
+//    Práce se strukturami (záznamy).
+//    Inicializace celého záznamu.
+//    Naplnění jednotlivých prvků záznamu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/03_structs.html
 
 package main
 
