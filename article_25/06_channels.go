@@ -12,7 +12,12 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Gorutiny a kanály
+//    Konstrukce a spuštění gorutiny.
+//    Konstrukce kanálu.
+//    Komunikace mezi gorutinami s využitím kanálu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/06_channels.html
 
 package main
 
