@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_25/README.md
 //
 // Demonstrační příklad číslo 5:
-//     Spuštění dvou gorutin
+//    Konstrukce a spuštění trojice gorutin.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_25/05_goroutines.html
 
 package main
 
