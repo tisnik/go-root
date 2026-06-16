@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 1:
-//    Datový typ boolean
+//    Datový typ boolean.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/01_boolean_type.html
 
 package main
 
