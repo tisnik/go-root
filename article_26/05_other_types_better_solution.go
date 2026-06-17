@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 5:
-//    Ostatní datové typy, lepší přístup
+//    Ostatní datové typy, lepší přístup.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/05_other_types_better_solution.html
 
 package main
 
