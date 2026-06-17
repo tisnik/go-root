@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 6:
-//    Struktury (záznamy)
+//    Struktury (záznamy).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/06_structs.html
 
 package main
 
