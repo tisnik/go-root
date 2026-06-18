@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 8:
 //    true a false mohou být korektní jméno konstanty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/08_true_false_vars.html
 
 package main
 
