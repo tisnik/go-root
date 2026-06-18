@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 10B:
-//    Ukazatel inicializovaný na nil
+//    Ukazatel inicializovaný na nil.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/10B_nil_pointer.html
 
 package main
 
