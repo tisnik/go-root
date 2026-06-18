@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    nil může být korektní jméno konstanty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/07_nil_as_variable.html
 
 package main
 
