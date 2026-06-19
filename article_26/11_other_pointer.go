@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 11:
-//    Ukazatel na celé číslo
+//    Ukazatel na celé číslo.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/11_other_pointer.html
 
 package main
 
