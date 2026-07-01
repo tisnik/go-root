@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 15:
-//    Přidání prvků do nulové mapy
+//    Přidání prvků do nulové mapy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/15_add_into_nil_map.html
 
 package main
 
