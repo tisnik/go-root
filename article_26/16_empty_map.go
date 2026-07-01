@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 16:
-//    Prázdná mapa a přidání prvků do prázdné mapy
+//    Prázdná mapa a přidání prvků do prázdné mapy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/16_empty_map.html
 
 package main
 
