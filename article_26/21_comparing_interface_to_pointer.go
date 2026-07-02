@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 21:
-//    Porovnání dvou ukazatelů
+//    Porovnání dvou ukazatelů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/21_comparing_interface_to_pointer.html
 
 package main
 
