@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 20:
-//    Dva ukazatele s nulovou hodnotou
+//    Dva ukazatele s nulovou hodnotou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/20_two_nil_pointers.html
 
 package main
 
