@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 19:
-//    nil se někdy nerovná nil
+//    nil se někdy nerovná nil.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/19_nil_is_not_nil.html
 
 package main
 
