@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 18:
-//    Prázdné rozhraní a rozhraní s jednou metodou
+//    Prázdné rozhraní a rozhraní s jednou metodou.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/18_two_interfaces.html
 
 package main
 
