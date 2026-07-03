@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 23:
-//    Nulový kanál
+//    Nulový kanál.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/23_nil_channels.html
 
 package main
 
