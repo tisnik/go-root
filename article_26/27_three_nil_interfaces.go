@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 27:
-//    Tři nulová rozhraní
+//    Tři nulová rozhraní.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/27_three_nil_interfaces.html
 
 package main
 
