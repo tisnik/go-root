@@ -12,7 +12,10 @@
 //    https://github.com/tisnik/go-root/blob/master/article_26/README.md
 //
 // Demonstrační příklad číslo 24:
-//    Zápis do nulového kanálu
+//    Zápis do nulového kanálu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_26/24_nil_channel_write.html
 
 package main
 
