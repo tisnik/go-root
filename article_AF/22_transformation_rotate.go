@@ -14,7 +14,7 @@ import (
 )
 
 func Radians(angle float64) float64 {
-	return float64(angle / 360.0 * math.Pi)
+	return float64(angle / 180.0 * math.Pi)
 }
 
 func main() {
