@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 2:
 //    Poslání skriptu v řetězci do Lua VM.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/02B_do_string_3.html
 
 package main
 
