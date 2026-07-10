@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 3:
 //    Načtení externího skriptu do Lua VM.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/03_do_file.html
 
 package main
 
