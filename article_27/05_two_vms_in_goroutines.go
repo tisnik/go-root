@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 5:
 //    Spuštění dvou Lua VM, každé v jedné gorutině.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/05_two_vms_in_goroutines.html
 
 package main
 
