@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 7:
 //    Zavolání Lua funkce z Go s předáním parametrů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/07_call_lua_parameters.html
 
 package main
 
