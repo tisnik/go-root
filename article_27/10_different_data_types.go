@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 10:
 //    Použití datových typů jazyka Lua.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/10_different_data_types.html
 
 package main
 
