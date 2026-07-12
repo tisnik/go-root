@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 15:
 //    Volání Go funkcí z Lua.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/15_go_from_lua.html
 
 package main
 
