@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 11:
 //    Konverze datových typů jazyka Lua.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/11_conversion.html
 
 package main
 
