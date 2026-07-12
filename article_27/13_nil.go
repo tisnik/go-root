@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 13:
 //    Hodnota nil.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/13_nil.html
 
 package main
 
