@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 12:
 //    Pravdivostní hodnoty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/12_boolean.html
 
 package main
 
