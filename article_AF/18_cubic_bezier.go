@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 18:
 //    Balíček gogpu/gg.
 //    Kubická Bézierova křivka.
+//
 
 package main
 

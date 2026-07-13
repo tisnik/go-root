@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 11:
 //    Balíček gogpu/gg.
 //    Nastavení stylu konců úseček.
+//
 
 package main
 
@@ -41,7 +42,7 @@ func main() {
 		dc.Stroke()
 
 		// nastavení stylů obou konců úsečky
-		dc.SetLineCap(gg.LineCapRound)
+		dc.SetLineCap(gg.LineCapButt)
 		dc.DrawLine(x, 92, x, height-92)
 		dc.Stroke()
 

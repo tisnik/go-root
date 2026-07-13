@@ -5,6 +5,7 @@
 //    Balíček gogpu/gg.
 //    Rasterizace do zvoleného rastrového formátu.
 //    Výsledkem bude animovaný GIF.
+//
 
 package main
 

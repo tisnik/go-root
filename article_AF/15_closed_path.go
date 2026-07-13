@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 15:
 //    Balíček gogpu/gg.
 //    Uzavřená cesta (closed path).
+//
 
 package main
 

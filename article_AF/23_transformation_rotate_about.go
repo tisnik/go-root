@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 23:
 //    Balíček gogpu/gg.
 //    Transformace (rotace okolo zvoleného bodu).
+//
 
 package main
 

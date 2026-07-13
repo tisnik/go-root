@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 20:
 //    Balíček gogpu/gg.
 //    Rotace vykreslovaných objektů.
+//
 
 package main
 

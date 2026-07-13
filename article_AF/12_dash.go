@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 12:
 //    Balíček gogpu/gg.
 //    Nastavení stylu vykreslovaných úseček.
+//
 
 package main
 

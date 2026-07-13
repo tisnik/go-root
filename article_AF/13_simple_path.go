@@ -4,6 +4,7 @@
 // Demonstrační příklad číslo 13:
 //    Balíček gogpu/gg.
 //    Práce s cestou (path).
+//
 
 package main
 
