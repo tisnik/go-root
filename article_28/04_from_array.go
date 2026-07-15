@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 4:
 //    Vytvoření streamů z polí struktur.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/04_from_array.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
@@ -29,6 +34,7 @@ type User struct {
 }
 
 func main() {
+	// pole struktur
 	var users = [3]User{
 		User{
 			id:      1,
