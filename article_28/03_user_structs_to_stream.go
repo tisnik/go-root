@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 3:
 //    Struktury konvertované do streamů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/03_user_structs_to_stream.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
