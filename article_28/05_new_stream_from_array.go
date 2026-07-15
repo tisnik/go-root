@@ -13,11 +13,17 @@
 //
 // Demonstrační příklad číslo 5:
 //    Nový stream vytvořený z pole.
+//
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/05_new_stream_from_array.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee/stream"
 )
 
