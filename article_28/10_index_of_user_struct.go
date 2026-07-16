@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 10:
 //    Metoda IndexOf() a stream se strukturami.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/10_index_of_user_struct.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
