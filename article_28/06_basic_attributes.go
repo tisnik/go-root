@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 6:
 //    Základní atributy streamů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/06_basic_attributes.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 

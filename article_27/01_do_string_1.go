@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 1:
 //    Vytvoření virtuálního stroje jazyka Lua, poslání skriptu v řetězci.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/01_do_string_1.html
 
 package main
 

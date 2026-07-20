@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 4:
 //    Vytvoření dvou samostatných Lua VM.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/04_two_vms.html
 
 package main
 

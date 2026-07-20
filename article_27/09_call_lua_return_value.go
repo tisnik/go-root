@@ -14,6 +14,8 @@
 // Demonstrační příklad číslo 9:
 //    Zavolání Lua funkce z Go s předáním parametrů, přečtení výsledku.
 //
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/09_call_lua_return_value.html
 
 package main
 

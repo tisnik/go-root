@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 17:
 //    Zjištění návratové hodnoty a jejího typu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/17_go_from_lua_calc.html
 
 package main
 

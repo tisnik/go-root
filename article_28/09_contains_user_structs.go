@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 9:
 //    Uživatelské struktury a streamy.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/09_contains_user_structs.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 

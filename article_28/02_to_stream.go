@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 2:
 //    Konverze polí a řezů do streamů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/02_to_stream.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 

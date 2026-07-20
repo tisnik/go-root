@@ -13,7 +13,7 @@
 //
 // Demonstrační příklad:
 //    Standardní balíček syscall/js.
-//    Manipulace s DOMem z jazyka Go.
+//    Manipulace s DOMem z programovacího jazyka Go.
 //
 // Dokumentace ve stylu "literate programming":
 //    https://tisnik.github.io/go-root/article_19/dom_add_element.html

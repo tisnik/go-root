@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 1:
 //    Vytvoření několika streamů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/01_new_stream.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee/stream"
 )
 

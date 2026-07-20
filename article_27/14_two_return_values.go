@@ -13,6 +13,9 @@
 //
 // Demonstrační příklad číslo 14:
 //    Funkce vracející dvě hodnoty.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_27/14_two_return_values.html
 
 package main
 
