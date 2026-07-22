@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 11:
 //    Metoda Take() a stream s celočíselnými hodnotami.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/11_take.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
