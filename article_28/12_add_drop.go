@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 12:
 //    Metody Add() a Drop().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/12_add_drop.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
