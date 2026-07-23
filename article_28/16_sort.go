@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 16:
 //    Metoda Sort().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/16_sort.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
