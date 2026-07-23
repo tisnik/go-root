@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 13B:
 //    Metoda Filter() a stream s celočíselnými hodnotami.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/13B_filter_anonymous.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
