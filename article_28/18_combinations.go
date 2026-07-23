@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 18:
 //    Kombinace různých metod pro "streaming".
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/18_combinations.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
