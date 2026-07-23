@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 13:
 //    Metoda Filter().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/13_filter.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
