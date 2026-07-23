@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 17:
 //    Metoda Reverse().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/17_reverse.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
