@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 15:
 //    Metoda ForEach().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/15_for_each.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
