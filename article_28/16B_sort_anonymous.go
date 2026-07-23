@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 16B:
 //    Metoda Sort() a stream s celočíselnými hodnotami.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/16B_sort_anonymous.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
