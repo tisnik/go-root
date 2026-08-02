@@ -1,11 +1,12 @@
 module gg-demos
 
-go 1.25.0
+go 1.25.10
 
 require (
-	github.com/gogpu/gg v0.50.1 // indirect
-	github.com/gogpu/gpucontext v0.21.0 // indirect
-	github.com/gogpu/gputypes v0.5.1 // indirect
-	golang.org/x/image v0.43.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	github.com/coregx/gxpdf v0.2.0 // indirect
+	github.com/gogpu/gg v0.23.0 // indirect
+	github.com/gogpu/gg-pdf v0.1.0 // indirect
+	github.com/gogpu/gg-svg v0.1.0 // indirect
+	golang.org/x/image v0.35.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 )
