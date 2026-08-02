@@ -51,8 +51,6 @@
 //    Chybný pokus o deklaraci proměnné za příkazem return.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_02
 // ----------------------------------------------------
@@ -129,8 +127,6 @@
 // 24_slice_from_slice.go:
 //    Kopie řezů polí.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_03
@@ -227,8 +223,6 @@
 //    Datový typ "funkce s návratovou hodnotou".
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_04
 // ----------------------------------------------------
@@ -299,8 +293,6 @@
 // 20_workers_deadlock.go:
 //    Deadlock, který může nastat při volání gorutin a komunikace přes kanály.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_05
@@ -412,8 +404,6 @@
 //    Dvojice vnořených smyček for a příkaz continue.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_06
 // ----------------------------------------------------
@@ -503,8 +493,6 @@
 //    Bitové operátory se dvěma operandy.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_07
 // ----------------------------------------------------
@@ -575,8 +563,6 @@
 // 18_variadic_function_improper_usage.go:
 //    Variadické funkce.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_08
@@ -651,8 +637,6 @@
 // 23_package_init.go:
 //    Inicializace balíčku, implicitně a automaticky se volá funkce init.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_09
@@ -735,8 +719,6 @@
 //    Datová struktura Red-Black tree.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_10
 // ----------------------------------------------------
@@ -786,8 +768,6 @@
 //    Použití balíčku os.
 //    Základní operace se soubory.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_11
@@ -874,8 +854,6 @@
 //    Kombinace předchozích možností
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_12
 // ----------------------------------------------------
@@ -939,8 +917,6 @@
 //    Standardní balíček "html/template".
 //    Jednoduchý HTTPS server.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_13
@@ -1039,8 +1015,6 @@
 //    Export rastrového obrázku do formátu JPEG s ovlivněním kvality.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_14
 // ----------------------------------------------------
@@ -1121,8 +1095,6 @@
 //    Standardní balíčky image, image/color, image/draw a image/png.
 //    Blending v Go (opět rastrové operace).
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_15
@@ -1208,8 +1180,6 @@
 //    Balíček gg.
 //    Specifikace stylu vykreslovaných cest.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_16
@@ -1308,8 +1278,6 @@
 //    Vykreslení vycentrovaného textu.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_17
 // ----------------------------------------------------
@@ -1387,8 +1355,6 @@
 //    Implementace jednotkových testů.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_18
 // ----------------------------------------------------
@@ -1464,8 +1430,6 @@
 //    Testovaný balíček s výpočtem faktoriálu.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_19
 // ----------------------------------------------------
@@ -1492,8 +1456,6 @@
 //    Standardní balíček syscall/js.
 //    Rozhraní mezi jazyky Go a JavaScript.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_20
@@ -1541,8 +1503,6 @@
 //    Balíček go-prompt.
 //    Víceslovní příkazy.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_21
@@ -1609,8 +1569,6 @@
 //    Tři úlohy vytvořené nástrojem go-cron.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_22
 // ----------------------------------------------------
@@ -1676,8 +1634,6 @@
 // 18_file_block_copy.go:
 //    Blokové přenosy dat při kopii souboru.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_23
@@ -1746,8 +1702,6 @@
 // 21_base_64_encoder.go:
 //    Zakódování binárních dat do tisknutelné podoby podle Base64.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_24
@@ -1833,8 +1787,6 @@
 //    Úprava předchozího příkladu, aby zobrazoval prováděné operace.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_25
 // ----------------------------------------------------
@@ -1862,8 +1814,6 @@
 //    Konstrukce kanálu.
 //    Komunikace mezi gorutinami s využitím kanálu.
 //
-
-
 
 // ----------------------------------------------------
 // Adresář: article_26
@@ -1957,8 +1907,6 @@
 //    Tři nulová rozhraní.
 //
 
-
-
 // ----------------------------------------------------
 // Adresář: article_27
 // ----------------------------------------------------
@@ -2016,4 +1964,84 @@
 //
 // 17_go_from_lua_calc.go:
 //    Zjištění návratové hodnoty a jejího typu.
+//
+
+// ----------------------------------------------------
+// Adresář: article_28
+// ----------------------------------------------------
+//
+// 01_new_stream.go:
+//    Vytvoření několika streamů.
+//
+// 02_to_stream.go:
+//    Konverze polí a řezů do streamů.
+//
+// 03_user_structs_to_stream.go:
+//    Struktury konvertované do streamů.
+//
+// 04_from_array.go:
+//    Vytvoření streamů z polí struktur.
+//
+// 05_new_stream_from_array.go:
+//    Nový stream vytvořený z pole.
+//
+// 06_basic_attributes.go:
+//    Základní atributy streamů.
+//
+// 07_contains.go:
+//    Metoda Contains().
+//
+// 08_index_of.go:
+//    Metoda IndexOf().
+//
+// 09_contains_user_structs.go:
+//    Uživatelské struktury a streamy.
+//
+// 10_index_of_user_struct.go:
+//    Metoda IndexOf() a stream se strukturami.
+//
+// 11_take.go:
+//    Metoda Take() a stream s celočíselnými hodnotami.
+//
+// 12_add_drop.go:
+//    Metody Add() a Drop().
+//
+// 13_filter.go:
+//    Metoda Filter().
+//
+// 13B_filter_anonymous.go:
+//    Metoda Filter() a stream s celočíselnými hodnotami.
+//
+// 14_map.go:
+//    Metoda Map().
+//
+// 14B_map_anonymous.go:
+//    Metoda Map() a stream s celočíselnými hodnotami.
+//
+// 15_for_each.go:
+//    Metoda ForEach().
+//
+// 16_sort.go:
+//    Metoda Sort().
+//
+// 16B_sort_anonymous.go:
+//    Metoda Sort() a stream s celočíselnými hodnotami.
+//
+// 17_reverse.go:
+//    Metoda Reverse().
+//
+// 18_combinations.go:
+//    Kombinace různých metod pro "streaming".
+//
+// 19_combinations_error.go:
+//    Kombinace různých metod pro "streaming", zpracování chyb.
+//
+// 20_reduce.go:
+//    Metoda Reduce().
+//
+// 20B_reduce_anonymous.go:
+//    Metoda Reduce() a stream s celočíselnými hodnotami.
+//
+// 21_max_value.go:
+//    Metoda Reduce().
 //
