@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 20:
 //    Metoda Reduce().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/20_reduce.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
