@@ -13,11 +13,16 @@
 //
 // Demonstrační příklad číslo 21:
 //    Metoda Reduce().
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_28/21_max_value.html
+//
 
 package main
 
 import (
 	"fmt"
+
 	"github.com/wesovilabs/koazee"
 )
 
