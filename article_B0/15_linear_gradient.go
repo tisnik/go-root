@@ -24,7 +24,7 @@ func main() {
 
 	const border = 40
 
-	// lineární přechod mezi dvěma barvami
+	// lineární přechod mezi třemi barvami
 	gradientFill := gg.NewLinearGradientBrush(
 		border, height/2, width-border*2, height/2).
 		AddColorStop(0, customColor1).
