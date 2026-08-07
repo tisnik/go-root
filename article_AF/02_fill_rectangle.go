@@ -8,15 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
-// Seznam demonstračních příkladů ze čtrnácté části:
-//    https://github.com/tisnik/go-root/blob/master/article_14/README.md
+// Seznam demonstračních příkladů ze sto třinácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_AF/README.md
 //
 // Demonstrační příklad číslo 2:
 //    Balíček gogpu/gg.
 //    Vymazání obrázku vykreslením vyplněného obdélníku.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_A0/02_fill_rectangle.html
+//    https://tisnik.github.io/go-root/article_AF/02_fill_rectangle.html
 
 package main
 
