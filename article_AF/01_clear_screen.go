@@ -8,15 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
-// Seznam demonstračních příkladů ze čtrnácté části:
-//    https://github.com/tisnik/go-root/blob/master/article_14/README.md
+// Seznam demonstračních příkladů ze sto třinácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_AF/README.md
 //
 // Demonstrační příklad číslo 1:
 //    Balíček gogpu/gg.
 //    Vymazání obsahu rastrového obrázku.
 //
 // Dokumentace ve stylu "literate programming":
-//    https://tisnik.github.io/go-root/article_A0/01_clear_screen.html
+//    https://tisnik.github.io/go-root/article_AF/01_clear_screen.html
 
 package main
 
