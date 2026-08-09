@@ -14,7 +14,7 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
-// Demonstrační příklad číslo 9:
+// Demonstrační příklad číslo 10:
 //    Balíček gogpu/gg.
 //    Nastavení šířky vykreslovaných úseček a křivek.
 //
