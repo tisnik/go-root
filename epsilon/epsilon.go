@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +33,11 @@ const PageFooter = `
     </body>
 </html>
 `
+
+// Resources embedded into the final binary file
+
+//go:embed img/edit-copy.png
+var ImageEditCopy []byte
 
 type Storage interface {
 }
@@ -65,8 +71,13 @@ func (s ServerImpl) Serve(port uint) {
 
 	http.HandleFunc("/", s.mainEndpoint)
 
+	// static content
 	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
 	http.HandleFunc("/canvas.lua", s.serveCanvas)
+
+	// images
+	http.HandleFunc("/edit_copy.png", s.serveImageEditCopy)
+
 	// REST API endpoints
 	http.HandleFunc("GET /cell/{id}", s.returnCell)
 
@@ -81,12 +92,13 @@ func (s ServerImpl) Serve(port uint) {
 	}
 }
 
-func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Request) {
-	if request.URL.Path != "/" {
-		http.NotFound(writer, request)
-		return
-	}
-	io.WriteString(writer, PageHeader)
+func (s ServerImpl) serveImageEditCopy(w http.ResponseWriter, r *http.Request) {
+	// TODO: MIME type
+	// TODO: refactoring
+	w.Write(ImageEditCopy)
+}
+
+func (s ServerImpl) renderTable(writer http.ResponseWriter) {
 	io.WriteString(writer, "        <table>\n")
 	io.WriteString(writer, "            <tr><th>&nbsp;</th>")
 	for column := 'A'; column <= MaxColumns; column++ {
@@ -103,6 +115,22 @@ func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Reque
 		io.WriteString(writer, "</tr>\n")
 	}
 	io.WriteString(writer, "        </table>\n")
+}
+
+func (s ServerImpl) renderToolbar(writer http.ResponseWriter) {
+	io.WriteString(writer, "<img src='edit_copy.png' />")
+	io.WriteString(writer, "<img src='edit_paste.png' />")
+	io.WriteString(writer, "<img src='edit_delete.png' />")
+}
+
+func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Request) {
+	if request.URL.Path != "/" {
+		http.NotFound(writer, request)
+		return
+	}
+	io.WriteString(writer, PageHeader)
+	s.renderToolbar(writer)
+	s.renderTable(writer)
 	io.WriteString(writer, PageFooter)
 }
 
