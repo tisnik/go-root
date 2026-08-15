@@ -1,10 +1,25 @@
 // Seriál "Programovací jazyk Go"
 //    https://www.root.cz/serialy/programovaci-jazyk-go/
 //
+// Sto třináctá část
+//    Tvorba 2D i 3D grafiky a animací v Go s využitím projektu GoGPU
+//    https://www.root.cz/clanky/tvorba-2d-i-3d-grafiky-a-animaci-v-go-s-vyuzitim-projektu-gogpu/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze sto třinácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_AF/README.md
+//
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
 // Demonstrační příklad číslo 17:
 //    Balíček gogpu/gg.
 //    Kvadratická Bézierova křivka s řídicími body.
 //
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_AF/17_quadratic_bezier_control_points.html
 
 package main
 
