@@ -5,13 +5,13 @@
 //    HTTP server, který generuje rastrové obrázky.
 //
 // 02_image_server_with_pprof.go:
-//     HTTP server nabízející i pprof metriky.
+//    HTTP server nabízející i pprof metriky.
 //
 // 03_image_server_fractal.go:
 //    HTTP server generující rastrový obrázek s fraktálem.
 //
 // 04_basic_tracing.go:
-//     Vytvoření souboru s trasovacími informacemi.
+//    Vytvoření souboru s trasovacími informacemi.
 //
 // 05_context.go:
 //    Zpracování kontextu v trasovacích informacích.
