@@ -1,12 +1,14 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -34,10 +36,18 @@ const PageFooter = `
 </html>
 `
 
+// ---------------------------------------------------------------------------
 // Resources embedded into the final binary file
+// ---------------------------------------------------------------------------
 
-//go:embed img/edit-copy.png
-var ImageEditCopy []byte
+// Static images
+//
+//go:embed img/*.png
+var StaticImages embed.FS
+
+// ---------------------------------------------------------------------------
+// New data types
+// ---------------------------------------------------------------------------
 
 type Storage interface {
 }
@@ -66,36 +76,29 @@ func NewServer(storage Storage) Server {
 	}
 }
 
-func (s ServerImpl) Serve(port uint) {
-	log.Printf("Starting server on port %d", port)
+// serveStaticImage serves a PNG image from the embedded static image bundle
+//
+// It maps requests under /image/ to files in the img/ directory, reads the
+// requested file from StaticImages, and writes it to the response with a
+// Content-Type of image/png.
+//
+// If the image cannot be found or read, it logs the error and returns a 404
+// Not Found.
+func (s ServerImpl) serveStaticImage(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.String()
 
-	http.HandleFunc("/", s.mainEndpoint)
+	// construct proper image name from provided path
+	imageName := "img/" + strings.TrimPrefix(path, "/image/")
 
-	// static content
-	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
-	http.HandleFunc("/canvas.lua", s.serveCanvas)
-
-	// images
-	http.HandleFunc("/edit_copy.png", s.serveImageEditCopy)
-
-	// REST API endpoints
-	http.HandleFunc("GET /cell/{id}", s.returnCell)
-
-	// start the server
-	httpServer := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
-		Handler:           http.DefaultServeMux,
-		ReadHeaderTimeout: HttpRequestTimeout,
+	// read binary data bundled together with the application
+	binaryData, err := StaticImages.ReadFile(imageName)
+	if err != nil {
+		log.Print(err)
+		http.NotFound(w, r)
+		return
 	}
-	if err := httpServer.ListenAndServe(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (s ServerImpl) serveImageEditCopy(w http.ResponseWriter, r *http.Request) {
-	// TODO: MIME type
-	// TODO: refactoring
-	w.Write(ImageEditCopy)
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(binaryData)
 }
 
 func (s ServerImpl) renderTable(writer http.ResponseWriter) {
@@ -162,6 +165,32 @@ func (s ServerImpl) returnCell(writer http.ResponseWriter, r *http.Request) {
 			}*/
 	writer.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(writer).Encode(ID)
+}
+
+func (s ServerImpl) Serve(port uint) {
+	log.Printf("Starting server on port %d", port)
+
+	http.HandleFunc("/", s.mainEndpoint)
+
+	// static content
+	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
+	http.HandleFunc("/canvas.lua", s.serveCanvas)
+
+	// images
+	http.HandleFunc("/edit_copy.png", s.serveImageEditCopy)
+
+	// REST API endpoints
+	http.HandleFunc("GET /cell/{id}", s.returnCell)
+
+	// start the server
+	httpServer := &http.Server{
+		Addr:              fmt.Sprintf(":%d", port),
+		Handler:           http.DefaultServeMux,
+		ReadHeaderTimeout: HttpRequestTimeout,
+	}
+	if err := httpServer.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
