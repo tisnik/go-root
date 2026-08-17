@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_30/README.md
 //
 // Demonstrační příklad číslo 2:
-//     HTTP server nabízející i pprof metriky.
+//    HTTP server nabízející i pprof metriky.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/02_image_server_with_pprof.html
+//
 
 package main
 
