@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 3:
 //    HTTP server generující rastrový obrázek s fraktálem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/03_image_server_fractal.html
+//
 
 package main
 
