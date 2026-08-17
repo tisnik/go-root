@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 1:
 //    HTTP server, který generuje rastrové obrázky.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/01_image_server.html
+//
 
 package main
 
