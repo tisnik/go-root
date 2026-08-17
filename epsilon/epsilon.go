@@ -45,6 +45,11 @@ const PageFooter = `
 //go:embed img/*.png
 var StaticImages embed.FS
 
+// Stylesheets
+//
+//go:embed css/*.css
+var StaticStylesheets embed.FS
+
 // ---------------------------------------------------------------------------
 // New data types
 // ---------------------------------------------------------------------------
@@ -99,6 +104,19 @@ func (s ServerImpl) serveStaticImage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(binaryData)
+}
+
+func (s ServerImpl) serveStaticStylesheet(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.String()
+	styleSheetName := "css/" + strings.TrimPrefix(path, "/css/")
+	data, err := StaticStylesheets.ReadFile(styleSheetName)
+	if err != nil {
+		log.Print(err)
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/css")
+	w.Write(data)
 }
 
 func (s ServerImpl) renderTable(writer http.ResponseWriter) {
@@ -177,7 +195,9 @@ func (s ServerImpl) Serve(port uint) {
 	http.HandleFunc("/canvas.lua", s.serveCanvas)
 
 	// images
-	http.HandleFunc("/edit_copy.png", s.serveImageEditCopy)
+	http.HandleFunc("/image/{path}", s.serveStaticImage)
+	// stylesheets
+	http.HandleFunc("/css/{path}", s.serveStaticStylesheet)
 
 	// REST API endpoints
 	http.HandleFunc("GET /cell/{id}", s.returnCell)
