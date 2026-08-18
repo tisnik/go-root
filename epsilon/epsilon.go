@@ -23,6 +23,7 @@ const PageHeader = `
 <html>
     <head>
         <title>ε</title>
+	<link rel="stylesheet" href="css/main.css">
         <script src="fengari-web.js"></script>
     </head>
     <body>
@@ -139,9 +140,20 @@ func (s ServerImpl) renderTable(writer http.ResponseWriter) {
 }
 
 func (s ServerImpl) renderToolbar(writer http.ResponseWriter) {
-	io.WriteString(writer, "<img src='edit_copy.png' />")
-	io.WriteString(writer, "<img src='edit_paste.png' />")
-	io.WriteString(writer, "<img src='edit_delete.png' />")
+	io.WriteString(writer, "<div id='toolbar'>")
+	io.WriteString(writer, "<img src='/image/edit-copy.png' />")
+	io.WriteString(writer, "<img src='/image/edit-paste.png' />")
+	io.WriteString(writer, "<img src='/image/edit-delete.png' />")
+	io.WriteString(writer, "&nbsp;&nbsp;&nbsp;")
+	io.WriteString(writer, "<img src='/image/help-about.png' />")
+	io.WriteString(writer, "<img src='/image/help-faq.png' />")
+	io.WriteString(writer, "</div>\n")
+}
+
+func (s ServerImpl) renderInputbar(writer http.ResponseWriter) {
+	io.WriteString(writer, "<div id='inputbar'>")
+	io.WriteString(writer, "<input type='text' id='input' name='input' />")
+	io.WriteString(writer, "</div>\n")
 }
 
 func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Request) {
@@ -149,8 +161,10 @@ func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Reque
 		http.NotFound(writer, request)
 		return
 	}
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	io.WriteString(writer, PageHeader)
 	s.renderToolbar(writer)
+	s.renderInputbar(writer)
 	s.renderTable(writer)
 	io.WriteString(writer, PageFooter)
 }
