@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 7:
 //    Hierarchie regionů v souboru s trasovacími informacemi.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/07_region_hierarchy.html
+//
 
 package main
 
