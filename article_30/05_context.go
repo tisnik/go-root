@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 5:
 //    Zpracování kontextu v trasovacích informacích.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/05_context.html
+//
 
 package main
 
