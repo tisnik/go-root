@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_30/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Vytvoření souboru s trasovacími informacemi.
+//    Vytvoření souboru s trasovacími informacemi.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/04_basic_tracing.html
+//
 
 package main
 
