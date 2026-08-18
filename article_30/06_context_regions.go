@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 6:
 //    Transakce a regiony v trasovacím souboru.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_30/06_context_regions.html
+//
 
 package main
 
