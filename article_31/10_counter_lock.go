@@ -14,6 +14,10 @@
 // Demonstrační příklad číslo 10:
 //    Čítač zvyšovaný ve více vláknech se synchronizací (v mutextu).
 //
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/10_counter_lock.html
+//
 
 package main
 
