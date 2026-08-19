@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 9:
 //    Čítač zvyšovaný ve více vláknech bez synchronizace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/09_counter.html
+//
 
 package main
 
