@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 2:
 //    Přidání jednoduchého čítače do HTTP serveru.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/02_image_server_counter.html
+//
 
 package main
 
