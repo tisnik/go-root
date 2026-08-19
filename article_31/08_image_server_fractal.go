@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 8:
 //    Další tři sledované metriky: čas výpočtu, počet vypočtených pixelů, čas v tisknutelné podobě.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/08_image_server_fractal.html
+//
 
 package main
 
