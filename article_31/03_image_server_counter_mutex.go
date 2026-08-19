@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 3:
 //    Čítač měněný v mutexu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/03_image_server_counter_mutex.html
+//
 
 package main
 
