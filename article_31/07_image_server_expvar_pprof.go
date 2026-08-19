@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 7:
 //    Použití pprof (profilovací a další metriky)
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/07_image_server_expvar_pprof.html
+//
 
 package main
 
