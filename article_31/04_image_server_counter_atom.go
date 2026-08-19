@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 4:
 //    Atomická změna čítače.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/04_image_server_counter_atom.html
+//
 
 package main
 
