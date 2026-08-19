@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 1:
 //    HTTP server, který vrací HTML stránku s generovaným obrázkem.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/01_image_server.html
+//
 
 package main
 
