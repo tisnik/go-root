@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 6:
 //    Úprava předchozího příkladu používajícího uzávěry.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/06_image_server_expvar_closure.html
+//
 
 package main
 
