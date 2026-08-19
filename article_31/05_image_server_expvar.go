@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 5:
 //    Exportované proměnné - čítač.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/05_image_server_expvar.html
+//
 
 package main
 
