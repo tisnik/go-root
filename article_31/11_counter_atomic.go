@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 11:
 //    Čítač atomicky zvyšovaný ve více vláknech.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_31/11_counter_atomic.html
+//
 
 package main
 
