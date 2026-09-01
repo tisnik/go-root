@@ -18,27 +18,10 @@ const HttpRequestTimeout = 5 * time.Second
 const MaxRows = 99
 const MaxColumns = 'Z'
 
-const PageHeader = `
-<!doctype html>
-<html>
-    <head>
-        <title>ε</title>
-	<link rel="stylesheet" href="css/main.css">
-        <script src="fengari-web.js"></script>
-    </head>
-    <body>
-        <div id="toolbar">
-            <button><img src="/image/edit-copy.png" /></button>
-            <button><img src='/image/edit-paste.png' /></button>
-            <button><img src='/image/edit-delete.png' /></button>
-            &nbsp;&nbsp;&nbsp;
-            <button><img src='/image/help-about.png' /></button>
-            <button><img src='/image/help-faq.png' /></button>
-        </div>
-	<div id="inputbar">
-	    <input type="text" id="input" name="input" />
-        </div>
-`
+// HTML pages, templates, and part of pages
+//
+//go:embed html/page_header.htm
+var PageHeader string
 
 const PageFooter = `
         <canvas id="canvas" width="400" height="400"></canvas>
