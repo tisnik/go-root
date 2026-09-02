@@ -18,22 +18,18 @@ const HttpRequestTimeout = 5 * time.Second
 const MaxRows = 99
 const MaxColumns = 'Z'
 
+// ---------------------------------------------------------------------------
+// Resources embedded into the final binary file
+// ---------------------------------------------------------------------------
+
 // HTML pages, templates, and part of pages
 //
 //go:embed html/page_header.htm
 var PageHeader string
 
-const PageFooter = `
-        <canvas id="canvas" width="400" height="400"></canvas>
-        <script src="canvas.lua" type="text/lua">
-        </script>
-    </body>
-</html>
-`
-
-// ---------------------------------------------------------------------------
-// Resources embedded into the final binary file
-// ---------------------------------------------------------------------------
+//
+//go:embed html/page_footer.htm
+var PageFooter string
 
 // Static images
 //
