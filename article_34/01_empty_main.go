@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 1:
 //    Kostra programu napsaného v Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/01_empty_main.html
+//
 
 package main
 
