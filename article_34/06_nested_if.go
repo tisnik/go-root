@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 6:
 //    Vnořené podmínky typu "if".
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/06_nested_if.html
+//
 
 package main
 
