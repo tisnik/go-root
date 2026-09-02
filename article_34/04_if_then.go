@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_34/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Podmínka typu "if-then" v jazyce Go.
+//    Podmínka typu "if-then" v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/04_if_then.html
+//
 
 package main
 
