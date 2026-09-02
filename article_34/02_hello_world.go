@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 2:
 //    Klasický program typu Hello world.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/02_hello_world.html
+//
 
 package main
 
