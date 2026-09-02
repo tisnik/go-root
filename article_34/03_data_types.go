@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 3:
 //    Zjištění velikostí základních datových typů jazyka Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/03_data_types.html
+//
 
 package main
 
