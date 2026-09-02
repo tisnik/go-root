@@ -11,13 +11,13 @@
 //    Zjištění velikostí základních datových typů jazyka Go.
 //
 // 04_if_then.go:
-//     Podmínka typu "if-then" v jazyce Go.
+//    Podmínka typu "if-then" v jazyce Go.
 //
 // 05_if_then_else.go:
-//     Podmínka typu "if-then-else" v jazyce Go.
+//    Podmínka typu "if-then-else" v jazyce Go.
 //
 // 06_better_approach.go:
-//     Rozvětvení s využitím switch namísto podmínky typu "if-then-else".
+//    Rozvětvení s využitím switch namísto podmínky typu "if-then-else".
 //
 // 06_nested_if.go:
 //    Vnořené podmínky typu "if".
@@ -38,13 +38,13 @@
 //    Implementace programové smyčky typu "for" v jazyce Go.
 //
 // 13_break_in_loop.go:
-//     Smyčky a příkaz break.
+//    Smyčky a příkaz break.
 //
 // 13_break_in_loop_B.go:
 //    Nekonečná smyčka v jazyce Go.
 //
 // 14_switch.go:
-//     Rozvětvení v jazyce Go.
+//    Rozvětvení v jazyce Go.
 //
 // 15_simple_function.go:
 //    Deklarace jednoduché funkce.
