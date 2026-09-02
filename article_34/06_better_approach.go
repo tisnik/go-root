@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_34/README.md
 //
 // Demonstrační příklad číslo 6:
-//     Rozvětvení s využitím switch namísto podmínky typu "if-then-else".
+//    Rozvětvení s využitím switch namísto podmínky typu "if-then-else".
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/06_better_approach.html
+//
 
 package main
 
