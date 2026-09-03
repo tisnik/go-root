@@ -9,7 +9,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_34/README.md
 //
 // Demonstrační příklad číslo 13:
-//     Smyčky a příkaz break.
+//    Smyčky a příkaz break.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/13_break_in_loop.html
+//
 
 package main
 
