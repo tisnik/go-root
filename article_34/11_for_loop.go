@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 11:
 //    Implementace programové smyčky typu "for" v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/11_for_loop.html
+//
 
 package main
 
