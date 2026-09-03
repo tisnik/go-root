@@ -9,7 +9,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_34/README.md
 //
 // Demonstrační příklad číslo 14:
-//     Rozvětvení v jazyce Go.
+//    Rozvětvení v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/14_switch.html
+//
 
 package main
 
