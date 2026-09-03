@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 9:
 //    Implementace programové smyčky typu "do-while" v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/09_do_while_loop.html
+//
 
 package main
 
