@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 13:
 //    Nekonečná smyčka v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/13_break_in_loop_B.html
+//
 
 package main
 
