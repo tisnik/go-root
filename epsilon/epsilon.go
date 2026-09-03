@@ -36,6 +36,9 @@ var PageFooter string
 //go:embed img/*.png
 var StaticImages embed.FS
 
+//go:emded img/favicon.ico
+var Favicon []byte
+
 // Stylesheets
 //
 //go:embed css/*.css
@@ -144,6 +147,11 @@ func (s ServerImpl) serveLuaInterpreter(w http.ResponseWriter, r *http.Request) 
 	http.ServeFile(w, r, "fengari-web.js")
 }
 
+func (s ServerImpl) serveFavicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/x-icon")
+	w.Write(Favicon)
+}
+
 func (s ServerImpl) serveCanvas(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "canvas.lua")
 }
@@ -176,6 +184,7 @@ func (s ServerImpl) Serve(port uint) {
 	http.HandleFunc("/", s.mainEndpoint)
 
 	// static content
+	http.HandleFunc("/favicon.ico", s.serveFavicon)
 	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
 	http.HandleFunc("/canvas.lua", s.serveCanvas)
 
