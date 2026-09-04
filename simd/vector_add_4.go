@@ -26,7 +26,7 @@ func main() {
 	fmt.Println("a1", a1)
 	fmt.Println("a2", a2)
 
-	// převod pole na vektor se čtyřmi prvky
+	// převod pole na vektor se šestnácti prvky
 	v1 := archsimd.LoadFloat32x16Array(&a1)
 	v2 := archsimd.LoadFloat32x16Array(&a2)
 
