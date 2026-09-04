@@ -44,6 +44,14 @@ var Favicon []byte
 //go:embed css/*.css
 var StaticStylesheets embed.FS
 
+// Scripts
+//
+//go:embed scripts/fengari-web.js
+var FengariWebJS string
+
+//go:embed scripts/*.lua
+var Scripts embed.FS
+
 // ---------------------------------------------------------------------------
 // New data types
 // ---------------------------------------------------------------------------
@@ -144,7 +152,8 @@ func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Reque
 }
 
 func (s ServerImpl) serveLuaInterpreter(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "fengari-web.js")
+	w.Header().Set("Content-Type", "application/javascript")
+	io.WriteString(w, FengariWebJS)
 }
 
 func (s ServerImpl) serveFavicon(w http.ResponseWriter, r *http.Request) {
@@ -152,8 +161,16 @@ func (s ServerImpl) serveFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Write(Favicon)
 }
 
-func (s ServerImpl) serveCanvas(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "canvas.lua")
+func (s ServerImpl) serveScripts(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.String()
+	scriptFileName := "scripts/" + strings.TrimPrefix(path, "/scripts/")
+	data, err := Scripts.ReadFile(scriptFileName)
+	if err != nil {
+		log.Print(err)
+		http.NotFound(w, r)
+		return
+	}
+	w.Write(data)
 }
 
 func (s ServerImpl) returnCell(writer http.ResponseWriter, r *http.Request) {
@@ -186,10 +203,13 @@ func (s ServerImpl) Serve(port uint) {
 	// static content
 	http.HandleFunc("/favicon.ico", s.serveFavicon)
 	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
-	http.HandleFunc("/canvas.lua", s.serveCanvas)
+
+	// scripts
+	http.HandleFunc("/scripts/{path}", s.serveScripts)
 
 	// images
 	http.HandleFunc("/image/{path}", s.serveStaticImage)
+
 	// stylesheets
 	http.HandleFunc("/css/{path}", s.serveStaticStylesheet)
 
