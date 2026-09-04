@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 15:
 //    Deklarace jednoduché funkce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/15_simple_function.html
+//
 
 package main
 
