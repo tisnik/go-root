@@ -5,10 +5,13 @@ import (
 	"embed"
 	_ "embed"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -224,7 +227,8 @@ func (s ServerImpl) returnCell(writer http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(writer).Encode(ID)
 }
 
-func (s ServerImpl) Serve(port uint) {
+func (s ServerImpl) Serve() {
+	port := s.app.config.port
 	log.Printf("Starting server on port %d", port)
 
 	http.HandleFunc("/", s.mainEndpoint)
@@ -250,6 +254,9 @@ func (s ServerImpl) Serve(port uint) {
 		Addr:              fmt.Sprintf(":%d", port),
 		Handler:           http.DefaultServeMux,
 		ReadHeaderTimeout: HttpRequestTimeout,
+		ReadTimeout:       HttpRequestTimeout,
+		WriteTimeout:      HttpRequestTimeout,
+		IdleTimeout:       HttpRequestTimeout,
 	}
 	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)
@@ -257,9 +264,42 @@ func (s ServerImpl) Serve(port uint) {
 }
 
 func main() {
-	// TODO: read configuration
-	// TODO: read CLI options
-	storage := NewStorage()
-	server := NewServer(storage)
-	server.Serve(Port)
+	var cfg Configuration
+
+	// Read env vars (if any)
+	defaultPort := os.Getenv("PORT")
+	if defaultPort == "" {
+		defaultPort = strconv.Itoa(Port)
+	}
+	defaultPortNumber, err := strconv.Atoi(defaultPort)
+	if err != nil {
+		fmt.Printf("Improper port value: %s\n", defaultPort)
+		return
+	}
+
+	flag.BoolVar(&cfg.showHelp, "h", false, "display help")
+	flag.BoolVar(&cfg.showVersion, "v", false, "display version")
+	flag.UintVar(&cfg.port, "p", uint(defaultPortNumber), "port for the server (shorthand)")
+	flag.UintVar(&cfg.port, "port", uint(defaultPortNumber), "port for the server")
+	flag.Parse()
+
+	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+	app := &Application{
+		config: cfg,
+		logger: logger,
+	}
+
+	switch {
+	case cfg.showHelp:
+		flag.PrintDefaults()
+	case cfg.showVersion:
+		fmt.Println("version")
+	default:
+		// default operation: start the HTTP server
+		//storage := NewStorage()
+		server := NewServer(app)
+		server.Serve()
+	}
+
 }
