@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 16:
 //    Funkce s parametry.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/16_function_with_params.html
+//
 
 package main
 
