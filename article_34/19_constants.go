@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 19:
 //    Deklarace konstant v Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/19_constants.html
+//
 
 package main
 
