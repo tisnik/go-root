@@ -72,20 +72,32 @@ func NewStorage() Storage {
 	return MemoryStorage{}
 }
 
+type Configuration struct {
+	port        uint `json:"port"`
+	showHelp    bool
+	showVersion bool
+}
+
+// application holds the dependencies for our web application.
+type Application struct {
+	config Configuration
+	logger *log.Logger
+}
+
 // Server interface
 type Server interface {
-	Serve(port uint)
+	Serve()
 }
 
 // ServerImpl is a simple HTTP server implementation
 type ServerImpl struct {
-	storage Storage
+	app *Application
 }
 
 // NewServer creates a server backed by the provided storage.
-func NewServer(storage Storage) Server {
+func NewServer(app *Application) Server {
 	return ServerImpl{
-		storage: storage,
+		app: app,
 	}
 }
 
