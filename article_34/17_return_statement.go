@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 17:
 //    Příkaz return pro ukončení funkce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/17_return_statement.html
+//
 
 package main
 
