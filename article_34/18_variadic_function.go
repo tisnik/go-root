@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 18:
 //    Variadické funkce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/18_variadic_function.html
+//
 
 package main
 
