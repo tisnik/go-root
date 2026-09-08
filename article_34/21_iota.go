@@ -10,6 +10,10 @@
 //
 // Demonstrační příklad číslo 21:
 //    Deklarace konstant v Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_34/21_iota.html
+//
 
 package main
 
