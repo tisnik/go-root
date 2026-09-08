@@ -184,7 +184,6 @@ func (s ServerImpl) serveScripts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s ServerImpl) renderTable(writer http.ResponseWriter) {
-	io.WriteString(writer, "        <table>\n")
 	io.WriteString(writer, "            <tr><th>&nbsp;</th>")
 	for column := 'A'; column <= MaxColumns; column++ {
 		io.WriteString(writer, fmt.Sprintf("<th>%c</th>", column))
@@ -199,7 +198,6 @@ func (s ServerImpl) renderTable(writer http.ResponseWriter) {
 		}
 		io.WriteString(writer, "</tr>\n")
 	}
-	io.WriteString(writer, "        </table>\n")
 }
 
 // mainEndpoint serves the main HTML page at the root path.
