@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 1:
-//     Pravdivostní hodnoty v jazyce Go.
+//    Pravdivostní hodnoty v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/01_booleans.html
+//
 
 package main
 
