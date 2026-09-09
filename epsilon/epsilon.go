@@ -94,7 +94,7 @@ type ServerImpl struct {
 	app *Application
 }
 
-// NewServer creates a server backed by the provided storage.
+// NewServer creates a server for the provided application.
 func NewServer(app *Application) Server {
 	return ServerImpl{
 		app: app,
@@ -273,6 +273,8 @@ func (s ServerImpl) Serve() {
 	}
 }
 
+// main parses command-line options, configures the application, and starts the HTTP server.
+// It prints help or version information when requested and reports invalid port values.
 func main() {
 	var cfg Configuration
 
