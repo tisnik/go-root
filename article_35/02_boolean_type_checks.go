@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 2:
-//     Převod různých hodnot na typ bool.
+//    Převod různých hodnot na typ bool.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/02_boolean_type_checks.html
+//
 
 package main
 
