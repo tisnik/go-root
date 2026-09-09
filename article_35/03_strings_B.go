@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 3B:
-//     Práce s řetězci v jazyce Go.
+//    Práce s řetězci v jazyce Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/03_strings_B.html
+//
 
 package main
 
