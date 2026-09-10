@@ -24,6 +24,38 @@ const MaxRows = 99
 const MaxColumns = 'Z'
 
 // ---------------------------------------------------------------------------
+// New data types
+// ---------------------------------------------------------------------------
+
+type Storage interface {
+}
+
+type MemoryStorage struct {
+}
+
+type Configuration struct {
+	port        uint `json:"port"`
+	showHelp    bool
+	showVersion bool
+}
+
+// application holds the dependencies for our web application.
+type Application struct {
+	config Configuration
+	logger *log.Logger
+}
+
+// Server interface
+type Server interface {
+	Serve()
+}
+
+// ServerImpl is a simple HTTP server implementation
+type ServerImpl struct {
+	app *Application
+}
+
+// ---------------------------------------------------------------------------
 // Resources embedded into the final binary file
 // ---------------------------------------------------------------------------
 
@@ -58,41 +90,17 @@ var FengariWebJS string
 var Scripts embed.FS
 
 // ---------------------------------------------------------------------------
-// New data types
+// Interface implementations
 // ---------------------------------------------------------------------------
-
-type Storage interface {
-}
-
-type MemoryStorage struct {
-}
 
 // NewStorage creates and returns an in-memory storage implementation.
 func NewStorage() Storage {
 	return MemoryStorage{}
 }
 
-type Configuration struct {
-	port        uint `json:"port"`
-	showHelp    bool
-	showVersion bool
-}
-
-// application holds the dependencies for our web application.
-type Application struct {
-	config Configuration
-	logger *log.Logger
-}
-
-// Server interface
-type Server interface {
-	Serve()
-}
-
-// ServerImpl is a simple HTTP server implementation
-type ServerImpl struct {
-	app *Application
-}
+// ---------------------------------------------------------------------------
+// HTTP server implementations
+// ---------------------------------------------------------------------------
 
 // NewServer creates a server for the provided application.
 func NewServer(app *Application) Server {
@@ -272,6 +280,10 @@ func (s ServerImpl) Serve() {
 		log.Fatal(err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Import/export
+// ---------------------------------------------------------------------------
 
 // main parses command-line options, configures the application, and starts the HTTP server.
 // It prints help or version information when requested and reports invalid port values.
