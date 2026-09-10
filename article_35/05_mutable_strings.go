@@ -13,6 +13,10 @@
 //
 // Demonstrační příklad číslo 5:
 //    Alternativa k měnitelným řetězcům.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/05_mutable_strings.html
+//
 
 package main
 
