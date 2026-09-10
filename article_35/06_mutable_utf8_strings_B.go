@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 6B:
-//     Přístup k bajtům řetězce v UTF-8.
+//    Přístup k bajtům řetězce v UTF-8.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/06_mutable_utf8_strings_B.html
+//
 
 package main
 
