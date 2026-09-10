@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 4:
-//     Řetězce jsou v Go neměnitelné.
+//    Řetězce jsou v Go neměnitelné.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/04_immutable_strings.html
+//
 
 package main
 
