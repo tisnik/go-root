@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 7:
-//     Porovnávání řetězců v Go.
+//    Porovnávání řetězců v Go.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/07_string_comparison.html
+//
 
 package main
 
