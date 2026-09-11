@@ -4,6 +4,8 @@ package main
 import (
 	"embed"
 	_ "embed"
+	"encoding/csv"
+	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -34,9 +36,10 @@ type MemoryStorage struct {
 }
 
 type Configuration struct {
-	port        uint `json:"port"`
-	showHelp    bool
-	showVersion bool
+	port             uint `json:"port"`
+	showHelp         bool
+	showVersion      bool
+	generateExamples bool
 }
 
 // application holds the dependencies for our web application.
@@ -53,6 +56,18 @@ type Server interface {
 // ServerImpl is a simple HTTP server implementation
 type ServerImpl struct {
 	app *Application
+}
+
+type Coordinate struct {
+	Column string
+	Row    int
+}
+
+type Cell string
+
+type WorkSheet struct {
+	Name  string
+	Cells map[Coordinate]Cell
 }
 
 // ---------------------------------------------------------------------------
@@ -285,10 +300,82 @@ func (s ServerImpl) Serve() {
 // Import/export
 // ---------------------------------------------------------------------------
 
+func readCsv(filename string) ([][]string, error) {
+	var cells [][]string
+	fin, err := os.Open(filename)
+	if err != nil {
+		return cells, err
+	}
+	defer fin.Close()
+
+	reader := csv.NewReader(fin)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return cells, err
+	}
+
+	var row []string
+	for i, r := range records {
+		if i == 0 {
+			// skip header
+			continue
+		}
+		for _, c := range r {
+			row = append(row, c)
+		}
+
+		cells = append(cells, row)
+	}
+
+	return cells, nil
+}
+
+func readWorkSheet(filename string) (WorkSheet, error) {
+	return WorkSheet{}, nil
+}
+
+func writeWorksheet(worksheet WorkSheet, filename string) error {
+	fout, err := os.Create("test.epsilon")
+	if err != nil {
+		return err
+	}
+	defer fout.Close()
+
+	enc := gob.NewEncoder(fout)
+	err = enc.Encode(worksheet)
+	if err != nil {
+		log.Fatal("encode error:", err)
+	}
+	return nil
+}
+
+func generateExamples() {
+	cells := make(map[Coordinate]Cell)
+	cells[Coordinate{"A", 1}] = "foo"
+	cells[Coordinate{"Z", 99}] = "bar"
+
+	worksheet := WorkSheet{
+		Name:  "test1",
+		Cells: cells,
+	}
+	writeWorksheet(worksheet, "ws.epsilon")
+}
+
 // main parses command-line options, configures the application, and starts the HTTP server.
 // It prints help or version information when requested and reports invalid port values.
 func main() {
 	var cfg Configuration
+	var test bool = false
+
+	if test {
+		cells, err := readCsv("sheets/test.csv")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(len(cells))
+		fmt.Println(cells)
+		return
+	}
 
 	// Read env vars (if any)
 	defaultPort := os.Getenv("PORT")
@@ -305,6 +392,7 @@ func main() {
 	flag.BoolVar(&cfg.showVersion, "v", false, "display version")
 	flag.UintVar(&cfg.port, "p", uint(defaultPortNumber), "port for the server (shorthand)")
 	flag.UintVar(&cfg.port, "port", uint(defaultPortNumber), "port for the server")
+	flag.BoolVar(&cfg.generateExamples, "g", false, "generate example sheets")
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
@@ -319,11 +407,12 @@ func main() {
 		flag.PrintDefaults()
 	case cfg.showVersion:
 		fmt.Println("version")
+	case cfg.generateExamples:
+		generateExamples()
 	default:
 		// default operation: start the HTTP server
 		//storage := NewStorage()
 		server := NewServer(app)
 		server.Serve()
 	}
-
 }
