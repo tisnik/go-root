@@ -12,13 +12,20 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 7C:
-//     Porovnávání řetězců v Go s podporou češtiny.
+//    Porovnávání řetězců v Go s podporou češtiny.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/07_string_comparison_C.html
+//
 
 package main
 
-import "golang.org/x/text/collate"
-import "golang.org/x/text/language"
-import "fmt"
+import (
+	"fmt"
+
+	"golang.org/x/text/collate"
+	"golang.org/x/text/language"
+)
 
 func main() {
 	cl := collate.New(language.Czech)
