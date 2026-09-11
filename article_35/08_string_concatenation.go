@@ -12,7 +12,11 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 8:
-//     Spojení řetězců.
+//    Spojení řetězců.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/08_string_concatenation.html
+//
 
 package main
 
