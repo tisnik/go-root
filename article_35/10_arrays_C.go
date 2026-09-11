@@ -10,6 +10,13 @@
 //
 // Seznam demonstračních příkladů ze třicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
+//
+// Demonstrační příklad číslo 10C:
+//    Modifikace obsahu dvourozměrného pole.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/10_arrays_C.html
+//
 
 package main
 
