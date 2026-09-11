@@ -12,12 +12,18 @@
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
 //
 // Demonstrační příklad číslo 7B:
-//     Porovnávání řetězců v Go bez podpory češtiny.
+//    Porovnávání řetězců v Go bez podpory češtiny.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/07_string_comparison_B.html
+//
 
 package main
 
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func main() {
 	fmt.Println(strings.Compare("aa", "ab"))
