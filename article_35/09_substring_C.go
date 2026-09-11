@@ -10,6 +10,13 @@
 //
 // Seznam demonstračních příkladů ze třicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
+//
+// Demonstrační příklad číslo 9B:
+//    Získání části řetězce.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/09_substring_C.html
+//
 
 package main
 
