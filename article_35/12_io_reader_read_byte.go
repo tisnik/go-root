@@ -10,6 +10,13 @@
 //
 // Seznam demonstračních příkladů ze třicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
+//
+// Demonstrační příklad číslo 12:
+//    Základní vstupně-výstupní operace.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/12_io_reader_read_byte.html
+//
 
 package main
 
