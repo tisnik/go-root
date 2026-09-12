@@ -10,6 +10,13 @@
 //
 // Seznam demonstračních příkladů ze třicáté páté části:
 //    https://github.com/tisnik/go-root/blob/master/article_35/README.md
+//
+// Demonstrační příklad číslo 14:
+//    Kopie obsahu jednoho souboru do souboru druhého.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_35/14_io_reader_read_block.html
+//
 
 package main
 
