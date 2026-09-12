@@ -83,12 +83,17 @@ var PageHeader string
 //go:embed html/page_footer.htm
 var PageFooter string
 
-// Static images
+// Static images in PNG format
 //
-//go:embed img/*.png
+//go:embed images/*.png
 var StaticImages embed.FS
 
-//go:emded img/favicon.ico
+// Static icons in SVG format
+//
+//go:embed icons/*.svg
+var StaticIcons embed.FS
+
+//go:emded icons/favicon.ico
 var Favicon []byte
 
 // Stylesheets
@@ -98,10 +103,7 @@ var StaticStylesheets embed.FS
 
 // Scripts
 //
-//go:embed scripts/fengari-web.js
-var FengariWebJS string
-
-//go:embed scripts/*.lua
+//go:embed scripts/*.js
 var Scripts embed.FS
 
 // ---------------------------------------------------------------------------
@@ -171,16 +173,6 @@ func (s ServerImpl) serveStaticStylesheet(w http.ResponseWriter, r *http.Request
 	w.Write(data)
 }
 
-// serveLuaInterpreter serves the embedded JavaScript runtime needed to run Lua
-// interpreter in the web browser.
-//
-// It responds with the Fengari web bundle and sets the content type to
-// application/javascript.
-func (s ServerImpl) serveLuaInterpreter(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/javascript")
-	io.WriteString(w, FengariWebJS)
-}
-
 // serveFavicon serves the application's favicon as an ICO image.
 //
 // It sets the response content type to image/x-icon and writes the embedded
@@ -203,6 +195,7 @@ func (s ServerImpl) serveScripts(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	w.Header().Set("Content-Type", "text/javascript")
 	w.Write(data)
 }
 
@@ -268,7 +261,6 @@ func (s ServerImpl) Serve() {
 
 	// static content
 	http.HandleFunc("/favicon.ico", s.serveFavicon)
-	http.HandleFunc("/fengari-web.js", s.serveLuaInterpreter)
 
 	// scripts
 	http.HandleFunc("/scripts/{path}", s.serveScripts)
