@@ -151,6 +151,31 @@ func (s ServerImpl) serveStaticImage(w http.ResponseWriter, r *http.Request) {
 	w.Write(binaryData)
 }
 
+// serveStaticIcon serves a SVG icon from the embedded static icon bundle.
+//
+// It maps requests under /icons/ to files in the icons/ directory, reads the
+// requested file from StaticIcons, and writes it to the response with a
+// Content-Type of image/svg+xml.
+//
+// If the icon cannot be found or read, it logs the error and returns a 404
+// Not Found.
+func (s ServerImpl) serveStaticIcon(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.String()
+
+	// construct proper image name from provided path
+	imageName := "icons/" + strings.TrimPrefix(path, "/icons/")
+
+	// read text data bundled together with the application
+	textData, err := StaticIcons.ReadFile(imageName)
+	if err != nil {
+		log.Print(err)
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Write(textData)
+}
+
 // serveStaticStylesheet serves a CSS stylesheet from the embedded static
 // assets.
 //
@@ -267,6 +292,9 @@ func (s ServerImpl) Serve() {
 
 	// images
 	http.HandleFunc("/image/{path}", s.serveStaticImage)
+
+	// icons
+	http.HandleFunc("/icons/{path}", s.serveStaticIcon)
 
 	// stylesheets
 	http.HandleFunc("/css/{path}", s.serveStaticStylesheet)
