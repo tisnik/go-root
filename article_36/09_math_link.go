@@ -8,8 +8,16 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 9:
+//    Volání nativní funkce s předáním hodnoty s plovoucí řádovou čárkou.
+//    Korektní přilinkování knihovny math.
+//
 // Seznam demonstračních příkladů ze třicáté šesté části:
 //    https://github.com/tisnik/go-root/blob/master/article_36/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_36/09_math_link.html
+//
 
 package main
 
