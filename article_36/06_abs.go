@@ -8,8 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 6:
+//    Volání nativní funkce s předáním celočíselné hodnoty.
+//
 // Seznam demonstračních příkladů ze třicáté šesté části:
 //    https://github.com/tisnik/go-root/blob/master/article_36/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_36/06_abs.html
+//
 
 package main
 
