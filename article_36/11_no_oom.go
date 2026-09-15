@@ -8,8 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 11:
+//    Uvolňování paměti.
+//
 // Seznam demonstračních příkladů ze třicáté šesté části:
 //    https://github.com/tisnik/go-root/blob/master/article_36/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_36/11_no_oom.html
+//
 
 package main
 
