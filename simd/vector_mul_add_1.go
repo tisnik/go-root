@@ -1,6 +1,18 @@
-// ----------------------------------------------------------------------
-// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd
-// ----------------------------------------------------------------------
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Sto sedmnáctá část
+//    Dlouho očekávaná podpora SIMD operací v programovacím jazyku Go (2. část)
+//    https://www.root.cz/clanky/dlouho-ocekavana-podpora-simd-operaci-v-programovacim-jazyku-go-2-cast/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze sto sedmnácté části:
+//    https://github.com/tisnik/go-root/blob/master/simd/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/simd/vector_mul_add_1.html
 
 package main
 
