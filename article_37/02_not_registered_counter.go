@@ -8,18 +8,27 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 2:
+//    HTTP server s endpointem s metrikami.
+//    Přidání čítače.
+//
 // Seznam demonstračních příkladů ze třicáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_37/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_37/02_not_registered_counter.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var counter = prometheus.NewCounter(prometheus.CounterOpts{
