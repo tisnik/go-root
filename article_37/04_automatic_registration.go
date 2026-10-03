@@ -8,19 +8,29 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 4:
+//    HTTP server s endpointem s metrikami.
+//    Přidání čítače.
+//    Automatické zaregistrování čítače.
+//
 // Seznam demonstračních příkladů ze třicáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_37/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_37/04_automatic_registration.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var counter = promauto.NewCounter(prometheus.CounterOpts{
