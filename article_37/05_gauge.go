@@ -8,20 +8,29 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 5:
+//    HTTP server s endpointem s metrikami.
+//    Metrika typu Gauge.
+//
 // Seznam demonstračních příkladů ze třicáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_37/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_37/05_gauge.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var goroutines = promauto.NewGauge(prometheus.GaugeOpts{
