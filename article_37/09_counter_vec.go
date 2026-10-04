@@ -8,19 +8,28 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 9:
+//    HTTP server s endpointem s metrikami.
+//    Metrika typu CounterVec.
+//
 // Seznam demonstračních příkladů ze třicáté sedmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_37/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_37/09_counter_vec.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var pageRequests = promauto.NewCounterVec(prometheus.CounterOpts{
