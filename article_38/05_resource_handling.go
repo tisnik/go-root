@@ -10,15 +10,23 @@
 //
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Demonstrační příklad číslo 5:
+//    Vylepšená správa zdrojů (resources).
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/05_resource_handling.html
+//
 
 package main
 
 import (
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/gorilla/mux"
 )
 
 // ADDRESS is a default address of HTTP server
