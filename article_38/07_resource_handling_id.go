@@ -10,17 +10,25 @@
 //
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Demonstrační příklad číslo 7:
+//    Omezení znaků, které může být použito ve jménu zdroje.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/07_resource_handling_id.html
+//
 
 package main
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // ADDRESS is a default address of HTTP server
