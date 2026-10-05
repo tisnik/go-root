@@ -10,12 +10,18 @@
 //
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Demonstrační příklad číslo 4:
+//    Rozšíření a vylepšení předchozího příkladu.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/04_method_specification.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
 	"io"
 	"io/ioutil"
 	"log"
@@ -23,6 +29,8 @@ import (
 	"os"
 	"strconv"
 	"sync"
+
+	"github.com/gorilla/mux"
 )
 
 // ADDRESS is a default address of HTTP server
