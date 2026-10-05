@@ -10,17 +10,25 @@
 //
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Demonstrační příklad číslo 3:
+//    Specifikace HTTP metod použitých při volání REST API.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/03_method_specification.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/gorilla/mux"
 )
 
 // ADDRESS is a default address of HTTP server
