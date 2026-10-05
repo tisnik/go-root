@@ -8,19 +8,27 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 2:
+//    HTTP server používající balíček gorilla/mux.
+//
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/02_http_server_with_mux.html
+//
 
 package main
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/gorilla/mux"
 )
 
 // ADDRESS is a default address of HTTP server
