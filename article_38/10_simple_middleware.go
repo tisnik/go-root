@@ -10,18 +10,26 @@
 //
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Demonstrační příklad číslo 10:
+//    Dvě middleware funkce použité při zpracování dotazů.
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/10_simple_middleware.html
+//
 
 package main
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 const ADDRESS = ":8080"
