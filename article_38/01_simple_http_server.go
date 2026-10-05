@@ -8,8 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 1:
+//    Jednoduchý HTTP server založený na standardním balíčku net.
+//
 // Seznam demonstračních příkladů ze třicáté osmé části:
 //    https://github.com/tisnik/go-root/blob/master/article_38/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_38/01_simple_http_server.html
+//
 
 package main
 
