@@ -5,11 +5,18 @@
 //    Programovací jazyk Go a relační databáze
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-relacni-databaze/
 //
+// Demonstrační příklad číslo 6:
+//    Využití ukazatele na prvky struktury pro zjednodušení předchozího příkladu.
+//
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
 // Seznam demonstračních příkladů ze třicáté deváté části:
 //    https://github.com/tisnik/go-root/blob/master/article_39/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_39/06_pointer_to_struct_item.html
+//
 
 package main
 
@@ -17,8 +24,9 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Customer struct {
