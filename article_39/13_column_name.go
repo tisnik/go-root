@@ -5,20 +5,28 @@
 //    Programovací jazyk Go a relační databáze
 //    https://www.root.cz/clanky/programovaci-jazyk-go-a-relacni-databaze/
 //
+// Demonstrační příklad číslo 13:
+//    Specifikace jména sloupce v databázové tabulce.
+//
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
 // Seznam demonstračních příkladů ze třicáté deváté části:
 //    https://github.com/tisnik/go-root/blob/master/article_39/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_39/13_column_name.html
+//
 
 package main
 
 import (
 	"flag"
 	"fmt"
+	"log"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 )
 
 type Customer struct {
