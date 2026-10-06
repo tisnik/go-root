@@ -8,8 +8,15 @@
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
+// Demonstrační příklad číslo 8:
+//    Databázový dotaz s parametry, druhá varianta.
+//
 // Seznam demonstračních příkladů ze třicáté deváté části:
 //    https://github.com/tisnik/go-root/blob/master/article_39/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_39/08_query_parameter_2.html
+//
 
 package main
 
@@ -17,8 +24,9 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Product struct {
