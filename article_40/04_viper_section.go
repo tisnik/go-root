@@ -5,17 +5,25 @@
 //    Zpracování konfiguračních souborů v Go s využitím knihovny Viper
 //    https://www.root.cz/clanky/zpracovani-konfiguracnich-souboru-v-go-s-vyuzitim-knihovny-viper/
 //
+// Demonstrační příklad číslo 4:
+//    Přečtení konfigurace rozdělené do více sekcí.
+//
 // Repositář:
 //    https://github.com/tisnik/go-root/
 //
 // Seznam demonstračních příkladů ze čtyřicáté části:
 //    https://github.com/tisnik/go-root/blob/master/article_40/README.md
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/html-root/article_40/04_viper_section.html
+//
 
 package main
 
 import (
-	"github.com/spf13/viper"
 	"log"
+
+	"github.com/spf13/viper"
 )
 
 func main() {
