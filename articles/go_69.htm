@@ -1,0 +1,2036 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Dnes dokončíme popis přímé manipulace s Parquet soubory v programovacím jazyce Go s využitím knihovny parquet-go. Zaměříme se především na rychlost přístupu k datům, protože právě větší rychlost čtení dat je hlavním důvodem k využití sloupcových databází.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Komunikace se sloupcovými databázemi z&nbsp;jazyka Go: Parquet soubory (dokončení)</a></p>
+<p><a href="#k02">2. Rychlost zápisu vs. rychlost čtení z&nbsp;Parquet souborů</a></p>
+<p><a href="#k03">3. Čtení ze sloupcové databáze po záznamech je pomalé!</a></p>
+<p><a href="#k04">4. Čtení dat po blocích</a></p>
+<p><a href="#k05">5. Vliv velikosti bloku na rychlost čtení dat</a></p>
+<p><a href="#k06">6. Vyhodnocení výsledků</a></p>
+<p><a href="#k07">7. Konstantní počet gorutin pro čtení a jejich vliv na rychlost zpracování Parquet souborů</a></p>
+<p><a href="#k08">8. Vyhodnocení výsledků &ndash; použití jedné resp. 100 gorutin při čtení</a></p>
+<p><a href="#k09">9. Odvození počtu gorutin od velikosti bloku</a></p>
+<p><a href="#k10">10. Vyhodnocení výsledků &ndash; odvození počtu gorutin od velikosti bloku</a></p>
+<p><a href="#k11">11. Čtení hodnot z&nbsp;vybraného sloupce</a></p>
+<p><a href="#k12">12. Použití indexu sloupce při čtení</a></p>
+<p><a href="#k13">13. Zjištění počtu aktivních a neaktivních uživatelů</a></p>
+<p><a href="#k14">14. Výsledky &ndash; čtení a zpracování dat z&nbsp;jednoho sloupce</a></p>
+<p><a href="#k15">15. Specifikace čteného sloupce jeho jménem (cestou)</a></p>
+<p><a href="#k16">16. Rychlost přečtení všech údajů z&nbsp;jediného sloupce</a></p>
+<p><a href="#k17">17. Výsledky měření rychlosti</a></p>
+<p><a href="#k18">18. Pomocné skripty pro tvorbu grafů</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Komunikace se sloupcovými databázemi z&nbsp;jazyka Go: Parquet soubory (dokončení)</h2>
+
+<p>V&nbsp;dnešním článku, který svým zaměřením přímo navazuje na <a
+href="https://www.root.cz/clanky/komunikace-se-sloupcovymi-databazemi-z-jazyka-go-parquet-soubory/">článek
+předchozí</a>, dokončíme popis práce s&nbsp;Parquet soubory
+v&nbsp;programovacím jazyku Go. Zaměříme se na dvě oblasti. Jednou z&nbsp;nich
+je rychlost zápisu a čtení z&nbsp;Parquet souborů, protože k&nbsp;tomuto
+formátu se většinou uchylujeme ve chvíli, kdy je zapotřebí zajistit velmi
+rychlý přístup k&nbsp;jednotlivým sloupcům (a pouhé tvrzení &bdquo;sloupcové
+databáze jsou rychlé&ldquo; pochopitelně v&nbsp;praxi neobstojí a musí se
+dokázat, za jakých předpokladů platí). A právě čtení jednotlivých sloupců je
+druhým důležitým tématem, kterým se dnes budeme zabývat.</p>
+
+<p><div class="rs-tip-major">Poznámka: jen pro připomenutí &ndash; zajímat nás
+bude přímá práce s&nbsp;Parquet soubory; nebudeme se tedy zabývat například
+dotazovacím jazykem apod. To je téma na samostatný článek, který navíc nebude
+přímo souviset s&nbsp;programovacím jazykem Go.</div></p>
+
+<p><div class="rs-tip-major">Poznámka<sup>2</sup>: ve všech benchmarcích se
+&ndash; pokud není stanoveno jinak &ndash; ukládá či naopak načítá jeden milion
+záznamů popř.&nbsp;jeden milion hodnot z&nbsp;vybraného sloupce. Všechny
+výpočty časů jsou z&nbsp;tohoto důvodu poměrně přímočaré.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Rychlost zápisu vs. rychlost čtení z&nbsp;Parquet souborů</h2>
+
+<p>Na konci předchozího článku jsme si uvedli dva příklady, které slouží pro
+jednoduché zjištění, jak dlouho trvá vytvoření a naplnění nového Parquet
+souboru daty a jak rychle je naopak možné tato data přečíst. Pro vytváření
+souboru, resp.&nbsp;jednotlivých záznamů, použijeme knihovnu
+<strong>faker</strong>, která nám vygeneruje pseudonáhodná data:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "math/rand"
+        "os"
+        "time"
+&nbsp;
+        "github.com/bxcodec/faker/v3"
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+func <strong>generateColor</strong>() string {
+        var colors []string = []string{
+                "black",
+                "blue",
+                "red",
+                "magenta",
+                "green",
+                "cyan",
+                "yellow",
+                "white",
+        }
+        return colors[rand.Int()%len(colors)]
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.ID = uint64(i)
+                record.Name = faker.FirstName()
+                record.Surname = faker.LastName()
+                record.Email = faker.Email()
+                record.Active = i%2 == 0
+                record.Color = generateColor()
+&nbsp;
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int, compression parquet.CompressionCodec) {
+        t1 := time.Now()
+&nbsp;
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = compression
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("1000000records_compression_none.parquet", 1000000, parquet.CompressionCodec_UNCOMPRESSED)
+        createAndWriteIntoParquetFile("1000000records_compression_snappy.parquet", 1000000, parquet.CompressionCodec_SNAPPY)
+        createAndWriteIntoParquetFile("1000000records_compression_gzip.parquet", 1000000, parquet.CompressionCodec_GZIP)
+}
+</pre>
+
+<p>Časy trvání zápisu do ramdisku s&nbsp;využitím obou komprimačních algoritmů
+(první zápis nepoužívá žádný algoritmus):</p>
+
+<pre>
+2020/11/14 16:22:21 Write Finished
+2020/11/14 16:22:21 Start time:  2020-11-14 16:22:18.382414375 +0100 CET m=+0.001018949
+2020/11/14 16:22:21 End time:    2020-11-14 16:22:21.496799932 +0100 CET m=+3.115404464
+2020/11/14 16:22:21 Duration:    3.114385625s
+&nbsp;
+2020/11/14 16:22:24 Write Finished
+2020/11/14 16:22:24 Start time:  2020-11-14 16:22:21.52651968 +0100 CET m=+3.145124247
+2020/11/14 16:22:24 End time:    2020-11-14 16:22:24.81071525 +0100 CET m=+6.429319812
+2020/11/14 16:22:24 Duration:    3.284195685s
+&nbsp;
+2020/11/14 16:22:28 Write Finished
+2020/11/14 16:22:28 Start time:  2020-11-14 16:22:24.835851362 +0100 CET m=+6.454455962
+2020/11/14 16:22:28 End time:    2020-11-14 16:22:28.88592985 +0100 CET m=+10.504534394
+2020/11/14 16:22:28 Duration:    4.050078532s
+</pre>
+
+<p>Taktéž jsme si uvedli příklad sloužící pro otestování rychlosti čtení po
+jednotlivých záznamech. Jedná se o nejpomalejší možný způsob čtení, protože zde
+vůbec nevyužijeme výhod poskytovaných sloupcovou databází:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file.</i>
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line.</i>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string) {
+        t1 := time.Now()
+&nbsp;
+        const parallelNumber = 1
+&nbsp;
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record),
+                parallelNumber)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        readRecords(parquetReader)
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>readRecords</strong>(parquetReader *reader.ParquetReader) {
+        recordCount := int(parquetReader.GetNumRows())
+        log.Println("Records to read", recordCount)
+&nbsp;
+        record := make([]Record, 1)
+        records := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for i := 0; i &lt; recordCount; i++ {
+                // try to read record
+                err := parquetReader.Read(&amp;record)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        records++
+                }
+        }
+        log.Println("Read", records, "records")
+}
+&nbsp;
+func <strong>main</strong>() {
+        readParquetFile("1000000records_compression_none.parquet")
+        readParquetFile("1000000records_compression_snappy.parquet")
+        readParquetFile("1000000records_compression_gzip.parquet")
+}
+</pre>
+
+<p>Podívejme se nyní na dosažené výsledky. Rychlost čtení (po jednotlivých
+záznamech) je mnohem pomalejší, než samotný zápis do sloupcové databáze:</p>
+
+<pre>
+2020/11/14 16:46:53 Records to read 1000000
+2020/11/14 16:47:17 Read 1000000 records
+2020/11/14 16:47:17 Start time:  2020-11-14 16:46:53.80851109 +0100 CET m=+0.000895204
+2020/11/14 16:47:17 End time:    2020-11-14 16:47:17.695641899 +0100 CET m=+23.888025988
+2020/11/14 16:47:17 Duration:    23.887130935s
+2020/11/14 16:47:17 Records to read 1000000
+2020/11/14 16:47:41 Read 1000000 records
+2020/11/14 16:47:41 Start time:  2020-11-14 16:47:17.695696876 +0100 CET m=+23.888080959
+2020/11/14 16:47:41 End time:    2020-11-14 16:47:41.460809934 +0100 CET m=+47.653194032
+2020/11/14 16:47:41 Duration:    23.765113146s
+2020/11/14 16:47:41 Records to read 1000000
+2020/11/14 16:48:05 Read 1000000 records
+2020/11/14 16:48:05 Start time:  2020-11-14 16:47:41.460860147 +0100 CET m=+47.653244228
+2020/11/14 16:48:05 End time:    2020-11-14 16:48:05.50961075 +0100 CET m=+71.701994837
+2020/11/14 16:48:05 Duration:    24.048750743s
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Čtení ze sloupcové databáze po záznamech je pomalé!</h2>
+
+<p>Výsledky získané z&nbsp;obou předchozích příkladů a shrnuté do jediné
+tabulky ukazují, že čtení po jednotlivých záznamech je skutečně pomalé:</p>
+
+<table>
+<tr><th>#</th><th>Komprimace</th><th>Zápis</th><th>Čtení</th></tr>
+<tr><td>1</td><td>None</td><td>3.15</td><td>23.88s</td></tr>
+<tr><td>2</td><td>Snappy</td><td>3.30s</td><td>23.76s</td></tr>
+<tr><td>3</td><td>GZIP</td><td>4.07s</td><td>24.04s</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: tento přístup, tedy čtení po záznamech,
+by se pravděpodobně nikdy neměl používat v&nbsp;praxi, protože opravu znamená,
+že se sloupová databáze využívá značně neefektivním způsobem.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Čtení dat po blocích</h2>
+
+<p>Pokud z&nbsp;nějakého důvodu potřebujete skutečně zpracovávat data po
+záznamech a nikoli po sloupcích, je obecně rychlejší použít čtení po celých
+blocích. Je to vlastně velmi jednoduché. Postačuje tento kus kódu...</p>
+
+<pre>
+recordCount := int(parquetReader.GetNumRows())
+&nbsp;
+record := make([]Record, 1)
+&nbsp;
+<i>// try to read and display all records</i>
+for i := 0; i &lt; recordCount; i++ {
+        // try to read record
+        err := parquetReader.Read(&amp;record)
+        if err != nil {
+                log.Println("Read error", err)
+                continue
+        } else {
+                <strong>// zde se může se záznamem pracovat</strong>
+        }
+}
+</pre>
+
+<p>...nahradit za čtení po větších blocích, jejichž délku si můžete určit (až
+pochopitelně na poslední blok, který bude obecně menší):</p>
+
+<pre>
+recordCount := int(parquetReader.GetNumRows())
+&nbsp;
+records := make([]Record, blockSize)
+readRecords := 0
+&nbsp;
+<i>// try to read and display all records</i>
+for readRecords &lt; recordCount {
+        // try to read record
+        err := parquetReader.Read(&amp;records)
+        if err != nil {
+                log.Println("Read error", err)
+                continue
+        } else {
+                readRecords += len(records)
+                <strong>// zde se může se záznamy v řezu pracovat</strong>
+        }
+}
+// log.Println("Read", readRecords, "records")
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Vliv velikosti bloku na rychlost čtení dat</h2>
+
+<p>Nyní tedy umíme pracovat s&nbsp;daty po větších blocích. Jaký je však vliv
+velikosti bloku na rychlost čtení? To je obecně velmi důležitá informace,
+protože nutnost alokovat velké bloky může mít negativní vliv na paměťové nároky
+a/nebo i na rychlost celé aplikace. Můžeme se pokusit provést malé měření a
+velikost bloku postupně zvětšovat od jednoho záznamu až po 1000
+(resp.&nbsp;přesněji <strong>maxBlockSize</strong>) záznamů. Po každém zvětšení
+bloku opět přečteme všechny záznamy a zaznamenáme celkový čas:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file.</i>
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line.</i>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "log"
+        "os"
+        "strconv"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// maximum block size for reading Parquet files by blocks</i>
+const <strong>maxBlockSize</strong> = 1000
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string, blockSize int) {
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record), 1)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        readRecords(parquetReader, blockSize)
+}
+&nbsp;
+func <strong>readRecords</strong>(parquetReader *reader.ParquetReader, blockSize int) {
+        recordCount := int(parquetReader.GetNumRows())
+        <i>// log.Println("Records to read", recordCount)</i>
+&nbsp;
+        records := make([]Record, blockSize)
+        readRecords := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for readRecords &lt; recordCount {
+                <i>// try to read record</i>
+                err := parquetReader.Read(&amp;records)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        readRecords += len(records)
+                }
+        }
+        <i>// log.Println("Read", readRecords, "records")</i>
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// create and open new CSV file</i>
+        csvFile, err := os.Create("durations.csv")
+        if err != nil {
+                log.Fatal("Create CSV file", err)
+        }
+&nbsp;
+        defer csvFile.Close()
+&nbsp;
+        <i>// initialize CSV writer</i>
+        csvWriter := csv.NewWriter(csvFile)
+        defer csvWriter.Flush()
+&nbsp;
+        csvWriter.Write([]string{"Block size", "Time to read"})
+&nbsp;
+        for blockSize := 1; blockSize &lt;= maxBlockSize; blockSize++ {
+                t1 := time.Now()
+&nbsp;
+                readParquetFile("1000000records_compression_none.parquet", blockSize)
+&nbsp;
+                <i>// compute and print duration</i>
+                since := time.Since(t1)
+                log.Printf("Block size: %d  Duration: %d\n", blockSize, since)
+&nbsp;
+                <i>// write duration into CSV file</i>
+                csvWriter.Write([]string{strconv.Itoa(blockSize), strconv.Itoa(int(since))})
+        }
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Vyhodnocení výsledků</h2>
+
+<p>Z&nbsp;grafu, který je možné ze získaných dat vykreslit, je patrné, že čím
+větší je velikost bloku, tím kratší je celková doba nutná pro načtení všech
+záznamů. Na konci grafu jsou vidět &bdquo;zákmity&ldquo; způsobené činností
+automatického správce paměti:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-1.png" class="image-419029" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 1: Vliv velikosti bloku (počet záznamů čtených jedinou operací)
+na rychlost načtení.</i></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Konstantní počet gorutin pro čtení a jejich vliv na rychlost zpracování Parquet souborů</h2>
+
+<p>Při inicializaci objektu, který čtení z&nbsp;Parquet souborů realizuje, je
+možné specifikovat počet gorutin, v&nbsp;nichž je prováděno vlastní čtení.
+Prozatím jsme počet gorutin měli nastaven na hodnotu 1:</p>
+
+<pre>
+<i>// initialize Parquet file reader</i>
+parquetReader, err := reader.NewParquetReader(fileReader, new(Record), <u>1</u>)
+</pre>
+
+<p>Tento počet je však možné měnit a celkový počet gorutin bude mít vliv na
+rychlost čtení. Zda se jedná o záporný či spíše kladný vliv, se pokusíme
+zjistit v&nbsp;dalším příkladu, který těchto gorutin bude vyžadovat přesně 100
+(konstanta <strong>readers</strong>), což je mimochodem mnohem více, než počet
+procesorových jader (osm fyzických jader tvářících se jako šestnáct jader
+logických):</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file</i>.
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line</i>.
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "log"
+        "os"
+        "strconv"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// maximum block size for reading Parquet files by blocks</i>
+const <strong>maxBlockSize</strong> = 1000
+&nbsp;
+const <strong>readers</strong> = 100
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string, blockSize int) {
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record), readers)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        readRecords(parquetReader, blockSize)
+}
+&nbsp;
+func <strong>readRecords</strong>(parquetReader *reader.ParquetReader, blockSize int) {
+        recordCount := int(parquetReader.GetNumRows())
+        <i>// log.Println("Records to read", recordCount)</i>
+&nbsp;
+        records := make([]Record, blockSize)
+        readRecords := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for readRecords &lt; recordCount {
+                <i>// try to read record</i>
+                err := parquetReader.Read(&amp;records)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        readRecords += len(records)
+                }
+        }
+        <i>// log.Println("Read", readRecords, "records")</i>
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// create and open new CSV file</i>
+        csvFile, err := os.Create("durations.csv")
+        if err != nil {
+                log.Fatal("Create CSV file", err)
+        }
+&nbsp;
+        defer csvFile.Close()
+&nbsp;
+        <i>// initialize CSV writer</i>
+        csvWriter := csv.NewWriter(csvFile)
+        defer csvWriter.Flush()
+&nbsp;
+        csvWriter.Write([]string{"Block size", "Time to read"})
+&nbsp;
+        for blockSize := 1; blockSize &lt;= maxBlockSize; blockSize++ {
+                t1 := time.Now()
+&nbsp;
+                readParquetFile("1000000records_compression_none.parquet", blockSize)
+&nbsp;
+                <i>// compute and print duration</i>
+                since := time.Since(t1)
+                log.Printf("Block size: %d  Duration: %d\n", blockSize, since)
+&nbsp;
+                <i>// write duration into CSV file</i>
+                csvWriter.Write([]string{strconv.Itoa(blockSize), strconv.Itoa(int(since))})
+        }
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Vyhodnocení výsledků &ndash; použití jedné resp. 100 gorutin při čtení</h2>
+
+<p>Časy běhu závislé na velikosti bloku budou v&nbsp;tomto případě odlišné:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-2.png" class="image-419030" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 2: Vliv velikosti bloku (počet záznamů čtených jedinou operací)
+na rychlost načtení při použití 100 gorutin.</i></p>
+
+<p>Zajímavější je však porovnání s&nbsp;předchozím měřením s&nbsp;jedinou
+gorutinou:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-3.png" class="image-419031" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 3: Vliv počtu gorutin a současně i velikosti bloku na rychlost
+čtení.</i></p>
+
+<p>Z&nbsp;grafu je patrné, že pokud je velikost bloku větší než počet gorutin,
+je výhodnější druhá možnost. Ovšem problém nastává při čtení po kratších
+blocích, kdy větší počet gorutin paradoxně vede ke zpomalení čtení (a to
+dokonce o celý řád!). Měli bychom tudíž přijít s&nbsp;lepším řešením a nějakým
+způsobem svázat počet gorutin s&nbsp;velikostí bloku.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Odvození počtu gorutin od velikosti bloku</h2>
+
+<p>V&nbsp;některých materiálech o knihovně určené pro čtení Parquet souborů se
+setkáme s&nbsp;tvrzením, že velikost bloku by měla odpovídat počtu gorutin,
+v&nbsp;nichž běží načítací rutina. Zda je toto tvrzení pravdivé, popř.&nbsp;pro
+jaké velikosti bloků je pravdivé, si ověříme v&nbsp;dalším demonstračním
+příkladu:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file</i>.
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line</i>.
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "log"
+        "os"
+        "strconv"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// maximum block size for reading Parquet files by blocks</i>
+const <strong>maxBlockSize</strong> = 1000
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string, blockSize int) {
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record), int64(blockSize))
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        readRecords(parquetReader, blockSize)
+}
+&nbsp;
+func <strong>readRecords</strong>(parquetReader *reader.ParquetReader, blockSize int) {
+        recordCount := int(parquetReader.GetNumRows())
+        <i>// log.Println("Records to read", recordCount)</i>
+&nbsp;
+        records := make([]Record, blockSize)
+        readRecords := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for readRecords &lt; recordCount {
+                // try to read record
+                err := parquetReader.Read(&amp;records)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        readRecords += len(records)
+                }
+        }
+        <i>// log.Println("Read", readRecords, "records")</i>
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// create and open new CSV file</i>
+        csvFile, err := os.Create("durations.csv")
+        if err != nil {
+                log.Fatal("Create CSV file", err)
+        }
+&nbsp;
+        defer csvFile.Close()
+&nbsp;
+        <i>// initialize CSV writer</i>
+        csvWriter := csv.NewWriter(csvFile)
+        defer csvWriter.Flush()
+&nbsp;
+        csvWriter.Write([]string{"Block size", "Time to read"})
+&nbsp;
+        for blockSize := 1; blockSize &lt;= maxBlockSize; blockSize++ {
+                t1 := time.Now()
+&nbsp;
+                readParquetFile("1000000records_compression_none.parquet", blockSize)
+&nbsp;
+                <i>// compute and print duration</i>
+                since := time.Since(t1)
+                log.Printf("Block size: %d  Duration: %d\n", blockSize, since)
+&nbsp;
+                <i>// write duration into CSV file</i>
+                csvWriter.Write([]string{strconv.Itoa(blockSize), strconv.Itoa(int(since))})
+        }
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Vyhodnocení výsledků &ndash; odvození počtu gorutin od velikosti bloku</h2>
+
+<p>Nejprve se podívejme na vliv doby načtení 1000000 záznamů v&nbsp;blocích o
+velikosti od jednoho záznamu až po tisíc záznamů. Počet gorutin přesně odpovídá
+velikosti bloku:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-4.png" class="image-419032" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 4: Čtení po blocích rozdílné velikosti s&nbsp;rozdílným počtem
+gorutin.</i></p>
+
+<p>Vidíme, že doporučení, aby se počet gorutin odvozoval od velikosti bloku,
+není zcela dobré. Ještě více je to patrné z&nbsp;následujícího grafu:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-5.png" class="image-419033" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 5: Čtení po blocích rozdílné velikosti s&nbsp;rozdílným počtem
+gorutin. Porovnání se čtením v&nbsp;jediné gorutině.</i></p>
+
+<p>Doporučení by tedy mělo znít spíše takto: počet gorutin by měl odpovídat
+počtu logických procesorových jader. Pouze v&nbsp;případě, že je zapotřebí číst
+po jednotlivých záznamech, použijte jedinou gorutinu.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Čtení hodnot z&nbsp;vybraného sloupce</h2>
+
+<p>Sloupcové databáze jsou optimalizovány na to, aby se data načítala a
+zpracovávala po jednotlivých sloupcích. Parquet soubory nejsou výjimkou, takže
+i v&nbsp;knihovně <strong>parquet-go</strong> nalezneme dvě metody určené pro
+čtení hodnot z&nbsp;vybraného sloupce:</p>
+
+<table>
+<tr><th>#</th><th>Funkce</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>ReadColumnByIndex</td><td>čtení ze sloupce vybraného pomocí indexu</td></tr>
+<tr><td>2</td><td>ReadColumnByPath</td><td>čtení ze sloupce vybraného cestou</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: nesmíme zapomenout na to, že se liší i
+objekt určený pro čtení. Tento objekt se získá konstruktorem
+<strong>NewParquetColumnReader</strong> a nikoli
+<strong>NewParquetReader</strong>:</div></p>
+
+<pre>
+fileReader, err := <strong>local.NewLocalFileReader</strong>(fileName)
+&nbsp;
+<i>// fileReader needs to be closed properly</i>
+defer closeReader(fileReader)
+&nbsp;
+<i>// initialize Parquet file reader</i>
+parquetColumnReader, err := <strong>reader.NewParquetColumnReader</strong>(fileReader, parallelNumber)
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Použití indexu sloupce při čtení</h2>
+
+<p>Pro načtení jediné hodnoty ze sloupce s&nbsp;indexem
+<strong>columnIndex</strong> se použije metoda
+<strong>ReadColumnByIndex</strong>, které se předá index sloupce (čísluje se od
+nuly) a počet načítaných hodnot:</p>
+
+<pre>
+data, _, _, err := parquetReader.ReadColumnByIndex(int64(columnIndex), 1)
+if err != nil {
+        log.Println("Read error", err)
+        continue
+}
+</pre>
+
+<p>Typ vrácené hodnoty je řez (<i>slice</i>) hodnot implementujících prázdné
+rozhraní &ndash; jinými slovy se jedná o kolekci libovolných hodnot. O
+přetypování se musí postarat samotný program, a to například následovně:</p>
+
+<pre>
+if data[0].(bool) {
+        activeCount++
+} else {
+        inactiveCount++
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti se z&nbsp;metody
+<strong>ReadColumnByIndex</strong> vrací čtyři hodnoty, ovšem pro nás je
+relevantní jen hodnota první a poslední &ndash; v&nbsp;poslední hodnotě se
+podle úzu vrací chyba.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Zjištění počtu aktivních a neaktivních uživatelů</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu se zjišťuje počet aktivních a
+neaktivních uživatelů. Co to znamená? Z&nbsp;databáze se strukturou:</p>
+
+<pre>
+ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+Active  bool   `parquet:"name=active, type=BOOLEAN"`
+Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+</pre>
+
+<p>budeme zpracovávat pouze sloupec <strong>Active</strong>, jehož index je
+roven čtyřem:</p>
+
+<pre>
+const activeColumnIndex = 4
+</pre>
+
+<p>Příklad, který načte a zpracuje údaje z&nbsp;tohoto sloupce, by mohl vypadat
+následovně:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file</i>.
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line</i>.
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+const activeColumnIndex = 4
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string) {
+        t1 := time.Now()
+&nbsp;
+        const parallelNumber = 1
+&nbsp;
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetColumnReader, err := reader.NewParquetColumnReader(fileReader, parallelNumber)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet column reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetColumnReader.ReadStop()
+&nbsp;
+        readColumnData(parquetColumnReader, activeColumnIndex)
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>readColumnData</strong>(parquetReader *reader.ParquetReader, columnIndex int) {
+        valuesCount := int(parquetReader.GetNumRows())
+        log.Println("Values to read", valuesCount)
+&nbsp;
+        activeCount := 0
+        inactiveCount := 0
+&nbsp;
+        values := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for i := 0; i &lt; valuesCount; i++ {
+                // try to read value
+                data, _, _, err := parquetReader.ReadColumnByIndex(int64(columnIndex), 1)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        values++
+                }
+                if data[0].(bool) {
+                        activeCount++
+                } else {
+                        inactiveCount++
+                }
+        }
+        log.Println("Read", values, "values", "active", activeCount, "inactive", inactiveCount)
+}
+&nbsp;
+func main() {
+        readParquetFile("1000000records_compression_none.parquet")
+        readParquetFile("1000000records_compression_snappy.parquet")
+        readParquetFile("1000000records_compression_gzip.parquet")
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výsledky &ndash; čtení a zpracování dat z&nbsp;jednoho sloupce</h2>
+
+<p>Nezávisle na tom, který soubor (každý používá jiný komprimační algoritmus)
+je zpracováván, by se mělo vypočítat 500000 aktivních a 500000 neaktivních
+uživatelů, protože těmito hodnotami byla databáze naplněna:</p>
+
+<pre>
+2020/11/17 19:18:08 Values to read 1000000
+2020/11/17 19:18:08 Read 1000000 values active 500000 inactive 500000
+2020/11/17 19:18:08 Start time:  2020-11-17 19:18:08.01666144 +0100 CET m=+0.000954929
+2020/11/17 19:18:08 End time:    2020-11-17 19:18:08.598879555 +0100 CET m=+0.583173023
+2020/11/17 19:18:08 Duration:    582.218211ms
+&nbsp;
+2020/11/17 19:18:08 Values to read 1000000
+2020/11/17 19:18:09 Read 1000000 values active 500000 inactive 500000
+2020/11/17 19:18:09 Start time:  2020-11-17 19:18:08.598904304 +0100 CET m=+0.583197768
+2020/11/17 19:18:09 End time:    2020-11-17 19:18:09.145461682 +0100 CET m=+1.129755154
+2020/11/17 19:18:09 Duration:    546.557462ms
+&nbsp;
+2020/11/17 19:18:09 Values to read 1000000
+2020/11/17 19:18:09 Read 1000000 values active 500000 inactive 500000
+2020/11/17 19:18:09 Start time:  2020-11-17 19:18:09.145480412 +0100 CET m=+1.129773875
+2020/11/17 19:18:09 End time:    2020-11-17 19:18:09.743330813 +0100 CET m=+1.727624282
+2020/11/17 19:18:09 Duration:    597.850522ms
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že i při čtení po
+jednotlivých záznamech jsme dosáhli času přibližně 0,6 sekundy, což je
+v&nbsp;porovnání s&nbsp;přibližně 24 sekundami pro celou databázi skutečné
+zrychlení ukazující jednu z&nbsp;předností sloupcových databází.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Specifikace čteného sloupce jeho jménem (cestou)</h2>
+
+<p>V&nbsp;dalším &ndash; již předposledním &ndash; demonstračním příkladu je
+ukázáno, jak lze specifikovat sloupec cestou. Zde je situace nepatrně
+složitější, protože v&nbsp;cestě není uveden jen název sloupce, ale i případné
+jméno souboru obsahujícího tento sloupec (teoreticky je totiž možné tabulku
+rozdělit do většího množství souborů):</p>
+
+<pre>
+const activeColumnPath = "parquet_go_root.active"
+</pre>
+
+<p>Čtení potom může vypadat následovně:</p>
+
+<pre>
+for i := 0; i &lt; valuesCount; i++ {
+        <i>// try to read value</i>
+        data, _, _, err := <strong>parquetReader.ReadColumnByPath(activeColumnPath, 1)</strong>
+        if err != nil {
+                log.Println("Read error", err)
+                continue
+        } else {
+                <i>// ...</i>
+        }
+        if data[0].(bool) {
+                activeCount++
+        } else {
+                inactiveCount++
+        }
+}
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file</i>.
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line</i>.
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+const <strong>activeColumnPath</strong> = "parquet_go_root.active"
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string) {
+        t1 := time.Now()
+&nbsp;
+        const parallelNumber = 1
+&nbsp;
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetColumnReader, err := reader.NewParquetColumnReader(fileReader, parallelNumber)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet column reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetColumnReader.ReadStop()
+&nbsp;
+        readColumnData(parquetColumnReader, activeColumnPath)
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>readColumnData</strong>(parquetReader *reader.ParquetReader, columnPath string) {
+        valuesCount := int(parquetReader.GetNumRows())
+        log.Println("Values to read", valuesCount)
+&nbsp;
+        activeCount := 0
+        inactiveCount := 0
+&nbsp;
+        values := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for i := 0; i &lt; valuesCount; i++ {
+                // try to read value
+                data, _, _, err := parquetReader.ReadColumnByPath(columnPath, 1)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        values++
+                }
+                if data[0].(bool) {
+                        activeCount++
+                } else {
+                        inactiveCount++
+                }
+        }
+        log.Println("Read", values, "values", "active", activeCount, "inactive", inactiveCount)
+}
+&nbsp;
+func <strong>main</strong>() {
+        readParquetFile("1000000records_compression_none.parquet")
+        readParquetFile("1000000records_compression_snappy.parquet")
+        readParquetFile("1000000records_compression_gzip.parquet")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: časy čtení zde neuvádím, protože jsou
+prakticky totožné s&nbsp;časy, které jsme získali předchozím demonstračním
+příkladem.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Rychlost přečtení všech údajů z&nbsp;jediného sloupce</h2>
+
+<p>I když je čtení dat z&nbsp;jediného sloupce (podle očekávání) rychlejší, než
+zpracování databáze po řádcích, je možné ho urychlit čtením po větších blocích,
+což je postup, který již velmi dobře známe. Pro naše účely tento postup
+nepatrně upravíme:</p>
+
+<pre>
+for readValues &lt; valuesCount {
+        <i>// try to read value</i>
+        data, _, _, err := parquetReader.ReadColumnByIndex(int64(columnIndex), int64(blockSize))
+        if err != nil {
+                log.Println("Read error", err)
+                continue
+        }
+        for _, active := range data {
+                if active.(bool) {
+                        activeCount++
+                } else {
+                        inactiveCount++
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se v&nbsp;tomto
+případě z&nbsp;metody <strong>parquetReader.ReadColumnByIndex</strong> vrátil
+řez o maximálním počtu prvků odpovídající hodnotě <strong>blockSize</strong>.
+Poslední blok opět může být menší, což je pochopitelné (počet řádků nemusí
+odpovídat celočíselnému násobku velikosti bloku).</div></p>
+
+<p>V&nbsp;dnešním posledním příkladu se přečte celý sloupec s&nbsp;využitím
+bloků proměnné délky a současně i při použití jedné, osmi, šestnácti
+popř.&nbsp;32 gorutin, v&nbsp;jejichž kódu je realizován kód pro čtení:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file</i>.
+<i>// Currently</i>, only records with the structure `Record` is read correctly. Name
+<i>// of input Parquet file needs to be selected from command line</i>.
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/csv"
+        "fmt"
+        "log"
+        "os"
+        "strconv"
+        "time"
+
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// maximum block size for reading Parquet files by blocks</i>
+const <strong>maxBlockSize</strong> = 100
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+const <strong>activeColumnIndex</strong> = 4
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func closeReader(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string, blockSize int, readers int) {
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initialize Parquet file reader</i>
+        parquetColumnReader, err := reader.NewParquetColumnReader(fileReader, int64(readers))
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet column reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetColumnReader.ReadStop()
+&nbsp;
+        readColumnData(parquetColumnReader, activeColumnIndex, blockSize)
+
+}
+&nbsp;
+func <strong>readColumnData</strong>(parquetReader *reader.ParquetReader, columnIndex int, blockSize int) {
+        valuesCount := int(parquetReader.GetNumRows())
+&nbsp;
+        activeCount := 0
+        inactiveCount := 0
+&nbsp;
+        readValues := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for readValues &lt; valuesCount {
+                <i>// try to read value</i>
+                data, _, _, err := parquetReader.ReadColumnByIndex(int64(columnIndex), int64(blockSize))
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        readValues += len(data)
+                }
+                for _, active := range data {
+                        if active.(bool) {
+                                activeCount++
+                        } else {
+                                inactiveCount++
+                        }
+                }
+        }
+        log.Println("Read", readValues, "values", "active", activeCount, "inactive", inactiveCount)
+}
+&nbsp;
+func <strong>main</strong>() {
+        var readers []int = []int{1, 8, 16, 32}
+&nbsp;
+        for _, numReaders := range readers {
+                <i>// create and open new CSV file</i>
+                csvFileName := fmt.Sprintf("durations-%d-readers.csv", numReaders)
+&nbsp;
+                csvFile, err := os.Create(csvFileName)
+                if err != nil {
+                        log.Fatal("Create CSV file", err)
+                }
+&nbsp;
+                defer csvFile.Close()
+&nbsp;
+                <i>// initialize CSV writer</i>
+                csvWriter := csv.NewWriter(csvFile)
+                defer csvWriter.Flush()
+&nbsp;
+                csvWriter.Write([]string{"Block size", "Time to read"})
+&nbsp;
+                for blockSize := 1; blockSize &lt;= maxBlockSize; blockSize++ {
+                        t1 := time.Now()
+&nbsp;
+                        readParquetFile("1000000records_compression_none.parquet", blockSize, numReaders)
+&nbsp;
+                        <i>// compute and print duration</i>
+                        since := time.Since(t1)
+                        log.Printf("Block size: %d  Readers: %d  Duration: %d\n", blockSize, numReaders, since)
+&nbsp;
+                        <i>// write duration into CSV file</i>
+                        csvWriter.Write([]string{strconv.Itoa(blockSize), strconv.Itoa(int(since))})
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledky měření rychlosti</h2>
+
+<p>Podívejme se nyní na dosažené časy. Z&nbsp;nich je patrné, že i relativně
+malá velikost bloku (řekněme šedesát prvků) vede ke znatelnému urychlení
+načítání hodnot ze sloupce:</p>
+
+<img src="https://i.iinfo.cz/images/256/go-parquet-6.png" class="image-419034" alt="&#160;" width="640" height="480" />
+<p><i>Obrázek 6: Rychlost čtení údajů z&nbsp;jediného sloupce pro různé
+velikosti bloků a různý počet gorutin.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě nemá počet gorutin
+prakticky žádný význam, a to z&nbsp;toho důvodu, že sloupec obsahuje jen
+primitivní hodnoty, takže kód pro načtení je dostatečně malý a
+rychlý.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Pomocné skripty pro tvorbu grafů</h2>
+
+<p>Jen pro úplnost si uveďme, jaké skripty byly použity pro přípravu grafů pro
+dnešní článek.</p>
+
+<p>První skript načte CSV soubor s&nbsp;dvojicí sloupců &ndash; velikost bloku
+a čas přečtení všech záznamů popř.&nbsp;hodnot z&nbsp;Parquet souboru.
+Z&nbsp;těchto údajů vytvoří jednoduchý graf, který je zobrazen a současně i
+uložen (rastrový obrázek PNG + vektorová kresba SVG). Využívá se možností
+knihovny Matplotlib:</p>
+
+<pre>
+<i>#!/usr/bin/env python3</i>
+&nbsp;
+import sys
+import csv
+import matplotlib.pyplot as plt
+&nbsp;
+<i># Check if command line argument is specified (it is mandatory).</i>
+if len(sys.argv) &lt; 2:
+    print("Usage:")
+    print("  read-by-blocks-chart.py input_file.csv")
+    print("Example:")
+    print("  read-by-blocks-chart.py durations.csv")
+    sys.exit(1)
+&nbsp;
+<i># First command line argument should contain name of input CSV.</i>
+input_csv = sys.argv[1]
+&nbsp;
+<i># Try to open the CSV file specified.</i>
+with open(input_csv) as csv_input:
+    <i># And open this file as CSV</i>
+    csv_reader = csv.reader(csv_input)
+&nbsp;
+    <i># Skip header</i>
+    next(csv_reader, None)
+&nbsp;
+    <i># Read all rows from the provided CSV file</i>
+    durations = [(int(row[0]), int(row[1])) for row in csv_reader]
+&nbsp;
+<i># Create new graph</i>
+x = [i[0] for i in durations]
+y = [i[1] for i in durations]
+&nbsp;
+plt.plot(x, y, "b")
+&nbsp;
+<i># Title of a graph</i>
+plt.title("Reading by block with size N")
+&nbsp;
+<i># Add a label to x-axis</i>
+plt.xlabel("Block size")
+&nbsp;
+<i># Add a label to y-axis</i>
+plt.ylabel("Duration time [ns]")
+&nbsp;
+<i># Set the plot layout</i>
+plt.tight_layout()
+&nbsp;
+<i># And save the plot into raster format and vector format as well</i>
+plt.savefig("read-by-block-time.png")
+plt.savefig("read-by-block-time.svg")
+&nbsp;
+<i># Try to show the plot on screen</i>
+plt.show()
+</pre>
+
+<p>Druhý skript je velmi podobný skriptu prvnímu, ovšem odlišnost spočívá
+v&nbsp;tom, že načte dva CSV soubory a vykreslí graf s&nbsp;dvojicí průběhů,
+které je tak možné snadno porovnat:</p>
+
+<pre>
+<i>#!/usr/bin/env python3</i>
+&nbsp;
+import sys
+import csv
+import matplotlib.pyplot as plt
+&nbsp;
+&nbsp;
+def <strong>read_csv</strong>(filename):
+    <i># Try to open the CSV file specified.</i>
+    with open(filename) as csv_input:
+        <i># And open this file as CSV</i>
+        csv_reader = csv.reader(csv_input)
+&nbsp;
+        <i># Skip header</i>
+        next(csv_reader, None)
+&nbsp;
+        <i># Read all rows from the provided CSV file</i>
+        durations = [(int(row[0]), int(row[1])) for row in csv_reader]
+&nbsp;
+    <i># Create new graph</i>
+    x = [i[0] for i in durations]
+    y = [i[1] for i in durations]
+&nbsp;
+    return x, y
+&nbsp;
+&nbsp;
+<i># Check if command line argument is specified (it is mandatory).</i>
+if len(sys.argv) &lt; 3:
+    print("Usage:")
+    print("  read-by-blocks-charts.py input_file.csv input_file.csv")
+    print("Example:")
+    print("  read-by-blocks-charts.py durations-1.csv durations-100.csv")
+    sys.exit(1)
+&nbsp;
+<i># First command line argument should contain name of input CSV.</i>
+input_csv_1 = sys.argv[1]
+input_csv_2 = sys.argv[2]
+&nbsp;
+x1, y1 = read_csv(input_csv_1)
+x2, y2 = read_csv(input_csv_2)
+&nbsp;
+plt.plot(x1, y1, "b", label="1 reader goroutine")
+plt.plot(x2, y2, "r", label="100 reader goroutines")
+&nbsp;
+<i># Title of a graph</i>
+plt.title("Reading by block with size N")
+&nbsp;
+<i># Add a label to x-axis</i>
+plt.xlabel("Block size")
+&nbsp;
+<i># Add a label to y-axis</i>
+plt.ylabel("Duration time [ns]")
+&nbsp;
+<i># Add a legend</i>
+plt.legend()
+&nbsp;
+<i># Set the plot layout</i>
+plt.tight_layout()
+&nbsp;
+<i># And save the plot into raster format and vector format as well</i>
+plt.savefig("read-by-block-time.png")
+plt.savefig("read-by-block-time.svg")
+&nbsp;
+<i># Try to show the plot on screen</i>
+plt.show()
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01-write-performance-by-records</td><td>měření rychlosti zápisu do Parquet souborů po záznamech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/01-write-performance-by-records">https://github.com/tisnik/go-root/blob/master/article_68/09-write-performance/01-write-performance-by-records</a></td></tr>
+<tr><td> 2</td><td>02-read-performance-by-records</td><td>měření rychlosti čtení z&nbsp;Parquet souborů po záznamech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/02-read-performance-by-records">https://github.com/tisnik/go-root/blob/master/article_69/02-read-performance-by-records</a></td></tr>
+<tr><td> 3</td><td>03-read-performance-by-blocks</td><td>měření rychlosti čtení z&nbsp;Parquet souborů po blocích</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/03-read-performance-by-blocks">https://github.com/tisnik/go-root/blob/master/article_69/03-read-performance-by-blocks</a></td></tr>
+<tr><td> 4</td><td>04-write-performance-by-records-pprof</td><td>měření rychlosti čtení z&nbsp;Parquet souborů po záznamech + informace z&nbsp;profileru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/04-write-performance-by-records-pprof">https://github.com/tisnik/go-root/blob/master/article_69/04-write-performance-by-records-pprof</a></td></tr>
+<tr><td> 5</td><td>05-plot-read-performance-by-blocks</td><td>vytvoření CSV souboru s&nbsp;údaji o rychlosti čtení z&nbsp;Parquet souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/05-plot-read-performance-by-blocks">https://github.com/tisnik/go-root/blob/master/article_69/05-plot-read-performance-by-blocks</a></td></tr>
+<tr><td> 6</td><td>06-plot-read-performance-by-blocks-100-readers</td><td>čtení z&nbsp;Parquet souborů s&nbsp;využitím 100 gorutin</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/06-plot-read-performance-by-blocks-100-readers">https://github.com/tisnik/go-root/blob/master/article_69/06-plot-read-performance-by-blocks-100-readers</a></td></tr>
+<tr><td> 7</td><td>07-plot-read-performance-by-block-N-readers</td><td>čtení z&nbsp;Parquet souborů s&nbsp;využitím proměnného počtu gorutin</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/07-plot-read-performance-by-block-N-readers">https://github.com/tisnik/go-root/blob/master/article_69/07-plot-read-performance-by-block-N-readers</a></td></tr>
+<tr><td> 8</td><td>08-read-performance-by-column-index</td><td>čtení hodnot ze sloupce vybraného jeho indexem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/08-read-performance-by-column-index">https://github.com/tisnik/go-root/blob/master/article_69/08-read-performance-by-column-index</a></td></tr>
+<tr><td> 9</td><td>09-read-performance-by-column-path</td><td>čtení hodnot ze sloupce vybraného &bdquo;cestou&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/09-read-performance-by-column-path">https://github.com/tisnik/go-root/blob/master/article_69/09-read-performance-by-column-path</a></td></tr>
+<tr><td>10</td><td>10-plot-read-performance-by-column-index</td><td>změření rychlosti čtení hodnot z&nbsp;vybraného sloupce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/10-plot-read-performance-by-column-index">https://github.com/tisnik/go-root/blob/master/article_69/10-plot-read-performance-by-column-index</a></td></tr>
+</table>
+
+<p>Pomocné nástroje:</p>
+
+<table>
+<tr><th> #</th><th>Skript</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>read-by-blocks-chart.py</td><td>vytvoření grafu rychlosti načítání dat v&nbsp;závislosti na velikosti bloku</td><td><a href="https://github.com/tisnik/go-root/blob/master/tools/read-by-blocks-chart.py">https://github.com/tisnik/go-root/blob/master/tools/read-by-blocks-chart.py</a></td></tr>
+<tr><td> 2</td><td>read-by-blocks-charts.py</td><td>vytvoření grafů s&nbsp;větším množstvím průběhů</td><td><a href="https://github.com/tisnik/go-root/blob/master/tools/read-by-blocks-charts.py">https://github.com/tisnik/go-root/blob/master/tools/read-by-blocks-charts.py</a></td></tr>
+</table>
+
+<p>Výsledky všech měření ve formě CSV souborů:</p>
+
+<table>
+<tr><th> #</th><th>Soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>durations-1.csv</td><td>přečtení všech záznamů v&nbsp;jediné gorutině</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-1.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-1.csv</a></td></tr>
+<tr><td> 2</td><td>durations-100.csv</td><td>přečtení všech záznamů ve 100 gorutinách</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-100.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-100.csv</a></td></tr>
+<tr><td> 3</td><td>durations-N.csv</td><td>přečtení všech záznamů v&nbsp;proměnném počtu gorutin</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-N.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-N.csv</a></td></tr>
+<tr><td> 4</td><td>durations-column-reader-1-readers.csv</td><td>přečtení obsahu sloupce v&nbsp;jedné gorutině</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-1-readers.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-1-readers.csv</a></td></tr>
+<tr><td> 5</td><td>durations-column-reader-8-readers.csv</td><td>přečtení obsahu sloupce v&nbsp;8 gorutinách</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-8-readers.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-8-readers.csv</a></td></tr>
+<tr><td> 6</td><td>durations-column-reader-16-readers.csv</td><td>přečtení obsahu sloupce v&nbsp;16 gorutinách</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-16-readers.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-16-readers.csv</a></td></tr>
+<tr><td> 7</td><td>durations-column-reader-32-readers.csv</td><td>přečtení obsahu sloupce v&nbsp;32 gorutinách</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-32-readers.csv">https://github.com/tisnik/go-root/blob/master/article_69/results/durations-column-reader-32-readers.csv</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Několik poznámek ke sloupcovým databázím<br />
+<a href="https://www.root.cz/clanky/nekolik-poznamek-ke-sloupcovym-databazim/">https://www.root.cz/clanky/nekolik-poznamek-ke-sloupcovym-databazim/</a>
+</li>
+
+<li>Column-oriented DBMS (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Column-oriented_DBMS">https://en.wikipedia.org/wiki/Column-oriented_DBMS</a>
+</li>
+
+<li>Extract, transform, load (ETL)<br />
+<a href="https://en.wikipedia.org/wiki/Extract,_transform,_load">https://en.wikipedia.org/wiki/Extract,_transform,_load</a>
+</li>
+
+<li>Top 9 column-oriented databases<br />
+<a href="https://www.predictiveanalyticstoday.com/top-wide-columnar-store-databases/">https://www.predictiveanalyticstoday.com/top-wide-columnar-store-databases/</a>
+</li>
+
+<li>Apache Parquet<br />
+<a href="https://parquet.apache.org/">https://parquet.apache.org/</a>
+</li>
+
+<li>Parquet format<br />
+<a href="https://github.com/apache/parquet-format">https://github.com/apache/parquet-format</a>
+</li>
+
+<li>Processing parquet files in Golang<br />
+<a href="https://dev.to/eminetto/processing-parquet-files-in-golang-1nni">https://dev.to/eminetto/processing-parquet-files-in-golang-1nni</a>
+</li>
+
+<li>Processing parquet files in Golang<br />
+<a href="https://eltonminetto.dev/en/post/2019-12-09-parquet-golang/">https://eltonminetto.dev/en/post/2019-12-09-parquet-golang/</a>
+</li>
+
+<li>Converting CSV files to Parquet with Go<br />
+<a href="https://mungingdata.com/go/csv-to-parquet/">https://mungingdata.com/go/csv-to-parquet/</a>
+</li>
+
+<li>Balíček parquet-go<br />
+<a href="https://github.com/xitongsys/parquet-go">https://github.com/xitongsys/parquet-go</a>
+</li>
+
+<li>Balíček parquet<br />
+<a href="https://github.com/parsyl/parquet">https://github.com/parsyl/parquet</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku parquet-go<br />
+<a href="https://godoc.org/github.com/xitongsys/parquet-go">https://godoc.org/github.com/xitongsys/parquet-go</a>
+</li>
+
+<li>Parquet File Format Hadoop<br />
+<a href="https://acadgild.com/blog/parquet-file-format-hadoop">https://acadgild.com/blog/parquet-file-format-hadoop</a>
+</li>
+
+<li>What is Apache Parquet and why you should use it<br />
+<a href="https://www.upsolver.com/blog/apache-parquet-why-use">https://www.upsolver.com/blog/apache-parquet-why-use</a>
+</li>
+
+<li>Structure Of Parquet File Format<br />
+<a href="https://www.ellicium.com/parquet-file-format-structure/">https://www.ellicium.com/parquet-file-format-structure/</a>
+</li>
+
+<li>Parquet File with Example<br />
+<a href="https://commandstech.com/parquet-with-example/">https://commandstech.com/parquet-with-example/</a>
+</li>
+
+<li>Faker<br />
+<a href="https://github.com/bxcodec/faker/">https://github.com/bxcodec/faker/</a>
+</li>
+
+<li>Apache ORC &ndash; the smallest, fastest columnar storage for Hadoop workloads<br />
+<a href="https://orc.apache.org/">https://orc.apache.org/</a>
+</li>
+
+<li>Apache Parquet (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Apache_Parquet">https://en.wikipedia.org/wiki/Apache_Parquet</a>
+</li>
+
+<li>Apache ORC (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Apache_ORC">https://en.wikipedia.org/wiki/Apache_ORC</a>
+</li>
+
+<li>MonetDB<br />
+<a href="https://www.monetdb.org/">https://www.monetdb.org/</a>
+</li>
+
+<li>Future of Column-Oriented Data Processing with Arrow &amp; Parquet by Julien Le Dem | DataEngConf NY '16<br />
+<a href="https://www.youtube.com/watch?v=6lCVKMQR8Dw">https://www.youtube.com/watch?v=6lCVKMQR8Dw</a>
+</li>
+
+<li>Data Architecture 101 for Your Business<br />
+<a href="https://www.youtube.com/watch?v=ArzohefZLE4">https://www.youtube.com/watch?v=ArzohefZLE4</a>
+</li>
+
+<li>Functional Data Engineering - A Set of Best Practices | Lyft<br />
+<a href="https://www.youtube.com/watch?v=4Spo2QRTz1k">https://www.youtube.com/watch?v=4Spo2QRTz1k</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Formát BSON<br />
+<a href="http://bsonspec.org/">http://bsonspec.org/</a>
+</li>
+
+<li>Golang Guide: A List of Top Golang Frameworks, IDEs &amp; Tools<br />
+<a href="https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/">https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/</a>
+</li>
+
+<li>Stránky projektu MinIO<br />
+<a href="https://min.io/">https://min.io/</a>
+</li>
+
+<li>MinIO Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-quickstart-guide.html">https://docs.min.io/docs/minio-quickstart-guide.html</a>
+</li>
+
+<li>MinIO Go Client API Reference<br />
+<a href="https://docs.min.io/docs/golang-client-api-reference">https://docs.min.io/docs/golang-client-api-reference</a>
+</li>
+
+<li>MinIO Python Client API Reference<br />
+<a href="https://docs.min.io/docs/python-client-api-reference.html">https://docs.min.io/docs/python-client-api-reference.html</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>MinIO Client Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-client-quickstart-guide.html">https://docs.min.io/docs/minio-client-quickstart-guide.html</a>
+</li>
+
+<li>Analýza kvality zdrojových kódů Minia<br />
+<a href="https://goreportcard.com/report/github.com/minio/minio">https://goreportcard.com/report/github.com/minio/minio</a>
+</li>
+
+<li>This is MinIO<br />
+<a href="https://www.youtube.com/watch?v=vF0lQh0XOCs">https://www.youtube.com/watch?v=vF0lQh0XOCs</a>
+</li>
+
+<li>Running MinIO Standalone<br />
+<a href="https://www.youtube.com/watch?v=dIQsPCHvHoM">https://www.youtube.com/watch?v=dIQsPCHvHoM</a>
+</li>
+
+<li>"Amazon S3 Compatible Storage in Kubernetes" - Rob Girard, Principal Tech Marketing Engineer, Minio<br />
+<a href="https://www.youtube.com/watch?v=wlpn8K0jJ4U">https://www.youtube.com/watch?v=wlpn8K0jJ4U</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>How to use databases with Golang<br />
+<a href="https://hackernoon.com/how-to-work-with-databases-in-golang-33b002aa8c47">https://hackernoon.com/how-to-work-with-databases-in-golang-33b002aa8c47</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2020</small></p>
+</body>
+</html>
+
