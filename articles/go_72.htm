@@ -1,0 +1,1970 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Při psaní jednotkových testů se mnohdy nevyhneme nutnosti otestovat i ty funkce a metody, které přistupují k SQL (relačním) databázím. V takových případech je nutné funkcionalitu nabízenou SQL databází vhodným způsobem mockovat. Dnes si ukážeme, jak lze tento problém vyřešit v ekosystému jazyka Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k&nbsp;SQL databázím</a></p>
+<p><a href="#k02">2. Přístup k&nbsp;relačním (SQL databázím z&nbsp;jazyka Go</a></p>
+<p><a href="#k03">3. Databázové ovladače použitelné v&nbsp;jazyku Go</a></p>
+<p><a href="#k04">4. Příprava databáze používané testovanou aplikací</a></p>
+<p><a href="#k05">5. Vytvoření a naplnění tabulky používané testovanou aplikací</a></p>
+<p><a href="#k06">6. První verze testované aplikace</a></p>
+<p><a href="#k07">7. Popis jednotlivých částí testované aplikace</a></p>
+<p><a href="#k08">8. Spuštění testované aplikace</a></p>
+<p><a href="#k09">9. Jednotkové testy v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k10">10. Příklad vytvoření jednotkových testů</a></p>
+<p><a href="#k11">11. Mockování funkcí a metod pro potřeby jednotkových testů</a></p>
+<p><a href="#k12">12. Mockování funkcí a metod přistupujících do relační databáze s&nbsp;využitím knihovny <strong>go-sqlmock</strong></a></p>
+<p><a href="#k13">13. Export testovaných funkcí a kostra jednotkových testů</a></p>
+<p><a href="#k14">14. Základní otestování funkce <strong>DisplayAllRecords</strong></a></p>
+<p><a href="#k15">15. Přidání řádků, které SQL mock vrátí testované funkci jako výsledek SQL dotazu</a></p>
+<p><a href="#k16">16. Test funkce vracející data načtená z&nbsp;databáze</a></p>
+<p><a href="#k17">17. Funkce se složitějším SQL dotazem s&nbsp;klauzulí <strong>WHERE</strong></a></p>
+<p><a href="#k18">18. Otestování nové funkce</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k&nbsp;SQL databázím</h2>
+
+<p>Již v&nbsp;úvodních částech <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a> jsme si řekli, že se tento programovací jazyk velmi
+často &ndash; a nutno říci, že i s&nbsp;úspěchem &ndash; používá pro
+implementaci různých webových služeb a mikroslužeb. Této problematice jsme se
+ostatně věnovali i <a
+href="https://www.root.cz/clanky/tvorba-webovych-aplikaci-v-go-s-vyuzitim-projektu-gorilla-web-toolkit/">v&nbsp;tomto
+článku</a>. Ovšem mnohé služby pochopitelně potřebují používat nějakou formu
+databáze pro zajištění persistence dat. Může se jednat o relační databáze,
+dokumentové databáze, grafové databáze, objektové databáze atd. Způsob práce
+s&nbsp;relačními databázemi jsme si <a
+href="https://www.root.cz/clanky/programovaci-jazyk-go-a-relacni-databaze/">již
+taktéž popsali</a>, a to včetně zmínky o několika systémech pro ORM. Popsali
+jsme si taktéž propojení aplikací psaných v&nbsp;jazyce Go <a
+href="https://www.root.cz/clanky/pouziti-databaze-redis-v-aplikacich-naprogramovanych-v-go/">s&nbsp;nerelační
+databází Redis</a>.</p>
+
+<p>Dnes se ovšem zaměříme na poněkud odlišné téma &ndash; jak vlastně testovat
+aplikace, které databázi používají. Pro <a
+href="https://www.root.cz/clanky/pouziti-pythonu-pro-tvorbu-testu-od-jednotkovych-testu-az-po-testy-ui/#k05">integrační</a>
+a end-to-end testy lze samozřejmě použít reálnou databázi (pochopitelně
+odlišnou instanci, než je instance produkční), ovšem <a
+href="https://www.root.cz/clanky/pouziti-pythonu-pro-tvorbu-testu-od-jednotkovych-testu-az-po-testy-ui/#k04">v&nbsp;případě
+jednotkových testů</a> je situace nepatrně složitější, neboť v&nbsp;nich budeme
+většinou potřebovat nahradit reálnou databázi nějakou formou <i>mocku</i>
+&ndash; buď databází ležící v&nbsp;operační paměti, nebo mohou být mockovány
+přímo databázové operace.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;demonstračních příkladech se
+zaměříme na nízkoúrovňový přístup. Při použití tohoto přístupu je nutné
+explicitně zapisovat všechny SQL příkazy, předávat jim parametry a
+popř.&nbsp;explicitně načítat a zpracovávat jednotlivé záznamy vrácené dotazem
+<strong>SELECT</strong>. V&nbsp;některých případech je tento přístup velmi
+užitečný (ostatně SQL je s&nbsp;velkou pravděpodobností <a
+href="https://www.tiobe.com/tiobe-index/">nejpopulárnějším doménově specifickým
+jazykem</a> neboli DSL vůbec), protože například umožňuje snadné optimalizace
+dotazů.  Mnoho programátorů však dává přednost jinému přístupu, který spočívá
+ve využití nějaké knihovny zajišťující ORM, tedy (zjednodušeně řečeno) mapování
+mezi záznamy uloženými v&nbsp;databázi a datovými strukturami vytvářenými na
+straně aplikace. Nicméně dále popsané řešení jednotkových testů bude použitelné
+jak při nízkoúrovňovém přístupu, tak i při použití ORM (pro diskusi o ORM viz
+taktéž <a
+href="https://zdrojak.cz/clanky/orm-je-antipattern/">[1]</a>).</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Přístup k&nbsp;relačním (SQL) databázím z&nbsp;jazyka Go</h2>
+
+<p>Pro přístup k&nbsp;relačním databázím (resp.&nbsp;přesněji řečeno
+k&nbsp;databázím používajícím jazyk SQL jako svůj doménově specifický jazyk)
+slouží v&nbsp;programovacím jazyce Go standardní balíček nazvaný <a
+href="https://golang.org/pkg/database/sql/">database/sql</a>. Tento balíček
+zajišťuje navázání připojení k&nbsp;databázi, spouštění příkazů na straně
+databáze (jak <i>DDL</i> &ndash; <i>Data Definition Language</i>, tak i
+<i>DML</i> a <i>DQL</i>, tedy zjednodušeně řečeno příkazy
+<strong>SELECT</strong>, <strong>INSERT</strong>, <strong>UPDATE</strong> a
+<strong>DELETE</strong>), umožňuje zpracování výsledků příkazu
+<strong>SELECT</strong>, parsing záznamů, datové převody (časová razítka atd.),
+zajišťuje předávání parametrů všem DML i DQL příkazům atd. Všechny tyto
+podporované operace jsou přitom obecně nezávislé na použité databázi, protože
+balíček <strong>database/sql</strong> používá pro přístup ke konkrétní databázi
+takzvané databázové ovladače (<i>drivers</i>).</p>
+
+<p>V&nbsp;praxi to znamená zejména to, že aplikace může být napsána obecně,
+přičemž konkrétní databázový ovladač bude vybrán až na základě aktuální
+konfigurace. Příkladem může být využití databáze <a
+href="https://www.postgresql.org/">PostgreSQL</a> při lokálním nasazení
+popř.&nbsp;ve vývojovém prostředí, zatímco na předprodukčním a produkčním
+prostředí bude použita <a href="https://aws.amazon.com/rds/">AWS RDS</a>.
+Podobně &ndash; pokud budou SQL příkazy napsány dostatečně přenositelně &ndash;
+lze v&nbsp;testech použít databázi SQLite běžící pouze v&nbsp;operační
+paměti.</p>
+
+<p><div class="rs-tip-major">Poznámka: pochopitelně se nejedná o specifikum
+programovacího jazyka Go, protože koncept oddělení rozhraní k&nbsp;databázím od
+konkrétních ovladačů nalezneme i v&nbsp;dalších ekosystémech.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Databázové ovladače použitelné v&nbsp;jazyku Go</h2>
+
+<p>V&nbsp;současnosti existuje několik desítek ovladačů umožňujících propojení
+aplikací psaných v&nbsp;jazyku Go s&nbsp;databázemi. Nejdůležitější ovladače
+jsou zmíněny v&nbsp;následující tabulce, ovšem s&nbsp;tím, že počet
+použitelných ovladačů i počet podporovaných databází neustále roste:</p>
+
+<table>
+<tr><th>Databáze</th><th>Driver pro Go</th></tr>
+<tr><td>Apache H2:</td><td><a href="https://github.com/jmrobles/h2go">https://github.com/jmrobles/h2go</a></td></tr>
+<tr><td>Apache Ignite/GridGain:</td><td><a href="https://github.com/amsokol/ignite-go-client">https://github.com/amsokol/ignite-go-client</a></td></tr>
+<tr><td>Apache Impala:</td><td><a href="https://github.com/bippio/go-impala">https://github.com/bippio/go-impala</a></td></tr>
+<tr><td>Apache Avatica/Phoenix:</td><td><a href="https://github.com/apache/calcite-avatica-go">https://github.com/apache/calcite-avatica-go</a></td></tr>
+<tr><td>Amazon AWS Athena:</td><td><a href="https://github.com/uber/athenadriver">https://github.com/uber/athenadriver</a></td></tr>
+<tr><td>AWS Athena:</td><td><a href="https://github.com/segmentio/go-athena">https://github.com/segmentio/go-athena</a></td></tr>
+<tr><td>Azure Cosmos DB:</td><td><a href="https://github.com/btnguyen2k/gocosmos">https://github.com/btnguyen2k/gocosmos</a></td></tr>
+<tr><td>ClickHouse (uses native TCP interface):</td><td><a href="https://github.com/ClickHouse/clickhouse-go">https://github.com/ClickHouse/clickhouse-go</a></td></tr>
+<tr><td>ClickHouse (uses HTTP API):</td><td><a href="https://github.com/mailru/go-clickhouse">https://github.com/mailru/go-clickhouse</a></td></tr>
+<tr><td>CockroachDB:</td><td><a href="Use any PostgreSQL driver">Use any PostgreSQL driver</a></td></tr>
+<tr><td>Couchbase N1QL:</td><td><a href="https://github.com/couchbase/go_n1ql">https://github.com/couchbase/go_n1ql</a></td></tr>
+<tr><td>DB2 LUW and DB2/Z with DB2-Connect:</td><td><a href="https://bitbucket.org/phiggins/db2cli (Last updated 2015-08)">https://bitbucket.org/phiggins/db2cli (Last updated 2015-08)</a></td></tr>
+<tr><td>DB2 LUW (uses cgo):</td><td><a href="https://github.com/asifjalil/cli">https://github.com/asifjalil/cli</a></td></tr>
+<tr><td>DB2 LUW, z/OS, iSeries and Informix:</td><td><a href="https://github.com/ibmdb/go_ibm_db">https://github.com/ibmdb/go_ibm_db</a></td></tr>
+<tr><td>Firebird SQL:</td><td><a href="https://github.com/nakagami/firebirdsql">https://github.com/nakagami/firebirdsql</a></td></tr>
+<tr><td>Genji (pure go):</td><td><a href="https://github.com/genjidb/genji">https://github.com/genjidb/genji</a></td></tr>
+<tr><td>Google Cloud BigQuery:</td><td><a href="https://github.com/solcates/go-sql-bigquery">https://github.com/solcates/go-sql-bigquery</a></td></tr>
+<tr><td>Google Cloud Spanner:</td><td><a href="https://github.com/rakyll/go-sql-driver-spanner">https://github.com/rakyll/go-sql-driver-spanner</a></td></tr>
+<tr><td>MS ADODB:</td><td><a href="https://github.com/mattn/go-adodb">https://github.com/mattn/go-adodb</a></td></tr>
+<tr><td>MS SQL Server (pure go):</td><td><a href="https://github.com/denisenkom/go-mssqldb">https://github.com/denisenkom/go-mssqldb</a></td></tr>
+<tr><td>MS SQL Server (uses cgo):</td><td><a href="https://github.com/minus5/gofreetds">https://github.com/minus5/gofreetds</a></td></tr>
+<tr><td>MySQL:</td><td><a href="https://github.com/go-sql-driver/mysql/">https://github.com/go-sql-driver/mysql/</a></td></tr>
+<tr><td>MySQL:</td><td><a href="https://github.com/siddontang/go-mysql/">https://github.com/siddontang/go-mysql/</a></td></tr>
+<tr><td>MySQL:</td><td><a href="https://github.com/ziutek/mymysql">https://github.com/ziutek/mymysql</a></td></tr>
+<tr><td>ODBC:</td><td><a href="https://bitbucket.org/miquella/mgodbc">https://bitbucket.org/miquella/mgodbc</a></td></tr>
+<tr><td>ODBC:</td><td><a href="https://github.com/alexbrainman/odbc">https://github.com/alexbrainman/odbc</a></td></tr>
+<tr><td>Oracle (uses cgo):</td><td><a href="https://github.com/mattn/go-oci8">https://github.com/mattn/go-oci8</a></td></tr>
+<tr><td>Oracle (uses cgo):</td><td><a href="https://gopkg.in/rana/ora.v4">https://gopkg.in/rana/ora.v4</a></td></tr>
+<tr><td>Oracle (uses cgo):</td><td><a href="https://github.com/godror/godror">https://github.com/godror/godror</a></td></tr>
+<tr><td>Oracle (pure go):</td><td><a href="https://github.com/sijms/go-ora">https://github.com/sijms/go-ora</a></td></tr>
+<tr><td>QL:</td><td><a href="http://godoc.org/github.com/cznic/ql/driver">http://godoc.org/github.com/cznic/ql/driver</a></td></tr>
+<tr><td>Postgres (pure Go):</td><td><a href="https://github.com/lib/pq">https://github.com/lib/pq</a></td></tr>
+<tr><td>Postgres (uses cgo):</td><td><a href="https://github.com/jbarham/gopgsqldriver">https://github.com/jbarham/gopgsqldriver</a></td></tr>
+<tr><td>Postgres (pure Go):</td><td><a href="https://github.com/jackc/pgx">https://github.com/jackc/pgx</a></td></tr>
+<tr><td>Presto:</td><td><a href="https://github.com/prestodb/presto-go-client">https://github.com/prestodb/presto-go-client</a></td></tr>
+<tr><td>SAP HANA (uses cgo):</td><td><a href="https://help.sap.com/viewer/0eec0d68141541d1b07893a39944924e/2.0.03/en-US/0ffbe86c9d9f44338441829c6bee15e6.html">https://help.sap.com/viewer/0eec0d68141541d1b07893a39944924e/2.0.03/en-US/0ffbe86c9d9f44338441829c6bee15e6.html</a></td></tr>
+<tr><td>SAP HANA (pure go):</td><td><a href="https://github.com/SAP/go-hdb">https://github.com/SAP/go-hdb</a></td></tr>
+<tr><td>SAP ASE (uses cgo):</td><td><a href="https://github.com/SAP/go-ase - package cgo (pure go package planned)">https://github.com/SAP/go-ase - package cgo (pure go package planned)</a></td></tr>
+<tr><td>Snowflake (pure Go):</td><td><a href="https://github.com/snowflakedb/gosnowflake">https://github.com/snowflakedb/gosnowflake</a></td></tr>
+<tr><td>SQLite (uses cgo):</td><td><a href="https://github.com/mattn/go-sqlite3">https://github.com/mattn/go-sqlite3</a></td></tr>
+<tr><td>SQLite (uses cgo):</td><td><a href="https://github.com/gwenn/gosqlite">https://github.com/gwenn/gosqlite</a></td></tr>
+<tr><td>SQLite (uses cgo):</td><td><a href="https://github.com/mxk/go-sqlite">https://github.com/mxk/go-sqlite</a></td></tr>
+<tr><td>SQLite:</td><td><a href="(uses cgo): https://github.com/rsc/sqlite">(uses cgo): https://github.com/rsc/sqlite</a></td></tr>
+<tr><td>SQLite:</td><td><a href="(pure go): https://modernc.org/sqlite">(pure go): https://modernc.org/sqlite</a></td></tr>
+<tr><td>SQL over REST:</td><td><a href="https://github.com/adaptant-labs/go-sql-rest-driver">https://github.com/adaptant-labs/go-sql-rest-driver</a></td></tr>
+<tr><td>Sybase SQL Anywhere:</td><td><a href="https://github.com/a-palchikov/sqlago">https://github.com/a-palchikov/sqlago</a></td></tr>
+<tr><td>Sybase ASE (pure go):</td><td><a href="https://github.com/thda/tds">https://github.com/thda/tds</a></td></tr>
+<tr><td>Vertica:</td><td><a href="https://github.com/vertica/vertica-sql-go">https://github.com/vertica/vertica-sql-go</a></td></tr>
+<tr><td>Vitess:</td><td><a href="https://godoc.org/vitess.io/vitess/go/vt/vitessdriver">https://godoc.org/vitess.io/vitess/go/vt/vitessdriver</a></td></tr>
+<tr><td>YQL (Yahoo! Query Language):</td><td><a href="https://github.com/mattn/go-yql">https://github.com/mattn/go-yql</a></td></tr>
+<tr><td>Apache Hive:</td><td><a href="https://github.com/sql-machine-learning/gohive">https://github.com/sql-machine-learning/gohive</a></td></tr>
+<tr><td>MaxCompute:</td><td><a href="https://github.com/sql-machine-learning/gomaxcompute">https://github.com/sql-machine-learning/gomaxcompute</a></td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;dnešním článku použijeme ovladač
+k&nbsp;databází PostgreSQL, ovšem stejně dobře lze použít i jinou databázi.
+V&nbsp;některých případech bude nutné změnit zápis parametrů předávaných SQL
+příkazům.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Příprava databáze používané testovanou aplikací</h2>
+
+<p>Aplikace (resp.&nbsp;přesněji řečeno kostra aplikace), pro kterou budeme
+v&nbsp;rámci dalších kapitol vytvářet jednotkové testy, přistupuje
+k&nbsp;databázi typu PostgreSQL. Jméno databáze bude <strong>testdb</strong>,
+přičemž tato databáze bude obsahovat jedinou tabulku <strong>persons</strong>
+se třemi sloupci.  V&nbsp;této kapitole si ukážeme, jak takovou databázi
+připravit, <a href="#k05">v&nbsp;navazující kapitole</a>, jak vytvořit a
+naplnit tabulku <strong>persons</strong>.</p>
+
+<p>Nejprve je nutné PostgreSQL nainstalovat (<strong>apt-get</strong>,
+<strong>dnf</strong>, <strong>yum</strong> atd.) a spustit. Použít se může
+&bdquo;univerzální&ldquo; příkaz:</p>
+
+<pre>
+# <strong>service postgresql start</strong>
+</pre>
+
+<p>nebo přímo příkaz pro systemd:</p>
+
+<pre>
+# <strong>systemctl start postgresql</strong>
+</pre>
+
+<p>Přesvědčíme se, že databáze skutečně běží:</p>
+
+<pre>
+$ <strong>systemctl status postgresql</strong>
+&nbsp;
+● postgresql.service - PostgreSQL database server
+   Loaded: loaded (/usr/lib/systemd/system/postgresql.service; disabled; vendor 
+   Active: active (running) since Mon 2021-03-01 12:10:01 CET; 2 weeks 1 days ag
+  Process: 27550 ExecStart=/usr/libexec/postgresql-ctl start -D ${PGDATA} -s -w 
+  Process: 27548 ExecStartPre=/usr/libexec/postgresql-check-db-dir postgresql (c
+ Main PID: 27553 (postgres)
+    Tasks: 7 (limit: 4915)
+   CGroup: /system.slice/postgresql.service
+           ├─27553 /usr/bin/postgres -D /var/lib/pgsql/data
+           ├─27554 postgres: logger process   
+           ├─27556 postgres: checkpointer process   
+           ├─27557 postgres: writer process   
+           ├─27558 postgres: wal writer process   
+           ├─27559 postgres: autovacuum launcher process   
+           └─27560 postgres: stats collector process   
+</pre>
+
+<p>Dále se připojíme k&nbsp;databázi řádkovým klientem
+<strong>psql</strong>:</p>
+
+<pre>
+$ <strong>psql -U postgres</strong>
+Password for user postgres: <i>(zde se taktéž použije nastavené heslo)</i>
+psql (9.6.10)
+Type "help" for help.
+&nbsp;
+postgres=#
+</pre>
+
+<p>Po připojení vytvoříme novou databázi pojmenovanou
+<strong>testdb</strong>:</p>
+
+<pre>
+postgres=# <strong>CREATE DATABASE testdb;</strong>
+CREATE DATABASE
+</pre>
+
+<p>Pro jistotu se podíváme, jestli byla databáze skutečně vytvořena:</p>
+
+<pre>
+postgres=# <strong>\l</strong>
+                                  List of databases
+    Name    |  Owner   | Encoding |   Collate   |    Ctype    |   Access privileges
+------------+----------+----------+-------------+-------------+-----------------------
+ aggregator | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+ controller | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+ postgres   | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+ ptisnovs   | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+ template0  | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+            |          |          |             |             | postgres=CTc/postgres
+ template1  | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+            |          |          |             |             | postgres=CTc/postgres
+ test       | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+ <strong>testdb</strong>     | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
+(8 rows)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve vašem případě se vypíše méně databází
+&ndash; můj systém už je trošku zabordelařený :-)</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Vytvoření a naplnění tabulky používané testovanou aplikací</h2>
+
+<p>Nyní nám zbývá vytvořit a naplnit tabulku <strong>persons</strong>, která
+bude následně využita testovanou aplikací. Přepneme se tedy (stále
+v&nbsp;interaktivním prostředí <strong>psql</strong>) do databáze
+<strong>testdb</strong>:</p>
+
+<pre>
+postgres=# <strong>\c testdb</strong>
+&nbsp;
+You are now connected to database "testdb" as user "postgres".
+</pre>
+
+<p>Dále vytvoříme tabulku používanou aplikací (tedy využijeme DDL, které je
+součástí SQL):</p>
+
+<pre>
+CREATE TABLE persons(
+    id        SERIAL PRIMARY KEY,
+    name      VARCHAR(50) NOT NULL,
+    surname   VARCHAR(50) NOT NULL);
+</pre>
+
+<p>Pro jistotu zkontrolujeme, zda tabulka existuje a jakou má strukturu:</p>
+
+<pre>
+testdb=# <strong>\dt</strong>
+&nbsp;
+ public | persons | table | postgres
+</pre>
+
+<pre>
+testdb=# <strong>\d persons</strong>
+&nbsp;
+ id      | integer               | not null default nextval('persons_id_seq'::regclass)
+ name    | character varying(50) | not null
+ surname | character varying(50) | not null
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poněkud nestandardní informace o sloupci
+<strong>id</strong> nás informuje o tom, že se jedná o automaticky generovaný
+primární klíč.</div></p>
+
+<p>Předposledním krokem je naplnění této tabulky sedmi záznamy. Jedná se o
+postavy ze známé Cimrmanovské hry Švestka:</p>
+
+<pre>
+INSERT INTO persons(name, surname) VALUES('Eliška', 'Najbrtová');
+INSERT INTO persons(name, surname) VALUES('Jenny', 'Suk');
+INSERT INTO persons(name, surname) VALUES('Anička', 'Šafářová');
+INSERT INTO persons(name, surname) VALUES('Sváťa', 'Pulec');
+INSERT INTO persons(name, surname) VALUES('Blažej', 'Motyčka');
+INSERT INTO persons(name, surname) VALUES('Eda', 'Wasserfall');
+INSERT INTO persons(name, surname) VALUES('Přemysl', 'Hájek');
+</pre>
+
+<p>V&nbsp;posledním kroku pouze zkontrolujeme, zda tabulka
+<strong>persons</strong> skutečně obsahuje všech sedm postav:</p>
+
+<pre>
+testdb=# <strong>select * from persons;</strong>
+&nbsp;
+  1 | Eliška  | Najbrtová
+  2 | Jenny   | Suk
+  3 | Anička  | Šafářová
+  4 | Sváťa   | Pulec
+  5 | Blažej  | Motyčka
+  6 | Eda     | Wasserfall
+  7 | Přemysl | Hájek
+</pre>
+
+<p>Klienta <strong>psql</strong> nyní již můžeme opustit:</p>
+
+<pre>
+postgres=# <strong>\q</strong>
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. První verze testované aplikace</h2>
+
+<p>V&nbsp;dalším kroku si připravíme první verzi aplikace, která bude
+k&nbsp;databázi přistupovat a pro kterou postupně vytvoříme jednotkové testy.
+Nejprve vytvoříme kostru nového projektu psaného v&nbsp;jazyce Go, a to
+konkrétně příkazem:</p>
+
+<pre>
+$ <strong>go mod init db-test</strong>
+</pre>
+
+<p>Měl by se vytvořit soubor <strong>go.mod</strong>, jehož původní verze bude
+vypadat následovně:</p>
+
+<pre>
+module db-test
+&nbsp;
+go 1.14
+</pre>
+
+<p>První verze testované aplikace vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+&nbsp;
+        "database/sql"
+&nbsp;
+        _ "github.com/lib/pq"           <i>// PostgreSQL database driver</i>
+        _ "github.com/mattn/go-sqlite3" <i>// SQLite database driver</i>
+&nbsp;
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+<i>// Datová struktura s konfigurací připojení k databázi</i>
+type <strong>StorageConfiguration</strong> struct {
+        Driver           string `mapstructure:"db_driver" toml:"db_driver"`
+        SQLiteDataSource string `mapstructure:"sqlite_datasource" toml:"sqlite_datasource"`
+        PGUsername       string `mapstructure:"pg_username" toml:"pg_username"`
+        PGPassword       string `mapstructure:"pg_password" toml:"pg_password"`
+        PGHost           string `mapstructure:"pg_host" toml:"pg_host"`
+        PGPort           int    `mapstructure:"pg_port" toml:"pg_port"`
+        PGDBName         string `mapstructure:"pg_db_name" toml:"pg_db_name"`
+        PGParams         string `mapstructure:"pg_params" toml:"pg_params"`
+}
+&nbsp;
+<i>// Chybové zprávy</i>
+const (
+        canNotConnectToDataStorageMessage = "Can not connect to data storage"
+        connectionToDBNotEstablished      = "Connection to database not established"
+        unableToCloseDBRowsHandle         = "Unable to close the DB rows handle"
+        databaseOperationFailed           = "Database operation failed"
+)
+&nbsp;
+<i>// Inicializace připojení k databázi</i>
+func <strong>initDatabaseConnection</strong>(configuration StorageConfiguration) (*sql.DB, error) {
+        driverName := configuration.Driver
+        dataSource := ""
+        log.Info().Str("driverName", configuration.Driver).Msg("DB connection configuration")
+&nbsp;
+        <i>// inicializace připojení s vybraným driverem</i>
+        switch driverName {
+        case "sqlite3":
+                <i>//driverType := DBDriverSQLite3</i>
+                <i>//driver = &sqlite3.SQLiteDriver{}</i>
+                dataSource = configuration.SQLiteDataSource
+        case "postgres":
+                <i>//driverType := DBDriverPostgres</i>
+                <i>//driver = &pq.Driver{}</i>
+                dataSource = fmt.Sprintf(
+                        "postgresql://%v:%v@%v:%v/%v?%v",
+                        configuration.PGUsername,
+                        configuration.PGPassword,
+                        configuration.PGHost,
+                        configuration.PGPort,
+                        configuration.PGDBName,
+                        configuration.PGParams,
+                )
+        default:
+                <i>// neznámý driver</i>
+                err := fmt.Errorf("driver %v is not supported", driverName)
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        <i>// pokus o inicializaci připojení k databázi</i>
+        connection, err := sql.Open(driverName, dataSource)
+&nbsp;
+        <i>// test, zda bylo připojení k databázi úspěšné</i>
+        if err != nil {
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        return connection, nil
+}
+&nbsp;
+<i>// Zobrazení všech záznamů v tabulce "persons"</i>
+func <strong>displayAllRecords</strong>(connection *sql.DB) error {
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons"
+        rows, err := connection.Query(query)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var (
+                        id      int
+                        name    string
+                        surname string
+                )
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname); err != nil {
+                        return err
+                }
+&nbsp;
+                <i>// výpis načteného záznamu</i>
+                log.Info().Int("ID", id).
+                        Str("name", name).
+                        Str("surname", surname).
+                        Msg("Record")
+        }
+&nbsp;
+        return nil
+}
+&nbsp;
+<i>// Vložení nového záznamu do tabulky "persons"</i>
+func <strong>insertRecord</strong>(connection *sql.DB, name string, surname string) (int, error) {
+        <i>// provedení SQL příkazu se dvěma parametry</i>
+        sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
+        result, err := connection.Exec(sqlStatement, name, surname)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+&nbsp;
+<i>// Vymazání záznamu nebo záznamů na základě zapsaného jména</i>
+func <strong>deleteByName</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := connection.Exec(sqlStatement, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// nastavit logovací systém pro barevný výstup na terminál</i>
+        log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+&nbsp;
+        <i>// konfigurace připojení do databáze</i>
+        config := StorageConfiguration{
+                Driver:     "postgres",
+                PGUsername: "postgres",
+                PGPassword: "postgres",
+                PGHost:     "localhost",
+                PGPort:     5432,
+                PGDBName:   "testdb",
+                PGParams:   "sslmode=disable",
+        }
+&nbsp;
+        log.Debug().Msg("Started")
+&nbsp;
+        <i>// inicializace připojení k databázi</i>
+        connection, err := initDatabaseConnection(config)
+        if err != nil {
+                log.Err(err).Msg(connectionToDBNotEstablished)
+                return
+        }
+&nbsp;
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        <i>// vymazání záznamu či záznamů na základě zapsaného jména</i>
+        affected, err := deleteByName(connection, "Eda")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("deleted rows", affected).Msg("DELETE")
+&nbsp;
+        <i>// přidání nového záznamu do databáze</i>
+        affected, err = insertRecord(connection, "Eda", "Vodopád")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("inserted rows", affected).Msg("INSERT")
+&nbsp;
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        log.Debug().Msg("Finished")
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Popis jednotlivých částí testované aplikace</h2>
+
+<p>Pojďme si nyní alespoň ve stručnosti popsat jednotlivé části testované
+aplikace.</p>
+
+<p>Po uvedení jména balíčku následuje import dalších balíčků. Povšimněte si, že
+se importují dva balíčky obsahující drivery podporovaných SQL databází. Funkce
+ani struktury z&nbsp;těchto driverů nebudeme používat, takže se namísto
+skutečných jmen jako jmenný alias použije podtržítko (jinak by se jednalo o
+chybu zjišťovanou při překladu), ovšem import být proveden musí, neboť je
+používán linkerem. Další dva importované balíčky jsou použity pro logování
+prováděných operací na standardním výstupu (v&nbsp;ekosystému jazyka Go se
+jedná o poměrně populární balíčky):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+&nbsp;
+        "database/sql"
+&nbsp;
+        _ "github.com/lib/pq"           <i>// PostgreSQL database driver</i>
+        _ "github.com/mattn/go-sqlite3" <i>// SQLite database driver</i>
+&nbsp;
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+)
+</pre>
+
+<p>Následuje deklarace datové struktury použité pro specifikaci připojení ke
+konkrétní databázi. Tato struktura je nastavena takovým způsobem, že ji lze
+načíst ze souborů typu TOML atd.:</p>
+
+<pre>
+<i>// Datová struktura s konfigurací připojení k databázi</i>
+type <strong>StorageConfiguration</strong> struct {
+        Driver           string `mapstructure:"db_driver" toml:"db_driver"`
+        SQLiteDataSource string `mapstructure:"sqlite_datasource" toml:"sqlite_datasource"`
+        PGUsername       string `mapstructure:"pg_username" toml:"pg_username"`
+        PGPassword       string `mapstructure:"pg_password" toml:"pg_password"`
+        PGHost           string `mapstructure:"pg_host" toml:"pg_host"`
+        PGPort           int    `mapstructure:"pg_port" toml:"pg_port"`
+        PGDBName         string `mapstructure:"pg_db_name" toml:"pg_db_name"`
+        PGParams         string `mapstructure:"pg_params" toml:"pg_params"`
+}
+</pre>
+
+<p>Další část zdrojového kódu pouze obsahuje konstanty s&nbsp;chybovými
+zprávami. Některé z&nbsp;těchto zpráv jsou totiž použity na více místech:</p>
+
+<pre>
+<i>// Chybové zprávy</i>
+const (
+        canNotConnectToDataStorageMessage = "Can not connect to data storage"
+        connectionToDBNotEstablished      = "Connection to database not established"
+        unableToCloseDBRowsHandle         = "Unable to close the DB rows handle"
+        databaseOperationFailed           = "Database operation failed"
+)
+</pre>
+
+<p>Mnohem zajímavější je funkce nazvaná
+<strong>initDatabaseConnection</strong>. Ta totiž podle zvoleného databázového
+driveru zajistí připojení k&nbsp;databázi. Řetězec použitý pro specifikaci
+připojení (<i>connection string</i>) je pro každou databázi odlišný:</p>
+
+<pre>
+<i>// Inicializace připojení k databázi</i>
+func <strong>initDatabaseConnection</strong>(configuration StorageConfiguration) (*sql.DB, error) {
+        driverName := configuration.Driver
+        dataSource := ""
+        log.Info().Str("driverName", configuration.Driver).Msg("DB connection configuration")
+&nbsp;
+        <i>// inicializace připojení s vybraným driverem</i>
+        switch driverName {
+        case "sqlite3":
+                <i>//driverType := DBDriverSQLite3</i>
+                <i>//driver = &sqlite3.SQLiteDriver{}</i>
+                dataSource = configuration.SQLiteDataSource
+        case "postgres":
+                <i>//driverType := DBDriverPostgres</i>
+                <i>//driver = &pq.Driver{}</i>
+                dataSource = fmt.Sprintf(
+                        "postgresql://%v:%v@%v:%v/%v?%v",
+                        configuration.PGUsername,
+                        configuration.PGPassword,
+                        configuration.PGHost,
+                        configuration.PGPort,
+                        configuration.PGDBName,
+                        configuration.PGParams,
+                )
+        default:
+                <i>// neznámý driver</i>
+                err := fmt.Errorf("driver %v is not supported", driverName)
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        <i>// pokus o inicializaci připojení k databázi</i>
+        connection, err := sql.Open(driverName, dataSource)
+&nbsp;
+        <i>// test, zda bylo připojení k databázi úspěšné</i>
+        if err != nil {
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        return connection, nil
+}
+</pre>
+
+<p>Následují funkce,  pro které v&nbsp;rámci dalšího textu (a navazujícího
+článku) postupně vytvoříme jednotkové testy. První z&nbsp;těchto funkcí spustí
+jednoduchý dotaz a zobrazí výsledky tohoto dotazu (pochopitelně
+s&nbsp;kontrolou chyb, které mohou nastat). Povšimněte si, že se jedná skutečně
+o jednoduchý dotaz, v&nbsp;němž se nepoužívají žádné parametry:</p>
+
+<pre>
+<i>// Zobrazení všech záznamů v tabulce "persons"</i>
+func <strong>displayAllRecords</strong>(connection *sql.DB) error {
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons"
+        rows, err := connection.Query(query)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var (
+                        id      int
+                        name    string
+                        surname string
+                )
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname); err != nil {
+                        return err
+                }
+&nbsp;
+                <i>// výpis načteného záznamu</i>
+                log.Info().Int("ID", id).
+                        Str("name", name).
+                        Str("surname", surname).
+                        Msg("Record")
+        }
+&nbsp;
+        return nil
+}
+</pre>
+
+<p>Další funkce zajistí vložení nového záznamu do databáze. Povšimněte si
+způsobu práce s&nbsp;parametry, které se do dotazu předávají. Skutečné hodnoty
+parametrů <strong>$1</strong> a <strong>$2</strong> jsou předány v&nbsp;metodě
+<strong>Exec</strong>, takže se vyhneme případnému &bdquo;řetězcovému&ldquo;
+skládání SQL dotazů, což je (nebo možná byl?) jeden z&nbsp;často používaných
+antipatternů:</p>
+
+<pre>
+<i>// Vložení nového záznamu do tabulky "persons"</i>
+func <strong>insertRecord</strong>(connection *sql.DB, name string, surname string) (int, error) {
+        <i>// provedení SQL příkazu se dvěma parametry</i>
+        sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
+        result, err := connection.Exec(sqlStatement, name, surname)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+</pre>
+
+<p>Třetí funkce typu <i>CRUD</i> (<i>Create, read, update and delete</i>)
+naopak záznam z&nbsp;databáze vymaže, pochopitelně za předpokladu, že je
+splněna zapsaná podmínka. Opět se zde využívá předávání parametrů SQL příkazu
+namísto skládání celého příkazu řetězcovými operacemi (což je ve většině
+případů zbytečné &ndash; pokud ovšem není nutné měnit jméno tabulky atd.):</p>
+
+<pre>
+<i>// Vymazání záznamu nebo záznamů na základě zapsaného jména</i>
+func <strong>deleteByName</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := connection.Exec(sqlStatement, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+</pre>
+
+<p>Všechny tři CRUD funkce jsou otestovány po spuštění celého programu, což si
+ostatně ukážeme <a href="#k08">v&nbsp;následující kapitole</a>:</p>
+
+<pre>
+func <strong>main</strong>() {
+        <i>// nastavit logovací systém pro barevný výstup na terminál</i>
+        log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+&nbsp;
+        <i>// konfigurace připojení do databáze</i>
+        config := StorageConfiguration{
+                Driver:     "postgres",
+                PGUsername: "postgres",
+                PGPassword: "postgres",
+                PGHost:     "localhost",
+                PGPort:     5432,
+                PGDBName:   "testdb",
+                PGParams:   "sslmode=disable",
+        }
+&nbsp;
+        log.Debug().Msg("Started")
+&nbsp;
+        <i>// inicializace připojení k databázi</i>
+        connection, err := initDatabaseConnection(config)
+        if err != nil {
+                log.Err(err).Msg(connectionToDBNotEstablished)
+                return
+        }
+&nbsp;
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        <i>// vymazání záznamu či záznamů na základě zapsaného jména</i>
+        affected, err := deleteByName(connection, "Eda")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("deleted rows", affected).Msg("DELETE")
+&nbsp;
+        <i>// přidání nového záznamu do databáze</i>
+        affected, err = insertRecord(connection, "Eda", "Vodopád")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("inserted rows", affected).Msg("INSERT")
+&nbsp;
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        log.Debug().Msg("Finished")
+}
+</pre>
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Spuštění testované aplikace</h2>
+
+<p>Aplikaci popsanou <a href="#k07">v&nbsp;předchozí kapitole</a> spustíme, jak
+je tomu v&nbsp;ekosystému jazyka Go běžné, příkazem:</p>
+
+<pre>
+$ <strong>go run</strong>
+</pre>
+
+<p>Na standardní výstup se vypíšou (nebo by se alespoň měly vypsat) tyto
+řádky:</p>
+
+<pre>
+8:02PM DBG Started
+8:02PM INF DB connection configuration driverName=postgres
+8:02PM INF Record ID=1 name="Eliška" surname="Najbrtová"
+8:02PM INF Record ID=2 name=Jenny surname=Suk
+8:02PM INF Record ID=3 name="Anička" surname="Šafářová"
+8:02PM INF Record ID=4 name="Sváťa" surname=Pulec
+8:02PM INF Record ID=5 name="Blažej" surname="Motyčka"
+8:02PM INF Record ID=6 name=Eda surname=Wasserfall
+8:02PM INF Record ID=7 name="Přemysl" surname="Hájek"
+8:02PM INF DELETE deleted rows=1
+8:02PM INF INSERT inserted rows=1
+8:02PM INF Record ID=1 name="Eliška" surname="Najbrtová"
+8:02PM INF Record ID=2 name=Jenny surname=Suk
+8:02PM INF Record ID=3 name="Anička" surname="Šafářová"
+8:02PM INF Record ID=4 name="Sváťa" surname=Pulec
+8:02PM INF Record ID=5 name="Blažej" surname="Motyčka"
+8:02PM INF Record ID=7 name="Přemysl" surname="Hájek"
+8:02PM INF Record ID=8 name=Eda surname="Vodopád"
+8:02PM DBG Finished
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti je výstup barevný:</div></p>
+
+<img src="https://i.iinfo.cz/images/635/sqlmock-1.png" class="image-444964" alt="&#160;" width="704" height="507" />
+<p><i>Obrázek 1: Skutečný výstup na terminálu po spuštění testované aplikace.</i></p>
+
+<p>Současně dojde k&nbsp;automatické modifikaci souboru
+<strong>go.mod</strong>, protože se doplní potřebné knihovny:</p>
+
+<pre>
+module db-test
+&nbsp;
+go 1.14
+&nbsp;
+require (
+        github.com/lib/pq v1.10.0
+        github.com/mattn/go-sqlite3 v2.0.3+incompatible
+        github.com/rs/zerolog v1.20.0
+)
+</pre>
+
+<p>Vytvoří se i soubor <strong>go.sum</strong> s&nbsp;tranzitivními
+závislostmi:</p>
+
+<pre>
+github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
+github.com/lib/pq v1.10.0 h1:Zx5DJFEYQXio93kgXnQ09fXNiUKsqv4OUEu2UtGcB1E=
+github.com/lib/pq v1.10.0/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
+github.com/mattn/go-sqlite3 v2.0.3+incompatible h1:gXHsfypPkaMZrKbD5209QV9jbUTJKjyR5WD3HYQSd+U=
+github.com/mattn/go-sqlite3 v2.0.3+incompatible/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
+github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
+github.com/rs/zerolog v1.20.0 h1:38k9hgtUBdxFwE34yS8rTHmHBa4eN16E4DJlv177LNs=
+github.com/rs/zerolog v1.20.0/go.mod h1:IzD0RJ65iWH0w97OQQebJEvTZYvsCUm9WVLWBQrJRjo=
+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/tools v0.0.0-20190828213141-aed303cbaa74/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+</pre>
+
+<p>Nakonec se můžeme po přihlášení do interaktivní konzole
+<strong>psql</strong> přesvědčit, že došlo ke změně obsahu tabulky:</p>
+
+<pre>
+$ <strong>psql -U postgres</strong>
+Password for user postgres: <i>(zde se taktéž použije nastavené heslo)</i>
+psql (9.6.10)
+Type "help" for help.
+&nbsp;
+postgres=#
+&nbsp;
+postgres=# <strong>\c testdb</strong>
+&nbsp;
+testdb=# <strong>select * from persons;</strong>
+ id |  name   |  surname
+----+---------+-----------
+  1 | Eliška  | Najbrtová
+  2 | Jenny   | Suk
+  3 | Anička  | Šafářová
+  4 | Sváťa   | Pulec
+  5 | Blažej  | Motyčka
+  7 | Přemysl | Hájek
+  8 | Eda     | Vodopád
+(7 rows)
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Jednotkové testy v&nbsp;programovacím jazyce Go</h2>
+
+<p>Tvorba testů, ať již testů jednotkových, integračních, výkonnostních atd.,
+je v&nbsp;současnosti prakticky nedílnou součástí vývoje všech nových
+informačních systémů (a ostatně i desktopových aplikací). I z&nbsp;tohoto
+důvodu se v&nbsp;nabídce standardních nástrojů programovacího jazyka Go nachází
+i nástroj určený pro spouštění jednotkových testů (<i>unit tests</i>)
+s&nbsp;vyhodnocením jejich výsledků, zjištěním, která část zdrojových kódů je
+jednotkovými testy pokryta, výpočtem procenta pokrytí kódu testy atd.
+V&nbsp;souvislosti s&nbsp;jednotkovými testy je mnohdy nutné určité části
+programu nahradit jejich zjednodušenými (umělými) variantami, které se nazývají
+<i>mock</i>. Nástroj či knihovnu pro <i>mockování</i> sice přímo
+v&nbsp;základní sadě nástrojů Go nenalezneme (lze ji relativně snadno
+doinstalovat), ovšem jak si ukážeme v&nbsp;navazujících kapitolách, je většinou
+možné si vystačit s&nbsp;možnostmi poskytovanými samotným programovacím jazykem
+(zejména se to týká využití rozhraní &ndash; <i>interface</i>) a v&nbsp;případě
+SQL databází pak balíčkem <strong>go-sqlmock</strong>.</p>
+
+<p>Jak jsme si již řekli v&nbsp;úvodním odstavci této kapitoly, obsahuje
+standardní instalace programovacího jazyka Go i knihovnu určenou pro psaní
+jednotkových testů. Tato knihovna se jmenuje <strong>testing</strong> a
+základní informace o ní získáme stejným způsobem, jako je tomu v&nbsp;případě
+všech dalších knihoven či balíčků &ndash; tedy příkazem <strong>go
+doc</strong>. Zde konkrétně následujícím způsobem:</p>
+
+<pre>
+$ <strong>go doc testing</strong>
+&nbsp;
+package testing // import "testing"
+&nbsp;
+Package testing provides support for automated testing of Go packages. It is
+intended to be used in concert with the ``go test'' command, which automates
+execution of any function of the form
+&nbsp;
+    func TestXxx(*testing.T)
+&nbsp;
+where Xxx does not start with a lowercase letter. The function name serves
+to identify the test routine.
+...
+...
+...
+</pre>
+
+<p>Samotná implementace jednotkových testů je tedy představována běžnými
+funkcemi, jejichž jména začínají na <strong>Test</strong> a akceptují parametr
+typu <strong>*testing.T</strong>, tj.&nbsp;ukazatel na strukturu obsahující
+informace o kontextu, ve kterém jsou jednotlivé testy spouštěny:</p>
+
+<pre>
+type <strong>T</strong> struct {
+        common <i>// další struktura s informacemi o času spuštění testu atd. atd.</i>
+        isParallel bool
+        context    *testContext <i>// For running tests and subtests.</i>
+}
+</pre>
+
+<p>Důležité je, že existuje poměrně velké množství metod pro strukturu
+<strong>testing.T</strong>, které jsou použity právě při tvorbě jednotkových
+testů. Z&nbsp;praktického hlediska se jedná především o následující metody:</p>
+
+<table>
+<tr><th>#</th><th>Metoda</th><th>Stručný popis metody</th></tr>
+<tr><td>1</td><td>Error</td><td>provede se zalogování chyby a funkce s&nbsp;testem se označí příznakem &bdquo;chyba&ldquo;</td></tr>
+<tr><td>2</td><td>Fail</td><td>funkce s&nbsp;testem se označí příznakem &bdquo;chyba&ldquo;</td></tr>
+<tr><td>3</td><td>FailNow</td><td>dtto, ovšem současně se příslušná funkce i ukončí</td></tr>
+<tr><td>4</td><td>Log</td><td>zalogování zprávy, typicky s&nbsp;informací o chybě</td></tr>
+<tr><td>5</td><td>Fatal</td><td>odpovídá kombinaci volání funkcí <strong>Log</strong>+<strong>FailNow</strong></td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: typicky tedy ve funkcích
+<strong>TestXXX</strong> nalezneme volání metody <strong>Error</strong> nebo
+<strong>Fatal</strong>, podle toho, zda se má celá testovací funkce ukončit či
+nikoli.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Příklad vytvoření jednotkových testů</h2>
+
+<p>Již v&nbsp;dokumentaci k&nbsp;programovacímu jazyku Go je ve stručnosti
+zmíněno, jakým způsobem se mají jednotkové testy tvořit, ovšem jedná se o tak
+důležité téma, že se mu budeme věnovat v&nbsp;této kapitole podrobněji. Nejprve
+se podívejme na <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add.go">zdrojový
+kód</a> obsahující funkci nazvanou <strong>Add</strong>, kterou budeme chtít
+otestovat s&nbsp;využitím jednotkových testů. Kód funkce <strong>Add</strong> i
+příslušné funkce <strong>main</strong> je uložen v&nbsp;souboru pojmenovaném
+&bdquo;add.go&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>Add</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        println(Add(1, 2))
+}
+</pre>
+
+<p>Jakým způsobem se napíše jednotkový test či jednotkové testy pro tuto
+funkci? Testy budou zapisovány do souboru pojmenovaného
+&bdquo;add_test.go&ldquo;, protože právě na základě řetězce &bdquo;_test&ldquo;
+ve jménu souboru nástroje jazyka Go rozpoznávají, jestli se jedná o zdrojový
+kód, který má být součástí výsledné aplikace, či naopak o kód používaný pro
+testování.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti existují i další
+možnosti, jakými je možné rozdělit zdrojové kódy a testy. Někteří programátoři
+dávají přednost tomu, aby byly soubory s&nbsp;jednotkovými testy uloženy ve
+zvláštním (pod)adresáři. To je možné, ovšem v&nbsp;dnešním článku pro
+jednoduchost použijeme standardní postup &ndash; rozlišení běžných zdrojových
+kódů od testů na základě řetězce &bdquo;_test&ldquo;, který se ve jméně
+zdrojových souborů uvádí vždy před koncovku &bdquo;.go&ldquo; (takto ostatně
+vypadá i mnoho reálných a úspěšných projektů psaných v&nbsp;jazyce
+Go).</div></p>
+
+<p>Ukažme si tedy způsob naprogramování <a
+href="https://github.com/tisnik/go-root/blob/master/article_17/tests01/add_test.go">velmi
+jednoduchého jednotkového testu</a> určeného pro otestování funkcionality
+funkce <strong>Add</strong>. Použijeme přitom takový postup, že se zavoláním
+metody <strong>Error</strong> zaregistruje, že test nebyl dokončen úspěšně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "testing"
+&nbsp;
+func <strong>TestAdd</strong>(t *testing.T) {
+        result := Add(1, 2)
+        if result != 3 {
+                t.Error("1+2 should be 3, got ", result, "instead")
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: připomeňme si, že v&nbsp;programovacím
+jazyku Go není podporován příkaz <strong>assert</strong>. Autory Go k&nbsp;tomu
+vedlo několik důvodů, které jsou shrnuty ve FAQ <a
+href="https://golang.org/doc/faq#assertions">https://golang.org/doc/faq#assertions</a>.
+Pro nás je v&nbsp;tuto chvíli důležité, že můžeme snadno řídit, zda se má po
+nesplnění nějaké podmínky celý test ukončit, či zda se má pouze zaznamenat
+chyba a testování bude pokračovat dále &ndash; tedy zda se má použít metoda
+<strong>Error</strong> či <strong>FailNow</strong> popř.&nbsp;dokonce
+<strong>Fatal</strong>. Nevýhodou je, že (bez použití dalších pomocných
+knihoven) se v&nbsp;testech bude opakovat explicitní zápis podmínek tvořených
+strukturovaným příkazem <strong>if</strong>.</div></p>
+
+<p>Pro spuštění jednotkových testů se nepoužívá příkaz <strong>go run</strong>,
+ale příkaz <strong>go test</strong>. Ten nalezne všechny soubory
+<strong>*_test.go</strong> v&nbsp;daném adresáři či podadresářích a pokusí se
+v&nbsp;něm spustit všechny funkce s&nbsp;implementací jednotkových testů:</p>
+
+<pre>
+$ <strong>go test</strong>
+&nbsp;
+PASS
+ok      _/home/tester/go-root/article_17/tests01   0.005s
+</pre>
+
+<p>Lepší je však použít přepínač <strong>-v</strong>, aby se vypsaly
+podrobnější informace o spuštěných testech:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+&nbsp;
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+PASS
+ok      _/home/tester/go-root/article_17/tests01   0.004s
+</pre>
+
+<p>Dále je možné zjistit pokrytí kódu jednotkovými testy:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+</pre>
+
+<p>Vygenerovaný soubor <strong>coverage.out</strong> slouží pro další
+analýzy.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Mockování funkcí a metod pro potřeby jednotkových testů</h2>
+
+<p>Při testování aplikací, zejména při psaní jednotkových testů, se poměrně
+často dostaneme do situace, kdy potřebujeme nahradit nějakou funkci či metodu
+používanou v&nbsp;reálné aplikaci za &bdquo;falešnou&ldquo; funkci
+resp.&nbsp;metodu vytvořenou pouze pro účely jednotkových testů.
+V&nbsp;programovacím jazyku Go je možné pro tvorbu a použití takových
+&bdquo;falešných&ldquo; funkcí použít hned několik různých knihoven, které se
+od sebe odlišují jak svými možnostmi, tak i způsobem zápisu či deklarace
+očekávaného chování testované aplikace. Dnes se seznámíme s&nbsp;jednou
+knihovnou určenou primárně pro mockování funkcí a metod používaných SQL drivery
+pro přístup k&nbsp;relačním databázím. Tato knihovna umožňuje testovat aplikace
+používající jak přímo standardní balíček <strong>database/sql</strong>, tak i
+prakticky jakýkoli balíček nabízející ORM, tedy objektově-relační mapování.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Mockování funkcí a metod přistupujících do relační databáze s&nbsp;využitím knihovny <strong>go-sqlmock</strong></h2>
+
+<p>Pro otestování funkcí, které přistupují do relační databáze, použijeme
+knihovnu nazvanou <strong>go-sqlmock</strong>. Tato knihovna nabízí aplikacím
+vlastní SQL driver, takže ji lze použít jak pro ty aplikace, které přímo volají
+funkce a metody z&nbsp;balíčku <strong>database/sql</strong>, tak pro aplikace
+postavené na ORM, například <a href="https://gorm.io/">na knihovně Gorm</a>.
+Samotná struktura testů je následující:</p>
+
+<ol>
+<li>Vytvoří se připojení do mockované databáze, což je objekt typu <strong>*sql.DB</strong></li>
+<li>SQL driver se nakonfiguruje &ndash; specifikuje se, jaký dotaz či dotazy má očekávat</li>
+<li>Dále se specifikuje, jaká data se mají vrátit jako výsledek dotazu (tedy mockujeme odpověď databáze)</li>
+<li>Zavolá se testovaná funkce, která interně volá SQL příkazy</li>
+<li>Otestuje se, zda jsou splněny podmínky z&nbsp;bodu 2, tedy zda se skutečně zavolaly očekávané SQL příkazy a jen tyto příkazy</li>
+<li>Otestuje se, zda volaná funkce vrátila očekávaná data (typicky získaná z&nbsp;dat vrácených mockovanou databází)</li>
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: interně se nejedná o složitou knihovnu,
+protože například testování, zda se do SQL databáze poslal očekávaný dotaz, se
+děje na základě porovnání řetězce s&nbsp;regulárním výrazem &ndash; mockovaný
+SQL driver se tedy nijak nesnaží komplexně &bdquo;porozumět&ldquo; celému
+dotazu.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Export testovaných funkcí a kostra jednotkových testů</h2>
+
+<p>Nyní již máme k&nbsp;dispozici všechny základní informace o způsobu
+testování kódu, který používá balíček <strong>database/sql</strong>, a to jak
+přímo, tak i nepřímo. Můžeme se tedy pokusit vytvořit si první jednoduché
+jednotkové testy. Nejprve je nutné zajistit, aby byly testované funkce dostupné
+(viditelné) nejenom z&nbsp;balíčku <strong>main</strong>, ale i z&nbsp;balíčku
+<strong>main_test</strong>. K&nbsp;tomu můžeme použít malého triku &ndash;
+vytvoříme soubor <strong>export_test.go</strong>, který je v&nbsp;balíčku
+<strong>main</strong> a který bude obsahovat alternativní jména testovaných
+funkcí, ovšem začínajících na velké písmeno (tedy takové funkce budou viditelné
+i vně balíčku):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+var (
+        DisplayAllRecords = displayAllRecords
+)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: funkce jsou v&nbsp;jazyku Go považovány
+za plnohodnotné hodnoty, proto je tento trik takto jednoduše
+implementovatelný.</div></p>
+
+<p>Dále můžeme vytvořit kostru jednotkových testů. Bude se jednat o soubor se
+jménem končícím na <strong>_test.go</strong> a bude spadat do balíčku
+<strong>main_test</strong> (tím pádem se testy nebudou linkovat do výsledného
+binárního kódu aplikace). Importovat budeme pochopitelně balíček
+<strong>testing</strong> zmíněný v&nbsp;předchozích kapitolách, dále hlavní
+balíček <strong>main</strong> a taktéž balíček <strong>go-sqlmock</strong>:</p>
+
+<pre>
+package <strong>main_test</strong>
+&nbsp;
+import (
+        "testing"
+&nbsp;
+        main "db-test"
+&nbsp;
+        "github.com/DATA-DOG/go-sqlmock"
+)
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Základní otestování funkce <strong>DisplayAllRecords</strong></h2>
+
+<p>Nyní již můžeme vytvořit jednotkový test, který bude volat funkci
+<strong>DisplayAllRecords</strong> (resp.&nbsp;původní funkci
+<strong>displayAllRecords</strong>). Hlavička funkce s&nbsp;jednotkovým testem
+vypadá následovně &ndash; jméno funkce začíná na <strong>Test</strong> a jediný
+parametr je typu <strong>*testing.T</strong>:</p>
+
+<pre>
+func <strong>TestSelect1</strong>(t *testing.T) {
+</pre>
+
+<p>V&nbsp;testu nejdříve vytvoříme připojení do databáze, ovšem nyní nikoli do
+reálné databáze PostgreSQL; namísto toho použijeme SQL mock:</p>
+
+<pre>
+connection, mock, err := <strong>sqlmock.New()</strong>
+if err != nil {
+        t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+}
+</pre>
+
+<p>Získaný objekt se chová stejně jako reálný SQL driver, tudíž musíme zajistit
+uzavření připojení na konci (teoreticky nemusíme, ale takto je celý přístup
+čistější a mocky se nebudou hromadit v&nbsp;operační paměti):</p>
+
+<pre>
+defer <strong>connection.Close()</strong>
+</pre>
+
+<p>Nyní konečně nastává vlastní příprava mocku. Vytvoříme datovou strukturu
+s&nbsp;popisem řádků, které má mockované SQL vrátit. Prozatím budeme požadovat,
+aby se nevrátily žádné záznamy, tudíž struktura sice bude existovat, ale bude
+prázdná:</p>
+
+<pre>
+rows := sqlmock.NewRows([]string{})
+</pre>
+
+<p>Nejdůležitější je následující řádek, kterým se specifikuje, jaký dotaz bude
+SQL mock očekávat (tedy jak se má chovat testovaná funkce) a jaká data se
+testované funkci vrátí jako výsledek SQL dotazu. Celý zápis je možné zapsat na
+jediný řádek:</p>
+
+<pre>
+mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+</pre>
+
+<p>SQL mock je připraven a tudíž se můžeme pokusit zavolat testovanou funkci,
+které přidáme objekt realizující připojení do mockovaného SQL driveru:</p>
+
+<pre>
+err = <strong>main.DisplayAllRecords(connection)</strong>
+if err != nil {
+        t.Errorf("error was not expected while updating stats: %s", err)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výsledkem volání této funkce je pouze
+hodnota typu <strong>error</strong>, kterou pochopitelně můžeme
+v&nbsp;jednotkových testech dále zpracovat.</div></p>
+
+<p>Pokud testovaná funkce nevrátila chybu, ještě to vůbec neznamená, že pracuje
+s&nbsp;SQL korektně. To zjistíme až otestováním, zda mockované SQL přijalo
+očekávaný dotaz (a nikoli dotaz jiný či žádný):</p>
+
+<pre>
+err = <strong>mock.ExpectationsWereMet()</strong>
+if err != nil {
+        t.Errorf("there were unfulfilled expectations: %s", err)
+}
+</pre>
+
+<p>Výsledná podoba funkce s&nbsp;jednotkovým testem bude vypadat
+následovně:</p>
+
+<pre>
+func <strong>TestSelect1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{})
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+&nbsp;
+        err = main.DisplayAllRecords(connection)
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Přidání řádků, které SQL mock vrátí testované funkci jako výsledek SQL dotazu</h2>
+
+<p>Mockovaný driver SQL databáze dokáže z&nbsp;SQL dotazu (typicky
+<strong>SELECT</strong>) vrátit libovolná v&nbsp;jednotkových testech
+specifikovaná data. Postačuje pouze tato data reprezentovat formou datové
+struktury typu <strong>sqlmock.Rows</strong>. Podívejme se nyní na celý postup,
+který není složitý.</p>
+
+<p>Strukturu <strong>sqlmock.Rows</strong> zkonstruujeme s&nbsp;využitím
+konstruktoru <strong>sqlmock.NewRows</strong>; přitom je nutné specifikovat
+jména sloupců výsledku (povšimněte si, že se neřeší struktura zdrojových
+tabulek, ale pouze výsledek dotazu):</p>
+
+<pre>
+rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+</pre>
+
+<p>Do této struktury se nové řádky přidávají metodou nazvanou
+<strong>AddRow</strong>.  Opět si povšimněte, že lze relativně bez problémů
+pracovat s&nbsp;různými datovými typy prvků (poněkud problematická je práce
+například s&nbsp;časovými razítky, o čemž se zmíníme příště):</p>
+
+<pre>
+rows.AddRow(1, "foo", "bar")
+rows.AddRow(2, "x", "y")
+rows.AddRow(3, "a", "b")
+</pre>
+
+<p>Předání dat do mockovaného driveru:</p>
+
+<pre>
+mock.ExpectQuery("SELECT id, name, surname FROM persons").<strong>WillReturnRows(rows)</strong>
+</pre>
+
+<p>A to je vše &ndash; upravený test tedy může vypadat následovně:</p>
+
+<pre>
+func <strong>TestSelect2</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.AddRow(2, "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+&nbsp;
+        err = main.DisplayAllRecords(connection)
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+        
+<p>Nyní po spuštění jednotkových testů můžeme na standardním výstupu vidět, že
+funkce <strong>displayAllRecords</strong> skutečně získá trojici řádků, jejichž
+obsah vypíše na obrazovku:</p>
+
+<pre>
+$ <strong>go test</strong>
+&nbsp;
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Test funkce vracející data načtená z&nbsp;databáze</h2>
+
+<p>Pokusme se nyní upravit naši aplikaci takovým způsobem, aby obsahovala
+funkci, která načte záznamy z&nbsp;databáze a vrátí tato data formou řezu
+záznamů. Bude se tedy jednat o poměrně snadno testovatelnou funkci (a
+z&nbsp;hlediska návrhu aplikace lepší funkci s&nbsp;jasně definovaným jediným
+úkolem).</p>
+
+<p>Nejprve si připravíme strukturu reprezentující každý záznam přečtený
+z&nbsp;databáze:</p>
+
+<pre>
+<strong>// datová struktura odpovídající struktuře záznamu v databázi</strong>
+type <strong>Record</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+}
+</pre>
+
+<p>Samotná funkce pro přečtení záznamů z&nbsp;databáze (se všemi potřebnými
+testy na případné chyby) může vypadat následovně:</p>
+
+<pre>
+<strong>// funkce vracející data přečtená z databázové tabulky</strong>
+func <strong>readAllRecords</strong>(connection *sql.DB) ([]Record, error) {
+        results := make([]Record, 0)
+&nbsp;
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons"
+        rows, err := connection.Query(query)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return results, err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var record Record
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;record.Id, &amp;record.Name, &amp;record.Surname); err != nil {
+                        return results, err
+                }
+&nbsp;
+                results = append(results, record)
+        }
+&nbsp;
+        return results, nil
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, jak se v&nbsp;Go
+získávají ukazatele na prvky záznamu (struktury).</div></p>
+
+<p>Před úpravou testů musíme do souboru <strong>export_test.go</strong> přidat
+jmenný alias existující funkce, ovšem s&nbsp;velkým písmenem na začátku:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+var (
+        DisplayAllRecords   = displayAllRecords
+        ReadAllRecords      = readAllRecords
+)
+</pre>
+
+<p>Do souboru s&nbsp;jednotkovými testy nyní můžeme přidat nový test:</p>
+
+<pre>
+func <strong>TestSelect3</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.AddRow(2, "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+&nbsp;
+        results, err := main.ReadAllRecords(connection)
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        if len(results) != 3 {
+                t.Errorf("different number of results read from database: %d instead of 3", len(results))
+                return
+        }
+&nbsp;
+        expected := main.Record{1, "foo", "bar"}
+        if results[0] != expected {
+                t.Errorf("first result is different: %+v versus %+v", results[0], expected)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: za zmínku stojí fakt, že můžeme velmi
+snadno otestovat, zda funkce <strong>ReadRecordsWithName</strong>
+(resp.&nbsp;<strong>readRecordsWithName</strong>) skutečně vrátila očekávaná
+data. Prozatím jsem schválně přidal pouze kontrolu na počet vrácených záznamů a
+taktéž kontrolu, zda první vrácený záznam odpovídá očekávané hodnotě.
+Mimochodem: v&nbsp;Go lze skutečně porovnávat dvě struktury pomocí operátorů ==
+a !=.</div></p>
+
+<p>Pro zajímavost se podívejme na výsledek testů a kontrolu pokrytí zdrojového
+kódu testy:</p>
+
+<pre>
+$ <strong>go test -timeout 2m -coverprofile coverage.out</strong>
+&nbsp;
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-16T15:05:10+01:00","message":"Record"}
+PASS
+coverage: 11.0% of statements
+ok      db-test 0.003s
+&nbsp;
+$ <strong>go tool cover -func=coverage.out</strong>
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    displayAllRecords       76.9%
+db-test/db_operations.go:127:   readAllRecords          0.0%
+db-test/db_operations.go:162:   insertRecord            0.0%
+db-test/db_operations.go:183:   deleteByName            0.0%
+db-test/db_operations.go:203:   main                    0.0%
+total:                          (statements)            11.0%
+</pre>
+
+<img src="https://i.iinfo.cz/images/635/sqlmock-2.png" class="image-444965" alt="&#160;" width="909" height="860" />
+<p><i>Obrázek 2: Vizuální znázornění pokrytí zdrojového kódu jednotkovými testy
+(stále se používají standardní nástroje jazyka Go).</i></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Funkce se složitějším SQL dotazem s&nbsp;klauzulí <strong>WHERE</strong></h2>
+
+<p>V&nbsp;dalším kroku do naší testované aplikace přidáme další funkci. I tato
+funkce bude volat SQL dotaz a zpracovávat výsledky tohoto dotazu, ovšem nyní
+bude dotaz obsahovat parametr, konkrétně jméno, které mají vyhledávané záznamy
+obsahovat (ostatní kód je podobný předchozí funkci, ale pro větší přehlednost
+prozatím neprovedeme refaktoring):</p>
+
+<pre>
+<i>// funkce vracející data přečtená z databázové tabulky</i>
+func <strong>readRecordsWithName</strong>(connection *sql.DB, name string) ([]Record, error) {
+        results := make([]Record, 0)
+&nbsp;
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons WHERE name=$1"
+        rows, err := connection.Query(query, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return results, err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var record Record
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;record.Id, &amp;record.Name, &amp;record.Surname); err != nil {
+                        return results, err
+                }
+&nbsp;
+                results = append(results, record)
+        }
+&nbsp;
+        return results, nil
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Otestování nové funkce</h2>
+
+<p>Otestování nové funkce přidané v&nbsp;rámci <a href="#k17">sedmnácté
+kapitoly</a> bude triviální. Nejdříve jméno této funkce přidáme do souboru
+<strong>export_test.go</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+var (
+        DisplayAllRecords   = displayAllRecords
+        ReadAllRecords      = readAllRecords
+        ReadRecordsWithName = readRecordsWithName
+)
+</pre>
+
+<p>Dále vytvoříme jednotkový test. Zde si povšimněte způsobu zápisu příkazu,
+který je očekáván (tedy který má testovaná funkce zavolat). V&nbsp;příkazu se
+před parametr zadává zpětné lomítko, což ovšem nemusí být na první pohled
+zřejmé:</p>
+
+<pre>
+mock.ExpectQuery(<strong>"SELECT id, name, surname FROM persons WHERE name=\\$1"</strong>).WillReturnRows(rows)
+</pre>
+
+<p>Samotná implementace jednotkového testu:</p>
+
+<pre>
+func <strong>TestSelect4</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(2, "Eda", "Vodopád")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons WHERE name=\\$1").WillReturnRows(rows)
+&nbsp;
+        results, err := main.ReadRecordsWithName(connection, "Eda")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        if len(results) != 1 {
+                t.Errorf("different number of results read from database: %d instead of 1", len(results))
+                return
+        }
+&nbsp;
+        expected := main.Record{2, "Eda", "Vodopád"}
+        if results[0] != expected {
+                t.Errorf("first result is different: %+v versus %+v", results[0], expected)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět se zde nabízí velký prostor pro
+refaktoring, tentokrát refaktoring jednotkových testů.</div></p>
+
+<p>Ve skutečnosti je však možné očekávaný dotaz zapsat ve formě regulárního výrazu:</p>
+
+<pre>
+mock.ExpectQuery(<strong>"SELECT id, name, surname FROM persons WHERE name=.*"</strong>).WillReturnRows(rows)
+</pre>
+
+<p>Výsledný test:</p>
+
+<pre>
+func <strong>TestSelect5</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(2, "Eda", "Vodopád")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons WHERE name=.*").WillReturnRows(rows)
+&nbsp;
+        results, err := main.ReadRecordsWithName(connection, "Eda")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        if len(results) != 1 {
+                t.Errorf("different number of results read from database: %d instead of 1", len(results))
+                return
+        }
+&nbsp;
+        expected := main.Record{2, "Eda", "Vodopád"}
+        if results[0] != expected {
+                t.Errorf("first result is different: %+v versus %+v", results[0], expected)
+        }
+}
+</pre>
+
+<p>Výsledek spuštění jednotkových testů s&nbsp;výpočtem pokrytí kódu testy:</p>
+
+<pre>
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    displayAllRecords       76.9%
+db-test/db_operations.go:128:   readAllRecords          78.6%
+db-test/db_operations.go:163:   readRecordsWithName     78.6%
+db-test/db_operations.go:198:   insertRecord            0.0%
+db-test/db_operations.go:219:   deleteByName            0.0%
+db-test/db_operations.go:239:   main                    0.0%
+total:                          (statements)            28.6%
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-16T15:47:35+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-16T15:47:35+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-16T15:47:35+01:00","message":"Record"}
+PASS
+coverage: 28.6% of statements
+ok      db-test 0.003s
+</pre>
+
+<p>Dalším krokem tedy bude otestování zbylého kódu (což jsou většinou kontroly
+chyb) a taktéž CRUD příkazů <strong>INSERT</strong> a <strong>DELETE</strong>.
+To je ovšem téma, kterému se budeme věnovat příště.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>go.mod</td><td>projektový soubor projektu psaného v&nbsp;Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_72/go.mod">https://github.com/tisnik/go-root/blob/master/article_72/go.mod</a></td></tr>
+<tr><td>2</td><td>go.sum</td><td>závislosti vytvářeného projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_72/go.sum">https://github.com/tisnik/go-root/blob/master/article_72/go.sum</a></td></tr>
+<tr><td>3</td><td>db_operations.go</td><td>testovaná aplikace s&nbsp;několika databázovými operacemi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_72/db_operations.go">https://github.com/tisnik/go-root/blob/master/article_72/db_operations.go</a></td></tr>
+<tr><td>4</td><td>db_operations_test.go</td><td>jednotkové testy založené na mockování SQL příkazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_72/db_operations_test.go">https://github.com/tisnik/go-root/blob/master/article_72/db_operations_test.go</a></td></tr>
+<tr><td>5</td><td>export_test.go</td><td>export jmen funkcí volaných v&nbsp;jednotkových testech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_72/export_test.go">https://github.com/tisnik/go-root/blob/master/article_72/export_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>ORM je antipattern<br />
+<a href="https://zdrojak.cz/clanky/orm-je-antipattern/">https://zdrojak.cz/clanky/orm-je-antipattern/</a>
+</li>
+
+<li>DATA-DOG / go-sqlmock repository<br />
+<a href="https://github.com/DATA-DOG/go-sqlmock">https://github.com/DATA-DOG/go-sqlmock</a>
+</li>
+
+<li>Sql driver mock for Golang<br />
+<a href="https://pkg.go.dev/github.com/DATA-DOG/go-sqlmock?utm_source=godoc">https://pkg.go.dev/github.com/DATA-DOG/go-sqlmock?utm_source=godoc</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Package sql<br />
+<a href="https://golang.org/pkg/database/sql/">https://golang.org/pkg/database/sql/</a>
+</li>
+
+<li>Go database/sql tutorial<br />
+<a href="http://go-database-sql.org/">http://go-database-sql.org/</a>
+</li>
+
+<li>SQLDrivers<br />
+<a href="https://github.com/golang/go/wiki/SQLDrivers">https://github.com/golang/go/wiki/SQLDrivers</a>
+</li>
+
+<li>Package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>PostgreSQL CREATE DATABASE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-database/">https://www.postgresqltutorial.com/postgresql-create-database/</a>
+</li>
+
+<li>PostgreSQL CREATE SCHEMA<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-schema/">https://www.postgresqltutorial.com/postgresql-create-schema/</a>
+</li>
+
+<li>PostgreSQL CREATE TABLE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-table/">https://www.postgresqltutorial.com/postgresql-create-table/</a>
+</li>
+
+<li>PostgreSQL SELECT<br />
+<a href="https://www.postgresqltutorial.com/postgresql-select/">https://www.postgresqltutorial.com/postgresql-select/</a>
+</li>
+
+<li>PostgreSQL INSERT<br />
+<a href="https://www.postgresqltutorial.com/postgresql-insert/">https://www.postgresqltutorial.com/postgresql-insert/</a>
+</li>
+
+<li>PostgreSQL DELETE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-delete/">https://www.postgresqltutorial.com/postgresql-delete/</a>
+</li>
+
+<li>Data definition language<br />
+<a href="https://en.wikipedia.org/wiki/Data_definition_language">https://en.wikipedia.org/wiki/Data_definition_language</a>
+</li>
+
+<li>Data query language<br />
+<a href="https://en.wikipedia.org/wiki/Data_query_language">https://en.wikipedia.org/wiki/Data_query_language</a>
+</li>
+
+<li>Data manipulation language<br />
+<a href="https://en.wikipedia.org/wiki/Data_manipulation_language">https://en.wikipedia.org/wiki/Data_manipulation_language</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
