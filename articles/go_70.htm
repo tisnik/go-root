@@ -1,0 +1,2282 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vykreslení tabulek do terminálu v jazyce Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vykreslení tabulek do terminálu v jazyce Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Dnes se budeme zabývat zdánlivě triviálním tématem - jak do terminálu vykreslit tabulku s proměnnou šířkou sloupců popř. s využitím různých textových efektů (změna okrajů, barvy buněk atd.). Pro tento účel slouží v Go trojice podobně pojmenovaných balíčků: tabwriter, tablewriter a tableprinter.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vykreslení tabulek do terminálu v&nbsp;jazyce Go</a></p>
+<p><a href="#k02">2. Standardní balíček <strong>tabwriter</strong></a></p>
+<p><a href="#k03">3. Chování pro záznamy s&nbsp;odlišnou šířkou</a></p>
+<p><a href="#k04">4. Specifikace výplňových znaků včetně jejich minimálního počtu</a></p>
+<p><a href="#k05">5. Zarovnání hodnot doprava, příznak <strong>Debug</strong></a></p>
+<p><a href="#k06">6. Skutečný význam znaku <strong>Tab</strong></a></p>
+<p><a href="#k07">7. Zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</a></p>
+<p><a href="#k08">8. Postupné přidávání hodnot do výsledné tabulky funkcí <strong>fmt.Fprintf</strong></a></p>
+<p><a href="#k09">9. Zápis tabulky do souboru</a></p>
+<p><a href="#k10">10. HTTP server, který nabízí klientům naformátovanou tabulku</a></p>
+<p><a href="#k11">11. Balíček <strong>olekukonko/tablewriter</strong></a></p>
+<p><a href="#k12">12. Vykreslení tabulky s&nbsp;hlavičkou i s&nbsp;okraji buněk</a></p>
+<p><a href="#k13">13. Tabulka bez okrajů</a></p>
+<p><a href="#k14">14. Tabulka s&nbsp;patičkou (suma hodnot atd.)</a></p>
+<p><a href="#k15">15. Zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</a></p>
+<p><a href="#k16">16. Výstup do souboru, HTTP server nabízející klientům naformátovanou tabulku</a></p>
+<p><a href="#k17">17. Balíček <strong>lensesio/tableprinter</strong></a></p>
+<p><a href="#k18">18. Ukázky použití balíčku <strong>lensesio/tableprinter</strong></a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Vykreslení tabulek do terminálu v&nbsp;jazyce Go</h2>
+
+<p>V&nbsp;poměrně mnoha aplikacích je někdy nutné dokázat vykreslit do
+terminálu (tedy neproporcionálním fontem) tabulky, v&nbsp;nichž je použita
+různá (a mnohdy dopředu neznámá) šířka sloupců. Tento problém má pochopitelně
+celou řadu řešení. Dnes se zaměříme na programovací jazyk Go, pro který vznikla
+trojice podobně pojmenovaných balíčků, které dokážou tabulky vykreslovat, a to
+různými styly: <strong>tabwriter</strong>, <strong>tablewriter</strong> a
+konečně <strong>tableprinter</strong>. Nejdříve si popíšeme možnosti balíčku
+nazvaného <strong>tabwriter</strong>, už jen z&nbsp;toho důvodu, že se jedná o
+standardní balíček programovacího jazyka Go (i když jeho možnosti jsou
+v&nbsp;porovnání s&nbsp;konkurencí omezené). <strong>tabwriter</strong> je
+založen na algoritmu <i>elastic tabstops</i>, který po analýze dat (zejména
+jejich šířky) dokáže tabulku korektně naformátovat. Tento algoritmus slouží i
+ke zobrazení zdrojových kódů &ndash; viz následující dnes již pravděpodobně
+dokonale známou animaci, která ukazuje základní funkcionalitu tohoto algoritmu,
+která je dostupná na adrese <a
+href="https://nickgravgaard.com/elastic-tabstops/images/columnblocks_coloured.gif">https://nickgravgaard.com/elastic-tabstops/images/columnblocks_coloured.gif</a>:</p>
+
+<img src="https://nickgravgaard.com/elastic-tabstops/images/columnblocks_coloured.gif" alt="elastic tabstops" />
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto článku se často budeme
+zmiňovat o řídicím znaku <strong>Tab</strong>, takže možná stojí za zmínku, že
+demonstrační příklady, které budou dnes ukázány v&nbsp;navazujících kapitolách,
+prošly před importem do redakčního systému konverzí, které znaky
+<strong>Tab</strong> nahradilo za mezery (i když se pro <a
+href="https://golang.org/doc/effective_go#formatting">programovací jazyk Go
+oficiálně doporučují <strong>Taby</strong></a>). Z&nbsp;tohoto důvodu je lepší
+zdrojové kódy příkladů získat přímo z&nbsp;repositáře uvedeného <a
+href="#k19">v&nbsp;devatenácté kapitole</a>.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Standardní balíček <strong>tabwriter</strong></h2>
+
+<p>V&nbsp;úvodu dnešního článku se zaměříme na standardní balíček nazvaný
+<strong>tabwriter</strong> resp.&nbsp;přesněji (s&nbsp;celou cestou)
+<strong>text/tabwriter</strong>. Tento balíček umožňuje zobrazit sloupcová data
+libovolného typu, přičemž jednotlivé sloupce jsou na vstupu <i>ukončeny</i>
+(nikoli <i>odděleny</i>) znakem <strong>Tab</strong>. Použití je ve skutečnosti
+velmi jednoduché, protože pouze postačuje vytvořit instanci této struktury a
+zapisovat do ní libovolnými I/O funkcemi, které akceptují rozhraní typu
+<strong>io.Writer</strong>, což jsou například mnohé funkce z&nbsp;dalšího
+standardního balíčku <strong>fmt</strong>. Konstruktoru se předává několik
+parametrů popsaných dále:</p>
+
+<pre>
+w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+</pre>
+
+<p>Samotný zápis libovolných dat s&nbsp;definicí sloupců:</p>
+
+<pre>
+fmt.Fprintln(w, "1\t2\t3")
+fmt.Fprintln(w, "4\t5\t6")
+fmt.Fprintln(w, "7\t8\t9")
+</pre>
+
+<p>Nakonec je nutné zavolat metodu <strong>Flush</strong>, která zajistí
+vykreslení celé tabulky:</p>
+
+<pre>
+w.Flush()
+</pre>
+
+<p>Podívejme se na dnešní první demonstrační příklad, který po svém spuštění
+vypíše do terminálu dvojici tabulek, každou s&nbsp;odlišnou šířkou sloupců:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 0
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = 0
+)
+&nbsp;
+func <strong>main</strong>() {
+        w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "1\t2\t3")
+        fmt.Fprintln(w, "4\t5\t6")
+        fmt.Fprintln(w, "7\t8\t9")
+        w.Flush()
+&nbsp;
+        fmt.Println()
+&nbsp;
+        w = tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "foo\tbar\tbaz")
+        fmt.Fprintln(w, "foo\tbar\tbaz")
+        fmt.Fprintln(w, "foo\tbar\tbaz")
+        w.Flush()
+}
+</pre>
+
+<p>Výsledek by měl vypadat následovně:</p>
+
+<pre>
+1 2 3
+4 5 6
+7 8 9
+&nbsp;
+foo bar baz
+foo bar baz
+foo bar baz
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Chování pro záznamy s&nbsp;odlišnou šířkou</h2>
+
+<p>Ve druhém demonstračním příkladu se opět pokusíme vykreslit dvě tabulky,
+tentokrát ovšem budou mít jednotlivé záznamy odlišnou šířku. Tomu se
+automaticky přizpůsobí výsledná tabulka (což je velký rozdíl oproti přímočarému
+použití znaků <strong>Tab</strong>, které tyto automatické úpravy
+nepodporují):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 0
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = 0
+)
+&nbsp;
+func <strong>main</strong>() {
+        w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "1\t1\t1")
+        fmt.Fprintln(w, "22\t22\t22")
+        fmt.Fprintln(w, "333\t333\t333")
+        fmt.Fprintln(w, "4444\t4444\t4444")
+        w.Flush()
+&nbsp;
+        fmt.Println()
+&nbsp;
+        w = tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "f\tb\tb")
+        fmt.Fprintln(w, "foo\tbar\tbaz")
+        fmt.Fprintln(w, "foobar\tbarbaz\tbazfoo")
+        w.Flush()
+}
+</pre>
+
+<p>Výsledek by měl vypadat takto:</p>
+
+<pre>
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+f      b      b
+foo    bar    baz
+foobar barbaz bazfoo
+</pre>
+
+<p>Šířku (přesněji řečeno minimální šířku) lze specifikovat i explicitně, a to
+konkrétně úpravou druhého parametru konstruktoru <strong>NewWriter</strong>.
+V&nbsp;dalším demonstračním příkladu minimální šířku postupně zvětšujeme od
+nuly až do devíti znaků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = 0
+)
+&nbsp;
+func <strong>main</strong>() {
+        for minWidth := 0; minWidth &lt; 10; minWidth++ {
+                fmt.Printf("Min width = %d\n", minWidth)
+                w := tabwriter.NewWriter(os.Stdout, minWidth, TabWidth, Padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1")
+                fmt.Fprintln(w, "22\t22\t22")
+                fmt.Fprintln(w, "333\t333\t333")
+                fmt.Fprintln(w, "4444\t4444\t4444")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Na výsledku je patrné, že zpočátku nemá zadaná šířka žádný vliv na výslednou
+tabulku, protože záznamy jsou delší, než specifikovaná šířka. Posléze ovšem
+dojde k&nbsp;roztažení sloupců tabulky na požadovanou šířku:</p>
+
+<pre>
+Min width = 0
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 1
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 2
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 3
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 4
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 5
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+Min width = 6
+1     1     1
+22    22    22
+333   333   333
+4444  4444  4444
+&nbsp;
+Min width = 7
+1      1      1
+22     22     22
+333    333    333
+4444   4444   4444
+&nbsp;
+Min width = 8
+1       1       1
+22      22      22
+333     333     333
+4444    4444    4444
+&nbsp;
+Min width = 9
+1        1        1
+22       22       22
+333      333      333
+4444     4444     4444
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Specifikace výplňových znaků včetně jejich minimálního počtu</h2>
+
+<p>Mezi další parametry konstruktoru <strong>NewWriter</strong> patří
+specifikace výplňového znaku (libovolný znak z&nbsp;celého Unicode, jak je
+ostatně v&nbsp;Go dobrým zvykem) a taktéž minimálního počtu výplňových znaků.
+Nejprve se podívejme, jak se změní formát výsledných tabulek, pokud budeme
+postupně měnit počet výplňových znaků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 0
+        TabWidth         = 0
+        PaddingCharacter = ' '
+        Flags            = 0
+)
+&nbsp;
+func <strong>main</strong>() {
+        for padding := 0; padding &lt; 10; padding++ {
+                fmt.Printf("padding = %d\n", padding)
+                w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1")
+                fmt.Fprintln(w, "22\t22\t22")
+                fmt.Fprintln(w, "333\t333\t333")
+                fmt.Fprintln(w, "4444\t4444\t4444")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Výsledné tabulky:</p>
+
+<pre>
+padding = 0
+1   1   1
+22  22  22
+333 333 333
+444444444444
+&nbsp;
+padding = 1
+1    1    1
+22   22   22
+333  333  333
+4444 4444 4444
+&nbsp;
+padding = 2
+1     1     1
+22    22    22
+333   333   333
+4444  4444  4444
+&nbsp;
+padding = 3
+1      1      1
+22     22     22
+333    333    333
+4444   4444   4444
+&nbsp;
+padding = 4
+1       1       1
+22      22      22
+333     333     333
+4444    4444    4444
+&nbsp;
+padding = 5
+1        1        1
+22       22       22
+333      333      333
+4444     4444     4444
+&nbsp;
+padding = 6
+1         1         1
+22        22        22
+333       333       333
+4444      4444      4444
+&nbsp;
+padding = 7
+1          1          1
+22         22         22
+333        333        333
+4444       4444       4444
+&nbsp;
+padding = 8
+1           1           1
+22          22          22
+333         333         333
+4444        4444        4444
+&nbsp;
+padding = 9
+1            1            1
+22           22           22
+333          333          333
+4444         4444         4444
+</pre>
+
+<p>Výplňovým znakem byla až doposud mezera, ovšem ve skutečnosti se může použít
+libovolný jiný znak, což je ukázáno na dalším demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 0
+        TabWidth         = 0
+        PaddingCharacter = '.'
+        Flags            = 0
+)
+&nbsp;
+func <strong>main</strong>() {
+        for padding := 0; padding &lt; 10; padding++ {
+                fmt.Printf("padding = %d\n", padding)
+                w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1")
+                fmt.Fprintln(w, "22\t22\t22")
+                fmt.Fprintln(w, "333\t333\t333")
+                fmt.Fprintln(w, "4444\t4444\t4444")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Nyní je z&nbsp;výsledků patrné, jak se s&nbsp;výplňovými znaky pracuje
+v&nbsp;praxi:</p>
+
+<pre>
+padding = 0
+1...1...1
+22..22..22
+333.333.333
+444444444444
+&nbsp;
+padding = 1
+1....1....1
+22...22...22
+333..333..333
+4444.4444.4444
+&nbsp;
+padding = 2
+1.....1.....1
+22....22....22
+333...333...333
+4444..4444..4444
+&nbsp;
+padding = 3
+1......1......1
+22.....22.....22
+333....333....333
+4444...4444...4444
+&nbsp;
+padding = 4
+1.......1.......1
+22......22......22
+333.....333.....333
+4444....4444....4444
+&nbsp;
+padding = 5
+1........1........1
+22.......22.......22
+333......333......333
+4444.....4444.....4444
+&nbsp;
+padding = 6
+1.........1.........1
+22........22........22
+333.......333.......333
+4444......4444......4444
+&nbsp;
+padding = 7
+1..........1..........1
+22.........22.........22
+333........333........333
+4444.......4444.......4444
+&nbsp;
+padding = 8
+1...........1...........1
+22..........22..........22
+333.........333.........333
+4444........4444........4444
+&nbsp;
+padding = 9
+1............1............1
+22...........22...........22
+333..........333..........333
+4444.........4444.........4444
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Zarovnání hodnot doprava, příznak <strong>Debug</strong></h2>
+
+<p>Posledním parametrem konstruktoru <strong>NewWriter</strong> je celočíselná
+hodnota s&nbsp;příznaky, které mění vlastnosti vykreslované tabulky. Jeden
+z&nbsp;těchto příznaků se jmenuje příznačně <strong>AlignRight</strong>. Pomocí
+tohoto příznaku lze hodnoty ve sloupcích zarovnat doprava a nikoli doleva (což
+je výchozí chování):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight
+)
+&nbsp;
+func <strong>main</strong>() {
+        for minWidth := 0; minWidth &lt; 10; minWidth++ {
+                fmt.Printf("Min width = %d\n", minWidth)
+                w := tabwriter.NewWriter(os.Stdout, minWidth, TabWidth, Padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1")
+                fmt.Fprintln(w, "22\t22\t22")
+                fmt.Fprintln(w, "333\t333\t333")
+                fmt.Fprintln(w, "4444\t4444\t4444")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Výsledkem jsou tabulky se třemi sloupci, které ovšem vypadají
+&bdquo;divně&ldquo;. Proč tomu tak je, si vysvětlíme v&nbsp;dalším textu:</p>
+
+<pre>
+Min width = 0
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 1
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 2
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 3
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 4
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 5
+    1    11
+   22   2222
+  333  333333
+ 4444 44444444
+&nbsp;
+Min width = 6
+     1     11
+    22    2222
+   333   333333
+  4444  44444444
+&nbsp;
+Min width = 7
+      1      11
+     22     2222
+    333    333333
+   4444   44444444
+&nbsp;
+Min width = 8
+       1       11
+      22      2222
+     333     333333
+    4444    44444444
+&nbsp;
+Min width = 9
+        1        11
+       22       2222
+      333      333333
+     4444     44444444
+</pre>
+
+<p>Druhým užitečným příznakem je příznak nazvaný <strong>Debug</strong>. Tímto
+příznakem se povoluje zobrazení oddělovačů mezi sloupci. Oddělovačem je ve
+výchozím nastavení znak &bdquo;|&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+func <strong>main</strong>() {
+        for minWidth := 0; minWidth &lt; 10; minWidth++ {
+                fmt.Printf("Min width = %d\n", minWidth)
+                w := tabwriter.NewWriter(os.Stdout, minWidth, TabWidth, Padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1")
+                fmt.Fprintln(w, "22\t22\t22")
+                fmt.Fprintln(w, "333\t333\t333")
+                fmt.Fprintln(w, "4444\t4444\t4444")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Nyní jsou &ndash; alespoň teoreticky &ndash; sloupce zarovnané doprava a
+současně jsou od sebe oddělené znakem &bdquo;|&ldquo;:</p>
+
+<pre>
+Min width = 0
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 1
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 2
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 3
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 4
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 5
+    1|    1|1
+   22|   22|22
+  333|  333|333
+ 4444| 4444|4444
+&nbsp;
+Min width = 6
+     1|     1|1
+    22|    22|22
+   333|   333|333
+  4444|  4444|4444
+&nbsp;
+Min width = 7
+      1|      1|1
+     22|     22|22
+    333|    333|333
+   4444|   4444|4444
+&nbsp;
+Min width = 8
+       1|       1|1
+      22|      22|22
+     333|     333|333
+    4444|    4444|4444
+&nbsp;
+Min width = 9
+        1|        1|1
+       22|       22|22
+      333|      333|333
+     4444|     4444|4444
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Skutečný význam znaku <strong>Tab</strong></h2>
+
+<p>Předchozí dvojice demonstračních příkladů nepracovala korektně, protože
+poslední (třetí) sloupec ve skutečnosti nebyl zarovnán doprava, ale doleva. Je
+tomu tak z&nbsp;toho důvodu, že znak <strong>Tab</strong> slouží pro
+<i>ukončení</i> sloupců, nikoli pro jejich <i>oddělení</i>. V&nbsp;praxi to
+znamená to, že je nutné uvést znak <strong>Tab</strong> i na konci vypisovaného
+řetězce (přesněji řečeno před znakem pro konec řádku):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight
+)
+&nbsp;
+func <strong>main</strong>() {
+        for minWidth := 0; minWidth &lt; 10; minWidth++ {
+                fmt.Printf("Min width = %d\n", minWidth)
+                w := tabwriter.NewWriter(os.Stdout, minWidth, TabWidth, Padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1\t")
+                fmt.Fprintln(w, "22\t22\t22\t")
+                fmt.Fprintln(w, "333\t333\t333\t")
+                fmt.Fprintln(w, "4444\t4444\t4444\t")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Tento demonstrační příklad již zobrazí všechny sloupce s&nbsp;korektním
+zarovnáním:</p>
+
+<pre>
+Min width = 0
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 1
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 2
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 3
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 4
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 5
+    1    1    1
+   22   22   22
+  333  333  333
+ 4444 4444 4444
+&nbsp;
+Min width = 6
+     1     1     1
+    22    22    22
+   333   333   333
+  4444  4444  4444
+&nbsp;
+Min width = 7
+      1      1      1
+     22     22     22
+    333    333    333
+   4444   4444   4444
+&nbsp;
+Min width = 8
+       1       1       1
+      22      22      22
+     333     333     333
+    4444    4444    4444
+&nbsp;
+Min width = 9
+        1        1        1
+       22       22       22
+      333      333      333
+     4444     4444     4444
+</pre>
+
+<p>Totéž bude platit i při využití příznaku <strong>Debug</strong>, kterým
+zajistíme oddělení hodnot ve sloupcích znakem &bdquo;|&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+func <strong>main</strong>() {
+        for minWidth := 0; minWidth &lt; 10; minWidth++ {
+                fmt.Printf("Min width = %d\n", minWidth)
+                w := tabwriter.NewWriter(os.Stdout, minWidth, TabWidth, Padding, PaddingCharacter, Flags)
+                fmt.Fprintln(w, "1\t1\t1\t")
+                fmt.Fprintln(w, "22\t22\t22\t")
+                fmt.Fprintln(w, "333\t333\t333\t")
+                fmt.Fprintln(w, "4444\t4444\t4444\t")
+                w.Flush()
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Min width = 0
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 1
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 2
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 3
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 4
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 5
+    1|    1|    1|
+   22|   22|   22|
+  333|  333|  333|
+ 4444| 4444| 4444|
+&nbsp;
+Min width = 6
+     1|     1|     1|
+    22|    22|    22|
+   333|   333|   333|
+  4444|  4444|  4444|
+&nbsp;
+Min width = 7
+      1|      1|      1|
+     22|     22|     22|
+    333|    333|    333|
+   4444|   4444|   4444|
+&nbsp;
+Min width = 8
+       1|       1|       1|
+      22|      22|      22|
+     333|     333|     333|
+    4444|    4444|    4444|
+&nbsp;
+Min width = 9
+        1|        1|        1|
+       22|       22|       22|
+      333|      333|      333|
+     4444|     4444|     4444|
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu, který bude ještě několikrát zopakován,
+ovšem pokaždé při použití odlišného balíčku, je ukázán způsob zobrazení tabulky
+s&nbsp;faktoriály hodnot 0 až 20. Výsledky velmi rychle rostou, ovšem tabulka
+se bez problémů přizpůsobí různé šířce hodnot:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 5
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "n\tn!\t")
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                fmt.Fprintf(w, "%d\t%d\t\n", n, Factorial(int64(n)))
+        }
+&nbsp;
+        w.Flush()
+}
+</pre>
+
+<p>Výsledná tabulka zobrazená na terminálu by měla vypadat následovně:</p>
+
+<pre>
+    n|                  n!|
+    0|                   1|
+    1|                   1|
+    2|                   2|
+    3|                   6|
+    4|                  24|
+    5|                 120|
+    6|                 720|
+    7|                5040|
+    8|               40320|
+    9|              362880|
+   10|             3628800|
+   11|            39916800|
+   12|           479001600|
+   13|          6227020800|
+   14|         87178291200|
+   15|       1307674368000|
+   16|      20922789888000|
+   17|     355687428096000|
+   18|    6402373705728000|
+   19|  121645100408832000|
+   20| 2432902008176640000|
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Postupné přidávání hodnot do výsledné tabulky funkcí <strong>fmt.Fprintf</strong></h2>
+
+<p>Při konstrukci výsledné tabulky se balíček <strong>text/tabwriter</strong>
+ovládá dvěma řídicími znaky &ndash; <strong>Tab</strong> a
+<strong>Newline</strong>, tedy v&nbsp;programovém zápisu '\t' a '\n'. Znak
+nového řádku vede k&nbsp;vykreslení jednoho řádku tabulky, znak
+<strong>Tab</strong> pak k&nbsp;ukončení položky záznamu. Co to ovšem znamená
+v&nbsp;praxi? Není nutné celý řádek tabulky vypsat jedinou funkcí
+<strong>fmt.Println</strong> či nějakou podobnou funkcí, která na výstup posílá
+i znak pro konec řádku. Naopak &ndash; jednotlivé položky záznamu je možné
+přidávat postupně, což může být i přehlednější. Viz též následující
+demonstrační příklad:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 5
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        w := tabwriter.NewWriter(os.Stdout, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "n\tn!\t")
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                fmt.Fprintf(w, "%d\t", n)
+                result := Factorial(int64(n))
+                fmt.Fprintf(w, "%d\t", result)
+                fmt.Fprintln(w)
+        }
+&nbsp;
+        w.Flush()
+}
+</pre>
+
+<p>Výsledek by měl být totožný s&nbsp;příkladem, který byl ukázán <a
+href="#k07">v&nbsp;předchozí kapitole</a>:</p>
+
+<pre>
+    n|                  n!|
+    0|                   1|
+    1|                   1|
+    2|                   2|
+    3|                   6|
+    4|                  24|
+    5|                 120|
+    6|                 720|
+    7|                5040|
+    8|               40320|
+    9|              362880|
+   10|             3628800|
+   11|            39916800|
+   12|           479001600|
+   13|          6227020800|
+   14|         87178291200|
+   15|       1307674368000|
+   16|      20922789888000|
+   17|     355687428096000|
+   18|    6402373705728000|
+   19|  121645100408832000|
+   20| 2432902008176640000|
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Zápis tabulky do souboru</h2>
+
+<p>Tabulku je možné ve skutečnosti poslat (neboli zobrazit) s&nbsp;využitím
+libovolné struktury, která implementuje rozhraní <strong>Writer</strong>. Zcela
+triviálně je tak podporován zápis do souboru, což je ostatně ukázáno
+v&nbsp;dnešním dvanáctém demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 5
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        file, err := os.Create("table1.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        defer file.Close()
+&nbsp;
+        w := tabwriter.NewWriter(file, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "n\tn!\t")
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                fmt.Fprintf(w, "%d\t", n)
+                result := Factorial(int64(n))
+                fmt.Fprintf(w, "%d\t", result)
+                fmt.Fprintln(w)
+        }
+&nbsp;
+        w.Flush()
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se vytvoří soubor &bdquo;table1.txt&ldquo;,
+jehož obsah je následující:</p>
+
+<pre>
+    n|                  n!|
+    0|                   1|
+    1|                   1|
+    2|                   2|
+    3|                   6|
+    4|                  24|
+    5|                 120|
+    6|                 720|
+    7|                5040|
+    8|               40320|
+    9|              362880|
+   10|             3628800|
+   11|            39916800|
+   12|           479001600|
+   13|          6227020800|
+   14|         87178291200|
+   15|       1307674368000|
+   16|      20922789888000|
+   17|     355687428096000|
+   18|    6402373705728000|
+   19|  121645100408832000|
+   20| 2432902008176640000|
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. HTTP server, který nabízí klientům naformátovanou tabulku</h2>
+
+<p>Poslední demonstrační příklad založený na balíčku
+<strong>text/tabwriter</strong> se od předchozích příkladů odlišuje. Jedná se
+totiž o implementaci HTTP serveru, jehož jediný <i>endpoint</i> slouží pro
+získání naformátované tabulky. Základní funkcionalita tohoto příkladu je
+založena na tom, že obsluha (<i>handler</i>) zajišťující přístup
+k&nbsp;endpointu pracuje s&nbsp;datovou strukturou implementující rozhraní
+<strong>io.Writer</strong> (přesněji řečeno s&nbsp;datovou strukturou, která
+danému rozhraní vyhovuje, abychom se drželi ustálené terminologie):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "net/http"
+        "text/tabwriter"
+)
+&nbsp;
+const (
+        MinWidth         = 5
+        TabWidth         = 0
+        Padding          = 1
+        PaddingCharacter = ' '
+        Flags            = tabwriter.AlignRight | tabwriter.Debug
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        w := tabwriter.NewWriter(writer, MinWidth, TabWidth, Padding, PaddingCharacter, Flags)
+        fmt.Fprintln(w, "n\tn!\t")
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                fmt.Fprintf(w, "%d\t", n)
+                result := Factorial(int64(n))
+                fmt.Fprintf(w, "%d\t", result)
+                fmt.Fprintln(w)
+        }
+&nbsp;
+        w.Flush()
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu je možné v&nbsp;jiném terminálu přistoupit na
+adresu <strong>localhost:8000</strong>, například nástrojem
+<strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl localhost:8000/</strong>
+&nbsp;
+    n|                  n!|
+    0|                   1|
+    1|                   1|
+    2|                   2|
+    3|                   6|
+    4|                  24|
+    5|                 120|
+    6|                 720|
+    7|                5040|
+    8|               40320|
+    9|              362880|
+   10|             3628800|
+   11|            39916800|
+   12|           479001600|
+   13|          6227020800|
+   14|         87178291200|
+   15|       1307674368000|
+   16|      20922789888000|
+   17|     355687428096000|
+   18|    6402373705728000|
+   19|  121645100408832000|
+   20| 2432902008176640000|
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výsledek tedy odpovídá předchozí dvojici
+demonstračních příkladů.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Balíček <strong>olekukonko/tablewriter</strong></h2>
+
+<p>Druhý balíček určený pro práci s&nbsp;tabulkami v&nbsp;programovacím jazyku
+Go se jmenuje <strong>olekukonko/tablewriter</strong>. Jedná se o nestandardní
+balíček, který je nutné explicitně nainstalovat:</p>
+
+<pre>
+$ <strong>go get github.com/olekukonko/tablewriter</strong>
+</pre>
+
+<p>Od této chvíle je možné balíček používat v&nbsp;jakémkoli projektu
+naprogramovaného v&nbsp;jazyce Go.</p>
+
+<p>S&nbsp;tímto balíčkem se pracuje poněkud odlišným způsobem, než se
+standardním balíčkem <strong>text/tabwriter</strong>. Hlavní rozdíl spočívá
+v&nbsp;konstrukci tabulek &ndash; nepoužívají se zde řetězce se znaky
+<strong>Tab</strong>, ale tabulka je konstruována z&nbsp;řezů řetězců
+(<i>string slice</i>), což vyžaduje poněkud odlišný přístup ke struktuře kódu,
+který tabulky generuje. Možnosti balíčku <strong>tablewriter</strong> jsou
+větší, než u standardního balíčku <strong>tabwriter</strong>, protože je
+podporován například výstup s&nbsp;využitím barev, orámováním tabulky, tabulka
+může obsahovat hlavičku a patičku atd. Některé možnosti jsou ukázány
+v&nbsp;navazujících kapitolách.</p>
+
+<p><div class="rs-tip-major">Poznámka: dnes si popíšeme pouze základní možnosti
+tohoto balíčku. Podrobnostmi, například nastavením barev, se budeme zabývat
+příště.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Vykreslení tabulky s&nbsp;hlavičkou i s&nbsp;okraji buněk</h2>
+
+<p>V&nbsp;následujícím kódu, který je mimochodem převzat prakticky beze změny
+přímo ze stránky balíčku <strong>tablewriter</strong>, je ukázána konstrukce
+tabulky. Nejprve je nutné zkonstruovat objekt reprezentující tabulku;
+k&nbsp;tomuto účelu slouží konstruktor <strong>NewWriter</strong>, jemuž se
+opět předává libovolná struktura vyhovující rozhraní
+<strong>io.Writer</strong>. Následně je možné specifikovat hlavičku tabulky
+metodou <strong>SetHeader</strong>, přidat do tabulky jednotlivé řádky metodou
+<strong>Append</strong> a na konci tabulku vykreslit metodou
+<strong>Render</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+func <strong>main</strong>() {
+        data := [][]string{
+                []string{"A", "The Good", "500"},
+                []string{"B", "The Very very Bad Man", "288"},
+                []string{"C", "The Ugly", "120"},
+                []string{"D", "The Gopher", "800"},
+        }
+&nbsp;
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"Name", "Sign", "Rating"})
+&nbsp;
+        for _, v := range data {
+                table.Append(v)
+        }
+        table.Render()
+}
+</pre>
+
+<p>Výsledná tabulka vypadá značně odlišně od předchozích tabulek:</p>
+
+<pre>
++------+-----------------------+--------+
+| NAME |         SIGN          | RATING |
++------+-----------------------+--------+
+| A    | The Good              |    500 |
+| B    | The Very very Bad Man |    288 |
+| C    | The Ugly              |    120 |
+| D    | The Gopher            |    800 |
++------+-----------------------+--------+
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Tabulka bez okrajů</h2>
+
+<p>Po konstrukci datové struktury představující tabulku konstruktorem
+<strong>NewWriter</strong> je možné modifikovat některé vlastnosti tabulky.
+Týká se to například zobrazení tabulky bez okrajů &ndash; pokud okraje
+z&nbsp;nějakého důvodu nepotřebujete zobrazit, postačuje zavolat metodu
+<strong>SetBorder</strong> a předat jí pravdivostní hodnotu
+<strong>false</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+func <strong>main</strong>() {
+        data := [][]string{
+                []string{"A", "The Good", "500"},
+                []string{"B", "The Very very Bad Man", "288"},
+                []string{"C", "The Ugly", "120"},
+                []string{"D", "The Gopher", "800"},
+        }
+&nbsp;
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"Name", "Sign", "Rating"})
+        table.SetBorder(false)
+&nbsp;
+        for _, v := range data {
+                table.Append(v)
+        }
+        table.Render()
+}
+</pre>
+
+<p>Výsledná tabulka by měla vypadat následovně:</p>
+
+<pre>
+  NAME |         SIGN          | RATING  
+-------+-----------------------+---------
+  A    | The Good              |    500  
+  B    | The Very very Bad Man |    288  
+  C    | The Ugly              |    120  
+  D    | The Gopher            |    800  
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Tabulka s&nbsp;patičkou (suma hodnot atd.)</h2>
+
+<p>Poměrně užitečná je možnost zobrazit tabulku nejenom s&nbsp;hlavičkou, ale i
+s&nbsp;patičkou. K&nbsp;přidání patičky slouží metoda
+<strong>SetFooter</strong>, která akceptuje stejné parametry, jako metody
+<strong>SetHeader</strong> i <strong>Append</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+func <strong>main</strong>() {
+        data := [][]string{
+                []string{"A", "The Good", "500"},
+                []string{"B", "The Very very Bad Man", "288"},
+                []string{"C", "The Ugly", "120"},
+                []string{"D", "The Gopher", "800"},
+        }
+&nbsp;
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"Name", "Sign", "Rating"})
+        table.SetFooter([]string{"", "Sum", "1708"})
+&nbsp;
+        for _, v := range data {
+                table.Append(v)
+        }
+        table.Render()
+}
+</pre>
+
+<p>Tabulka bude zobrazena následujícím způsobem (povšimněte si buňky
+s&nbsp;chybějící hodnotou v&nbsp;patičce):</p>
+
+<pre>
++------+-----------------------+--------+
+| NAME |         SIGN          | RATING |
++------+-----------------------+--------+
+| A    | The Good              |    500 |
+| B    | The Very very Bad Man |    288 |
+| C    | The Ugly              |    120 |
+| D    | The Gopher            |    800 |
++------+-----------------------+--------+
+|                 SUM          |  1708  |
++------+-----------------------+--------+
+</pre>
+
+<p>Prakticky stejný příklad, ovšem s&nbsp;tím nepatrným rozdílem, že tabulka
+nebude obsahovat okraje:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+func <strong>main</strong>() {
+        data := [][]string{
+                []string{"A", "The Good", "500"},
+                []string{"B", "The Very very Bad Man", "288"},
+                []string{"C", "The Ugly", "120"},
+                []string{"D", "The Gopher", "800"},
+        }
+&nbsp;
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"Name", "Sign", "Rating"})
+        table.SetFooter([]string{"", "Sum", "1708"})
+        table.SetBorder(false)
+&nbsp;
+        for _, v := range data {
+                table.Append(v)
+        }
+        table.Render()
+}
+</pre>
+
+<p>Výsledná tabulka vygenerovaná předchozím příkladem:</p>
+
+<pre>
+  NAME |         SIGN          | RATING  
+-------+-----------------------+---------
+  A    | The Good              |    500  
+  B    | The Very very Bad Man |    288  
+  C    | The Ugly              |    120  
+  D    | The Gopher            |    800  
+-------+-----------------------+---------
+                  SUM          |  1708   
+       ------------------------+---------
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</h2>
+
+<p>Opět se pokusme zobrazit tabulku s&nbsp;faktoriály hodnot 0 až 20, tentokrát
+ovšem s&nbsp;využitím balíčku <strong>tablewriter</strong> a nikoli
+<strong>tabwriter</strong>. Programový kód bude v&nbsp;tomto případě
+složitější, protože je nutné převádět celočíselné hodnoty na řetězce. Je tomu
+tak z&nbsp;toho důvodu, že metoda <strong>Append</strong> akceptuje pole
+řetězců &ndash; viz též <a
+href="https://pkg.go.dev/github.com/olekukonko/tablewriter#Table.Append">dokumentaci</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "strconv"
+
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"n", "n!"})
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                f := Factorial(int64(n))
+                row := []string{strconv.Itoa(n), strconv.FormatInt(f, 10)}
+                table.Append(row)
+        }
+&nbsp;
+        table.Render()
+}
+</pre>
+
+<p>Výsledná tabulka:</p>
+
+<pre>
++----+---------------------+
+| N  |         N!          |
++----+---------------------+
+|  0 |                   1 |
+|  1 |                   1 |
+|  2 |                   2 |
+|  3 |                   6 |
+|  4 |                  24 |
+|  5 |                 120 |
+|  6 |                 720 |
+|  7 |                5040 |
+|  8 |               40320 |
+|  9 |              362880 |
+| 10 |             3628800 |
+| 11 |            39916800 |
+| 12 |           479001600 |
+| 13 |          6227020800 |
+| 14 |         87178291200 |
+| 15 |       1307674368000 |
+| 16 |      20922789888000 |
+| 17 |     355687428096000 |
+| 18 |    6402373705728000 |
+| 19 |  121645100408832000 |
+| 20 | 2432902008176640000 |
++----+---------------------+
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výstup do souboru, HTTP server nabízející klientům naformátovanou tabulku</h2>
+
+<p>Protože balíček <strong>tablewriter</strong> dokáže pracovat s&nbsp;každou
+datovou strukturou vyhovující rozhraní <strong>io.Writer</strong>, je
+podporováno i vykreslení tabulky do textového souboru, což je ukázáno
+v&nbsp;dalším demonstračním příkladu. Ten po svém spuštění vytvoří soubor
+&bdquo;table2.txt&ldquo; a zapíše do něj příslušnou naformátovanou tabulku
+s&nbsp;hodnotami faktoriálů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+        "strconv"
+&nbsp;
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        file, err := os.Create("table2.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        defer file.Close()
+&nbsp;
+        table := tablewriter.NewWriter(file)
+        table.SetHeader([]string{"n", "n!"})
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                f := Factorial(int64(n))
+                row := []string{strconv.Itoa(n), strconv.FormatInt(f, 10)}
+                table.Append(row)
+        }
+&nbsp;
+        table.Render()
+}
+</pre>
+
+<p></p>
+
+<pre>
++----+---------------------+
+| N  |         N!          |
++----+---------------------+
+|  0 |                   1 |
+|  1 |                   1 |
+|  2 |                   2 |
+|  3 |                   6 |
+|  4 |                  24 |
+|  5 |                 120 |
+|  6 |                 720 |
+|  7 |                5040 |
+|  8 |               40320 |
+|  9 |              362880 |
+| 10 |             3628800 |
+| 11 |            39916800 |
+| 12 |           479001600 |
+| 13 |          6227020800 |
+| 14 |         87178291200 |
+| 15 |       1307674368000 |
+| 16 |      20922789888000 |
+| 17 |     355687428096000 |
+| 18 |    6402373705728000 |
+| 19 |  121645100408832000 |
+| 20 | 2432902008176640000 |
++----+---------------------+
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že balíček <strong>tablewriter</strong> dokáže tabulku
+vypsat do libovolné struktury vyhovující rozhraní <strong>io.Writer</strong>,
+je možné (opět) relativně snadno implementovat HTTP server, jehož obslužný kód
+endpointu takovou tabulku vytvoří a pošle zpět klientovi. Jedná se tedy o
+kombinaci příkladu <a href="#k15">z&nbsp;předchozí kapitoly</a>
+z&nbsp;příkladem <a href="#k10">z&nbsp;kapitoly desáté</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "strconv"
+&nbsp;
+        "github.com/olekukonko/tablewriter"
+)
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        table := tablewriter.NewWriter(writer)
+        table.SetHeader([]string{"n", "n!"})
+&nbsp;
+        for n := 0; n &lt;= 20; n++ {
+                f := Factorial(int64(n))
+                row := []string{strconv.Itoa(n), strconv.FormatInt(f, 10)}
+                table.Append(row)
+        }
+&nbsp;
+        table.Render()
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Po spuštění HTTP serveru přistoupíme k&nbsp;(jedinému) koncovému bodu a
+necháme si serverem poslat naformátovanou tabulku:</p>
+
+<pre>
+$ <strong>curl localhost:8000/</strong>
+&nbsp;
++----+---------------------+
+| N  |         N!          |
++----+---------------------+
+|  0 |                   1 |
+|  1 |                   1 |
+|  2 |                   2 |
+|  3 |                   6 |
+|  4 |                  24 |
+|  5 |                 120 |
+|  6 |                 720 |
+|  7 |                5040 |
+|  8 |               40320 |
+|  9 |              362880 |
+| 10 |             3628800 |
+| 11 |            39916800 |
+| 12 |           479001600 |
+| 13 |          6227020800 |
+| 14 |         87178291200 |
+| 15 |       1307674368000 |
+| 16 |      20922789888000 |
+| 17 |     355687428096000 |
+| 18 |    6402373705728000 |
+| 19 |  121645100408832000 |
+| 20 | 2432902008176640000 |
++----+---------------------+
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Balíček <strong>lensesio/tableprinter</strong></h2>
+
+<p>Poslední, v&nbsp;pořadí již třetí balíček, o němž se v&nbsp;dnešním článku
+zmíníme, se jmenuje <strong>tableprinter</strong> resp.&nbsp;celým jménem
+<strong>lensesio/tableprinter</strong>. Tento balíček je založen na balíčku
+<strong>tablewriter</strong>, ovšem rozšiřuje jeho možnosti, a to hned několika
+způsoby. Dnes se seznámíme jen se základními možnostmi nabízenými tímto
+balíčkem; případné podrobnosti (barevný výstup atd.) budou vysvětleny
+v&nbsp;navazujícím článku.</p>
+
+<p>Opět se jedná o nestandardní balíček, takže je nutná jeho explicitní
+instalace:</p>
+
+<pre>
+$ <strong>go get -u github.com/lensesio/tableprinter</strong>
+</pre>
+
+<p>Od této chvíle je možné balíček používat v&nbsp;jakémkoli projektu
+naprogramovaného v&nbsp;jazyce Go.</p>
+
+<p>Struktura dat, která se mají vykreslit v&nbsp;tabulce, je definována novým
+datovým typem, v&nbsp;němž lze u jednotlivých položek specifikovat i názvy
+sloupců (podobně se ostatně pracuje se soubory TOML, JSON atd.):</p>
+
+<pre>
+type <strong>Record</strong> struct {
+        Rank  string `header:"rank"`
+        Title string `header:"title"`
+        Value int    `header:"value"`
+}
+</pre>
+
+<p>Samotné vytvoření a vykreslení tabulky je jednoduché &ndash; nejprve se
+vytvoří instance objektu představujícího tabulku a poté se metodou
+<strong>Print</strong> tomuto objektu předají data, která se mají
+vykreslit:</p>
+
+<pre>
+table := tableprinter.New(os.Stdout)
+&nbsp;
+table.Print(data)
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Ukázky použití balíčku <strong>lensesio/tableprinter</strong></h2>
+
+<p>V&nbsp;této kapitole si &ndash; prozatím ovšem pouze ve stručnosti &ndash;
+ukážeme některé možnosti, které nám nabízí balíček
+<strong>tableprinter</strong> při tisku tabulek. První demonstrační příklad je
+nejjednodušší, protože vykreslí tabulku výchozím stylem bez dalších úprav:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        Rank  string `header:"rank"`
+        Title string `header:"title"`
+        Value int    `header:"value"`
+}
+&nbsp;
+func <strong>main</strong>() {
+        data := []Record{
+                {"A", "The Good", 500},
+                {"B", "The Very very Bad Man", 288},
+                {"C", "The Ugly", 120},
+                {"D", "The Gopher", 800},
+        }
+&nbsp;
+        table := tableprinter.New(os.Stdout)
+&nbsp;
+        table.Print(data)
+}
+</pre>
+
+<p>Výsledkem bude tato tabulka:</p>
+
+<pre>
+  RANK (4)    TITLE                   VALUE  
+ ----------- ----------------------- ------- 
+  A           The Good                  500  
+  B           The Very very Bad Man     288  
+  C           The Ugly                  120  
+  D           The Gopher                800  
+</pre>
+
+<p>Můžeme ovšem taktéž explicitně specifikovat styl okrajů tabulky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        Rank  string `header:"rank"`
+        Title string `header:"title"`
+        Value int    `header:"value"`
+}
+&nbsp;
+func <strong>main</strong>() {
+        data := []Record{
+                {"A", "The Good", 500},
+                {"B", "The Very very Bad Man", 288},
+                {"C", "The Ugly", 120},
+                {"D", "The Gopher", 800},
+        }
+&nbsp;
+        table := tableprinter.New(os.Stdout)
+        table.BorderTop, table.BorderBottom, table.BorderLeft, table.BorderRight = true, true, true, true
+&nbsp;
+        table.Print(data)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+ ----------- ----------------------- ------- 
+  RANK (4)    TITLE                   VALUE  
+ ----------- ----------------------- ------- 
+  A           The Good                  500  
+  B           The Very very Bad Man     288  
+  C           The Ugly                  120  
+  D           The Gopher                800  
+ ----------- ----------------------- ------- 
+</pre>
+
+<p>Určit je možné i znaky použité pro tisk okrajů. Podporováno je celé Unicode,
+samozřejmě pouze v&nbsp;případě použití fontu se všemi potřebnými znaky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        Rank  string `header:"rank"`
+        Title string `header:"title"`
+        Value int    `header:"value"`
+}
+&nbsp;
+func <strong>main</strong>() {
+        data := []Record{
+                {"A", "The Good", 500},
+                {"B", "The Very very Bad Man", 288},
+                {"C", "The Ugly", 120},
+                {"D", "The Gopher", 800},
+        }
+&nbsp;
+        table := tableprinter.New(os.Stdout)
+        table.BorderTop, table.BorderBottom, table.BorderLeft, table.BorderRight = true, true, true, true
+        table.CenterSeparator = "│"
+        table.ColumnSeparator = "│"
+        table.RowSeparator = "─"
+&nbsp;
+        table.Print(data)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+│───────────│───────────────────────│───────│
+│ RANK (4)  │ TITLE                 │ VALUE │
+│───────────│───────────────────────│───────│
+│ A         │ The Good              │   500 │
+│ B         │ The Very very Bad Man │   288 │
+│ C         │ The Ugly              │   120 │
+│ D         │ The Gopher            │   800 │
+│───────────│───────────────────────│───────│
+</pre>
+
+<p>Tisk tabulky s&nbsp;faktoriály:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        N int   `header:"n"`
+        F int64 `header:"n!"`
+}
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+const MaxN = 17
+&nbsp;
+func <strong>main</strong>() {
+        data := make([]Record, 0)
+&nbsp;
+        for n := 0; n &lt;= MaxN; n++ {
+                data = append(data, Record{n, Factorial(int64(n))})
+        }
+&nbsp;
+        table := tableprinter.New(os.Stdout)
+        table.BorderTop, table.BorderBottom, table.BorderLeft, table.BorderRight = true, true, true, true
+        table.CenterSeparator = "│"
+        table.ColumnSeparator = "│"
+        table.RowSeparator = "─"
+&nbsp;
+        table.Print(data)
+}
+</pre>
+
+<p>Povšimněte si, jak se velké hodnoty implicitně zkracují (což nemusí být vždy
+výhodné):</p>
+
+<pre>
+│─────────│────────│
+│ N (18)  │ N!     │
+│─────────│────────│
+│       0 │      1 │
+│       1 │      1 │
+│       2 │      2 │
+│       3 │      6 │
+│       4 │     24 │
+│       5 │    120 │
+│       6 │    720 │
+│       7 │   5.4K │
+│       8 │  40.3K │
+│       9 │ 362.8K │
+│      10 │   3.6M │
+│      11 │  39.9M │
+│      12 │ 479.1M │
+│      13 │   6.2B │
+│      14 │  87.1B │
+│      15 │   1.3T │
+│      16 │  20.9T │
+│      17 │ 355.6T │
+│─────────│────────│
+</pre>
+
+<p>Výstup do souboru:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        N int   `header:"n"`
+        F int64 `header:"n!"`
+}
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+const MaxN = 17
+&nbsp;
+func <strong>main</strong>() {
+        file, err := os.Create("table3.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        defer file.Close()
+&nbsp;
+        data := make([]Record, 0)
+&nbsp;
+        for n := 0; n &lt;= MaxN; n++ {
+                data = append(data, Record{n, Factorial(int64(n))})
+        }
+&nbsp;
+        table := tableprinter.New(file)
+        table.BorderTop, table.BorderBottom, table.BorderLeft, table.BorderRight = true, true, true, true
+        table.CenterSeparator = "│"
+        table.ColumnSeparator = "│"
+        table.RowSeparator = "─"
+&nbsp;
+        table.Print(data)
+}
+</pre>
+
+<p>Výsledkem bude soubor &bdquo;table3.txt&ldquo; s&nbsp;tímto obsahem:</p>
+
+<pre>
+│─────────│────────│
+│ N (18)  │ N!     │
+│─────────│────────│
+│       0 │      1 │
+│       1 │      1 │
+│       2 │      2 │
+│       3 │      6 │
+│       4 │     24 │
+│       5 │    120 │
+│       6 │    720 │
+│       7 │   5.4K │
+│       8 │  40.3K │
+│       9 │ 362.8K │
+│      10 │   3.6M │
+│      11 │  39.9M │
+│      12 │ 479.1M │
+│      13 │   6.2B │
+│      14 │  87.1B │
+│      15 │   1.3T │
+│      16 │  20.9T │
+│      17 │ 355.6T │
+│─────────│────────│
+</pre>
+
+<p>A konečně obdoba HTTP serveru z&nbsp;předchozích kapitol:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+&nbsp;
+        "github.com/lensesio/tableprinter"
+)
+&nbsp;
+type <strong>Record</strong> struct {
+        N int   `header:"n"`
+        F int64 `header:"n!"`
+}
+&nbsp;
+<i>// Factorial computes factorial for given n that might be positive integer</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        switch {
+        case n &lt; 0:
+                return 1
+        case n == 0:
+                return 1
+        default:
+                return n * Factorial(n-1)
+        }
+}
+&nbsp;
+const MaxN = 17
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        data := make([]Record, 0)
+&nbsp;
+        for n := 0; n &lt;= MaxN; n++ {
+                data = append(data, Record{n, Factorial(int64(n))})
+        }
+&nbsp;
+        table := tableprinter.New(writer)
+        table.BorderTop, table.BorderBottom, table.BorderLeft, table.BorderRight = true, true, true, true
+        table.CenterSeparator = "│"
+        table.ColumnSeparator = "│"
+        table.RowSeparator = "─"
+&nbsp;
+        table.Print(data)
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01-tabwriter-basic-usage.go</td><td>vykreslení dvou jednoduchých tabulek s&nbsp;využitím <strong>tabwriter</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/01-tabwriter-basic-usage.go">https://github.com/tisnik/go-root/blob/master/article_70/01-tabwriter-basic-usage.go</a></td></tr>
+<tr><td> 2</td><td>02-tabwriter-different-column-widths.go</td><td>chování pro záznamy s&nbsp;odlišnou šířkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/02-tabwriter-different-column-widths.go">https://github.com/tisnik/go-root/blob/master/article_70/02-tabwriter-different-column-widths.go</a></td></tr>
+<tr><td> 3</td><td>03-tabwriter-min-width.go</td><td>změna minimální šířky sloupců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/03-tabwriter-min-width.go">https://github.com/tisnik/go-root/blob/master/article_70/03-tabwriter-min-width.go</a></td></tr>
+<tr><td> 4</td><td>04-tabwriter-padding.go</td><td>změna minimálního počtu výplňových znaků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/04-tabwriter-padding.go">https://github.com/tisnik/go-root/blob/master/article_70/04-tabwriter-padding.go</a></td></tr>
+<tr><td> 5</td><td>05-tabwriter-padding-character.go</td><td>změna výplňového znaku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/05-tabwriter-padding-character.go">https://github.com/tisnik/go-root/blob/master/article_70/05-tabwriter-padding-character.go</a></td></tr>
+<tr><td> 6</td><td>06-tabwriter-align-right.go</td><td>zarovnání sloupců doprava</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/06-tabwriter-align-right.go">https://github.com/tisnik/go-root/blob/master/article_70/06-tabwriter-align-right.go</a></td></tr>
+<tr><td> 7</td><td>07-tabwriter-align-right-debug.go</td><td>zarovnání sloupců doprava + výstup s&nbsp;oddělovači mezi sloupci</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/07-tabwriter-align-right-debug.go">https://github.com/tisnik/go-root/blob/master/article_70/07-tabwriter-align-right-debug.go</a></td></tr>
+<tr><td> 8</td><td>08-tabwriter-align-right-trailing-tab.go</td><td>korektní použití &bdquo;trailing tab&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/08-tabwriter-align-right-trailing-tab.go">https://github.com/tisnik/go-root/blob/master/article_70/08-tabwriter-align-right-trailing-tab.go</a></td></tr>
+<tr><td> 9</td><td>09-tabwriter-align-right-trailing-tab-debug.go</td><td>korektní použití &bdquo;trailing tab&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/09-tabwriter-align-right-trailing-tab-debug.go">https://github.com/tisnik/go-root/blob/master/article_70/09-tabwriter-align-right-trailing-tab-debug.go</a></td></tr>
+<tr><td>10</td><td>10-tabwriter-factorial.go</td><td>zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/10-tabwriter-factorial.go">https://github.com/tisnik/go-root/blob/master/article_70/10-tabwriter-factorial.go</a></td></tr>
+<tr><td>11</td><td>11-tabwriter-factorial-multiprint.go</td><td>postupné přidávání hodnot do výsledné tabulky funkcí <strong>fmt.Fprintf</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/11-tabwriter-factorial-multiprint.go">https://github.com/tisnik/go-root/blob/master/article_70/11-tabwriter-factorial-multiprint.go</a></td></tr>
+<tr><td>12</td><td>12-tabwriter-write-to-file.go</td><td>zápis tabulky do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/12-tabwriter-write-to-file.go">https://github.com/tisnik/go-root/blob/master/article_70/12-tablewriter-basic-usage.go</a></td></tr>
+<tr><td>13</td><td>13-tabwriter-http-server.go</td><td>HTTP server, který nabízí klientům naformátovanou tabulku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/13-tabwriter-http-server.go">https://github.com/tisnik/go-root/blob/master/article_70/13-tabwriter-http-server.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>14</td><td>14-tablewriter-basic-usage.go</td><td>základní použití balíčku <strong>tablewriter</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/14-tablewriter-basic-usage.go">https://github.com/tisnik/go-root/blob/master/article_70/14-tablewriter-basic-usage.go</a></td></tr>
+<tr><td>15</td><td>15-tablewriter-no-border.go</td><td>zobrazení tabulky bez okrajů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/15-tablewriter-no-border.go">https://github.com/tisnik/go-root/blob/master/article_70/15-tablewriter-no-border.go</a></td></tr>
+<tr><td>16</td><td>16-tablewriter-set-footer.go</td><td>tabulka s&nbsp;patičkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/16-tablewriter-set-footer.go">https://github.com/tisnik/go-root/blob/master/article_70/16-tablewriter-set-footer.go</a></td></tr>
+<tr><td>17</td><td>17-tablewriter-set-footer-no-border.go</td><td>kombinace předchozích dvou příkladů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/17-tablewriter-set-footer-no-border.go">https://github.com/tisnik/go-root/blob/master/article_70/17-tablewriter-set-footer-no-border.go</a></td></tr>
+<tr><td>18</td><td>18-tablewriter-factorial.go</td><td>zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/18-tablewriter-factorial.go">https://github.com/tisnik/go-root/blob/master/article_70/18-tablewriter-factorial.go</a></td></tr>
+<tr><td>19</td><td>19-tablewriter-write-to-file.go</td><td>zápis tabulky do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/19-tablewriter-write-to-file.go">https://github.com/tisnik/go-root/blob/master/article_70/19-tablewriter-write-to-file.go</a></td></tr>
+<tr><td>20</td><td>20-tablewriter-http-server.go</td><td>HTTP server, který nabízí klientům naformátovanou tabulku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/20-tablewriter-http-server.go">https://github.com/tisnik/go-root/blob/master/article_70/20-tablewriter-http-server.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>21</td><td>21-tableprinter-basic-usage.go</td><td>základní použití balíčku <strong>tableprinter</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/21-tableprinter-basic-usage.go">https://github.com/tisnik/go-root/blob/master/article_70/21-tableprinter-basic-usage.go</a></td></tr>
+<tr><td>22</td><td>22-tableprinter-borders.go</td><td>nastavení okrajů tabulky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/22-tableprinter-borders.go">https://github.com/tisnik/go-root/blob/master/article_70/22-tableprinter-borders.go</a></td></tr>
+<tr><td>23</td><td>23-tableprinter-borders.go</td><td>nastavení okrajů tabulky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/23-tableprinter-borders.go">https://github.com/tisnik/go-root/blob/master/article_70/23-tableprinter-borders.go</a></td></tr>
+<tr><td>24</td><td>24-tableprinter-factorial.go</td><td>zobrazení tabulky s&nbsp;faktoriály hodnot 0 až 20</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/24-tableprinter-factorial.go">https://github.com/tisnik/go-root/blob/master/article_70/24-tableprinter-factorial.go</a></td></tr>
+<tr><td>25</td><td>25-tableprinter-write-to-file.go</td><td>zápis tabulky do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/25-tableprinter-write-to-file.go">https://github.com/tisnik/go-root/blob/master/article_70/25-tableprinter-write-to-file.go</a></td></tr>
+<tr><td>26</td><td>26-tableprinter-http-server.go</td><td>HTTP server, který nabízí klientům naformátovanou tabulku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_70/26-tableprinter-http-server.go">https://github.com/tisnik/go-root/blob/master/article_70/26-tableprinter-http-server.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Standardní balíček text/tabwriter<br />
+<a href="https://golang.org/pkg/text/tabwriter/">https://golang.org/pkg/text/tabwriter/</a>
+</li>
+
+<li>Elastic tabstops: A better way to indent and align code<br />
+<a href="https://nickgravgaard.com/elastic-tabstops/">https://nickgravgaard.com/elastic-tabstops/</a>
+</li>
+
+<li>ASCII Table Writer<br />
+<a href="https://github.com/olekukonko/tablewriter">https://github.com/olekukonko/tablewriter</a>
+</li>
+
+<li>TablePrinter<br />
+<a href="https://github.com/lensesio/tableprinter">https://github.com/lensesio/tableprinter</a>
+</li>
+
+<li>go-pretty<br />
+<a href="https://github.com/jedib0t/go-pretty">https://github.com/jedib0t/go-pretty</a>
+</li>
+
+<li>What are the drawbacks of elastic tabstops?<br />
+<a href="https://softwareengineering.stackexchange.com/questions/137290/what-are-the-drawbacks-of-elastic-tabstops">https://softwareengineering.stackexchange.com/questions/137290/what-are-the-drawbacks-of-elastic-tabstops</a>
+</li>
+
+<li>Elastic tabstop editors and plugins<br />
+<a href="https://stackoverflow.com/questions/28652/elastic-tabstop-editors-and-plugins">https://stackoverflow.com/questions/28652/elastic-tabstop-editors-and-plugins</a>
+</li>
+
+<li>Příkaz gofmt<br />
+<a href="https://golang.org/cmd/gofmt/">https://golang.org/cmd/gofmt/</a>
+</li>
+
+<li>Spaces vs. Tabs: A 20-Year Debate Reignited by Google’s Golang<br />
+<a href="https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/">https://thenewstack.io/spaces-vs-tabs-a-20-year-debate-and-now-this-what-the-hell-is-wrong-with-go/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
