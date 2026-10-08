@@ -1,0 +1,2007 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Komunikace se sloupcovými databázemi z jazyka Go: Parquet soubory</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V seriálu o programovacím jazyku Go jsme si již ukázali, jakým způsobem (resp. s jakými balíčky) se v jazyce Go pracuje s klasickými relačními databázemi a taktéž s nerelační databází Redis. Dnes si popíšeme základy práce s Parquet soubory, což je datový formát orientovaný na databáze sloupcové.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Komunikace se sloupcovými databázemi z&nbsp;jazyka Go: Parquet soubory</a></p>
+<p><a href="#k02">2. Souborový formát Parquet</a></p>
+<p><a href="#k03">3. Zápis záznamů do Parquet souborů</a></p>
+<p><a href="#k04">4. Přečtení záznamu z&nbsp;Parquet souboru</a></p>
+<p><a href="#k05">5. Ukládání pravdivostních hodnot</a></p>
+<p><a href="#k06">6. Porovnání výsledků &ndash; rozdíl mezi velikostí čistých dat a velikostí Parquet souboru</a></p>
+<p><a href="#k07">7. Ukládání celočíselných hodnot</a></p>
+<p><a href="#k08">8. Porovnání výsledků &ndash; přímé uložení celočíselných hodnot vs.&nbsp;změna hodnot</a></p>
+<p><a href="#k09">9. Nastavení komprimačního algoritmu</a></p>
+<p><a href="#k10">10. Porovnání výsledků &ndash; vliv komprimačního algoritmu na výslednou velikost souboru</a></p>
+<p><a href="#k11">11. Ukládání řetězců</a></p>
+<p><a href="#k12">12. Použití slovníků</a></p>
+<p><a href="#k13">13. Porovnání výsledků &ndash; přímé uložení řetězců versus použití slovníku</a></p>
+<p><a href="#k14">14. Rychlost zápisu záznamů</a></p>
+<p><a href="#k15">15. Výsledky benchmarku</a></p>
+<p><a href="#k16">16. Rychlost čtení záznamů</a></p>
+<p><a href="#k17">17. Výsledky benchmarku</a></p>
+<p><a href="#k18">18. Obsah navazující části seriálu</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Komunikace se sloupcovými databázemi z&nbsp;jazyka Go: Parquet soubory</h2>
+
+<p>Ve zhruba posledním desetiletí se stále častěji můžeme setkat
+s&nbsp;takzvanými sloupcovými databázemi neboli <i>column-oriented DBMS</i>
+popř.&nbsp;<i>columnar DBMS</i>, v&nbsp;nichž se &ndash; jak už jejich název
+naznačuje &ndash; data ukládají po sloupcích a nikoli po jednotlivých záznamech
+(řádcích). Způsob uložení dat má poměrně velký vliv jak na velikost výsledných
+souborů (lze totiž použít efektivní metody kódování a popř.&nbsp;i komprimace
+údajů), tak i na rychlost přístupu k&nbsp;datům ve chvíli, kdy potřebujeme
+zpracovat pouze jeden či několik sloupců &ndash; a to bývá v&nbsp;některých
+oblastech velmi častý požadavek (&bdquo;vypočti průměrnou útratu&ldquo; atd.).
+Nejdůležitější vlastnosti sloupcových databází byly popsány v&nbsp;pěkném
+článku <a
+href="https://www.root.cz/clanky/nekolik-poznamek-ke-sloupcovym-databazim/">Několik
+poznámek ke sloupcovým databázím</a> od <a
+href="https://www.root.cz/autori/pavel-stehule/">Pavla Stěhuleho</a> a právě
+s&nbsp;těmito vlastnostmi se setkáme při studiu resp.&nbsp;při používání
+Parquet souborů (viz navazující kapitoly).</p>
+
+<p><div class="rs-tip-major">Poznámka: uložení do sloupců lze realizovat i
+v&nbsp;některých klasických relačních databázích &ndash; ostatně to, že je
+databáze relační vlastně nijak neurčuje fyzický způsob uložení dat.</div></p>
+
+<p>Dnes se zaměříme na přímou práci s&nbsp;Parquet soubory, a to
+s&nbsp;využitím programovacího jazyka Go a balíčku <strong>go-parquet</strong>.
+Jedná se o souborový formát určený právě pro použití ve sloupcových databázích.
+Ovšem Parquet soubory lze vytvářet a popř.&nbsp;i číst i bez toho, aby nad nimi
+byla vytvořena další mezivrstva (nebo chcete-li rozhraní) ve formě SQL či
+jiného podobně koncipovaného DSL. Příklad použití můžeme vidět na prvním
+obrázku:</p>
+
+<img src="https://i.iinfo.cz/images/590/arch-parquet-2-1.png" class="image-418846" alt="&#160;" width="411" height="523" />
+<p><i>Obrázek 1: Parquet soubory mohou vznikat například na konci nějaké
+&bdquo;pipeline&ldquo;, v&nbsp;níž se shromažďují a transformují nějaká vstupní
+data (události). V&nbsp;takovém případě lze do souborů zapisovat přímo, bez
+použití DSL.</i></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Souborový formát Parquet</h2>
+
+<p>Formát Parquet souborů byl navržen s&nbsp;ohledem na to, aby bylo data možné
+kódovat a zmenšit tak jejich velikost. Podporována je i komprimace na úrovni
+jednotlivých sloupců (které jsou ovšem rozděleny do oddílů). Zmenšení velikosti
+souborů nevede jen k&nbsp;úsporám místa na médiu (to již nemusí být kritické),
+ale (společně se zápisem po sloupcích) i k&nbsp;výraznému urychlení přístupu
+k&nbsp;datům &ndash; méně načtených bloků z&nbsp;disku, méně výpadků L1 a L2
+cache a v&nbsp;případě Parquet formátu se jeho tvůrci zaměřili i na to, aby
+programový kód obsahoval co nejméně rozeskoků (a tím pádem potenciálních
+výpadků instrukční pipeline).</p>
+
+<p>Parquet formát podporuje následující tzv.&nbsp;primitivní typy hodnot:</p>
+
+<table>
+<tr><th>#</th><th>Typ</th><th>Popis</th><th>Poznámka</th></tr>
+<tr><td>1</td><td>BOOLEAN</td><td>1 bit</td><td>osm bitů ve sloupci zakódováno do jediného bajtu</td></tr>
+<tr><td>2</td><td>INT32</td><td>32 bitů</td><td>lze využít DELTA kódování</td></tr>
+<tr><td>3</td><td>INT64</td><td>64 bitů</td><td>lze využít DELTA kódování</td></tr>
+<tr><td>4</td><td>INT96</td><td>96 bitů</td><td>z&nbsp;historických důvodů</td></tr>
+<tr><td>5</td><td>FLOAT</td><td>32 bitů</td><td>podle IEEE 754</td></tr>
+<tr><td>6</td><td>DOUBLE</td><td>64 bitů</td><td>podle IEEE 754</td></tr>
+<tr><td>7</td><td>BYTE_ARRAY</td><td>libovolná délka</td><td>pro řetězce, seznamy atd.</td></tr>
+<tr><td>8</td><td>FIXED_LEN_BYTE_ARRAY</td><td>specifikovaná délka</td><td>pro řetězce, seznamy atd.</td></tr>
+</table>
+
+<p>Tyto primitivní typy jsou namapovány na logické typy následujícím
+způsobem:</p>
+
+<table>
+<tr><th>Parquet Type</th><th>Primitive Type</th><th>Go Type</th></tr>
+<tr><td>BOOLEAN</td><td>BOOLEAN</td><td>bool</td></tr>
+<tr><td>INT32</td><td>INT32</td><td>int32</td></tr>
+<tr><td>INT64</td><td>INT64</td><td>int64</td></tr>
+<tr><td>INT96</td><td>INT96</td><td>string</td></tr>
+<tr><td>FLOAT</td><td>FLOAT</td><td>float32</td></tr>
+<tr><td>DOUBLE</td><td>DOUBLE</td><td>float64</td></tr>
+<tr><td>BYTE_ARRAY</td><td>BYTE_ARRAY</td><td>string</td></tr>
+<tr><td>FIXED_LEN_BYTE_ARRAY</td><td>FIXED_LEN_BYTE_ARRAY</td><td>string</td></tr>
+<tr><td>UTF8</td><td>BYTE_ARRAY</td><td>string</td></tr>
+<tr><td>INT_8</td><td>INT32</td><td>int8</td></tr>
+<tr><td>INT_16</td><td>INT32</td><td>int16</td></tr>
+<tr><td>INT_32</td><td>INT32</td><td>int32</td></tr>
+<tr><td>INT_64</td><td>INT64</td><td>int64</td></tr>
+<tr><td>UINT_8</td><td>INT32</td><td>uint8</td></tr>
+<tr><td>UINT_16</td><td>INT32</td><td>uint16</td></tr>
+<tr><td>UINT_32</td><td>INT32</td><td>uint32</td></tr>
+<tr><td>UINT_64</td><td>INT64</td><td>uint64</td></tr>
+<tr><td>DATE</td><td>INT32</td><td>int32</td></tr>
+<tr><td>TIME_MILLIS</td><td>INT32</td><td>int32</td></tr>
+<tr><td>TIME_MICROS</td><td>INT64</td><td>int64</td></tr>
+<tr><td>TIMESTAMP_MILLIS</td><td>INT64</td><td>int64</td></tr>
+<tr><td>TIMESTAMP_MICROS</td><td>INT64</td><td>int64</td></tr>
+<tr><td>INTERVAL</td><td>FIXED_LEN_BYTE_ARRAY</td><td>string</td></tr>
+<tr><td>DECIMAL</td><td>INT32,INT64,FIXED_LEN_BYTE_ARRAY,BYTE_ARRAY</td><td>int32, int64, string, string</td></tr>
+<tr><td>LIST</td><td></td><td>slice</td></tr>
+<tr><td>MAP</td><td></td><td>map</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: dnes se zaměříme na práci s&nbsp;typy
+<strong>BOOLEAN</strong>, <strong>INT32</strong>/<strong>INT64</strong> a
+<strong>UTF8</strong>, tedy na ukládání pravdivostních hodnot, celých čísel a
+řetězců. Příště si vysvětlíme složitější datové typy a taktéž způsob zpracování
+hodnoty <strong>NULL</strong>.</div></p>
+
+<img src="https://i.iinfo.cz/images/500/arch-parquet-1.png" class="image-418847" alt="&#160;" width="445" height="729" />
+<p><i>Obrázek 2: I když to může vypadat podivně, setkáme se i
+s&nbsp;následující pipeline, která kombinuje Apache Kafku (tedy proud
+událostí), relační databázi uchovávající aktuální stav &bdquo;světa&ldquo; a
+Parquet soubory.</i></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Zápis záznamů do Parquet souborů</h2>
+
+<p>Nejprve se podívejme na způsob zápisu záznamů do Parquet souborů.
+K&nbsp;tomuto účelu použijeme knihovnu nazvanou <strong>parquet-go</strong>.
+Vytvoříme si kostru projektu:</p>
+
+<pre>
+$ <strong>go mod init parquet-writer</strong>
+</pre>
+
+<p>V&nbsp;souboru <strong>go.mod</strong> buď přímo upravíme seznam potřebných
+balíčků:</p>
+
+<pre>
+module parquet-generator
+&nbsp;
+go 1.13
+&nbsp;
+require (
+        github.com/xitongsys/parquet-go v1.5.4
+        github.com/xitongsys/parquet-go-source v0.0.0-20201108113611-f372b7d813be
+)
+</pre>
+
+<p>Nebo přímo začneme psát zdrojový kód s&nbsp;tím, že se seznam závislých
+balíčků nastaví automaticky při překladu aplikace:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+</pre>
+
+<p>V&nbsp;projektu vytvoříme běžnou datovou strukturu, u které v&nbsp;komentáři
+popíšeme mapování na sloupce v&nbsp;Parquet souboru, datový typ sloupce a
+popř.&nbsp;i kódování (viz další kapitoly):</p>
+
+<pre>
+type <strong>Record</strong> struct {
+        Id      int64  `parquet:"name=id, type=INT64"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Remark  string `parquet:"name=remark, type=UTF8, encoding=PLAIN"`
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: podobným způsobem jsme již popisovali
+mapování mezi prvky struktury a soubory JSON. Nejedná se o ideální způsob,
+protože případné chyby nejsou odhaleny překladačem, ovšem současná verze jazyka
+Go nám lepší způsob neumožňuje.</div></p>
+
+<p>Dále vytvoříme nový soubor a následně zkonstruujeme instanci objektu typu
+<strong>ParquetWriter</strong>. Můžeme taktéž nastavit velikost bloků a použitý
+komprimační algoritmus:</p>
+
+<pre>
+w, err := os.Create("flat.parquet")
+if err != nil {
+        log.Println("Can't create local file", err)
+        return
+}
+&nbsp;
+defer w.Close()
+&nbsp;
+<i>// initialize Parquet file writer</i>
+pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+if err != nil {
+        log.Println("Can't create parquet writer", err)
+        return
+}
+&nbsp;
+pw.RowGroupSize = 128 * 1024 * 1024 //128M
+pw.CompressionType = parquet.CompressionCodec_SNAPPY
+&nbsp;
+defer stopWrite(pw)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si volání
+<strong>stopWrite</strong> na konci práce s&nbsp;Parquet souborem. Potřebujeme
+totiž explicitně zjistit případné chyby &ndash; ty se mnohdy hlásí až při
+uzavírání souboru! (například špatné mapování atd.)</div></p>
+
+<p>Samotný zápis je realizován ve funkci <strong>writeRecord</strong>, která je
+součástí úplného zdrojového kódu tohoto demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Id      int64  `parquet:"name=id, type=INT64"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Remark  string `parquet:"name=remark, type=UTF8, encoding=PLAIN"`
+}
+&nbsp;
+func <strong>writeRecord</strong>(pw *writer.ParquetWriter) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{
+                Id:      int64(1),
+                Name:    "Pepa",
+                Surname: "Vyskoč",
+                Active:  false,
+                Remark:  "foo bar baz",
+        }
+&nbsp;
+        <i>// write the record structure into Parquet file</i>
+        err := pw.Write(record)
+        if err != nil {
+                log.Println("Write into Parquet error", err)
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        w, err := os.Create("flat.parquet")
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = parquet.CompressionCodec_SNAPPY
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecord(pw)
+&nbsp;
+        log.Println("Write Finished")
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Přečtení záznamu z&nbsp;Parquet souboru</h2>
+
+<p>Ukažme si i způsob přečtení záznamů z&nbsp;Parquet souboru. Na tomto místě
+je však vhodné poznamenat, že čtení po záznamech a nikoli po sloupcích nebude
+efektivní, zejména v&nbsp;případech, kdy postupně budeme číst jednotlivé
+záznamy a nikoli celé bloky. To si ostatně ukážeme v&nbsp;posledních kapitolách
+věnovaných jednoduchým benchmarkům.</p>
+
+<p>Otevření souboru pro čtení probíhá podobným způsobem, jako jeho otevření pro
+zápis. Zajímavé je, že lze určit počet gorutin s&nbsp;programovým kódem, který
+ze souborů čte. V&nbsp;našem případě je sice počet gorutin nastaven na 4, ovšem
+využije se gorutina jediná:</p>
+
+<pre>
+const parallelNumber = 4
+&nbsp;
+fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+if err != nil {
+        log.Fatal("Can't open file", err)
+        return
+}
+&nbsp;
+<i>// fileReader needs to be closed properly</i>
+defer closeReader(fileReader)
+&nbsp;
+<i>// initializa Parquet file reader</i>
+parquetReader, err := reader.NewParquetReader(fileReader, new(Record),
+        parallelNumber)
+&nbsp;
+if err != nil {
+        log.Fatal("Can't create parquet reader", err)
+        return
+}
+&nbsp;
+<i>// parquetReader needs to be stopped</i>
+defer parquetReader.ReadStop()
+</pre>
+
+<p>Přečtení záznamů tím nejméně efektivním způsobem, tedy po jednotlivých
+záznamech (tím se zcela zbavujeme výhod sloupcových databází!). Nejprve
+vytvoříme řez s&nbsp;jediným prvkem, který následně načteme:</p>
+
+<pre>
+recordCount := int(parquetReader.GetNumRows())
+&nbsp;
+<i>// try to read and display all records</i>
+for i := 0; i &lt; recordCount; i++ {
+        record := make([]Record, 1)
+&nbsp;
+        <i>// try to read record</i>
+        err := parquetReader.Read(&amp;record)
+        if err != nil {
+                log.Println("Read error", err)
+        } else {
+                <i>// and display it</i>
+                log.Println(record)
+        }
+}
+</pre>
+
+<p>Následuje výpis úplného zdrojového kódu tohoto demonstračního příkladu:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file.</i>
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line.</i>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+const defaultInputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Id      int64  `parquet:"name=id, type=INT64"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Remark  string `parquet:"name=remark, type=UTF8, encoding=PLAIN"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>displayContentOfParquetFile</strong>(fileName string) {
+        const parallelNumber = 4
+&nbsp;
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initializa Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record),
+                parallelNumber)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        displayRecords(parquetReader)
+}
+&nbsp;
+<i>// displayRecords function lists all records from Parquet file</i>
+func <strong>displayRecords</strong>(parquetReader *reader.ParquetReader) {
+        recordCount := int(parquetReader.GetNumRows())
+&nbsp;
+        <i>// try to read and display all records</i>
+        for i := 0; i &lt; recordCount; i++ {
+                record := make([]Record, 1)
+&nbsp;
+                <i>// try to read record</i>
+                err := parquetReader.Read(&amp;record)
+                if err != nil {
+                        log.Println("Read error", err)
+                } else {
+                        <i>// and display it</i>
+                        log.Println(record)
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        displayContentOfParquetFile(defaultInputFile)
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Ukládání pravdivostních hodnot</h2>
+
+<p>Ve <a href="#k02">druhé kapitole</a> jsme si řekli, že pravdivostní hodnoty
+jsou ukládány takovým způsobem, že se vždy osm hodnot umístí do jediného bajtu.
+Takové sloupce &ndash; a ty bývají v&nbsp;OLAP poměrně časté &ndash; jsou tak
+ukládány velmi efektivním způsobem. Ukažme si to na příkladu se záznamy
+obsahujícími jediný prvek &ndash; tím pádem bude výsledný Parquet soubor
+obsahovat jediný sloupec:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Active bool `parquet:"name=active, type=BOOLEAN"`
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{
+                Active: false,
+        }
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.Active = i%2 == 0
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = parquet.CompressionCodec_UNCOMPRESSED
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("0records.parquet", 0)
+        createAndWriteIntoParquetFile("1record.parquet", 1)
+        createAndWriteIntoParquetFile("10records.parquet", 10)
+        createAndWriteIntoParquetFile("100records.parquet", 100)
+        createAndWriteIntoParquetFile("1000records.parquet", 1000)
+        createAndWriteIntoParquetFile("10000records.parquet", 10000)
+        createAndWriteIntoParquetFile("100000records.parquet", 100000)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: po spuštění příkladu se vytvoří osm
+souborů s&nbsp;0, 1, 10, 100, 1000, 10000 a 100000 prvky v&nbsp;jediném
+sloupci.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Porovnání výsledků &ndash; rozdíl mezi velikostí čistých dat a velikostí Parquet souboru</h2>
+
+<p>Formát Parquet souborů <a href="https://github.com/apache/parquet-format">je
+popsán zde</a>. V&nbsp;souborech se kromě vlastních dat nachází i další pomocné
+údaje, hlavičky atd., takže (pokud nezapneme komprimaci sloupců) bude velikost
+souboru vždy větší, než teoretická velikost, kterou získáme, pokud vynásobíme
+šířku dat v&nbsp;každém sloupci počtem záznamů. Ostatně se můžeme podívat, jaká
+je velikost souborů s&nbsp;jediným sloupcem hodnot typu <i>bool</i>. Teoretická
+velikost je vypočtena jako celkový počet záznamů podělených osmi, protože každá
+pravdivostní hodnota je reprezentována jediným bitem:</p>
+
+<table>
+<tr><th>#</th><th>Počet záznamů</th><th>Teoretická velikost</th><th>Skutečná velikost</th><th>Rozdíl</th></tr>
+<tr><td>1</td><td>0</td><td>0</td><td>91</td><td>91</td></tr>
+<tr><td>2</td><td>1</td><td>1</td><td>175</td><td>174</td></tr>
+<tr><td>3</td><td>10</td><td>2</td><td>176</td><td>174</td></tr>
+<tr><td>4</td><td>100</td><td>13</td><td>191</td><td>178</td></tr>
+<tr><td>5</td><td>1000</td><td>126</td><td>308</td><td>182</td></tr>
+<tr><td>6</td><td>10000</td><td>1250</td><td>1471</td><td>221</td></tr>
+<tr><td>7</td><td>100000</td><td>12500</td><td>13472</td><td>972</td></tr>
+</table>
+
+<p>Vidíme, že v&nbsp;tomto případě s&nbsp;rostoucím počtem záznamů klesá poměr
+dalších údajů na cca 7%.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Ukládání celočíselných hodnot</h2>
+
+<p>Ve čtvrtém demonstračním příkladu je ukázáno ukládání celočíselných hodnot
+typu <strong>uint8</strong>. Takové hodnoty nejsou v&nbsp;Parquet formátu
+nativně podporovány (opět viz <a href="#k02">druhou kapitolu</a>), takže se ve
+skutečnosti budou ukládat 32bitové hodnoty, což může být dosti neefektivní
+(pokud tedy použijeme výchozí kódování <strong>PLAIN</strong> &ndash; viz
+podtržený text):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID uint8 `parquet:"name=id, type=UINT_8, <u>encoding=PLAIN</u>"`
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.ID = uint8(i % 256)
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = parquet.CompressionCodec_UNCOMPRESSED
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("0records.parquet", 0)
+        createAndWriteIntoParquetFile("1record.parquet", 1)
+        createAndWriteIntoParquetFile("10records.parquet", 10)
+        createAndWriteIntoParquetFile("100records.parquet", 100)
+        createAndWriteIntoParquetFile("1000records.parquet", 1000)
+        createAndWriteIntoParquetFile("10000records.parquet", 10000)
+        createAndWriteIntoParquetFile("100000records.parquet", 100000)
+}
+</pre>
+
+<p>Efektivita uložení malých celočíselných hodnot se může razantně zvýšit při
+použití kódování <strong>DELTA_BINARY_PACKED</strong>, což je ostatně jediná
+změna, kterou jsme provedli v&nbsp;pořadí již pátém demonstračním příkladu (viz
+podtržená část):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID uint8 `parquet:"name=id, type=UINT_8, <u>encoding=DELTA_BINARY_PACKED</u>"`
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.ID = uint8(i % 256)
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = parquet.CompressionCodec_UNCOMPRESSED
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("0records.parquet", 0)
+        createAndWriteIntoParquetFile("1record.parquet", 1)
+        createAndWriteIntoParquetFile("10records.parquet", 10)
+        createAndWriteIntoParquetFile("100records.parquet", 100)
+        createAndWriteIntoParquetFile("1000records.parquet", 1000)
+        createAndWriteIntoParquetFile("10000records.parquet", 10000)
+        createAndWriteIntoParquetFile("100000records.parquet", 100000)
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Porovnání výsledků &ndash; přímé uložení celočíselných hodnot vs.&nbsp;změna hodnot</h2>
+
+<p>Opět se podívejme na rozdíl mezi přímým uložením celočíselných hodnot (čtyři
+bajty na každou hodnotu) a uložením pouze změn mezi dvěma sousedícími
+záznamy:</p>
+
+<table>
+<tr><th>#</th><th>Počet záznamů</th><th>PLAIN</th><th>DELTA_BINARY_PACKED</th><th>%</th></tr>
+<tr><td>1</td><td>0</td><td>89</td><td>89</td><td>100%</td></tr>
+<tr><td>2</td><td>1</td><td>196</td><td>197</td><td>101%</td></tr>
+<tr><td>3</td><td>10</td><td>235</td><td>202</td><td>86%</td></tr>
+<tr><td>4</td><td>100</td><td>604</td><td>206</td><td>34%</td></tr>
+<tr><td>5</td><td>1000</td><td>4201</td><td>682</td><td>16%</td></tr>
+<tr><td>6</td><td>10000</td><td>40485</td><td>6545</td><td>16%</td></tr>
+<tr><td>7</td><td>100000</td><td>403015</td><td>63807</td><td>16%</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: kódování <strong>DELTA_</strong>, tedy
+uložení rozdílů, je podporováno i u časových razítek, kde je <i>velmi</i>
+efektivní, například při práci s&nbsp;logy atd. To si ostatně ukážeme
+příště.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Nastavení komprimačního algoritmu</h2>
+
+<p>Sloupce v&nbsp;Parquet souborech je možné buď ukládat přímo tak, jak byl
+vypočítán jejich obsah (přímé popř.&nbsp;delta kódování + ukládání bajtů po
+osmicích), nebo je možné obsah sloupců zkomprimovat. Komprimační algoritmus se
+nastavuje následovně:</p>
+
+<pre>
+pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+&nbsp;
+pw.RowGroupSize = 128 * 1024 * 1024 //128M
+</pre>
+
+<p>Volit je možné mezi přímým zápisem (žádný algoritmus), algoritmem
+<i>Snappy</i> založeným na slavném LZ77 (viz <a
+href="https://en.wikipedia.org/wiki/Snappy_(compression)">https://en.wikipedia.org/wiki/Snappy_(compression)</a>)
+a klasickým GZIPem:</p>
+
+<table>
+<tr><th>#</th><th>Algoritmus</th></tr>
+<tr><td>1</td><td>parquet.CompressionCodec_UNCOMPRESSED</td></tr>
+<tr><td>2</td><td>parquet.CompressionCodec_SNAPPY</td></tr>
+<tr><td>3</td><td>parquet.CompressionCodec_GZIP</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;naprosté většině případů nemá
+komprimace zásadní negativní vliv na rychlost zápisu (spíše naopak při použití
+pevných disků nebo vzdáleného úložiště), ovšem může ovlivnit náhodné čtení
+z&nbsp;Parquet souborů.</div></p>
+
+<p>Podívejme se nyní na úplný zdrojový kód příkladu, v&nbsp;němž se provádí
+zápis stejných dat, ovšem pokaždé s&nbsp;jiným komprimačním algoritmem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Active bool `parquet:"name=active, type=BOOLEAN"`
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{
+                Active: false,
+        }
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.Active = i%2 == 0
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int, compression parquet.CompressionCodec) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = compression
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("1000000records_compression_none.parquet", 1000000, parquet.CompressionCodec_UNCOMPRESSED)
+        createAndWriteIntoParquetFile("1000000records_compression_snappy.parquet", 1000000, parquet.CompressionCodec_SNAPPY)
+        createAndWriteIntoParquetFile("1000000records_compression_gzip.parquet", 1000000, parquet.CompressionCodec_GZIP)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Porovnání výsledků &ndash; vliv komprimačního algoritmu na výslednou velikost souboru</h2>
+
+<p>Opět si porovnejme výsledky velikostí souborů při použití různých
+komprimačních algoritmů. V&nbsp;následující tabulce je zobrazena jak výsledná
+velikost souboru, tak i poměr velikosti souboru vůči nezkomprimované variantě
+(první řádek):</p>
+
+<table>
+<tr><th>#</th><th>Algoritmus</th><th>Velikost</th><th>%</th></tr>
+<tr><td>1</td><td>UNCOMPRESSED</td><td>133452</td><td>100%</td></tr>
+<tr><td>2</td><td>SNAPPY</td><td>15045</td><td>11%</td></tr>
+<tr><td>3</td><td>GZIP</td><td>17056</td><td>13%</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti lze volit komprimační
+algoritmus pro každý sloupec zvlášť, což se hodí při práci s&nbsp;opravdu
+rozsáhlými soubory, u nichž se vyplatí provádět měření a analýzy.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Ukládání řetězců</h2>
+
+<p>V&nbsp;Parquet souborech lze pochopitelně pracovat i se sloupci, které
+obsahují řetězce. V&nbsp;tomto případě můžeme volit mezi uložením řetězců
+v&nbsp;původní podobě (typicky se jedná o UTF-8) nebo o algoritmus, který
+namísto řetězců ukládá do souborů index do slovníku. Soubor tedy na začátku
+obsahuje slovník hodnot a ve sloupci jsou jen odkazy do tohoto slovníku, což
+vede (většinou) ke značné úspoře místa, ovšem za předpokladu, že sloupec
+obsahuje relativně malé množství hodnot (v&nbsp;mnoha případech se tedy jedná o
+nevhodný způsob).</p>
+
+<p>Nejprve se podívejme, jak se řetězce ukládají v&nbsp;původní podobě (bez
+použití slovníku). I tyto řetězce lze pochopitelně komprimovat.
+V&nbsp;následujícím demonstračním příkladu se do jediného sloupce ukládají
+názvy barev generované touto funkcí:</p>
+
+<pre>
+func <strong>generateColor</strong>() string {
+        var colors []string = []string{
+                "black",
+                "blue",
+                "red",
+                "magenta",
+                "green",
+                "cyan",
+                "yellow",
+                "white",
+        }
+        return colors[rand.Int()%len(colors)]
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: uhodneme, odkud byla získána sekvence
+barev v&nbsp;předchozí funkci?</div></p>
+
+<p>Struktura záznamu, resp.&nbsp;jediného sloupce:</p>
+
+<pre>
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Color string `parquet:"name=color, type=UTF8, encoding=PLAIN"`
+}
+</pre>
+
+<p>Celý zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "math/rand"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Color string `parquet:"name=color, type=UTF8, encoding=PLAIN"`
+}
+&nbsp;
+func <strong>generateColor</strong>() string {
+        var colors []string = []string{
+                "black",
+                "blue",
+                "red",
+                "magenta",
+                "green",
+                "cyan",
+                "yellow",
+                "white",
+        }
+        return colors[rand.Int()%len(colors)]
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.Color = generateColor()
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int, compression parquet.CompressionCodec) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = compression
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("10000records_compression_none.parquet", 10000, parquet.CompressionCodec_UNCOMPRESSED)
+        createAndWriteIntoParquetFile("10000records_compression_snappy.parquet", 10000, parquet.CompressionCodec_SNAPPY)
+        createAndWriteIntoParquetFile("10000records_compression_gzip.parquet", 10000, parquet.CompressionCodec_GZIP)
+}
+</pre>
+
+<p>Řetězce jsou skutečně ukládány přímo tak, jak jsou zapsány:</p>
+
+<pre>
+$ <strong>xxd -g 1 10000records_compression_none.parquet | head -n 20</strong>
+&nbsp;
+00000000: 50 41 52 31 15 00 15 ec e8 01 15 ec e8 01 2c 15  PAR1..........,.
+00000010: 98 1a 15 00 15 06 15 06 1c 18 06 79 65 6c 6c 6f  ...........yello
+00000020: 77 18 05 62 6c 61 63 6b 38 06 79 65 6c 6c 6f 77  w..black8.yellow
+00000030: 18 05 62 6c 61 63 6b 00 00 00 03 00 00 00 72 65  ..black.......re
+00000040: 64 05 00 00 00 77 68 69 74 65 04 00 00 00 63 79  d....white....cy
+00000050: 61 6e 07 00 00 00 6d 61 67 65 6e 74 61 04 00 00  an....magenta...
+00000060: 00 62 6c 75 65 05 00 00 00 62 6c 61 63 6b 06 00  .blue....black..
+00000070: 00 00 79 65 6c 6c 6f 77 05 00 00 00 67 72 65 65  ..yellow....gree
+00000080: 6e 05 00 00 00 62 6c 61 63 6b 04 00 00 00 62 6c  n....black....bl
+00000090: 75 65 05 00 00 00 67 72 65 65 6e 05 00 00 00 77  ue....green....w
+000000a0: 68 69 74 65 06 00 00 00 79 65 6c 6c 6f 77 05 00  hite....yellow..
+000000b0: 00 00 67 72 65 65 6e 07 00 00 00 6d 61 67 65 6e  ..green....magen
+000000c0: 74 61 04 00 00 00 62 6c 75 65 05 00 00 00 62 6c  ta....blue....bl
+000000d0: 61 63 6b 07 00 00 00 6d 61 67 65 6e 74 61 06 00  ack....magenta..
+000000e0: 00 00 79 65 6c 6c 6f 77 07 00 00 00 6d 61 67 65  ..yellow....mage
+000000f0: 6e 74 61 04 00 00 00 62 6c 75 65 05 00 00 00 67  nta....blue....g
+00000100: 72 65 65 6e 05 00 00 00 77 68 69 74 65 04 00 00  reen....white...
+00000110: 00 63 79 61 6e 03 00 00 00 72 65 64 04 00 00 00  .cyan....red....
+00000120: 63 79 61 6e 05 00 00 00 62 6c 61 63 6b 03 00 00  cyan....black...
+00000130: 00 72 65 64 05 00 00 00 67 72 65 65 6e 07 00 00  .red....green...
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Použití slovníků</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu budeme řetězce ukládat ve formě indexů
+do slovníku. To je mnohem výhodnější, minimálně v&nbsp;tomto případě, protože
+počet hodnot ve sloupci je jasně omezen &ndash; jedná se o osm jmen barev.</p>
+
+<p>Struktura záznamu se specifikací formátu uložení:</p>
+
+<pre>
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Color string `parquet:"name=color, type=UTF8, <u>encoding=PLAIN_DICTIONARY"</u>`
+}
+</pre>
+
+<p>Opět následuje výpis úplného zdrojového kódu tohoto demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "math/rand"
+        "os"
+&nbsp;
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        Color string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+func <strong>generateColor</strong>() string {
+        var colors []string = []string{
+                "black",
+                "blue",
+                "red",
+                "magenta",
+                "green",
+                "cyan",
+                "yellow",
+                "white",
+        }
+        return colors[rand.Int()%len(colors)]
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.Color = generateColor()
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int, compression parquet.CompressionCodec) {
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = compression
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("10000records_compression_none.parquet", 10000, parquet.CompressionCodec_UNCOMPRESSED)
+        createAndWriteIntoParquetFile("10000records_compression_snappy.parquet", 10000, parquet.CompressionCodec_SNAPPY)
+        createAndWriteIntoParquetFile("10000records_compression_gzip.parquet", 10000, parquet.CompressionCodec_GZIP)
+}
+</pre>
+
+<p>Aniž bychom museli přesně znát interní formát Parquet souborů, je již na
+první pohled zřejmé, že se nejdříve uložil slovník (všech osm jmen barev) a
+následně soubor obsahuje pouze indexy do tohoto slovníku. Zvýrazněn je jeden
+z&nbsp;indexů, který je čtyřbajtový:</p>
+
+<pre>
+$ <strong>xxd -g 1 10000records_compression_none.parquet | head -n 20</strong>
+&nbsp;
+00000000: 50 41 52 31 15 04 15 8e 01 15 8e 01 4c 15 10 15  PAR1........L...
+00000010: 00 00 00 03 00 00 00 72 65 64 05 00 00 00 77 68  .......red....wh
+00000020: 69 74 65 04 00 00 00 63 79 61 6e 07 00 00 00 6d  ite....cyan....m
+00000030: 61 67 65 6e 74 61 04 00 00 00 62 6c 75 65 05 00  agenta....blue..
+00000040: 00 00 62 6c 61 63 6b 06 00 00 00 79 65 6c 6c 6f  ..black....yello
+00000050: 77 05 00 00 00 67 72 65 65 6e 15 00 15 8c 73 15  w....green....s.
+00000060: 8c 73 2c 15 96 1a 15 04 15 06 15 06 00 00 20 02  .s,........... .
+00000070: 00 00 00 00 02 01 00 00 00 02 02 00 00 00 02 03  ................
+00000080: 00 00 00 02 04 00 00 00 02 05 00 00 00 02 06 00  ................
+00000090: 00 00 02 07 <u>00 00 00 02</u> 05 00 00 00 02 04 00 00  ................
+000000a0: 00 02 07 00 00 00 02 01 00 00 00 02 06 00 00 00  ................
+000000b0: 02 07 00 00 00 02 03 00 00 00 02 04 00 00 00 02  ................
+000000c0: 05 00 00 00 02 03 00 00 00 02 06 00 00 00 02 03  ................
+000000d0: 00 00 00 02 04 00 00 00 02 07 00 00 00 02 01 00  ................
+000000e0: 00 00 02 02 00 00 00 02 00 00 00 00 02 02 00 00  ................
+000000f0: 00 02 05 00 00 00 02 00 00 00 00 02 07 00 00 00  ................
+00000100: 02 03 00 00 00 02 05 00 00 00 02 03 00 00 00 02  ................
+00000110: 01 00 00 00 0a 03 00 00 00 04 07 00 00 00 02 03  ................
+00000120: 00 00 00 04 07 00 00 00 02 01 00 00 00 02 07 00  ................
+00000130: 00 00 02 03 00 00 00 02 01 00 00 00 04 06 00 00  ................
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Porovnání výsledků &ndash; přímé uložení řetězců versus použití slovníku</h2>
+
+<p>Použití slovníků při práci s&nbsp;řetězci má potenciálně poměrně velký vliv
+na velikost výsledných souborů, o čemž se můžeme velmi snadno přesvědčit při
+pohledu na následující tabulku se soubory, z&nbsp;nichž každý obsahuje 10000
+záznamů:</p>
+
+<table>
+<tr><th>#</th><th>Algoritmus</th><th>Přímé uložení</th><th>Použití slovníku</th><th>%</th></tr>
+<tr><td>1</td><td>UNCOMPRESSED</td><td>89242</td><td>44332</td><td>49%</td></tr>
+<tr><td>2</td><td>SNAPPY</td><td>24915</td><td>17038</td><td>68%</td></tr>
+<tr><td>3</td><td>GZIP</td><td>13445</td><td>8181</td><td>60%</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: jména barev jsou tvořena velmi krátkými
+řetězci. Ušetření místa by bylo výraznější ve chvíli, kdyby se jednalo o delší
+texty.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Rychlost zápisu záznamů</h2>
+
+<p><a href="#k09">V&nbsp;deváté kapitole</a> jsme si řekli, že při zápisu
+sloupců je možné povolit komprimaci dat. Ta má pochopitelně vliv na velikost
+výsledných souborů a taktéž (i když většinou v&nbsp;malé míře) na rychlost
+zápisu. To si ostatně můžeme snadno ověřit velmi jednoduchým benchmarkem, který
+otestuje rychlost zápisu jednoho milionu (!) záznamů do sloupcové databáze:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "math/rand"
+        "os"
+        "time"
+&nbsp;
+        "github.com/bxcodec/faker/v3"
+        "github.com/xitongsys/parquet-go/parquet"
+        "github.com/xitongsys/parquet-go/writer"
+)
+&nbsp;
+const defaultOutputFile = "flat.parquet"
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+func <strong>generateColor</strong>() string {
+        var colors []string = []string{
+                "black",
+                "blue",
+                "red",
+                "magenta",
+                "green",
+                "cyan",
+                "yellow",
+                "white",
+        }
+        return colors[rand.Int()%len(colors)]
+}
+&nbsp;
+func <strong>writeRecords</strong>(pw *writer.ParquetWriter, n int) {
+        <i>// create report structure to be stored in Parquet file</i>
+        record := Record{}
+&nbsp;
+        for i := 0; i &lt; n; i++ {
+                record.ID = uint64(i)
+                record.Name = faker.FirstName()
+                record.Surname = faker.LastName()
+                record.Email = faker.Email()
+                record.Active = i%2 == 0
+                record.Color = generateColor()
+&nbsp;
+                <i>// write the record structure into Parquet file</i>
+                err := pw.Write(record)
+                if err != nil {
+                        log.Println("Write into Parquet error", err)
+                }
+        }
+}
+&nbsp;
+<i>// stopWrite function stop writing into Parquet file</i>
+func <strong>stopWrite</strong>(pw *writer.ParquetWriter) {
+        err := pw.WriteStop()
+&nbsp;
+        <i>// most write errors are caught at this time</i>
+        if err != nil {
+                log.Println("WriteStop error", err)
+        }
+}
+&nbsp;
+func <strong>createAndWriteIntoParquetFile</strong>(filename string, records int, compression parquet.CompressionCodec) {
+        t1 := time.Now()
+&nbsp;
+        w, err := os.Create(filename)
+        if err != nil {
+                log.Println("Can't create local file", err)
+                return
+        }
+&nbsp;
+        defer w.Close()
+&nbsp;
+        <i>// initialize Parquet file writer</i>
+        pw, err := writer.NewParquetWriterFromWriter(w, new(Record), 1)
+        if err != nil {
+                log.Println("Can't create parquet writer", err)
+                return
+        }
+&nbsp;
+        pw.RowGroupSize = 128 * 1024 * 1024 //128M
+        pw.CompressionType = compression
+&nbsp;
+        defer stopWrite(pw)
+&nbsp;
+        writeRecords(pw, records)
+&nbsp;
+        log.Println("Write Finished")
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>main</strong>() {
+        createAndWriteIntoParquetFile("1000000records_compression_none.parquet", 1000000, parquet.CompressionCodec_UNCOMPRESSED)
+        createAndWriteIntoParquetFile("1000000records_compression_snappy.parquet", 1000000, parquet.CompressionCodec_SNAPPY)
+        createAndWriteIntoParquetFile("1000000records_compression_gzip.parquet", 1000000, parquet.CompressionCodec_GZIP)
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Výsledky benchmarku</h2>
+
+<p>Podívejme se nyní na výsledky měření, a to konkrétně při použití
+netobookového SSD a ramdisku (v&nbsp;případě potřeby je pochopitelně možné
+měření provést i na serverovém &bdquo;železe&ldquo;).</p>
+
+<p>Zápis na SSD:</p>
+
+<pre>
+2020/11/14 16:21:55 Write Finished
+2020/11/14 16:21:55 Start time:  2020-11-14 16:21:52.018633135 +0100 CET m=+0.001051941
+2020/11/14 16:21:55 End time:    2020-11-14 16:21:55.172638037 +0100 CET m=+3.155056813
+2020/11/14 16:21:55 Duration:    3.154004978s
+&nbsp;
+2020/11/14 16:21:58 Write Finished
+2020/11/14 16:21:58 Start time:  2020-11-14 16:21:55.227638659 +0100 CET m=+3.210057475
+2020/11/14 16:21:58 End time:    2020-11-14 16:21:58.53302545 +0100 CET m=+6.515444235
+2020/11/14 16:21:58 Duration:    3.305386841s
+&nbsp;
+2020/11/14 16:22:02 Write Finished
+2020/11/14 16:22:02 Start time:  2020-11-14 16:21:58.575295122 +0100 CET m=+6.557713938
+2020/11/14 16:22:02 End time:    2020-11-14 16:22:02.65420359 +0100 CET m=+10.636622367
+2020/11/14 16:22:02 Duration:    4.07890851s
+</pre>
+
+<p>Zápis do ramdisku:</p>
+
+<pre>
+2020/11/14 16:22:21 Write Finished
+2020/11/14 16:22:21 Start time:  2020-11-14 16:22:18.382414375 +0100 CET m=+0.001018949
+2020/11/14 16:22:21 End time:    2020-11-14 16:22:21.496799932 +0100 CET m=+3.115404464
+2020/11/14 16:22:21 Duration:    3.114385625s
+&nbsp;
+2020/11/14 16:22:24 Write Finished
+2020/11/14 16:22:24 Start time:  2020-11-14 16:22:21.52651968 +0100 CET m=+3.145124247
+2020/11/14 16:22:24 End time:    2020-11-14 16:22:24.81071525 +0100 CET m=+6.429319812
+2020/11/14 16:22:24 Duration:    3.284195685s
+&nbsp;
+2020/11/14 16:22:28 Write Finished
+2020/11/14 16:22:28 Start time:  2020-11-14 16:22:24.835851362 +0100 CET m=+6.454455962
+2020/11/14 16:22:28 End time:    2020-11-14 16:22:28.88592985 +0100 CET m=+10.504534394
+2020/11/14 16:22:28 Duration:    4.050078532s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že u takto malých objemů
+dat je SSD (s&nbsp;případným bufferováním) prakticky stejně rychlý jako
+ramdisk. U větších objemů se již budou rozdíly mezi výsledky projevovat
+výraznějším způsobem.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Rychlost čtení záznamů</h2>
+
+<p>Otestovat si můžeme i rychlost čtení celých záznamů. Opět je nutné upozornit
+na to, že se jedná o velmi neefektivní způsob práce se sloupcovou databází a
+pokud je primárním účelem vaší aplikace přístup k&nbsp;datům po řádcích a
+nikoli po sloupcích, nebude výkon (rychlost čtení) nijak oslňující:</p>
+
+<pre>
+<i>// This tool is able to read all records stored in selected Parquet file.</i>
+<i>// Currently, only records with the structure `Record` is read correctly. Name</i>
+<i>// of input Parquet file needs to be selected from command line.</i>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "time"
+&nbsp;
+        "github.com/xitongsys/parquet-go-source/local"
+        "github.com/xitongsys/parquet-go/reader"
+        "github.com/xitongsys/parquet-go/source"
+)
+&nbsp;
+<i>// Record represents one record stored in Parquet file</i>
+type <strong>Record</strong> struct {
+        ID      uint64 `parquet:"name=id, type=UINT_64, encoding=PLAIN"`
+        Name    string `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+        Surname string `parquet:"name=surname, type=UTF8, encoding=PLAIN"`
+        Email   string `parquet:"name=email, type=UTF8, encoding=PLAIN"`
+        Active  bool   `parquet:"name=active, type=BOOLEAN"`
+        Color   string `parquet:"name=color, type=UTF8, encoding=PLAIN_DICTIONARY"`
+}
+&nbsp;
+<i>// closeReader tries to close the given Parquet file reader</i>
+func <strong>closeReader</strong>(reader source.ParquetFile) {
+        err := reader.Close()
+        if err != nil {
+                log.Println("close reader:", err)
+        }
+}
+&nbsp;
+func <strong>readParquetFile</strong>(fileName string) {
+        t1 := time.Now()
+&nbsp;
+        const parallelNumber = 1
+&nbsp;
+        <i>// construct the file reader and try to open the Parquet file for</i>
+        <i>// reading</i>
+        fileReader, err := local.NewLocalFileReader(fileName)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't open file", err)
+                return
+        }
+&nbsp;
+        <i>// fileReader needs to be closed properly</i>
+        defer closeReader(fileReader)
+&nbsp;
+        <i>// initializa Parquet file reader</i>
+        parquetReader, err := reader.NewParquetReader(fileReader, new(Record),
+                parallelNumber)
+&nbsp;
+        if err != nil {
+                log.Fatal("Can't create parquet reader", err)
+                return
+        }
+&nbsp;
+        <i>// parquetReader needs to be stopped</i>
+        defer parquetReader.ReadStop()
+&nbsp;
+        readRecords(parquetReader)
+&nbsp;
+        <i>// compute and print duration</i>
+        t2 := time.Now()
+        since := time.Since(t1)
+        log.Println("Start time: ", t1)
+        log.Println("End time:   ", t2)
+        log.Println("Duration:   ", since)
+}
+&nbsp;
+func <strong>readRecords</strong>(parquetReader *reader.ParquetReader) {
+        recordCount := int(parquetReader.GetNumRows())
+        log.Println("Records to read", recordCount)
+&nbsp;
+        record := make([]Record, 1)
+        records := 0
+&nbsp;
+        <i>// try to read and display all records</i>
+        for i := 0; i &lt; recordCount; i++ {
+                // try to read record
+                err := parquetReader.Read(&amp;record)
+                if err != nil {
+                        log.Println("Read error", err)
+                        continue
+                } else {
+                        records++
+                }
+        }
+        log.Println("Read", records, "records")
+}
+&nbsp;
+func <strong>main</strong>() {
+        readParquetFile("1000000records_compression_none.parquet")
+        readParquetFile("1000000records_compression_snappy.parquet")
+        readParquetFile("1000000records_compression_gzip.parquet")
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledky benchmarku</h2>
+
+<p>Podívejme se nyní na dosažené výsledky. Rychlost čtení (po jednotlivých
+záznamech) je mnohem pomalejší, než samotný zápis do sloupcové databáze!
+Podrobnosti si vysvětlíme příště:</p>
+
+<pre>
+2020/11/14 16:46:53 Records to read 1000000
+2020/11/14 16:47:17 Read 1000000 records
+2020/11/14 16:47:17 Start time:  2020-11-14 16:46:53.80851109 +0100 CET m=+0.000895204
+2020/11/14 16:47:17 End time:    2020-11-14 16:47:17.695641899 +0100 CET m=+23.888025988
+2020/11/14 16:47:17 Duration:    23.887130935s
+2020/11/14 16:47:17 Records to read 1000000
+2020/11/14 16:47:41 Read 1000000 records
+2020/11/14 16:47:41 Start time:  2020-11-14 16:47:17.695696876 +0100 CET m=+23.888080959
+2020/11/14 16:47:41 End time:    2020-11-14 16:47:41.460809934 +0100 CET m=+47.653194032
+2020/11/14 16:47:41 Duration:    23.765113146s
+2020/11/14 16:47:41 Records to read 1000000
+2020/11/14 16:48:05 Read 1000000 records
+2020/11/14 16:48:05 Start time:  2020-11-14 16:47:41.460860147 +0100 CET m=+47.653244228
+2020/11/14 16:48:05 End time:    2020-11-14 16:48:05.50961075 +0100 CET m=+71.701994837
+2020/11/14 16:48:05 Duration:    24.048750743s
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Obsah navazující části seriálu</h2>
+
+<p>Dnes jsme si popsali pouze základy práce s&nbsp;formátem Parquet. Příště si
+ukážeme, jak se přistupuje k&nbsp;datům po sloupcích, což je ostatně obecně
+doporučovaný přístup využívaný v&nbsp;mnoha analytických aplikacích, které
+v&nbsp;daný okamžik potřebují zpracovat údaje pouze z&nbsp;několika sloupců
+mnohdy velmi široké tabulky (taková tabulka může mít desítky popř.&nbsp;i
+stovky sloupců, což je pro mnohé klasické relační databáze zcela nevhodný
+přístup).</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01-parquet-generator</td><td>generátor Parquet souboru se zápisem struktury</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/01-parquet-generator">https://github.com/tisnik/go-root/blob/master/article_68/01-parquet-generator</a></td></tr>
+<tr><td> 2</td><td>02-parquet-reader</td><td>čtení Parquet souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/02-parquet-reader">https://github.com/tisnik/go-root/blob/master/article_68/02-parquet-reader</a></td></tr>
+<tr><td> 3</td><td>03-bool-values</td><td>vytvoření Parquet souborů s&nbsp;pravdivostními hodnotami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/03-bool-values">https://github.com/tisnik/go-root/blob/master/article_68/03-bool-values</a></td></tr>
+<tr><td> 4</td><td>04-int-values</td><td>vytvoření Parquet souborů s&nbsp;celočíselnými hodnotami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/04-int-values">https://github.com/tisnik/go-root/blob/master/article_68/04-int-values</a></td></tr>
+<tr><td> 5</td><td>05-int-values-packed</td><td>úsporné uložení celočíselných hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/05-int-values-packed">https://github.com/tisnik/go-root/blob/master/article_68/05-int-values-packed</a></td></tr>
+<tr><td> 6</td><td>06-compression</td><td>nastavení způsobu komprimace dat</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/06-compression">https://github.com/tisnik/go-root/blob/master/article_68/06-compression</a></td></tr>
+<tr><td> 7</td><td>07-strings</td><td>uložení řetězců v&nbsp;nezkomprimované podobě</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/07-strings">https://github.com/tisnik/go-root/blob/master/article_68/07-strings</a></td></tr>
+<tr><td> 8</td><td>08-dictionaries</td><td>uložení řetězců ve formě odkazů do slovníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/08-dictionaries">https://github.com/tisnik/go-root/blob/master/article_68/08-dictionaries</a></td></tr>
+<tr><td> 9</td><td>09-write-performance</td><td>měření rychlosti zápisu do Parquet souborů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/09-write-performance">https://github.com/tisnik/go-root/blob/master/article_68/09-write-performance</a></td></tr>
+<tr><td>10</td><td>10-read-performance</td><td>měření rychlosti čtení z&nbsp;Parquet souborů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_68/10-read-performance">https://github.com/tisnik/go-root/blob/master/article_68/10-read-performance</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Několik poznámek ke sloupcovým databázím<br />
+<a href="https://www.root.cz/clanky/nekolik-poznamek-ke-sloupcovym-databazim/">https://www.root.cz/clanky/nekolik-poznamek-ke-sloupcovym-databazim/</a>
+</li>
+
+<li>Column-oriented DBMS (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Column-oriented_DBMS">https://en.wikipedia.org/wiki/Column-oriented_DBMS</a>
+</li>
+
+<li>Extract, transform, load (ETL)<br />
+<a href="https://en.wikipedia.org/wiki/Extract,_transform,_load">https://en.wikipedia.org/wiki/Extract,_transform,_load</a>
+</li>
+
+<li>Top 9 column-oriented databases<br />
+<a href="https://www.predictiveanalyticstoday.com/top-wide-columnar-store-databases/">https://www.predictiveanalyticstoday.com/top-wide-columnar-store-databases/</a>
+</li>
+
+<li>Apache Parquet<br />
+<a href="https://parquet.apache.org/">https://parquet.apache.org/</a>
+</li>
+
+<li>Parquet format<br />
+<a href="https://github.com/apache/parquet-format">https://github.com/apache/parquet-format</a>
+</li>
+
+<li>Processing parquet files in Golang<br />
+<a href="https://dev.to/eminetto/processing-parquet-files-in-golang-1nni">https://dev.to/eminetto/processing-parquet-files-in-golang-1nni</a>
+</li>
+
+<li>Processing parquet files in Golang<br />
+<a href="https://eltonminetto.dev/en/post/2019-12-09-parquet-golang/">https://eltonminetto.dev/en/post/2019-12-09-parquet-golang/</a>
+</li>
+
+<li>Converting CSV files to Parquet with Go<br />
+<a href="https://mungingdata.com/go/csv-to-parquet/">https://mungingdata.com/go/csv-to-parquet/</a>
+</li>
+
+<li>Balíček parquet-go<br />
+<a href="https://github.com/xitongsys/parquet-go">https://github.com/xitongsys/parquet-go</a>
+</li>
+
+<li>Balíček parquet<br />
+<a href="https://github.com/parsyl/parquet">https://github.com/parsyl/parquet</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku parquet-go<br />
+<a href="https://godoc.org/github.com/xitongsys/parquet-go">https://godoc.org/github.com/xitongsys/parquet-go</a>
+</li>
+
+<li>Faker<br />
+<a href="https://github.com/bxcodec/faker/">https://github.com/bxcodec/faker/</a>
+</li>
+
+<li>Apache ORC &ndash; the smallest, fastest columnar storage for Hadoop workloads<br />
+<a href="https://orc.apache.org/">https://orc.apache.org/</a>
+</li>
+
+<li>Apache Parquet (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Apache_Parquet">https://en.wikipedia.org/wiki/Apache_Parquet</a>
+</li>
+
+<li>Apache ORC (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Apache_ORC">https://en.wikipedia.org/wiki/Apache_ORC</a>
+</li>
+
+<li>MonetDB<br />
+<a href="https://www.monetdb.org/">https://www.monetdb.org/</a>
+</li>
+
+<li>Future of Column-Oriented Data Processing with Arrow &amp; Parquet by Julien Le Dem | DataEngConf NY '16<br />
+<a href="https://www.youtube.com/watch?v=6lCVKMQR8Dw">https://www.youtube.com/watch?v=6lCVKMQR8Dw</a>
+</li>
+
+<li>Data Architecture 101 for Your Business<br />
+<a href="https://www.youtube.com/watch?v=ArzohefZLE4">https://www.youtube.com/watch?v=ArzohefZLE4</a>
+</li>
+
+<li>Functional Data Engineering - A Set of Best Practices | Lyft<br />
+<a href="https://www.youtube.com/watch?v=4Spo2QRTz1k">https://www.youtube.com/watch?v=4Spo2QRTz1k</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Formát BSON<br />
+<a href="http://bsonspec.org/">http://bsonspec.org/</a>
+</li>
+
+<li>Golang Guide: A List of Top Golang Frameworks, IDEs &amp; Tools<br />
+<a href="https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/">https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/</a>
+</li>
+
+<li>Stránky projektu MinIO<br />
+<a href="https://min.io/">https://min.io/</a>
+</li>
+
+<li>MinIO Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-quickstart-guide.html">https://docs.min.io/docs/minio-quickstart-guide.html</a>
+</li>
+
+<li>MinIO Go Client API Reference<br />
+<a href="https://docs.min.io/docs/golang-client-api-reference">https://docs.min.io/docs/golang-client-api-reference</a>
+</li>
+
+<li>MinIO Python Client API Reference<br />
+<a href="https://docs.min.io/docs/python-client-api-reference.html">https://docs.min.io/docs/python-client-api-reference.html</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>MinIO Client Quickstart Guide<br />
+<a href="https://docs.min.io/docs/minio-client-quickstart-guide.html">https://docs.min.io/docs/minio-client-quickstart-guide.html</a>
+</li>
+
+<li>Analýza kvality zdrojových kódů Minia<br />
+<a href="https://goreportcard.com/report/github.com/minio/minio">https://goreportcard.com/report/github.com/minio/minio</a>
+</li>
+
+<li>This is MinIO<br />
+<a href="https://www.youtube.com/watch?v=vF0lQh0XOCs">https://www.youtube.com/watch?v=vF0lQh0XOCs</a>
+</li>
+
+<li>Running MinIO Standalone<br />
+<a href="https://www.youtube.com/watch?v=dIQsPCHvHoM">https://www.youtube.com/watch?v=dIQsPCHvHoM</a>
+</li>
+
+<li>"Amazon S3 Compatible Storage in Kubernetes" - Rob Girard, Principal Tech Marketing Engineer, Minio<br />
+<a href="https://www.youtube.com/watch?v=wlpn8K0jJ4U">https://www.youtube.com/watch?v=wlpn8K0jJ4U</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Why are Prometheus histograms cumulative?<br />
+<a href="https://www.robustperception.io/why-are-prometheus-histograms-cumulative">https://www.robustperception.io/why-are-prometheus-histograms-cumulative</a>
+</li>
+
+<li>Histograms and summaries<br />
+<a href="https://prometheus.io/docs/practices/histograms/">https://prometheus.io/docs/practices/histograms/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Semantic Import Versioning in Go<br />
+<a href="https://www.aaronzhuo.com/semantic-import-versioning-in-go/">https://www.aaronzhuo.com/semantic-import-versioning-in-go/</a>
+</li>
+
+<li>Sémantické verzování<br />
+<a href="https://semver.org/">https://semver.org/</a>
+</li>
+
+<li>Getting started with Go modules<br />
+<a href="https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d">https://medium.com/@fonseka.live/getting-started-with-go-modules-b3dac652066d</a>
+</li>
+
+<li>Create projects independent of $GOPATH using Go Modules<br />
+<a href="https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o">https://medium.com/mindorks/create-projects-independent-of-gopath-using-go-modules-802260cdfb51o</a>
+</li>
+
+<li>Anatomy of Modules in Go<br />
+<a href="https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16">https://medium.com/rungo/anatomy-of-modules-in-go-c8274d215c16</a>
+</li>
+
+<li>Modules<br />
+<a href="https://github.com/golang/go/wiki/Modules">https://github.com/golang/go/wiki/Modules</a>
+</li>
+
+<li>Go Modules Tutorial<br />
+<a href="https://tutorialedge.net/golang/go-modules-tutorial/">https://tutorialedge.net/golang/go-modules-tutorial/</a>
+</li>
+
+<li>Module support<br />
+<a href="https://golang.org/cmd/go/#hdr-Module_support">https://golang.org/cmd/go/#hdr-Module_support</a>
+</li>
+
+<li>Go Lang: Memory Management and Garbage Collection<br />
+<a href="https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/">https://vikash1976.wordpress.com/2017/03/26/go-lang-memory-management-and-garbage-collection/</a>
+</li>
+
+<li>Golang Internals, Part 4: Object Files and Function Metadata<br />
+<a href="https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html">https://blog.altoros.com/golang-part-4-object-files-and-function-metadata.html</a>
+</li>
+
+<li>A StreamLike, Immutable, Lazy Loading and smart Golang Library to deal with slices<br />
+<a href="https://github.com/wesovilabs/koazee">https://github.com/wesovilabs/koazee</a>
+</li>
+
+<li>Handling Sparse Files on Linux<br />
+<a href="https://www.systutorials.com/136652/handling-sparse-files-on-linux/">https://www.systutorials.com/136652/handling-sparse-files-on-linux/</a>
+</li>
+
+<li>Gzip (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Gzip">https://en.wikipedia.org/wiki/Gzip</a>
+</li>
+
+<li>Deflate<br />
+<a href="https://en.wikipedia.org/wiki/DEFLATE">https://en.wikipedia.org/wiki/DEFLATE</a>
+</li>
+
+<li>Rozhraní io.ByteReader<br />
+<a href="https://golang.org/pkg/io/#ByteReader">https://golang.org/pkg/io/#ByteReader</a>
+</li>
+
+<li>Rozhraní io.RuneReader<br />
+<a href="https://golang.org/pkg/io/#RuneReader">https://golang.org/pkg/io/#RuneReader</a>
+</li>
+
+<li>Rozhraní io.ByteScanner<br />
+<a href="https://golang.org/pkg/io/#ByteScanner">https://golang.org/pkg/io/#ByteScanner</a>
+</li>
+
+<li>Rozhraní io.RuneScanner<br />
+<a href="https://golang.org/pkg/io/#RuneScanner">https://golang.org/pkg/io/#RuneScanner</a>
+</li>
+
+<li>Rozhraní io.Closer<br />
+<a href="https://golang.org/pkg/io/#Closer">https://golang.org/pkg/io/#Closer</a>
+</li>
+
+<li>Rozhraní io.Reader<br />
+<a href="https://golang.org/pkg/io/#Reader">https://golang.org/pkg/io/#Reader</a>
+</li>
+
+<li>Rozhraní io.Writer<br />
+<a href="https://golang.org/pkg/io/#Writer">https://golang.org/pkg/io/#Writer</a>
+</li>
+
+<li>Typ Strings.Reader<br />
+<a href="https://golang.org/pkg/strings/#Reader">https://golang.org/pkg/strings/#Reader</a>
+</li>
+
+<li>VACUUM (SQL)<br />
+<a href="https://www.sqlite.org/lang_vacuum.html">https://www.sqlite.org/lang_vacuum.html</a>
+</li>
+
+<li>VACUUM (Postgres)<br />
+<a href="https://www.postgresql.org/docs/8.4/sql-vacuum.html">https://www.postgresql.org/docs/8.4/sql-vacuum.html</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Package builtin<br />
+<a href="https://golang.org/pkg/builtin/">https://golang.org/pkg/builtin/</a>
+</li>
+
+<li>The Little Go Book (další kniha)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language by Brian W. Kernighan, Alan A. A. Donovan<br />
+<a href="https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html">https://www.safaribooksonline.com/library/view/the-go-programming/9780134190570/ebook_split_010.html</a>
+</li>
+
+<li>Learning Go<br />
+<a href="https://www.miek.nl/go/">https://www.miek.nl/go/</a>
+</li>
+
+<li>Go Bootcamp<br />
+<a href="http://www.golangbootcamp.com/">http://www.golangbootcamp.com/</a>
+</li>
+
+<li>Programming in Go: Creating Applications for the 21st Century (další kniha o jazyku Go)<br />
+<a href="http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637">http://www.informit.com/store/programming-in-go-creating-applications-for-the-21st-9780321774637</a>
+</li>
+
+<li>Introducing Go (Build Reliable, Scalable Programs)<br />
+<a href="http://shop.oreilly.com/product/0636920046516.do">http://shop.oreilly.com/product/0636920046516.do</a>
+</li>
+
+<li>Learning Go Programming<br />
+<a href="https://www.packtpub.com/application-development/learning-go-programming">https://www.packtpub.com/application-development/learning-go-programming</a>
+</li>
+
+<li>The Go Blog<br />
+<a href="https://blog.golang.org/">https://blog.golang.org/</a>
+</li>
+
+<li>Getting to Go: The Journey of Go's Garbage Collector<br />
+<a href="https://blog.golang.org/ismmkeynote">https://blog.golang.org/ismmkeynote</a>
+</li>
+
+<li>Go (programovací jazyk, Wikipedia)<br />
+<a href="https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)">https://cs.wikipedia.org/wiki/Go_(programovac%C3%AD_jazyk)</a>
+</li>
+
+<li>Installing Go on the Raspberry Pi<br />
+<a href="https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi">https://dave.cheney.net/2012/09/25/installing-go-on-the-raspberry-pi</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Niečo málo o Go - Golang (slovensky)<br />
+<a href="http://golangsk.logdown.com/">http://golangsk.logdown.com/</a>
+</li>
+
+<li>How Many Go Developers Are There?<br />
+<a href="https://research.swtch.com/gophercount">https://research.swtch.com/gophercount</a>
+</li>
+
+<li>Modern garbage collection: A look at the Go GC strategy<br />
+<a href="https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e">https://blog.plan99.net/modern-garbage-collection-911ef4f8bd8e</a>
+</li>
+
+<li>Go GC: Prioritizing low latency and simplicity<br />
+<a href="https://blog.golang.org/go15gc">https://blog.golang.org/go15gc</a>
+</li>
+
+<li>Is Golang a good language for embedded systems?<br />
+<a href="https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems">https://www.quora.com/Is-Golang-a-good-language-for-embedded-systems</a>
+</li>
+
+<li>How to use databases with Golang<br />
+<a href="https://hackernoon.com/how-to-work-with-databases-in-golang-33b002aa8c47">https://hackernoon.com/how-to-work-with-databases-in-golang-33b002aa8c47</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2020</small></p>
+</body>
+</html>
+
