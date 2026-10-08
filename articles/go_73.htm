@@ -1,0 +1,2114 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku dokončíme téma, kterému jsme se věnovali minule: tvorbě jednotkových testů pro funkce pracující s relačními databázemi. Ukážeme si způsob testování funkcí/metod, které do databáze přidávají nebo mažou řádky a taktéž takových funkcí, které používají databázové transakce.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Druhá verze testované aplikace</a></p>
+<p><a href="#k02">2. Výsledky běhu jednotkových testů</a></p>
+<p><a href="#k03">3. Jednotkový test pro funkci provádějící zápis do tabulky</a></p>
+<p><a href="#k04">4. Výsledek pokusu o spuštění jednotkových testů</a></p>
+<p><a href="#k05">5. Korektní zápis jednotkového testu a výsledek běhu testů</a></p>
+<p><a href="#k06">6. Jednotkový test pro funkci provádějící vymazání záznamu z&nbsp;tabulky</a></p>
+<p><a href="#k07">7. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</a></p>
+<p><a href="#k08">8. Simulace chyby na straně SQL databáze</a></p>
+<p><a href="#k09">9. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</a></p>
+<p><a href="#k10">10. Mockování špatných typů sloupců v&nbsp;jednotkových testech</a></p>
+<p><a href="#k11">11. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</a></p>
+<p><a href="#k12">12. Uzavření příkazu pro čtení dat z&nbsp;databáze v&nbsp;jednotkových testech</a></p>
+<p><a href="#k13">13. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</a></p>
+<p><a href="#k14">14. Otestování funkce s&nbsp;transakcemi</a></p>
+<p><a href="#k15">15. Jednotkový test očekávající transakční operaci</a></p>
+<p><a href="#k16">16. Chování ve chvíli, kdy není transakce korektně ukončena</a></p>
+<p><a href="#k17">17. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</a></p>
+<p><a href="#k18">18. Možné další vylepšení</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Druhá verze testované aplikace</h2>
+
+<p>V&nbsp;dnešním článku dokončíme téma, kterému jsme se věnovali <a
+href="https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim/">minule</a>.
+Připomeňme si, že jsme si ukázali jeden ze způsobů tvorby jednotkových testů
+v&nbsp;jazyku Go pro ty funkce a metody, které přistupují k&nbsp;relační
+databázi, a to buď přímo s&nbsp;využitím balíčku <strong>database/sql</strong>
+nebo nepřímo, tj.&nbsp;většinou přes nějaký balíček zajišťující ORM (příkladem
+může být projekt <a href="https://gorm.io/">GORM</a>). Dnes si ukážeme způsob
+testování funkcí/metod, které do databáze přidávají nebo mažou řádky a taktéž
+takových funkcí, které používají databázové transakce.</p>
+
+<p>Připomeňme si, že aplikace, kterou budeme testovat (resp.&nbsp;pro kterou
+budeme vytvářet jednotkové testy), používá přímo balíček
+<strong>database/sql</strong> ze standardní knihovny, a je v&nbsp;ní
+implementováno několik funkcí volajících SQL příkazy <strong>INSERT</strong> a
+<strong>DELETE</strong> i SQL dotaz <strong>SELECT</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+&nbsp;
+        "database/sql"
+&nbsp;
+        _ "github.com/lib/pq"           <i>// PostgreSQL database driver</i>
+        _ "github.com/mattn/go-sqlite3" <i>// SQLite database driver</i>
+&nbsp;
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+<i>// Datová struktura s konfigurací připojení k databázi</i>
+type <strong>StorageConfiguration</strong> struct {
+        Driver           string `mapstructure:"db_driver" toml:"db_driver"`
+        SQLiteDataSource string `mapstructure:"sqlite_datasource" toml:"sqlite_datasource"`
+        PGUsername       string `mapstructure:"pg_username" toml:"pg_username"`
+        PGPassword       string `mapstructure:"pg_password" toml:"pg_password"`
+        PGHost           string `mapstructure:"pg_host" toml:"pg_host"`
+        PGPort           int    `mapstructure:"pg_port" toml:"pg_port"`
+        PGDBName         string `mapstructure:"pg_db_name" toml:"pg_db_name"`
+        PGParams         string `mapstructure:"pg_params" toml:"pg_params"`
+}
+&nbsp;
+<i>// Chybové zprávy</i>
+const (
+        canNotConnectToDataStorageMessage = "Can not connect to data storage"
+        connectionToDBNotEstablished      = "Connection to database not established"
+        unableToCloseDBRowsHandle         = "Unable to close the DB rows handle"
+        databaseOperationFailed           = "Database operation failed"
+)
+&nbsp;
+<i>// Inicializace připojení k databázi</i>
+func <strong>initDatabaseConnection</strong>(configuration StorageConfiguration) (*sql.DB, error) {
+        driverName := configuration.Driver
+        dataSource := ""
+        log.Info().Str("driverName", configuration.Driver).Msg("DB connection configuration")
+&nbsp;
+        <i>// inicializace připojení s vybraným driverem</i>
+        switch driverName {
+        case "sqlite3":
+                <i>//driverType := DBDriverSQLite3</i>
+                <i>//driver = &sqlite3.SQLiteDriver{}</i>
+                dataSource = configuration.SQLiteDataSource
+        case "postgres":
+                <i>//driverType := DBDriverPostgres</i>
+                <i>//driver = &pq.Driver{}</i>
+                dataSource = fmt.Sprintf(
+                        "postgresql://%v:%v@%v:%v/%v?%v",
+                        configuration.PGUsername,
+                        configuration.PGPassword,
+                        configuration.PGHost,
+                        configuration.PGPort,
+                        configuration.PGDBName,
+                        configuration.PGParams,
+                )
+        default:
+                <i>// neznámý driver</i>
+                err := fmt.Errorf("driver %v is not supported", driverName)
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        <i>// pokus o inicializaci připojení k databázi</i>
+        connection, err := sql.Open(driverName, dataSource)
+&nbsp;
+        <i>// test, zda bylo připojení k databázi úspěšné</i>
+        if err != nil {
+                log.Err(err).Msg(canNotConnectToDataStorageMessage)
+                return nil, err
+        }
+&nbsp;
+        return connection, nil
+}
+&nbsp;
+<i>// Zobrazení všech záznamů v tabulce "persons"</i>
+func <strong>displayAllRecords</strong>(connection *sql.DB) error {
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons"
+        rows, err := connection.Query(query)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var (
+                        id      int
+                        name    string
+                        surname string
+                )
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;id, &amp;name, &amp;surname); err != nil {
+                        return err
+                }
+&nbsp;
+                <i>// výpis načteného záznamu</i>
+                log.Info().Int("ID", id).
+                        Str("name", name).
+                        Str("surname", surname).
+                        Msg("Record")
+        }
+&nbsp;
+        return nil
+}
+&nbsp;
+<i>// datová struktura odpovídající struktuře záznamu v databázi</i>
+type <strong>Record</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+}
+&nbsp;
+<i>// funkce vracející data přečtená z databázové tabulky</i>
+func <strong>readAllRecords</strong>(connection *sql.DB) ([]Record, error) {
+        results := make([]Record, 0)
+&nbsp;
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons"
+        rows, err := connection.Query(query)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return results, err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var record Record
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;record.Id, &amp;record.Name, &amp;record.Surname); err != nil {
+                        return results, err
+                }
+&nbsp;
+                results = append(results, record)
+        }
+&nbsp;
+        return results, nil
+}
+&nbsp;
+<i>// funkce vracející data přečtená z databázové tabulky</i>
+func <strong>readRecordsWithName</strong>(connection *sql.DB, name string) ([]Record, error) {
+        results := make([]Record, 0)
+&nbsp;
+        <i>// dotaz do databáze</i>
+        query := "SELECT id, name, surname FROM persons WHERE name=$1"
+        rows, err := connection.Query(query, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return results, err
+        }
+&nbsp;
+        defer func() {
+                <i>// pokud dojde k chybě nebo na konci smyčky, musíme uvolnit prostředky</i>
+                if closeErr := rows.Close(); closeErr != nil {
+                        log.Error().Err(closeErr).Msg(unableToCloseDBRowsHandle)
+                }
+        }()
+&nbsp;
+        <i>// projít všemi vrácenými řádky</i>
+        for rows.Next() {
+                var record Record
+&nbsp;
+                <i>// přečtení dat z jednoho vráceného řádku</i>
+                if err := rows.Scan(&amp;record.Id, &amp;record.Name, &amp;record.Surname); err != nil {
+                        return results, err
+                }
+&nbsp;
+                results = append(results, record)
+        }
+&nbsp;
+        return results, nil
+}
+&nbsp;
+<i>// Vložení nového záznamu do tabulky "persons"</i>
+func <strong>insertRecord</strong>(connection *sql.DB, name string, surname string) (int, error) {
+        <i>// provedení SQL příkazu se dvěma parametry</i>
+        sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
+        result, err := connection.Exec(sqlStatement, name, surname)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+&nbsp;
+<i>// Vymazání záznamu nebo záznamů na základě zapsaného jména</i>
+func <strong>deleteByName</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := connection.Exec(sqlStatement, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// nastavit logovací systém pro barevný výstup na terminál</i>
+        log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+&nbsp;
+        <i>// konfigurace připojení do databáze</i>
+        config := StorageConfiguration{
+                Driver:     "postgres",
+                PGUsername: "postgres",
+                PGPassword: "postgres",
+                PGHost:     "localhost",
+                PGPort:     5432,
+                PGDBName:   "testdb",
+                PGParams:   "sslmode=disable",
+        }
+&nbsp;
+        log.Debug().Msg("Started")
+&nbsp;
+        <i>// inicializace připojení k databázi</i>
+        connection, err := initDatabaseConnection(config)
+        if err != nil {
+                log.Err(err).Msg(connectionToDBNotEstablished)
+                return
+        }
+&nbsp;
+        log.Info().Msg("Read all records")
+        <i>// přečtení všech záznamů</i>
+        results, err := readAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        <i>// výpis získaných záznamů</i>
+        for _, result := range results {
+                log.Info().Int("ID", result.Id).
+                        Str("name", result.Name).
+                        Str("surname", result.Surname).
+                        Msg("Record")
+        }
+&nbsp;
+        log.Info().Msg("Display all records")
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        <i>// vymazání záznamu či záznamů na základě zapsaného jména</i>
+        affected, err := deleteByName(connection, "Eda")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("deleted rows", affected).Msg("DELETE")
+&nbsp;
+        <i>// přidání nového záznamu do databáze</i>
+        affected, err = insertRecord(connection, "Eda", "Vodopád")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        log.Info().Int("inserted rows", affected).Msg("INSERT")
+&nbsp;
+        <i>// přečtení všech záznamů z tabulky "persons"</i>
+        err = displayAllRecords(connection)
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+&nbsp;
+        log.Info().Msg("Read records with name Přemysl")
+        <i>// přečtení záznamů</i>
+        results, err = readRecordsWithName(connection, "Přemysl")
+        if err != nil {
+                log.Err(err).Msg(databaseOperationFailed)
+                return
+        }
+        <i>// výpis získaných záznamů</i>
+        for _, result := range results {
+                log.Info().Int("ID", result.Id).
+                        Str("name", result.Name).
+                        Str("surname", result.Surname).
+                        Msg("Record")
+        }
+&nbsp;
+        log.Debug().Msg("Finished")
+}
+</pre>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Výsledky běhu jednotkových testů</h2>
+
+<p>Podívejme se nyní na výsledky běhu jednotkových testů. Následující příkaz
+zajistí, že se testy spustí a současně se do souboru
+<strong>coverage.out</strong> zapíše informace o tom, které řádky testovaného
+kódu (aplikace) byly skutečně použity v&nbsp;jednotkových testech:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   <strong>TestSelect1</strong>
+--- PASS: <strong>TestSelect1</strong> (0.00s)
+=== RUN   <strong>TestSelect2</strong>
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-23T17:48:52+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-23T17:48:52+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-23T17:48:52+01:00","message":"Record"}
+--- PASS: <strong>TestSelect2</strong> (0.00s)
+=== RUN   <strong>TestSelect3</strong>
+--- PASS: <strong>TestSelect3</strong> (0.00s)
+=== RUN   <strong>TestSelect4</strong>
+--- PASS: <strong>TestSelect4</strong> (0.00s)
+=== RUN   <strong>TestSelect5</strong>
+--- PASS: <strong>TestSelect5</strong> (0.00s)
+PASS
+coverage: 20.8% of statements
+ok      db-test 0.003s
+</pre>
+
+<p>Další příkaz provede analýzu obsahu souboru <strong>coverage.out</strong> a
+vypíše souhrnné informace o pokrytí zdrojového kódu rozděleného na funkce a
+metody:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out</strong>
+&nbsp;
+db-test/db_operations.go:37:    initDatabaseConnection                  0.0%
+db-test/db_operations.go:80:    displayAllRecords                       76.9%
+db-test/db_operations.go:128:   readAllRecords                          78.6%
+db-test/db_operations.go:163:   readRecordsWithName                     78.6%
+db-test/db_operations.go:198:   insertRecord                            0.0%
+db-test/db_operations.go:219:   deleteByName                            0.0%
+db-test/db_operations.go:307:   main                                    0.0%
+total:                          (statements)                            20.8%
+</pre>
+
+<p>V&nbsp;rámci dalších kapitol se budeme snažit pokrytí zlepšit, ovšem pouze u
+funkcí provádějících operace s&nbsp;databází. Konkrétně se jedná o tyto
+funkce:</p>
+
+<ol>
+<li>displayAllRecords</li>
+<li>readAllRecords</li>
+<li>readRecordsWithName</li>
+<li>insertRecord</li>
+<li>deleteByName</li>
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: později k&nbsp;této pětici funkcí
+přidáme ještě dvě funkce další. Tyto nové funkce budou s&nbsp;databází pracovat
+v&nbsp;transakci.</div></p>
+
+<img src="https://i.iinfo.cz/images/635/sqlmock-2.png" class="image-444965" alt="&#160;" width="909" height="860" />
+<p><i>Obrázek 1: Vizuální znázornění pokrytí zdrojového kódu jednotkovými testy
+(stále se používají standardní nástroje jazyka Go).</i></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Jednotkový test pro funkci provádějící zápis do tabulky</h2>
+
+<p>Další jednotkový test, který se pokusíme vytvořit v&nbsp;rámci dnešního
+článku, bude testovat chování funkce, která provádí zápis nového řádku do
+databáze (s&nbsp;kontrolou chyb atd.). Jedná se o funkci nazvanou
+<strong>insertRecord</strong> s&nbsp;tímto obsahem:</p>
+
+<pre>
+<i>// Vložení nového záznamu do tabulky "persons"</i>
+func <strong>insertRecord</strong>(connection *sql.DB, name string, surname string) (int, error) {
+        <i>// provedení SQL příkazu se dvěma parametry</i>
+        sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
+        result, err := connection.Exec(sqlStatement, name, surname)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+</pre>
+
+<p>Nejprve je nutné přidat novou proměnnou do souboru
+<strong>export_test.go</strong>, a to z&nbsp;toho důvodu, že funkce, jejíž
+název začíná malým písmenem, není z&nbsp;jednotkových testů přímo
+viditelná:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+var (
+        DisplayAllRecords   = displayAllRecords
+        ReadAllRecords      = readAllRecords
+        ReadRecordsWithName = readRecordsWithName
+        <strong>InsertRecord        = insertRecord</strong>
+)
+</pre>
+
+<p>V&nbsp;jednotkovém testu se pokusíme zjistit, zda byl zavolán příslušný SQL
+příkaz <strong>INSERT</strong>. Přitom mockovaný SQL driver instruujeme, aby
+simuloval vrácení jednoho výsledku a změnu jediného řádku v&nbsp;tabulce
+(protože s&nbsp;těmito údaji testovaná funkce částečně pracuje):</p>
+
+<pre>
+mock.ExpectExec("INSERT INTO persons (name, surname) VALUES($1, $2);").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))
+</pre>
+
+<p>Zbytek testu se příliš neliší od testů, které jsme si již ukázali, takže ve
+stručnosti:</p>
+
+<pre>
+func <strong>TestInsertion1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectExec("INSERT INTO persons (name, surname) VALUES($1, $2);").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))</u>
+&nbsp;
+        updated, err := main.InsertRecord(connection, "foo", "bar")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        if updated != 1 {
+                t.Errorf("one row should be updated, but %d rows were updated", updated)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Výsledek pokusu o spuštění jednotkových testů</h2>
+
+<p>Zápis jednotkového testu vypadá &ndash; alespoň zdánlivě a na první pohled
+&ndash; v&nbsp;pořádku, takže si nyní vyzkoušejme, jak se nový test bude chovat
+v&nbsp;praxi:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   <strong>TestInsertion1</strong>
+--- FAIL: <strong>TestInsertion1</strong> (0.00s)
+    db_operations_test.go:262: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:266: one row should be updated, but 0 rows were updated
+    db_operations_test.go:271: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+FAIL
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Povšimněte si, že nový test ve skutečnosti zhavaroval, a to navíc
+s&nbsp;poněkud zvláštní chybou:</p>
+
+<pre>
+    db_operations_test.go:262: error was not expected while updating stats: ExecQuery: could not match actual sql: "<strong>INSERT INTO persons (name, surname) VALUES($1, $2);</strong>" with expected regexp "<strong>INSERT INTO persons (name, surname) VALUES($1, $2);</strong>"
+</pre>
+
+<p>Oba vypsané řetězce jsou totožné, ovšem jádro problému spočívá v&nbsp;tom,
+že do testu ve skutečnosti nezadáváme <i>řetězec</i>, ale <i>regulární
+výraz</i>, s&nbsp;nímž je skutečný SQL příkaz porovnáván
+(resp.&nbsp;<i>matchován</i>). Rozdíl spočívá v&nbsp;tom, že v&nbsp;regulárním
+výrazu mají znaky &bdquo;(&ldquo;, &bdquo;$&ldquo; atd. speciální význam a
+pokud budeme chtít otestovat, zda se v&nbsp;příkazu skutečně nachází
+<i>znak</i> dolaru, je nutné regulární výraz zapsat nepatrně odlišným
+způsobem.</p>
+
+<p><div class="rs-tip-major">Poznámka: na druhou stranu však použití
+regulárních výrazů umožňuje psát obecnější testy.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Korektní zápis jednotkového testu a výsledek běhu testů</h2>
+
+<p>Jednotkový test tedy musíme nějakým způsobem opravit. Jedná se o úpravu
+následujícího řádku, konkrétněji parametru metody
+<strong>ExpectExec</strong>:</p>
+
+<pre>
+mock.ExpectExec("INSERT INTO persons <strong>(</strong>name, surname<strong>)</strong> VALUES<strong>($1</strong>, <strong>$2)</strong>;").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))
+</pre>
+
+<p>Před všechny znaky, které mají v&nbsp;regulárním výrazu speciální význam, je
+nutné zapsat znak zpětného lomítka:</p>
+
+<pre>
+mock.ExpectExec("INSERT INTO persons <strong>\(</strong>name, surname<strong>\)</strong> VALUES<strong>\(\$1</strong>, <strong>\$2\)</strong>;").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))
+</pre>
+
+<p>To však ve skutečnosti taktéž není korektní, neboť znak zpětného lomítka má
+speciální význam při zápisu běžných řetězců (jak v&nbsp;Go, tak i například
+v&nbsp;C i dalších jazycích). Zpětné lomítko je tedy nutné zdvojit:</p>
+
+<pre>
+mock.ExpectExec("INSERT INTO persons <strong>\\(</strong>name, surname<strong>\\)</strong> VALUES<strong>\\(\\$1</strong>, <strong>\\$2\\)</strong>;").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))
+</pre>
+
+<p>Nyní již tedy můžeme vytvořit nový jednotkový rest, který by měl být zapsán
+korektně:</p>
+
+<pre>
+func <strong>TestInsertion2</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectExec("INSERT INTO persons \\(name, surname\\) VALUES\\(\\$1, \\$2\\);").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))</u>
+&nbsp;
+        updated, err := main.InsertRecord(connection, "foo", "bar")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        if updated != 1 {
+                t.Errorf("one row should be updated, but %d rows were updated", updated)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>Výsledek běhu jednotkových testů:</p>
+
+<pre>
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:262: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:266: one row should be updated, but 0 rows were updated
+    db_operations_test.go:271: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+FAIL
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Vidíme, že došlo ke zlepšení pokrytí kódu, a to (podle očekávání) právě u
+funkce <strong>insertRecord</strong> (z&nbsp;nuly na plných 87.5%):</p>
+
+<pre>
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    displayAllRecords       76.9%
+db-test/db_operations.go:128:   readAllRecords          78.6%
+db-test/db_operations.go:163:   readRecordsWithName     78.6%
+db-test/db_operations.go:198:   <strong>insertRecord            87.5%</strong>
+db-test/db_operations.go:219:   deleteByName            0.0%
+db-test/db_operations.go:239:   main                    0.0%
+total:                          (statements)            34.8%
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zvýrazněna je změna oproti předchozímu
+běhu testů.</div></p>
+
+<a href="https://www.root.cz/obrazek/445377/"><img src="https://i.iinfo.cz/images/383/go-sql-2-1-prev.png" class="image-445377" alt="&#160;" width="305" height="270" /></a>
+<p><i>Obrázek 2: Pokrytí testovaného kódu.</i></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Jednotkový test pro funkci provádějící vymazání záznamu z&nbsp;tabulky</h2>
+
+<p>Další funkcí, kterou otestujeme, je funkce provádějící vymazání záznamu
+z&nbsp;tabulky. Tato funkce vypadá následovně:</p>
+
+<pre>
+<i>// Vymazání záznamu nebo záznamů na základě zapsaného jména</i>
+func <strong>deleteByName</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := connection.Exec(sqlStatement, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                return 0, err
+        }
+        return int(affected), nil
+}
+</pre>
+
+<p>Upravíme soubor <strong>export_test.go</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+var (
+        DisplayAllRecords   = displayAllRecords
+        ReadAllRecords      = readAllRecords
+        ReadRecordsWithName = readRecordsWithName
+        InsertRecord        = insertRecord
+        <strong>DeleteByName        = deleteByName</strong>
+)
+</pre>
+
+<p>A napíšeme příslušný jednotkový test, nyní již ovšem se znalostí toho, jak
+pracovat se speciálními znaky v&nbsp;regulárním výrazu:</p>
+
+<pre>
+func <strong>TestDeletion1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectExec("DELETE FROM persons WHERE name = \\$1;").WithArgs("foo").WillReturnResult(sqlmock.NewResult(1, 1))</u>
+&nbsp;
+        updated, err := main.DeleteByName(connection, "foo")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        if updated != 1 {
+                t.Errorf("one row should be updated, but %d rows were updated", updated)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</h2>
+
+<p>Nyní by již mělo být možné jednotkové testy spustit. Použijeme k&nbsp;tomu
+následující příkaz, který mj.&nbsp;zajistí i vytvoření souboru
+s&nbsp;informacemi o pokrytí testovaného kódu jednotkovými testy:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-23T17:56:23+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-23T17:56:23+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-23T17:56:23+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:170: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:174: one row should be updated, but 0 rows were updated
+    db_operations_test.go:179: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+=== RUN   TestDeletion1
+--- PASS: TestDeletion1 (0.00s)
+FAIL
+coverage: 37.2% of statements
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Pokrytí jednotlivých funkcí jednotkovými testy se zjistí
+(resp.&nbsp;přesněji řečeno vypíše) následujícím způsobem:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out </strong>
+&nbsp;
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    displayAllRecords       76.9%
+db-test/db_operations.go:128:   readAllRecords          78.6%
+db-test/db_operations.go:163:   readRecordsWithName     78.6%
+db-test/db_operations.go:198:   insertRecord            87.5%
+db-test/db_operations.go:219:   <strong>deleteByName            75.0%</strong>
+db-test/db_operations.go:309:   main                    0.0%
+total:                          (statements)            37.2%
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět je zvýrazněna změna oproti
+předchozímu běhu testů.</div></p>
+
+<a href="https://www.root.cz/obrazek/445378/"><img src="https://i.iinfo.cz/images/383/go-sql-2-2-prev.png" class="image-445378" alt="&#160;" width="299" height="270" /></a>
+<p><i>Obrázek 3: Pokrytí testovaného kódu.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Simulace chyby na straně SQL databáze</h2>
+
+<p>Podívejme se ještě jednou na úryvek programového kódu, ve kterém se provádí
+nějaký SQL příkaz popř.&nbsp;dotaz:</p>
+
+<pre>
+sqlStatement := "INSERT INTO persons (name, surname) VALUES($1, $2);"
+result, err := connection.Exec(sqlStatement, name, surname)
+&nbsp;
+<i>// test, zda byl SQL příkaz proveden bez chyby</i>
+if err != nil {
+        return 0, err
+}
+</pre>
+
+<p>Již víme, jakým způsobem otestovat vlastní příkaz/dotaz, ovšem ještě nám
+zbývá ověřit, co se stane ve chvíli, když nastane chyba &ndash; tedy otestovat
+podmínku a její tělo. I to je pochopitelně možné. Nejprve zkonstruujeme objekt
+typu <strong>error</strong>, který obsahuje informace o chybě
+(resp.&nbsp;přesněji řečeno mockované chybě):</p>
+
+<pre>
+mockedError := errors.New("mocked error")
+</pre>
+
+<p>Dále můžeme specifikovat, že výsledkem SQL dotazu bude chyba, což zajišťuje
+mockovaný SQL driver (viz zvýrazněná metoda na konci celého řetězce):</p>
+
+<pre>
+mock.ExpectExec("INSERT INTO persons \\(name, surname\\) VALUES\\(\\$1, \\$2\\);").WithArgs("foo", "bar")<strong>.WillReturnError(mockedError)</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výše uvedený řádek říká, jaký dotaz má
+mockovaný SQL driver očekávat, jaké mají být jeho parametry a jaký má být
+výsledek.</div></p>
+
+<p>Tímto způsobem můžeme vytvořit celou řadu jednotkových testů pro všechny
+testované funkce, které pracují s&nbsp;databází.</p>
+
+<p>Příkaz pro vložení záznamu do databáze končící chybou:</p>
+
+<pre>
+func <strong>TestInsertionOnError</strong>(t *testing.T) {
+        mockedError := errors.New("mocked error")
+&nbsp;
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectExec("INSERT INTO persons \\(name, surname\\) VALUES\\(\\$1, \\$2\\);").WithArgs("foo", "bar").WillReturnError(mockedError)</u>
+&nbsp;
+        _, err = main.InsertRecord(connection, "foo", "bar")
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        if err != mockedError {
+                t.Errorf("different error was returned: %v", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>Příkaz pro smazání záznamu z&nbsp;databáze končící chybou:</p>
+
+<pre>
+func <strong>TestDeletionOnError</strong>(t *testing.T) {
+        mockedError := errors.New("mocked error")
+&nbsp;
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectExec("DELETE FROM persons WHERE name = \\$1;").WithArgs("foo").WillReturnError(mockedError)</u>
+&nbsp;
+        _, err = main.DeleteByName(connection, "foo")
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        if err != mockedError {
+                t.Errorf("different error was returned: %v", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>Dotazy do databáze končící chybou:</p>
+
+<pre>
+func <strong>TestSelectOnError1</strong>(t *testing.T) {
+        mockedError := errors.New("mocked error")
+&nbsp;
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnError(mockedError)</u>
+&nbsp;
+        err = main.DisplayAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        if err != mockedError {
+                t.Errorf("different error was returned: %v", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>Druhý test s&nbsp;dotazem do databáze:</p>
+
+<pre>
+func <strong>TestSelectOnError2</strong>(t *testing.T) {
+        mockedError := errors.New("mocked error")
+&nbsp;
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnError(mockedError)</u>
+&nbsp;
+        results, err := main.ReadAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        if err != mockedError {
+                t.Errorf("different error was returned: %v", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        if len(results) != 0 {
+                t.Errorf("different number of results read from database: %d instead of 0", len(results))
+                return
+        }
+}
+</pre>
+
+<p>Třetí a současně i poslední test s&nbsp;dotazem do databáze končící
+chybou:</p>
+
+<pre>
+func <strong>TestSelectOnError3</strong>(t *testing.T) {
+        mockedError := errors.New("mocked error")
+&nbsp;
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons WHERE name=.*").WillReturnError(mockedError)</u>
+&nbsp;
+        results, err := main.ReadRecordsWithName(connection, "Eda")
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        if err != mockedError {
+                t.Errorf("different error was returned: %v", err)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        if len(results) != 0 {
+                t.Errorf("different number of results read from database: %d instead of 0", len(results))
+                return
+        }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</h2>
+
+<p>Opět se podívejme na výsledky běhu jednotkových testů, včetně výpočtu
+pokrytí kódu testy. Počet pokrytých řádků by se měl podle všech předpokladů
+zvýšit:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-20T18:40:30+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   <strong>TestSelectOnError</strong>1
+--- PASS: <strong>TestSelectOnError1</strong> (0.00s)
+=== RUN   <strong>TestSelectOnError</strong>2
+--- PASS: <strong>TestSelectOnError2</strong> (0.00s)
+=== RUN   <strong>TestSelectOnError</strong>3
+--- PASS: <strong>TestSelectOnError3</strong> (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:262: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:266: one row should be updated, but 0 rows were updated
+    db_operations_test.go:271: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+=== RUN   <strong>TestInsertionOnErro</strong>r
+--- PASS: <strong>TestInsertionOnError</strong> (0.00s)
+=== RUN   TestDeletion1
+--- PASS: TestDeletion1 (0.00s)
+=== RUN   <strong>TestDeletionOnErro</strong>r
+--- PASS: <strong>TestDeletionOnError</strong> (0.00s)
+FAIL
+coverage: 43.8% of statements
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Výpočet pokrytí jednotlivých funkcí jednotkovými testy:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out </strong>
+&nbsp;
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    displayAllRecords       76.9%
+db-test/db_operations.go:128:   readAllRecords          78.6%
+db-test/db_operations.go:163:   readRecordsWithName     78.6%
+db-test/db_operations.go:198:   insertRecord            87.5%
+db-test/db_operations.go:219:   deleteByName            87.5%
+db-test/db_operations.go:239:   main                    0.0%
+total:                          (statements)            43.8%
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: můžeme vidět, že skutečně došlo
+k&nbsp;určitému zlepšení pokrytí, i když jsme prozatím nedosáhli 100% (to ovšem
+ani nemusí být vždy cílem).</div></p>
+
+<a href="https://www.root.cz/obrazek/445379/"><img src="https://i.iinfo.cz/images/383/go-sql-2-3-prev.png" class="image-445379" alt="&#160;" width="370" height="262" /></a>
+<p><i>Obrázek 4: Nové výsledky jednotkových testů.</i></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Mockování špatných typů sloupců v&nbsp;jednotkových testech</h2>
+
+<p>Další operací, která může v&nbsp;aplikaci zhavarovat, je zpracování výsledků
+SQL dotazů. Jak v&nbsp;relační databázi, tak i v&nbsp;programovacím jazyce Go
+mají jednotlivé sloupce definovány datový typ, přičemž jednotlivé typy musí
+korespondovat &ndash; například pokud je v&nbsp;databázi uložen klíč formou
+celého čísla, měla by být na straně Go taková hodnota reprezentována datovým
+typem <strong>int</strong>, <strong>uint</strong> apod. To je ostatně patrné i
+při pohledu na tu část zdrojového kódu, která načítání provádí:</p>
+
+<pre>
+var (
+        id      int
+        name    string
+        surname string
+)
+&nbsp;
+<i>// přečtení dat z jednoho vráceného řádku</i>
+if err := rows.Scan(&amp;id, &amp;name, &amp;surname); err != nil {
+        return err
+}
+</pre>
+
+<p>Popř.&nbsp;ve vylepšené verzi:</p>
+
+<pre>
+<i>// datová struktura odpovídající struktuře záznamu v databázi</i>
+type <strong>Record</strong> struct {
+        Id      int
+        Name    string
+        Surname string
+}
+&nbsp;
+var record Record
+&nbsp;
+<i>// přečtení dat z jednoho vráceného řádku</i>
+if err := rows.Scan(&amp;record.Id, &amp;record.Name, &amp;record.Surname); err != nil {
+        return results, err
+}
+</pre>
+
+<p>Při čtení je nutné testovat, zda nedošlo k&nbsp;chybě (viz předchozí
+podmínka) a právě existenci této podmínky můžeme zkontrolovat
+v&nbsp;jednotkových testech. Postačuje pouze vrátit špatná data,
+resp.&nbsp;data se špatným typem, z&nbsp;mockovaného SQL driveru:</p>
+
+<pre>
+rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+rows.AddRow(1, "foo", "bar")
+rows.AddRow(<strong>"this is not integer"</strong>, "x", "y")
+rows.AddRow(3, "a", "b")
+</pre>
+
+<p>Zpracování takto upravených, nebo chcete-li rozbitých, záznamů můžeme
+zařadit do našich jednotkových testů se zjištěním, zda se skutečně vrací
+očekávaná chyba.</p>
+
+<p>Test pro funkci <strong>displayAllRecords</strong>:</p>
+
+<pre>
+func <strong>TestSelectScanError1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)</u>
+&nbsp;
+        err = main.DisplayAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+(
+</pre>
+
+<p>Test pro funkci <strong>readAllRecords</strong>:</p>
+
+<pre>
+func <strong>TestSelectScanError2</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)</u>
+&nbsp;
+        results, err := main.ReadAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        <i>// první řádek by měl být přečten</i>
+        if len(results) != 1 {
+                t.Errorf("different number of results read from database: %d instead of 1", len(results))
+                return
+        }
+}
+</pre>
+
+<p>A konečně následuje test pro funkci
+<strong>readRecordsWithName</strong>:</p>
+
+<pre>
+func <strong>TestSelectScanError3</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        <u>mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)</u>
+&nbsp;
+        results, err := main.ReadRecordsWithName(connection, "foo")
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+&nbsp;
+        <i>// první řádek by měl být přečten</i>
+        if len(results) != 1 {
+                t.Errorf("different number of results read from database: %d instead of 1", len(results))
+                return
+        }
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</h2>
+
+<p>Pokud jednotkové testy znovu spustíme, mělo by se zvýšit pokrytí všech tří
+funkcí, které provádí SQL dotazy:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T18:58:25+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-20T18:58:25+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-20T18:58:25+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   TestSelectOnError1
+--- PASS: TestSelectOnError1 (0.00s)
+=== RUN   TestSelectOnError2
+--- PASS: TestSelectOnError2 (0.00s)
+=== RUN   TestSelectOnError3
+--- PASS: TestSelectOnError3 (0.00s)
+=== RUN   <strong>TestSelectScanError</strong>1
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T18:58:25+01:00","message":"Record"}
+--- PASS: <strong>TestSelectScanError1</strong> (0.00s)
+=== RUN   <strong>TestSelectScanError</strong>2
+--- PASS: <strong>TestSelectScanError2</strong> (0.00s)
+=== RUN   <strong>TestSelectScanError</strong>3
+--- PASS: <strong>TestSelectScanError3</strong> (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:352: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:356: one row should be updated, but 0 rows were updated
+    db_operations_test.go:361: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+=== RUN   TestInsertionOnError
+--- PASS: TestInsertionOnError (0.00s)
+=== RUN   TestDeletion1
+--- PASS: TestDeletion1 (0.00s)
+=== RUN   TestDeletionOnError
+--- PASS: TestDeletionOnError (0.00s)
+FAIL
+coverage: 46.4% of statements
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Změna v&nbsp;poměru pokrytí zdrojového textu jednotkovými testy je více
+patrná na následujícím reportu:</p>
+
+<pre>
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    <strong>displayAllRecords       92.3%</strong>
+db-test/db_operations.go:128:   <strong>readAllRecords          92.9%</strong>
+db-test/db_operations.go:163:   <strong>readRecordsWithName     92.9%</strong>
+db-test/db_operations.go:198:   insertRecord            87.5%
+db-test/db_operations.go:219:   deleteByName            87.5%
+db-test/db_operations.go:239:   main                    0.0%
+total:                          (statements)            46.4%
+</pre>
+
+<img src="https://i.iinfo.cz/images/383/go-sql-2-4.png" class="image-445380" alt="&#160;" width="582" height="844" />
+<p><i>Obrázek 5: Nové výsledky jednotkových testů.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Uzavření příkazu pro čtení dat z&nbsp;databáze v&nbsp;jednotkových testech</h2>
+
+<p>Mj.&nbsp;i z&nbsp;výsledků předchozích testů je zřejmé, že je vhodné provést
+ještě jednu kontrolu &ndash; jak se bude aplikace chovat ve chvíli, kdy je
+spojení s&nbsp;databází přerušeno v&nbsp;okamžiku zpracování výsledků SQL
+dotazu, tedy příkazu <strong>SELECT</strong>. I takovouto chybu je možné
+v&nbsp;mockovaném SQL driveru simulovat, a to konkrétně specifikací chyby přímo
+ve vrácených datech:</p>
+
+<pre>
+rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+rows.AddRow(1, "foo", "bar")
+<strong>rows.CloseError(errors.New("close error"))</strong>
+rows.AddRow("this is not integer", "x", "y")
+rows.AddRow(3, "a", "b")
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: chyba se musí vyskytnou uprostřed
+výsledků, nikoli až na jejich konci!</div></p>
+
+<p>Celý test pro funkci <strong>displayAllRecords</strong> může vypadat
+následovně:</p>
+
+<pre>
+func <strong>TestSelectCloseError1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.CloseError(errors.New("close error"))
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+&nbsp;
+        err = main.DisplayAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>Test pro další funkci provádějící dotaz do relační databáze:</p>
+
+<pre>
+func <strong>TestSelectCloseError2</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.CloseError(errors.New("close error"))
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons").WillReturnRows(rows)
+&nbsp;
+        _, err = main.ReadAllRecords(connection)
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+<p>A konečně test třetí:</p>
+
+<pre>
+func <strong>TestSelectCloseError3</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        rows := sqlmock.NewRows([]string{"id", "name", "surname"})
+        rows.AddRow(1, "foo", "bar")
+        rows.CloseError(errors.New("close error"))
+        rows.AddRow("this is not integer", "x", "y")
+        rows.AddRow(3, "a", "b")
+&nbsp;
+        mock.ExpectQuery("SELECT id, name, surname FROM persons .*").WillReturnRows(rows)
+&nbsp;
+        _, err = main.ReadRecordsWithName(connection, "foobar")
+&nbsp;
+        if err == nil {
+                t.Fatalf("error was expected while updating stats")
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</h2>
+
+<p>Znovu spustíme všechny jednotkové testy:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T19:04:00+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-20T19:04:00+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-20T19:04:00+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   TestSelectOnError1
+--- PASS: TestSelectOnError1 (0.00s)
+=== RUN   TestSelectOnError2
+--- PASS: TestSelectOnError2 (0.00s)
+=== RUN   TestSelectOnError3
+--- PASS: TestSelectOnError3 (0.00s)
+=== RUN   <strong>TestSelectScanError1</strong>
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T19:04:00+01:00","message":"Record"}
+--- PASS: <strong>TestSelectScanError1</strong> (0.00s)
+=== RUN   <strong>TestSelectScanError2</strong>
+--- PASS: <strong>TestSelectScanError2</strong> (0.00s)
+=== RUN   <strong>TestSelectScanError3</strong>
+--- PASS: <strong>TestSelectScanError3</strong> (0.00s)
+=== RUN   TestSelectCloseError1
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-20T19:04:00+01:00","message":"Record"}
+{"level":"error","error":"close error","time":"2021-03-20T19:04:00+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError1 (0.00s)
+=== RUN   TestSelectCloseError2
+{"level":"error","error":"close error","time":"2021-03-20T19:04:00+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError2 (0.00s)
+=== RUN   TestSelectCloseError3
+{"level":"error","error":"close error","time":"2021-03-20T19:04:00+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError3 (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:433: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:437: one row should be updated, but 0 rows were updated
+    db_operations_test.go:442: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+=== RUN   TestInsertionOnError
+--- PASS: TestInsertionOnError (0.00s)
+=== RUN   TestDeletion1
+--- PASS: TestDeletion1 (0.00s)
+=== RUN   TestDeletionOnError
+--- PASS: TestDeletionOnError (0.00s)
+FAIL
+coverage: 49.1% of statements
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Z&nbsp;výpočtu pokrytí testovaného kódu je patrné, že nyní jsou všechny tři
+funkce provádějící dotaz do relační databáze pokryty na sto procent, tedy že
+jsme zkontrolovali i všechny alternativní cesty v&nbsp;kódu:</p>
+
+<pre>
+db-test/db_operations.go:37:    initDatabaseConnection  0.0%
+db-test/db_operations.go:80:    <strong>displayAllRecords       100.0%</strong>
+db-test/db_operations.go:128:   <strong>readAllRecords          100.0%</strong>
+db-test/db_operations.go:163:   <strong>readRecordsWithName     100.0%</strong>
+db-test/db_operations.go:198:   insertRecord            87.5%
+db-test/db_operations.go:219:   deleteByName            87.5%
+db-test/db_operations.go:239:   main                    0.0%
+total:                          (statements)            49.1%
+</pre>
+
+<a href="https://www.root.cz/obrazek/445381/"><img src="https://i.iinfo.cz/images/383/go-sql-2-5-prev.png" class="image-445381" alt="&#160;" width="302" height="270" /></a>
+<p><i>Obrázek 6: Nové výsledky jednotkových testů &ndash; stoprocentní
+pokrytí.</i></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Otestování funkce s&nbsp;transakcemi</h2>
+
+<p>Mnoho funkcí pracujících s&nbsp;relační databází provádí SQL příkazy
+v&nbsp;transakcích. Transakce jsou pochopitelně podporovány i balíčkem
+<strong>database/sql</strong> ze standardní knihovny programovacího jazyka Go.
+Transakce se vytvoří metodou <strong>Begin</strong> vracející novou datovou
+strukturu s&nbsp;metodami <strong>Rollback</strong>, <strong>Commit</strong> i
+všemi běžných metodami pro relační databáze, zejména
+s&nbsp;<strong>Exec</strong> a <strong>ExecQuery</strong>. Následující funkce
+pouze využívá transakce, ovšem je značně zjednodušena &ndash; uvnitř transakce
+je provedena jen jediná databázová operace (typicky jich bývá více):</p>
+
+<pre>
+<i>// Vymazání záznamu nebo záznamů na základě zapsaného jména</i>
+func <strong>deleteByNameInTransaction</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// nová transakce</i>
+        tx, err := <strong>connection.Begin()</strong>
+&nbsp;
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := <strong>tx.Exec(sqlStatement, name)</strong>
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                rollbackError := <strong>tx.Rollback()</strong>
+                if rollbackError != nil {
+                        log.Err(rollbackError).Msgf("error when trying to rollback a transaction")
+                }
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.<strong>RowsAffected()</strong>
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                rollbackError := <strong>tx.Rollback()</strong>
+                if rollbackError != nil {
+                        log.Err(rollbackError).Msgf("error when trying to rollback a transaction")
+                }
+                return 0, err
+        }
+        commitError := <strong>tx.Commit()</strong>
+        if commitError != nil {
+                log.Err(commitError).Msgf("error when trying to commit a transaction")
+        }
+        return int(affected), nil
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: všechny operace, které se týkají
+transakce, jsou zvýrazněny.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Jednotkový test očekávající transakční operaci</h2>
+
+<p>Do jednotkového testu je možné po získání připojení k&nbsp;mockovanému SQL
+ovladači přidat kontroly, zda byla transakce zahájena i ukončena. V&nbsp;našem
+konkrétním případě může interní struktura testu vypadat následovně:</p>
+
+<pre>
+<strong>mock.ExpectBegin()</strong>
+mock.ExpectExec("DELETE FROM persons WHERE name = \\$1;").WithArgs("foo").WillReturnResult(sqlmock.NewResult(1, 1))
+<strong>mock.ExpectCommit()</strong>
+</pre>
+
+<p>V&nbsp;testu tedy očekáváme, že dojde k&nbsp;zahájení transakce, dále se
+očekává konkrétní SQL příkaz, který je následovaný commitem. Tyto tři řádky lze
+zakomponovat do uceleného jednotkového testu následujícím způsobem:</p>
+
+<pre>
+func <strong>TestDeletionInTransaction</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        <strong>mock.ExpectBegin()</strong>
+        mock.ExpectExec("DELETE FROM persons WHERE name = \\$1;").WithArgs("foo").WillReturnResult(sqlmock.NewResult(1, 1))
+        <strong>mock.ExpectCommit()</strong>
+&nbsp;
+        updated, err := main.DeleteByNameInTransaction(connection, "foo")
+        if err != nil {
+                t.Errorf("error was not expected while updating stats: %s", err)
+        }
+&nbsp;
+        if updated != 1 {
+                t.Errorf("one row should be updated, but %d rows were updated", updated)
+        }
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        if err != nil {
+                t.Errorf("there were unfulfilled expectations: %s", err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Chování ve chvíli, kdy není transakce korektně ukončena</h2>
+
+<p>Pokusme se nyní přidat do testované aplikace funkci, v&nbsp;níž zapomeneme
+provést <i>commit</i> na konci transakce. Jedná se tedy o obdobu funkce <a
+href="#k14">ze čtrnácté kapitoly</a>, ovšem bez závěrečné sekvence příkazů:</p>
+
+<pre>
+// Vymazání záznamu nebo záznamů na základě zapsaného jména
+func <strong>deleteByNameInTransactionNoCommit</strong>(connection *sql.DB, name string) (int, error) {
+        <i>// nová transakce</i>
+        tx, err := connection.Begin()
+&nbsp;
+        <i>// provedení SQL příkazu s jedním parametrem</i>
+        sqlStatement := "DELETE FROM persons WHERE name = $1;"
+        result, err := tx.Exec(sqlStatement, name)
+&nbsp;
+        <i>// test, zda byl SQL příkaz proveden bez chyby</i>
+        if err != nil {
+                rollbackError := tx.Rollback()
+                if rollbackError != nil {
+                        log.Err(rollbackError).Msgf("error when trying to rollback a transaction")
+                }
+                return 0, err
+        }
+&nbsp;
+        <i>// přečíst počet řádků v tabulce, které byly SQL příkazem upraveny</i>
+        affected, err := result.RowsAffected()
+&nbsp;
+        <i>// i tato operace může teoreticky skončit s chybou nebo nemusí být podporována</i>
+        if err != nil {
+                rollbackError := tx.Rollback()
+                if rollbackError != nil {
+                        log.Err(rollbackError).Msgf("error when trying to rollback a transaction")
+                }
+                return 0, err
+        }
+        return int(affected), nil
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledek běhu testů, včetně zjištění pokrytí kódu testy</h2>
+
+<p>Dnes již naposledy zavoláme nástroj, který spustí jednotkové testy a zobrazí
+výsledek jejich běhu:</p>
+
+<pre>
+$ <strong>go test -v -coverprofile coverage.out</strong>
+&nbsp;
+=== RUN   TestSelect1
+--- PASS: TestSelect1 (0.00s)
+=== RUN   TestSelect2
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-23T18:29:57+01:00","message":"Record"}
+{"level":"info","ID":2,"name":"x","surname":"y","time":"2021-03-23T18:29:57+01:00","message":"Record"}
+{"level":"info","ID":3,"name":"a","surname":"b","time":"2021-03-23T18:29:57+01:00","message":"Record"}
+--- PASS: TestSelect2 (0.00s)
+=== RUN   TestSelect3
+--- PASS: TestSelect3 (0.00s)
+=== RUN   TestSelect4
+--- PASS: TestSelect4 (0.00s)
+=== RUN   TestSelect5
+--- PASS: TestSelect5 (0.00s)
+=== RUN   TestSelectOnError1
+--- PASS: TestSelectOnError1 (0.00s)
+=== RUN   TestSelectOnError2
+--- PASS: TestSelectOnError2 (0.00s)
+=== RUN   TestSelectOnError3
+--- PASS: TestSelectOnError3 (0.00s)
+=== RUN   TestSelectScanError1
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-23T18:29:57+01:00","message":"Record"}
+--- PASS: TestSelectScanError1 (0.00s)
+=== RUN   TestSelectScanError2
+--- PASS: TestSelectScanError2 (0.00s)
+=== RUN   TestSelectScanError3
+--- PASS: TestSelectScanError3 (0.00s)
+=== RUN   TestSelectCloseError1
+{"level":"info","ID":1,"name":"foo","surname":"bar","time":"2021-03-23T18:29:57+01:00","message":"Record"}
+{"level":"error","error":"close error","time":"2021-03-23T18:29:57+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError1 (0.00s)
+=== RUN   TestSelectCloseError2
+{"level":"error","error":"close error","time":"2021-03-23T18:29:57+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError2 (0.00s)
+=== RUN   TestSelectCloseError3
+{"level":"error","error":"close error","time":"2021-03-23T18:29:57+01:00","message":"Unable to close the DB rows handle"}
+--- PASS: TestSelectCloseError3 (0.00s)
+=== RUN   TestInsertion1
+--- FAIL: TestInsertion1 (0.00s)
+    db_operations_test.go:433: error was not expected while updating stats: ExecQuery: could not match actual sql: "INSERT INTO persons (name, surname) VALUES($1, $2);" with expected regexp "INSERT INTO persons (name, surname) VALUES($1, $2);"
+    db_operations_test.go:437: one row should be updated, but 0 rows were updated
+    db_operations_test.go:442: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedExec =&gt; expecting Exec or ExecContext which:
+          - matches sql: 'INSERT INTO persons (name, surname) VALUES($1, $2);'
+          - is with arguments:
+            0 - foo
+            1 - bar
+          - should return Result having:
+              LastInsertId: 1
+              RowsAffected: 1
+=== RUN   TestInsertion2
+--- PASS: TestInsertion2 (0.00s)
+=== RUN   TestInsertionOnError
+--- PASS: TestInsertionOnError (0.00s)
+=== RUN   TestDeletion1
+--- PASS: TestDeletion1 (0.00s)
+=== RUN   TestDeletionOnError
+--- PASS: TestDeletionOnError (0.00s)
+=== RUN   TestDeletionInTransaction
+--- PASS: TestDeletionInTransaction (0.00s)
+=== <strong>RUN   TestDeletionInTransactionNoCommit</strong>
+--- <strong>FAIL: TestDeletionInTransactionNoCommit (0.00s)</strong>
+    <strong>db_operations_test.go:594: there were unfulfilled expectations: there is a remaining expectation which was not matched: ExpectedCommit =&gt; expecting transaction Commit</strong>
+<strong>FAIL</strong>
+coverage: 46.1% of statements
+exit status 1
+FAIL    db-test 0.004s
+</pre>
+
+<p>Na samotný závěr si ukažme výpočet pokrytí jednotlivých funkcí jednotkovými
+testy:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out </strong>
+&nbsp;
+db-test/db_operations.go:37:    initDatabaseConnection                  0.0%
+db-test/db_operations.go:80:    displayAllRecords                       100.0%
+db-test/db_operations.go:128:   readAllRecords                          100.0%
+db-test/db_operations.go:163:   readRecordsWithName                     100.0%
+db-test/db_operations.go:198:   insertRecord                            87.5%
+db-test/db_operations.go:219:   deleteByName                            87.5%
+db-test/db_operations.go:240:   deleteByNameInTransaction               50.0%
+db-test/db_operations.go:276:   deleteByNameInTransactionNoCommit       46.7%
+db-test/db_operations.go:307:   main                                    0.0%
+total:                          (statements)                            46.1%
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: obě funkce
+<strong>deleteByNameInTransaction</strong> a
+<strong>deleteByNameInTransactionNoCommit</strong> by pochopitelně bylo vhodné
+otestovat ještě lépe, nicméně pro účely tohoto článku stávající testy
+pravděpodobně postačují.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Možné další vylepšení</h2>
+
+<p>Jednotkové testy představené v&nbsp;předchozím i v&nbsp;dnešním článku
+v&nbsp;žádném případě nejsou dokonalé a existuje hned několik možností jejich
+vylepšení. V&nbsp;první řadě je vhodné testy správným způsobem označit štítky,
+aby bylo možné vybírat, které testy se mají v&nbsp;dané situaci spustit. Běžné
+bývá například označení některých testů štítkem &bdquo;smoketest&ldquo;,
+popř.&nbsp;lze testy rozdělit podle toho, s&nbsp;jakou částí databáze
+komunikují. Jak označen testů zajistit? Pokud budeme používat pouze základní
+sadu nástrojů jazyka Go, provede se celá operace následovně:</p>
+
+<ul>
+
+<li>Základní testy budou uloženy v&nbsp;souboru &bdquo;storage_test.go&ldquo;,
+tj.&nbsp;opět se použije standardní pojmenování.</li>
+
+<li>Ovšem navíc mohou existovat i další soubory, například
+&bdquo;smoke_test.go&ldquo; a &bdquo;storage_transactions_test.go&ldquo;
+s&nbsp;dalšími skupinami testů.
+
+</ul>
+
+<p>Důležité je, že ve dvou posledně zmíněných souborech použijeme strukturovaný
+komentář, který je rozeznán a zpracováván překladačem programovacího jazyka
+Go:</p>
+
+<pre>
+<i>// +build smoketests</i>
+&nbsp;
+<i>// +build transactions_tests</i>
+&nbsp;
+atd.
+</pre>
+
+<p>Nyní si můžeme jednotlivé testy spustit. Povšimněte si použití přepínače
+<strong>-tags</strong>:</p>
+
+<pre>
+$ <strong>go test -v</strong>
+</pre>
+
+<pre>
+$ <strong>go test -v -tags smoketests</strong>
+</pre>
+
+<pre>
+$ <strong>go test -v -tags transactions_tests</strong>
+</pre>
+
+<p>Dalším vylepšením je náhrada explicitních podmínek v&nbsp;testech
+zapisovaných s&nbsp;využitím konstrukce <strong>if</strong> za funkce typu
+<strong>assert</strong>. Ty sice (jako jazyková konstrukce) přímo v&nbsp;jazyku
+Go neexistují, ale nabízí je například balíček <strong>stretchr/
+testify/assert</strong>. Tento balíček nabízí hned několik způsobů zápisu
+asercí, například:</p>
+
+<pre>
+func <strong>TestNewStorageError</strong>(t *testing.T) {
+        _, err := storage.New(storage.Configuration{
+                Driver: "non existing driver",
+        })
+        <strong>assert.EqualError(t, err, "driver non existing driver is not supported")</strong>
+}
+</pre>
+
+<p>popř.:</p>
+
+<pre>
+func <strong>TestInsertion1</strong>(t *testing.T) {
+        connection, mock, err := sqlmock.New()
+        if err != nil {
+                t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+        }
+        defer connection.Close()
+&nbsp;
+        mock.ExpectExec("INSERT INTO persons (name, surname) VALUES($1, $2);").WithArgs("foo", "bar").WillReturnResult(sqlmock.NewResult(1, 1))
+&nbsp;
+        updated, err := main.InsertRecord(connection, "foo", "bar")
+        <u>assert.NoError(t, err, "error was not expected while updating stats: %s", err)</u>
+	<u>assert.Equal(t, updated, "one row should be updated, but %d rows were updated", updated)</u>
+&nbsp;
+        err = mock.ExpectationsWereMet()
+        <u>assert.NoError(t, err, "there were unfulfilled expectations: %s", err)</u>
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: o tomto balíčku se krátce zmíníme
+v&nbsp;navazujícím článku.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>go.mod</td><td>projektový soubor projektu psaného v&nbsp;Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_73/go.mod">https://github.com/tisnik/go-root/blob/master/article_73/go.mod</a></td></tr>
+<tr><td>2</td><td>go.sum</td><td>závislosti vytvářeného projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_73/go.sum">https://github.com/tisnik/go-root/blob/master/article_73/go.sum</a></td></tr>
+<tr><td>3</td><td>db_operations.go</td><td>testovaná aplikace s&nbsp;několika databázovými operacemi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_73/db_operations.go">https://github.com/tisnik/go-root/blob/master/article_73/db_operations.go</a></td></tr>
+<tr><td>4</td><td>db_operations_test.go</td><td>jednotkové testy založené na mockování SQL příkazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_73/db_operations_test.go">https://github.com/tisnik/go-root/blob/master/article_73/db_operations_test.go</a></td></tr>
+<tr><td>5</td><td>export_test.go</td><td>export jmen funkcí volaných v&nbsp;jednotkových testech</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_73/export_test.go">https://github.com/tisnik/go-root/blob/master/article_73/export_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>ORM je antipattern<br />
+<a href="https://zdrojak.cz/clanky/orm-je-antipattern/">https://zdrojak.cz/clanky/orm-je-antipattern/</a>
+</li>
+
+<li>DATA-DOG / go-sqlmock repository<br />
+<a href="https://github.com/DATA-DOG/go-sqlmock">https://github.com/DATA-DOG/go-sqlmock</a>
+</li>
+
+<li>Sql driver mock for Golang<br />
+<a href="https://pkg.go.dev/github.com/DATA-DOG/go-sqlmock?utm_source=godoc">https://pkg.go.dev/github.com/DATA-DOG/go-sqlmock?utm_source=godoc</a>
+</li>
+
+<li>The fantastic ORM library for Golang<br />
+<a href="http://gorm.io/">http://gorm.io/</a>
+</li>
+
+<li>Package sql<br />
+<a href="https://golang.org/pkg/database/sql/">https://golang.org/pkg/database/sql/</a>
+</li>
+
+<li>Go database/sql tutorial<br />
+<a href="http://go-database-sql.org/">http://go-database-sql.org/</a>
+</li>
+
+<li>SQLDrivers<br />
+<a href="https://github.com/golang/go/wiki/SQLDrivers">https://github.com/golang/go/wiki/SQLDrivers</a>
+</li>
+
+<li>Package testing<br />
+<a href="https://golang.org/pkg/testing/">https://golang.org/pkg/testing/</a>
+</li>
+
+<li>Golang basics - writing unit tests<br />
+<a href="https://blog.alexellis.io/golang-writing-unit-tests/">https://blog.alexellis.io/golang-writing-unit-tests/</a>
+</li>
+
+<li>An Introduction to Programming in Go / Testing<br />
+<a href="https://www.golang-book.com/books/intro/12">https://www.golang-book.com/books/intro/12</a>
+</li>
+
+<li>An Introduction to Testing in Go<br />
+<a href="https://tutorialedge.net/golang/intro-testing-in-go/">https://tutorialedge.net/golang/intro-testing-in-go/</a>
+</li>
+
+<li>Advanced Go Testing Tutorial<br />
+<a href="https://tutorialedge.net/golang/advanced-go-testing-tutorial/">https://tutorialedge.net/golang/advanced-go-testing-tutorial/</a>
+</li>
+
+<li>GoConvey<br />
+<a href="http://goconvey.co/">http://goconvey.co/</a>
+</li>
+
+<li>Testing Techniques<br />
+<a href="https://talks.golang.org/2014/testing.slide">https://talks.golang.org/2014/testing.slide</a>
+</li>
+
+<li>5 simple tips and tricks for writing unit tests in #golang<br />
+<a href="https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742">https://medium.com/@matryer/5-simple-tips-and-tricks-for-writing-unit-tests-in-golang-619653f90742</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>oglematchers</i><br />
+<a href="https://godoc.org/github.com/jacobsa/oglematchers">https://godoc.org/github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Balíček <i>oglematchers</i><br />
+<a href="https://github.com/jacobsa/oglematchers">https://github.com/jacobsa/oglematchers</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>ogletest</i><br />
+<a href="https://godoc.org/github.com/jacobsa/ogletest">https://godoc.org/github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Balíček <i>ogletest</i><br />
+<a href="https://github.com/jacobsa/ogletest">https://github.com/jacobsa/ogletest</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <i>assert</i><br />
+<a href="https://godoc.org/github.com/stretchr/testify/assert">https://godoc.org/github.com/stretchr/testify/assert</a>
+</li>
+
+<li>Testify - Thou Shalt Write Tests<br />
+<a href="https://github.com/stretchr/testify/">https://github.com/stretchr/testify/</a>
+</li>
+
+<li>PostgreSQL CREATE DATABASE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-database/">https://www.postgresqltutorial.com/postgresql-create-database/</a>
+</li>
+
+<li>PostgreSQL CREATE SCHEMA<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-schema/">https://www.postgresqltutorial.com/postgresql-create-schema/</a>
+</li>
+
+<li>PostgreSQL CREATE TABLE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-create-table/">https://www.postgresqltutorial.com/postgresql-create-table/</a>
+</li>
+
+<li>PostgreSQL SELECT<br />
+<a href="https://www.postgresqltutorial.com/postgresql-select/">https://www.postgresqltutorial.com/postgresql-select/</a>
+</li>
+
+<li>PostgreSQL INSERT<br />
+<a href="https://www.postgresqltutorial.com/postgresql-insert/">https://www.postgresqltutorial.com/postgresql-insert/</a>
+</li>
+
+<li>PostgreSQL DELETE<br />
+<a href="https://www.postgresqltutorial.com/postgresql-delete/">https://www.postgresqltutorial.com/postgresql-delete/</a>
+</li>
+
+<li>Data definition language<br />
+<a href="https://en.wikipedia.org/wiki/Data_definition_language">https://en.wikipedia.org/wiki/Data_definition_language</a>
+</li>
+
+<li>Data query language<br />
+<a href="https://en.wikipedia.org/wiki/Data_query_language">https://en.wikipedia.org/wiki/Data_query_language</a>
+</li>
+
+<li>Data manipulation language<br />
+<a href="https://en.wikipedia.org/wiki/Data_manipulation_language">https://en.wikipedia.org/wiki/Data_manipulation_language</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
