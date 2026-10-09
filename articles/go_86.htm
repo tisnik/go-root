@@ -1,0 +1,1450 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Propojení Go s Pythonem s využitím cgo a ctypes (2. část)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Propojení Go s Pythonem s využitím cgo a ctypes (2. část)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Pro plnohodnotnou integraci programovacího jazyka Go s&nbsp;Pythonem je nutné umět předávat i hodnoty neprimitivních typů, zejména pole, řezy, struktury (záznamy) atd. S&nbsp;touto již poměrně složitější problematikou se částečně seznámíme v&nbsp;dnešním článku.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Go, Python a problematika práce s&nbsp;řetězci</a></p>
+<p><a href="#k02">2. Funkce pro uvolnění řetězce z&nbsp;paměti naprogramovaná v&nbsp;jazyce Go</a></p>
+<p><a href="#k03">3. Explicitní správa paměti v&nbsp;Pythonu aneb odvrácená strana integrace s&nbsp;Go</a></p>
+<p><a href="#k04">4. Přímé volání céčkovské funkce <strong>free</strong> z&nbsp;Pythonu</a></p>
+<p><a href="#k05">5. Spojování řetězců s&nbsp;memory leakem vs. volání funkce <strong>free</strong></a></p>
+<p><a href="#k06">6. Předávání polí mezí Go a Pythonem</a></p>
+<p><a href="#k07">7. Funkce naprogramovaná v&nbsp;Go akceptující céčkové pole a jeho délku</a></p>
+<p><a href="#k08">8. Předání pole z&nbsp;céčka do funkce naprogramované v&nbsp;Go</a></p>
+<p><a href="#k09">9. Předání pole z&nbsp;Pythonu do funkce naprogramované v&nbsp;Go</a></p>
+<p><a href="#k10">10. Vytvoření pole ze seznamu hodnot</a></p>
+<p><a href="#k11">11. Pole s&nbsp;prvky typu <strong>double</strong> resp. <strong>float64</strong></a></p>
+<p><a href="#k12">12. Předání pole z&nbsp;Pythonu</a></p>
+<p><a href="#k13">13. Předávání struktur mezi Go, céčkem a Pythonem</a></p>
+<p><a href="#k14">14. Funkce naprogramovaná v&nbsp;Go akceptující parametr typu struktura</a></p>
+<p><a href="#k15">15. Zavolání Go funkce z&nbsp;céčka s&nbsp;předáním struktury</a></p>
+<p><a href="#k16">16. Zavolání Go funkce z&nbsp;Pythonu s&nbsp;předáním struktury</a></p>
+<p><a href="#k17">17. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k18">18. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Go, Python a problematika práce s&nbsp;řetězci</h2>
+
+<p><a
+href="https://www.root.cz/clanky/propojeni-go-s-pythonem-s-vyuzitim-cgo-a-ctypes/">V&nbsp;úvodním
+článku</a> věnovaném volání funkcí naprogramovaných v&nbsp;jazyce Go
+z&nbsp;Pythonu jsme si mj.&nbsp;ukázali i funkci, která akceptuje dva řetězce
+(konkrétně céčkovské řetězce), převede tyto řetězce na datový typ
+<strong>string</strong> v&nbsp;Go, řetězce spojí, převede výsledek zpět na
+céčkovský řetězec a ten vrátí, přesněji řečeno vrátí ukazatel na první znak
+tohoto nového řetězce. V&nbsp;této funkci je logická chyba, která není odhalena
+překladačem. Tato chyba spočívá v&nbsp;tom, že se alokovaný céčkovský řetězec
+neuvolňuje z&nbsp;paměti:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "C"
+&nbsp;
+<i>//export concat</i>
+func <strong>concat</strong>(text1, text2 *C.char) *C.char {
+        t1 := C.GoString(text1)
+        t2 := C.GoString(text2)
+&nbsp;
+        result := t1 + t2
+        return C.CString(result)
+}
+&nbsp;
+func <strong>main</strong>() {}
+</pre>
+
+<p>Překlad do dynamické knihovny:</p>
+
+<pre>
+$ <strong>go build -buildmode=c-shared -o so7.so so7.go</strong>
+</pre>
+
+<p>To, že k&nbsp;uvolňování naalokované paměti skutečně nedochází, si můžeme
+ověřit následujícím skriptem naprogramovaným v&nbsp;jazyku Python. Tento skript
+nejprve vytvoří dva dlouhé (korektně zakódované) řetězce, které postupně
+spojuje a vypisuje délku výsledného řetězce. Celý skript může vypadat
+následovně:</p>
+
+<pre>
+import ctypes
+import time
+&nbsp;
+so7 = ctypes.CDLL("./so7.so")
+&nbsp;
+t1 = ("ěščř ЩжΛλ"*10000).encode("utf-8")
+t2 = ("&lt;foobar&gt;"*10000).encode("utf-8")
+&nbsp;
+so7.concat.restype = ctypes.c_char_p
+&nbsp;
+for i in range(100000):
+    t = so7.concat(t1, t2)
+    print(len(t))
+    time.sleep(0.01)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nezapomeňte proces se skriptem ukončit
+ještě předtím, než se začne swapovat nebo se dokonce spustí OOM
+killer.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Funkce pro uvolnění řetězce z&nbsp;paměti naprogramovaná v&nbsp;jazyce Go</h2>
+
+<p>O uvolnění paměti alokované (i když poněkud nenápadně) funkcí
+<strong>C.Cstring</strong> se tedy musíme postarat sami. Pro tento účel
+vytvoříme novou funkci nazvanou například <strong>freeString</strong>, které se
+předá céčkový řetězec (tedy ukazatel na první znak v&nbsp;řetězci). Tato funkce
+zavolá standardní céčkovskou funkci <strong>free</strong>. Je ovšem nutné
+podotknout, že je zapotřebí několika triků. První trik spočívá v&nbsp;tom, že
+se použije strukturovaný komentář:</p>
+
+<pre>
+<i>// #include &lt;stdlib.h&gt;</i>
+</pre>
+
+<p>tento komentář se předá <strong>cgo</strong> při překladu a dělá přesně to,
+co je zde napsáno. Tento řádek je nutné použít proto, aby bylo možné zavolat
+funkci <strong>free</strong> přes <strong>C.free</strong> (víme již, že
+<strong>C</strong> je pseudobalíček).</p>
+
+<p>Další trik spočívá v&nbsp;konverzi běžného ukazatele v&nbsp;Go na
+&bdquo;ne-bezpečný&ldquo; céčkový ukazatel, který se předá standardní céčkovské
+funkci <strong>free</strong>:</p>
+
+<pre>
+C.free(unsafe.Pointer(s))
+</pre>
+
+<p>Nová podoba zdrojového kódu, který se bude překládat do dynamické knihovny,
+bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+<i>// #include &lt;stdlib.h&gt;</i>
+import "C"
+import "unsafe"
+&nbsp;
+<i>//export concat</i>
+func <strong>concat</strong>(text1, text2 *C.char) *C.char {
+        t1 := C.GoString(text1)
+        t2 := C.GoString(text2)
+&nbsp;
+        result := t1 + t2
+        return C.CString(result)
+}
+&nbsp;
+<i>//export freeString</i>
+func <strong>freeString</strong>(s *C.char) {
+        C.free(unsafe.Pointer(s))
+}
+&nbsp;
+func <strong>main</strong>() {}
+</pre>
+
+<p>Překlad do dynamické knihovny již známe:</p>
+
+<pre>
+$ <strong>go build -buildmode=c-shared -o so8.so so8.go</strong>
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Explicitní správa paměti v&nbsp;Pythonu aneb odvrácená strana integrace s&nbsp;Go</h2>
+
+<p>Samotná existence funkce <strong>freeString</strong> nám pochopitelně nijak
+kouzelně nepomůže vyřešit problém s&nbsp;uvolňováním paměti &ndash; budeme
+muset tuto funkci volat explicitně. Je to ukázáno v&nbsp;dalším skriptu, který
+získá ukazatel vracený funkcí <strong>concat</strong>, přetypováním a přístupem
+k&nbsp;atributu <strong>value</strong> získá řetězec, který vypíše a následně
+původní blok paměti (což je, jak již víme, céčkový řetězec) uvolní zavoláním
+funkce <strong>freeString</strong>:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so8 = ctypes.CDLL("./so8.so")
+&nbsp;
+t1 = "ěščř ЩжΛλ".encode("utf-8")
+t2 = "&lt;foobar&gt;".encode("utf-8")
+&nbsp;
+so8.concat.restype = ctypes.POINTER(ctypes.c_char)
+&nbsp;
+ptr = so8.concat(t1, t2)
+val = ctypes.cast(ptr, ctypes.c_char_p).value
+print(val.decode("utf-8"))
+so8.freeString(ptr)
+</pre>
+
+<p>V&nbsp;úvodní kapitole byl návratový typ funkce <strong>concat</strong>
+specifikován takto:</p>
+
+<pre>
+so7.concat.restype = ctypes.c_char_p
+</pre>
+
+<p>Tento datový typ <strong>nelze</strong> v&nbsp;novém skriptu použít, neboť
+<i>ctypes</i> se nám v&nbsp;tomto případě snaží pomoci a namísto ukazatele pro
+nás vytvoří Pythonovský řetězec (a původní ukazatel je ztracen &rarr; memory
+leak). Musíme tedy namísto toho použít:</p>
+
+<pre>
+so8.concat.restype = ctypes.POINTER(ctypes.c_char)
+</pre>
+
+<p>....což je zdánlivě to samé, ovšem tentokrát již <i>ctypes</i> nebude na
+pozadí provádět žádné další nepředložené operace.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Přímé volání céčkovské funkce <strong>free</strong> z&nbsp;Pythonu</h2>
+
+<p>Ve skutečnosti nemusíme v&nbsp;jazyce Go vytvářet funkci
+<strong>freeString</strong> ani žádnou podobnou funkci, protože s&nbsp;využitím
+<i>ctypes</i> je možné standardní céčkovskou funkci <strong>free</strong> volat
+přímo z&nbsp;Pythonu. Nejprve ovšem musíme standardní knihovnu (<i>libc</i>)
+najít a načíst. K&nbsp;tomu nám dopomůže pomocná funkce
+<strong>ctypes.util.find_library</strong>:</p>
+
+<pre>
+import ctypes.util
+&nbsp;
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+</pre>
+
+<p>Následně můžeme (pro jistotu) specifikovat, jakého typu je jediný argument
+této funkce:</p>
+
+<pre>
+libc.free.argtypes = (ctypes.c_void_p,)
+</pre>
+
+<p>Poté je již možné funkci <strong>free</strong> zavolat a předat jí libovolný
+platný céčkovský ukazatel (což je obecně odlišné od Pythonovské
+reference!):</p>
+
+<pre>
+libc.free(ptr)
+</pre>
+
+<p>Upravený skript vypadá následovně:</p>
+
+<pre>
+import ctypes
+import ctypes.util
+&nbsp;
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+libc.free.argtypes = (ctypes.c_void_p,)
+&nbsp;
+so8 = ctypes.CDLL("./so8.so")
+&nbsp;
+t1 = "ěščř ЩжΛλ".encode("utf-8")
+t2 = "&lt;foobar&gt;".encode("utf-8")
+&nbsp;
+so8.concat.restype = ctypes.POINTER(ctypes.c_char)
+&nbsp;
+ptr = so8.concat(t1, t2)
+val = ctypes.cast(ptr, ctypes.c_char_p).value
+print(val.decode("utf-8"))
+libc.free(ptr)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: mimochodem stojí za povšimnutí, jak
+relativně složité jsou kódy v&nbsp;Go i Pythonu ve chvíli, kdy se oba jazyky
+musí navzájem domlouvat přes typový systém programovacího jazyka C.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Spojování řetězců s&nbsp;memory leakem vs. volání funkce <strong>free</strong></h2>
+
+<p>Jen pro úplnost se podívejme na spojování řetězců s&nbsp;memory leakem (bez
+uvolnění paměti):</p>
+
+<pre>
+import ctypes
+import time
+&nbsp;
+so8 = ctypes.CDLL("./so8.so")
+&nbsp;
+t1 = ("ěščř ЩжΛλ"*10000).encode("utf-8")
+t2 = ("&lt;foobar&gt;"*10000).encode("utf-8")
+&nbsp;
+so8.concat.restype = ctypes.POINTER(ctypes.c_char)
+&nbsp;
+for i in range(100000):
+    ptr = so8.concat(t1, t2)
+    val = ctypes.cast(ptr, ctypes.c_char_p).value
+    print(len(val))
+    time.sleep(0.001)
+</pre>
+
+<p>Se skriptem, který uvolnění paměti korektně provádí:</p>
+
+<pre>
+import ctypes, ctypes.util
+import time
+&nbsp;
+so8 = ctypes.CDLL("./so8.so")
+&nbsp;
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+libc.free.argtypes = (ctypes.c_void_p,)
+&nbsp;
+t1 = ("ěščř ЩжΛλ"*10000).encode("utf-8")
+t2 = ("&lt;foobar&gt;"*10000).encode("utf-8")
+&nbsp;
+so8.concat.restype = ctypes.POINTER(ctypes.c_char)
+&nbsp;
+for i in range(100000):
+    ptr = so8.concat(t1, t2)
+    val = ctypes.cast(ptr, ctypes.c_char_p).value
+    print(len(val))
+    <strong>libc.free(ptr)</strong>
+    time.sleep(0.001)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: při běžném testování se na tento problém
+nemusí narazit, protože řetězce bývají v&nbsp;porovnání s&nbsp;kapacitami
+moderních RAM relativně malé. Ovšem v&nbsp;produkčním nasazení je problém
+způsobený použitím prvního skriptu prakticky zaručen :-)</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Předávání polí mezí Go a Pythonem</h2>
+
+<p>Ve druhé části dnešního článku se budeme zabývat další důležitou a velmi
+často dotazovanou problematikou. Konkrétně se jedná o předávání polí mezi
+programovacím jazykem Go a Pythonem. Zde opět velmi brzy narazíme na rozdíly
+mezi datovými typy jazyka Go a Pythonu, kde Go podporuje skutečná pole (ty
+ovšem ve skutečnosti nepoužijeme), kdežto v&nbsp;Pythonu se (pokud se omezíme
+na základní jazyk, nikoli například na knihovnu Numpy) pracuje spíše se
+seznamy. Proto je zapotřebí na straně Pythonu používat správné datové typy a
+explicitně konvertovat seznamy na pole.  Ovšem situace je problematická i na
+straně jazyka Go, protože je nutné předávat i délku pole &ndash; data se totiž
+budou předávat přes céčková pole, což je (opět) ukazatel na první prvek pole,
+tentokrát ovšem zcela bez informace o počtu prvků (pochopitelně za předpokladu,
+že pole neobsahuje nějaký prvek sloužící jako &bdquo;zarážka&ldquo;).</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Funkce naprogramovaná v&nbsp;Go akceptující céčkové pole a jeho délku</h2>
+
+<p>Podívejme se nyní na to, jakým způsobem by bylo možné v&nbsp;jazyku Go
+vytvořit funkci, která bude akceptovat céčkovské pole celých čísel a ve druhém
+parametru i délku pole. Pole se předává přes ukazatel (tedy referencí, nikoli
+hodnotou):</p>
+
+<pre>
+func <strong>sum</strong>(values *C.int, length int) int64 {
+    ...
+    ...
+    ...
+</pre>
+
+<p>Jakmile známe ukazatel na pole a jeho délku, můžeme vytvořit řez
+(<i>slice</i>), s&nbsp;nímž se pracuje mnohem lépe, než s&nbsp;pouhými poli
+(interně je však pole stále použito):</p>
+
+<pre>
+slice := unsafe.Slice(values, length)
+</pre>
+
+<p>Funkce následně vypočte a vrátí součet všech prvků tohoto pole.</p>
+
+<pre>
+var sum int64 = 0
+&nbsp;
+for _, value := range slice {
+        sum += int64(value)
+}
+&nbsp;
+return sum
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu bude vypadat takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "C"
+import "unsafe"
+&nbsp;
+<i>//export sum</i>
+func <strong>sum</strong>(values *C.int, length int) int64 {
+        var sum int64 = 0
+        slice := unsafe.Slice(values, length)
+        for _, value := range slice {
+                sum += int64(value)
+        }
+        return sum
+}
+&nbsp;
+func <strong>main</strong>() {}
+</pre>
+
+<p>Překlad do dynamické knihovny již známe:</p>
+
+<pre>
+$ <strong>go build -buildmode=c-shared -o so9.so so9.go</strong>
+</pre>
+
+<p>Po překladu výše uvedeného kódu do dynamické knihovny získáme mj.&nbsp;i
+hlavičkový soubor, který bude obsahovat i hlavičku funkce volatelnou
+z&nbsp;céčka či z&nbsp;například z&nbsp;Pythonu přes <i>ctypes</i> či
+<i>cffi</i>:</p>
+
+<pre>
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+extern GoInt64 sum(int* values, GoInt length);
+&nbsp;
+#ifdef __cplusplus
+</pre>
+
+<p>Celý vygenerovaný hlavičkový soubor pak vypadá následovně:</p>
+
+<pre>
+/* Code generated by cmd/cgo; DO NOT EDIT. */
+&nbsp;
+/* package command-line-arguments */
+&nbsp;
+&nbsp;
+#line 1 "cgo-builtin-export-prolog"
+&nbsp;
+#include &lt;stddef.h&gt; /* for ptrdiff_t below */
+&nbsp;
+#ifndef GO_CGO_EXPORT_PROLOGUE_H
+#define GO_CGO_EXPORT_PROLOGUE_H
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef struct { const char *p; ptrdiff_t n; } _GoString_;
+#endif
+&nbsp;
+#endif
+&nbsp;
+/* Start of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+/* End of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+/* Start of boilerplate cgo prologue.  */
+#line 1 "cgo-gcc-export-header-prolog"
+&nbsp;
+#ifndef GO_CGO_PROLOGUE_H
+#define GO_CGO_PROLOGUE_H
+&nbsp;
+typedef signed char GoInt8;
+typedef unsigned char GoUint8;
+typedef short GoInt16;
+typedef unsigned short GoUint16;
+typedef int GoInt32;
+typedef unsigned int GoUint32;
+typedef long long GoInt64;
+typedef unsigned long long GoUint64;
+typedef GoInt64 GoInt;
+typedef GoUint64 GoUint;
+typedef __SIZE_TYPE__ GoUintptr;
+typedef float GoFloat32;
+typedef double GoFloat64;
+typedef float _Complex GoComplex64;
+typedef double _Complex GoComplex128;
+&nbsp;
+/*
+  static assertion to make sure the file is being used on architecture
+  at least with matching size of GoInt.
+*/
+typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*)==64/8 ? 1:-1];
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef _GoString_ GoString;
+#endif
+typedef void *GoMap;
+typedef void *GoChan;
+typedef struct { void *t; void *v; } GoInterface;
+typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
+&nbsp;
+#endif
+&nbsp;
+/* End of boilerplate cgo prologue.  */
+&nbsp;
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+extern GoInt64 sum(int* values, GoInt length);
+&nbsp;
+#ifdef __cplusplus
+}
+#endif
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Předání pole z&nbsp;céčka do funkce naprogramované v&nbsp;Go</h2>
+
+<p>Pro lepší pochopení toho, jak má vlastně vypadat pole předávané do funkce
+naprogramované v&nbsp;Go si nejprve ukažme, jak by zavolání této funkce bylo
+realizováno v&nbsp;ANSI C. Konkrétně budeme chtít zavolat tuto funkci:</p>
+
+<pre>
+extern GoInt64 sum(int* values, GoInt length);
+</pre>
+
+<p>Deklarace typů <strong>GoInt64</strong> a <strong>GoInt</strong> je součástí
+výše uvedeného hlavičkového souboru (použijeme je dále):</p>
+
+<pre>
+typedef long long GoInt64;
+typedef GoInt64 GoInt;
+</pre>
+
+<p>Způsob otevření dynamické knihovny, získání ukazatele na pojmenovanou funkci
+(či symbol) a zavolání této funkce jsme si již <a
+href="https://www.root.cz/clanky/propojeni-go-s-pythonem-s-vyuzitim-cgo-a-ctypes/#k04">vysvětlili
+minule</a>. V&nbsp;následujícím příkladu se ovšem bude několik věcí odlišovat.
+Především ukazatel na volanou funkci má odlišný typ, a to konkrétně tento:</p>
+
+<pre>
+GoInt64 (*<strong>sum</strong>)(int* values, GoInt length);
+</pre>
+
+<p>Lišit se bude i způsob volání této funkce poté, co na ni získáme
+ukazatel:</p>
+
+<pre>
+int ret;
+int input[] = {1,2,3,4};
+&nbsp;
+printf("address for 'sum' retrieved: %p\n", (void*)sum);
+puts("Calling 'sum'...");
+&nbsp;
+ret = sum(input, sizeof(input)/sizeof(int));
+&nbsp;
+printf("...called, return value: %d\n", ret);
+</pre>
+
+<p>Úplný zdrojový kód příkladu naprogramovaného v&nbsp;céčku bude vypadat
+takto:</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;dlfcn.h&gt;
+&nbsp;
+#include "so9.h"
+&nbsp;
+int <strong>main</strong>()
+{
+    void *library;
+    GoInt64 (*sum)(int* values, GoInt length);
+&nbsp;
+    <i>/* pokus o otevreni a nacteni sdilene knihovny */</i>
+    library = dlopen("./so9.so", RTLD_LAZY);
+    if (library != NULL) {
+        printf("dynamic library loaded: %p\n", library);
+    } else {
+        puts("unable to load dynamic library");
+        return 1;
+    }
+&nbsp;
+    sum = dlsym(library, "sum");
+&nbsp;
+    if (sum != NULL) {
+        int ret;
+        int input[] = {1,2,3,4};
+        printf("address for 'sum' retrieved: %p\n", (void*)sum);
+        puts("Calling 'sum'...");
+        ret = sum(input, sizeof(input)/sizeof(int));
+        printf("...called, return value: %d\n", ret);
+    } else {
+        puts("unable to retrieve address for 'sum'");
+    }
+&nbsp;
+&nbsp;
+    <i>/* pokus o uzavreni sdilene knihovny */</i>
+    if (library != NULL) {
+        int err = dlclose(library);
+        if (err != 0) {
+            puts("unable to close dynamic library");
+            return 1;
+        } else {
+            puts("dynamic library closed");
+        }
+    }
+&nbsp;
+    return EXIT_SUCCESS;
+}
+</pre>
+
+<p>Překlad:</p>
+
+<pre>
+$ <strong>gcc -ansi -Wall use_so9.c -ldl</strong>
+</pre>
+
+<p>Otestování, že funkci z&nbsp;dynamické knihovny lze skutečně zavolat:</p>
+
+<pre>
+dynamic library loaded: 0x56256b1872c0
+address for 'sum' retrieved: 0x7f5b37b769b0
+Calling 'sum'...
+...called, return value: <strong>10</strong>
+dynamic library closed
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Předání pole z&nbsp;Pythonu do funkce naprogramované v&nbsp;Go</h2>
+
+<p>Nyní již víme, jak má vypadat pole, které se předá funkci naprogramované
+v&nbsp;Go. Pokud budeme chtít takové pole předat nikoli z&nbsp;céčka ale
+z&nbsp;Pythonu, budeme muset využít další vlastnosti knihovny <i>ctypes</i>.
+Konkrétně se bude jednat o definici nového typu &bdquo;čtyři hodnoty typu
+int&ldquo; a vytvoření hodnoty tohoto typu. To lze provést následovně:</p>
+
+<pre>
+IntArray = ctypes.c_int * 4
+array = IntArray(1, 2, 3, 4)
+</pre>
+
+<p>Proměnná <strong>array</strong> obsahuje referenci na inicializované pole
+kompatibilní s&nbsp;céčkem, čehož můžeme ihned využít:</p>
+
+<pre>
+print(so9.sum(array, 4))
+</pre>
+
+<p>Celý skript bude vypadat následovně:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so9 = ctypes.CDLL("./so9.so")
+&nbsp;
+IntArray = ctypes.c_int * 4
+array = IntArray(1, 2, 3, 4)
+&nbsp;
+so9.sum.restype =  ctypes.c_int64
+&nbsp;
+print(so9.sum(array, 4))
+</pre>
+
+<p>Otestování funkčnosti:</p>
+
+<pre>
+$ <strong>python3 use_so9A.py</strong>
+&nbsp;
+10
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Vytvoření pole ze seznamu hodnot</h2>
+
+<p>Častěji se však setkáme s&nbsp;požadavkem na převedení seznamu hodnot na
+céčkovské pole. I to je pochopitelně možné, a to způsobem ukázaným
+v&nbsp;dalším skriptu:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so9 = ctypes.CDLL("./so9.so")
+&nbsp;
+values = [1, 2, 3, 4, 5]
+&nbsp;
+IntArray = ctypes.c_int * len(values)
+array = IntArray(*values)
+&nbsp;
+so9.sum.restype =  ctypes.c_int64
+&nbsp;
+print(so9.sum(array, 4))
+</pre>
+
+<p>Otestování funkčnosti:</p>
+
+<pre>
+$ <strong>python3 use_so9B.py</strong>
+&nbsp;
+10
+</pre>
+
+<p>Ještě si pro jistotu vyzkoušejme, že se skutečně musí jednat o seznam celých
+čísel:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so9 = ctypes.CDLL("./so9.so")
+&nbsp;
+values = <strong>[1, "Foo", True, 4, None]</strong>
+&nbsp;
+IntArray = ctypes.c_int * len(values)
+array = IntArray(*values)
+&nbsp;
+so9.sum.restype =  ctypes.c_int64
+&nbsp;
+print(so9.sum(array, 4))
+</pre>
+
+<p>Nyní při pokusu o spuštění dostaneme chybové hlášení:</p>
+
+<pre>
+$ <strong>python3 use_so9C.py </strong>
+&nbsp;
+Traceback (most recent call last):
+  File "use_so9C.py", line 8, in &lt;module&gt;
+    array = IntArray(*values)
+TypeError: an integer is required (got type str)
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Pole s&nbsp;prvky typu <strong>double</strong> resp. <strong>float64</strong></h2>
+
+<p>Pro úplnost si ještě ukažme funkci, která pro vstupní pole hodnot typu
+<strong>double</strong> (což v&nbsp;Go odpovídá datovému typu
+<strong>float64</strong>) vypočte průměrnou hodnotu. Pokud je však pole
+prázdné, vrátí se hodnota -1 (tím mj.&nbsp;zabráníme dělení nulou).
+V&nbsp;jazyce Go bude vytvoření takové funkce snadné:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "C"
+import "unsafe"
+&nbsp;
+<i>//export average</i>
+func <strong>average</strong>(values *C.double, length int) float64 {
+        if length == 0 {
+                return -1
+        }
+&nbsp;
+        var sum float64 = 0
+        slice := unsafe.Slice(values, length)
+        for _, value := range slice {
+                sum += float64(value)
+        }
+        return sum / float64(length)
+}
+&nbsp;
+func <strong>main</strong>() {}
+</pre>
+
+<p>Překlad do dynamické knihovny již známe, takže jen ve stručnosti:</p>
+
+<pre>
+$ <strong>go build -buildmode=c-shared -o so10.so so10.go</strong>
+</pre>
+
+<p>Hlavička funkce volatelná z&nbsp;C či Pythonu:</p>
+
+<pre>
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+<strong>extern GoFloat64 average(double* values, GoInt length);</strong>
+&nbsp;
+#ifdef __cplusplus
+</pre>
+
+<p>A vygenerovaný hlavičkový soubor:</p>
+
+<pre>
+/* Code generated by cmd/cgo; DO NOT EDIT. */
+&nbsp;
+/* package command-line-arguments */
+&nbsp;
+&nbsp;
+#line 1 "cgo-builtin-export-prolog"
+&nbsp;
+#include &lt;stddef.h&gt; /* for ptrdiff_t below */
+&nbsp;
+#ifndef GO_CGO_EXPORT_PROLOGUE_H
+#define GO_CGO_EXPORT_PROLOGUE_H
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef struct { const char *p; ptrdiff_t n; } _GoString_;
+#endif
+&nbsp;
+#endif
+&nbsp;
+/* Start of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+/* End of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+/* Start of boilerplate cgo prologue.  */
+#line 1 "cgo-gcc-export-header-prolog"
+&nbsp;
+#ifndef GO_CGO_PROLOGUE_H
+#define GO_CGO_PROLOGUE_H
+&nbsp;
+typedef signed char GoInt8;
+typedef unsigned char GoUint8;
+typedef short GoInt16;
+typedef unsigned short GoUint16;
+typedef int GoInt32;
+typedef unsigned int GoUint32;
+typedef long long GoInt64;
+typedef unsigned long long GoUint64;
+typedef GoInt64 GoInt;
+typedef GoUint64 GoUint;
+typedef __SIZE_TYPE__ GoUintptr;
+typedef float GoFloat32;
+typedef double GoFloat64;
+typedef float _Complex GoComplex64;
+typedef double _Complex GoComplex128;
+&nbsp;
+/*
+  static assertion to make sure the file is being used on architecture
+  at least with matching size of GoInt.
+*/
+typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*)==64/8 ? 1:-1];
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef _GoString_ GoString;
+#endif
+typedef void *GoMap;
+typedef void *GoChan;
+typedef struct { void *t; void *v; } GoInterface;
+typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
+&nbsp;
+#endif
+&nbsp;
+/* End of boilerplate cgo prologue.  */
+&nbsp;
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+extern GoFloat64 average(double* values, GoInt length);
+&nbsp;
+#ifdef __cplusplus
+}
+#endif
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Předání pole z&nbsp;Pythonu</h2>
+
+<p>V&nbsp;případě, že budeme chtít výše uvedenou funkci
+<strong>average</strong> volat z&nbsp;Pythonu častěji, je vhodné si vytvořit
+pomocnou funkci konstruující céčkové pole z&nbsp;předaných hodnot:</p>
+
+<pre>
+def <strong>c_array</strong>(values):
+    ArrayType = ctypes.c_double * len(values)
+    return ArrayType(*values)
+</pre>
+
+<p>Použití takové funkce je již triviální:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so10 = ctypes.CDLL("./so10.so")
+&nbsp;
+def c_array(values):
+    ArrayType = ctypes.c_double * len(values)
+    return ArrayType(*values)
+&nbsp;
+so10.average.restype =  ctypes.c_double
+&nbsp;
+v1 = []
+print(so10.average(c_array(v1), len(v1)))
+&nbsp;
+v2 = [1]
+print(so10.average(c_array(v2), len(v2)))
+&nbsp;
+v3 = [1, 2]
+print(so10.average(c_array(v3), len(v3)))
+&nbsp;
+v4 = [1, 2, 3, 4]
+print(so10.average(c_array(v4), len(v4)))
+</pre>
+
+<p>Po spuštění tohoto skriptu dostaneme následující výsledky:</p>
+
+<pre>
+-1.0
+1.0
+1.5
+2.5
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: první vrácená hodnota indikuje, že
+předané pole bylo prázdné.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Předávání struktur mezi Go, céčkem a Pythonem</h2>
+
+<p>Třetí část dnešního článku je věnována již relativně dosti složité
+problematice &ndash; konkrétně tomu, jak se předávají struktury (záznamy) mezi
+kódem psaným v&nbsp;jazyce Go a Pythonem, přičemž &bdquo;mezikrokem&ldquo; jsou
+v&nbsp;tomto případě céčkovské datové struktury. Jádro problému spočívá
+v&nbsp;tom, že je nutné znát pravidla pro zarovnání prvků v&nbsp;datových
+strukturách (<i>align</i>). Nejprve se budeme zabývat tím nejjednodušším
+případem, konkrétně tím, že prvky struktury budou mít takovou šířku, že nedojde
+k&nbsp;jejich zarovnání, resp.&nbsp;přesněji řečeno se mezi prvky nevloží žádná
+výplň (což se týká použitého datového typu <strong>double</strong>).</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Funkce naprogramovaná v&nbsp;Go akceptující parametr typu struktura</h2>
+
+<p>V&nbsp;případě, že budeme chtít v&nbsp;programovacím jazyce Go vytvořit
+funkci akceptující jako svůj parametr (céčkovou) strukturu, je nutné tuto
+strukturu nejdříve popsat přímo v&nbsp;céčku, a to v&nbsp;komentáři:</p>
+
+<pre>
+<i>/*</i>
+<i>struct Vector {</i>
+<i>    double X;</i>
+<i>    double Y;</i>
+<i>};</i>
+<i>*/</i>
+</pre>
+
+<p>S&nbsp;využitím tohoto triku se v&nbsp;pseudobalíčku <strong>C</strong>
+objeví nový datový typ pojmenovaný <strong>struct_Vector</strong> (což je
+získáno z&nbsp;prvního řádku deklarace. Můžeme tedy vytvořit funkci, která bude
+strukturu akceptovat jako svůj parametr a vrátí vypočtenou délku vektoru.
+Taková funkce může vypadat například takto:</p>
+
+<pre>
+<i>//export length</i>
+func <strong>length</strong>(v C.struct_Vector) C.double {
+        r := C.double(math.Sqrt(float64(v.X*v.X) + float64(v.Y*v.Y)))
+        fmt.Printf("%f %f %f\n", float64(v.X), float64(v.Y), r)
+        return r
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: prostřední příkaz, tedy volání
+<strong>fmt</strong>, je pochopitelně možné po odladění odstranit.</div></p>
+
+<p>Celý zdrojový kód pak vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "math"
+import "fmt"
+&nbsp;
+<i>/*</i>
+<i>struct Vector {</i>
+<i>    double X;</i>
+<i>    double Y;</i>
+<i>};</i>
+<i>*/</i>
+import "C"
+&nbsp;
+<i>//export length</i>
+func <strong>length</strong>(v C.struct_Vector) C.double {
+        r := C.double(math.Sqrt(float64(v.X*v.X) + float64(v.Y*v.Y)))
+        fmt.Printf("%f %f %f\n", float64(v.X), float64(v.Y), r)
+        return r
+}
+&nbsp;
+func <strong>main</strong>() {}
+</pre>
+
+<p>Po překladu zdrojového kódu do dynamické knihovny:</p>
+
+<pre>
+$ <strong>go build -buildmode=c-shared -o so11.so so11.go</strong>
+</pre>
+
+<p>...bude důležité zjistit, jaké informace byly zahrnuty do vygenerovaného
+hlavičkového souboru <strong>so11.h</strong>. V&nbsp;první řadě zde nalezneme
+deklaraci struktury typu <strong>Vector</strong>:</p>
+
+<pre>
+#line 6 "so11.go"
+&nbsp;
+struct Vector {
+    double X;
+    double Y;
+};
+</pre>
+
+<p>A v&nbsp;řadě druhé pak i hlavičku funkce <strong>length</strong>:</p>
+
+<pre>
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+extern double length(struct Vector v);
+&nbsp;
+#ifdef __cplusplus
+</pre>
+
+<p>Celý hlavičkový soubor vypadá takto:</p>
+
+<pre>
+/* Code generated by cmd/cgo; DO NOT EDIT. */
+&nbsp;
+/* package command-line-arguments */
+&nbsp;
+&nbsp;
+#line 1 "cgo-builtin-export-prolog"
+&nbsp;
+#include &lt;stddef.h&gt; /* for ptrdiff_t below */
+&nbsp;
+#ifndef GO_CGO_EXPORT_PROLOGUE_H
+#define GO_CGO_EXPORT_PROLOGUE_H
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef struct { const char *p; ptrdiff_t n; } _GoString_;
+#endif
+&nbsp;
+#endif
+&nbsp;
+/* Start of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+#line 6 "so11.go"
+&nbsp;
+struct Vector {
+    double X;
+    double Y;
+};
+&nbsp;
+#line 1 "cgo-generated-wrapper"
+&nbsp;
+&nbsp;
+/* End of preamble from import "C" comments.  */
+&nbsp;
+&nbsp;
+/* Start of boilerplate cgo prologue.  */
+#line 1 "cgo-gcc-export-header-prolog"
+&nbsp;
+#ifndef GO_CGO_PROLOGUE_H
+#define GO_CGO_PROLOGUE_H
+&nbsp;
+typedef signed char GoInt8;
+typedef unsigned char GoUint8;
+typedef short GoInt16;
+typedef unsigned short GoUint16;
+typedef int GoInt32;
+typedef unsigned int GoUint32;
+typedef long long GoInt64;
+typedef unsigned long long GoUint64;
+typedef GoInt64 GoInt;
+typedef GoUint64 GoUint;
+typedef __SIZE_TYPE__ GoUintptr;
+typedef float GoFloat32;
+typedef double GoFloat64;
+typedef float _Complex GoComplex64;
+typedef double _Complex GoComplex128;
+&nbsp;
+/*
+  static assertion to make sure the file is being used on architecture
+  at least with matching size of GoInt.
+*/
+typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*)==64/8 ? 1:-1];
+&nbsp;
+#ifndef GO_CGO_GOSTRING_TYPEDEF
+typedef _GoString_ GoString;
+#endif
+typedef void *GoMap;
+typedef void *GoChan;
+typedef struct { void *t; void *v; } GoInterface;
+typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
+&nbsp;
+#endif
+&nbsp;
+/* End of boilerplate cgo prologue.  */
+&nbsp;
+#ifdef __cplusplus
+extern "C" {
+#endif
+&nbsp;
+extern double length(struct Vector v);
+&nbsp;
+#ifdef __cplusplus
+}
+#endif
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Zavolání Go funkce z&nbsp;céčka s&nbsp;předáním struktury</h2>
+
+<p>Před popisem práce se strukturami v&nbsp;Pythonu si opět ukážeme, jak se
+funkce naprogramovaná v&nbsp;Go zavolá z&nbsp;céčka. Budeme postupovat nám již
+známým způsobem, tedy otevřením a načtením dynamické knihovny a použitím
+následujícího ukazatele, ke kterému přiřadíme adresu vstupního bodu do
+přeložené funkce <strong>length</strong>:</p>
+
+<pre>
+double (*<strong>length</strong>)(struct Vector v);
+</pre>
+
+<p>Po získání ukazatele na funkci si jen připravíme strukturu se vstupními
+daty, funkci zavoláme a zobrazíme výsledek:</p>
+
+<pre>
+struct Vector v;
+&nbsp;
+v.X = 1.0;
+v.Y = 1.0;
+&nbsp;
+double ret;
+&nbsp;
+printf("address for 'length' retrieved: %p\n", (void*)length);
+puts("Calling 'length'...");
+<strong>ret = length(v);</strong>
+printf("...called, vector length: %f\n", ret);
+</pre>
+
+<p>Otestování funkcionality:</p>
+
+<pre>
+dynamic library loaded: 0x55f7dafc12c0
+address for 'length' retrieved: 0x7f10c9162b50
+Calling 'length'...
+1.000000 1.000000 1.414214
+...called, vector length: <strong>1.414214</strong>
+dynamic library closed
+</pre>
+
+<p>Pro jistotu si ukažme úplný zdrojový kód celého příkladu:</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;dlfcn.h&gt;
+&nbsp;
+#include "so11.h"
+&nbsp;
+int <strong>main</strong>()
+{
+    void *library;
+    double (*length)(struct Vector v);
+&nbsp;
+    <i>/* pokus o otevreni a nacteni sdilene knihovny */</i>
+    library = dlopen("./so11.so", RTLD_LAZY);
+    if (library != NULL) {
+        printf("dynamic library loaded: %p\n", library);
+    } else {
+        puts("unable to load dynamic library");
+        return 1;
+    }
+&nbsp;
+    length = dlsym(library, "length");
+&nbsp;
+    if (length != NULL) {
+        struct Vector v;
+        v.X = 1.0;
+        v.Y = 1.0;
+        double ret;
+        printf("address for 'length' retrieved: %p\n", (void*)length);
+        puts("Calling 'length'...");
+        ret = length(v);
+        printf("...called, vector length: %f\n", ret);
+    } else {
+        puts("unable to retrieve address for 'length'");
+    }
+&nbsp;
+    <i>/* pokus o uzavreni sdilene knihovny */</i>
+    if (library != NULL) {
+        int err = dlclose(library);
+        if (err != 0) {
+            puts("unable to close dynamic library");
+            return 1;
+        } else {
+            puts("dynamic library closed");
+        }
+    }
+&nbsp;
+    return EXIT_SUCCESS;
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Zavolání Go funkce z&nbsp;Pythonu s&nbsp;předáním struktury</h2>
+
+<p>Volání funkce akceptující strukturu z&nbsp;Pythonu lze realizovat poměrně
+elegantním způsobem. Samotný jazyk Python sice datový typ
+&bdquo;struktura&ldquo; nepodporuje, ovšem strukturu lze v&nbsp;tomto případě
+nahradit vhodně navrženou třídou. Tato třída je odvozena od třídy
+<strong>ctypes.Structure</strong> a musí mít definovány atributy odpovídající
+jak jménem, tak i typem svému céčkovému protějšku (a nepřímo tak i protějšku
+napsaném v&nbsp;Go). V&nbsp;našem konkrétním případě může tato třída vypadat
+takto:</p>
+
+<pre>
+class <strong>Vector</strong>(ctypes.Structure):
+    _fields_ = [("X", ctypes.c_double),
+                ("Y", ctypes.c_double)]
+</pre>
+
+<p>Realizace skriptu, který zavolá funkci <strong>length</strong>
+naprogramovanou původně v&nbsp;Go, tedy může vypadat následovně:</p>
+
+<pre>
+import ctypes
+&nbsp;
+so11 = ctypes.CDLL("./so11.so")
+&nbsp;
+so11.length.restype =  ctypes.c_double
+&nbsp;
+class <strong>Vector</strong>(ctypes.Structure):
+    _fields_ = [("X", ctypes.c_double),
+                ("Y", ctypes.c_double)]
+&nbsp;
+v = Vector(1.0, 1.0)
+&nbsp;
+print(so11.length(v))
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech minule i dnes použitých demonstračních příkladů byly
+uloženy do nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>so1.go</td><td>definice funkce <strong>hello</strong> v&nbsp;jazyce Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so1.go">https://github.com/tisnik/go-root/blob/master/article_85/so1.go</a></td></tr>
+<tr><td> 2</td><td>so1.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so1.h">https://github.com/tisnik/go-root/blob/master/article_85/so1.h</a></td></tr>
+<tr><td> 3</td><td>use_so1.c</td><td>volání funkce <strong>hello</strong> z&nbsp;céčka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so1.c">https://github.com/tisnik/go-root/blob/master/article_85/use_so1.c</a></td></tr>
+<tr><td> 4</td><td>use_so1A.py</td><td>volání nativní funkce <strong>hello</strong> z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so1A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so1A.py</a></td></tr>
+<tr><td> 5</td><td>use_so1B.py</td><td>volání nativní funkce <strong>hello</strong> z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so1B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so1B.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>so2.go</td><td>zavolání funkce <strong>hello</strong> z&nbsp;funkce <strong>main</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so2.go">https://github.com/tisnik/go-root/blob/master/article_85/so2.go</a></td></tr>
+<tr><td> 7</td><td>so2.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so2.h">https://github.com/tisnik/go-root/blob/master/article_85/so2.h</a></td></tr>
+<tr><td> 8</td><td>use_so2A.py</td><td>volání nativní funkce <strong>hello</strong> z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so2A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so2A.py</a></td></tr>
+<tr><td> 9</td><td>use_so2B.py</td><td>volání nativní funkce <strong>hello</strong> z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so2B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so2B.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>so3.go</td><td>definice funkce <strong>add</strong> v&nbsp;jazyce Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so3.go">https://github.com/tisnik/go-root/blob/master/article_85/so3.go</a></td></tr>
+<tr><td>11</td><td>so3.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so3.h">https://github.com/tisnik/go-root/blob/master/article_85/so3.h</a></td></tr>
+<tr><td>12</td><td>use_so3A.py</td><td>součet dvou celých čísel</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so3A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so3A.py</a></td></tr>
+<tr><td>13</td><td>use_so3B.py</td><td>pokus o součet dvou čísel s&nbsp;plovoucí řádovou čárkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so3B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so3B.py</a></td></tr>
+<tr><td>14</td><td>use_so3C.py</td><td>přetečení výsledku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so3C.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so3C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>15</td><td>so4.go</td><td>funkce <strong>add</strong> pro datový typ <strong>int64</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so4.go">https://github.com/tisnik/go-root/blob/master/article_85/so4.go</a></td></tr>
+<tr><td>16</td><td>so4.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so4.h">https://github.com/tisnik/go-root/blob/master/article_85/so4.h</a></td></tr>
+<tr><td>17</td><td>use_so4A.py</td><td>součet dvou hodnot bez přetečení</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so4A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so4A.py</a></td></tr>
+<tr><td>18</td><td>use_so4B.py</td><td>součet dvou hodnot s&nbsp;přetečením</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so4B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so4B.py</a></td></tr>
+<tr><td>19</td><td>use_so4C.py</td><td>explicitní určení návratového typu funkce <strong>add</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so4C.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so4C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>20</td><td>so5.go</td><td>funkce akceptující parametr obsahující řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so5.go">https://github.com/tisnik/go-root/blob/master/article_85/so5.go</a></td></tr>
+<tr><td>21</td><td>so5.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so5.h">https://github.com/tisnik/go-root/blob/master/article_85/so5.h</a></td></tr>
+<tr><td>22</td><td>use_so5A.py</td><td>pokus o volání funkce akceptující řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so5A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so5A.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>23</td><td>so6.go</td><td>funkce akceptující korektní céčkový řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so6.go">https://github.com/tisnik/go-root/blob/master/article_85/so6.go</a></td></tr>
+<tr><td>24</td><td>so6.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so6.h">https://github.com/tisnik/go-root/blob/master/article_85/so6.h</a></td></tr>
+<tr><td>25</td><td>use_so6A.py</td><td>zavolání funkce naprogramované v&nbsp;Go s&nbsp;předáním Pythonovského řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so6A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so6A.py</a></td></tr>
+<tr><td>26</td><td>use_so6B.py</td><td>zavolání funkce naprogramované v&nbsp;Go s&nbsp;předáním pole bajtů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so6B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so6B.py</a></td></tr>
+<tr><td>27</td><td>use_so6C.py</td><td>otestování s&nbsp;řetězcem obsahujícím znaky Unicode</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so6C.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so6C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>28</td><td>so7.go</td><td>funkce spojující dva céčkové řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so7.go">https://github.com/tisnik/go-root/blob/master/article_85/so7.go</a></td></tr>
+<tr><td>29</td><td>so7.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/so7.h">https://github.com/tisnik/go-root/blob/master/article_85/so7.h</a></td></tr>
+<tr><td>30</td><td>use_so7A.py</td><td>zavolání funkce naprogramované v&nbsp;Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so7A.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so7A.py</a></td></tr>
+<tr><td>31</td><td>use_so7B.py</td><td>zavolání funkce naprogramované v&nbsp;Go, převod výsledku na řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so7B.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so7B.py</a></td></tr>
+<tr><td>32</td><td>use_so7C.py</td><td>ukázka memory leaku v&nbsp;Go funkci</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_85/use_so7C.py">https://github.com/tisnik/go-root/blob/master/article_85/use_so7C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>33</td><td>so8.go</td><td>funkce spojující dva céčkové řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so8.go">https://github.com/tisnik/go-root/blob/master/article_86/so8.go</a></td></tr>
+<tr><td>34</td><td>so8.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so8.h">https://github.com/tisnik/go-root/blob/master/article_86/so8.h</a></td></tr>
+<tr><td>35</td><td>use_so8A.py</td><td>korektní zavolání funkce pro uvolnění řetězce z&nbsp;paměti</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so8A.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so8A.py</a></td></tr>
+<tr><td>36</td><td>use_so8B.py</td><td>přímé zavolání standardní funkce <strong>free</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so8B.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so8B.py</a></td></tr>
+<tr><td>37</td><td>use_so8C.py</td><td>test na memory leak</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so8C.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so8C.py</a></td></tr>
+<tr><td>38</td><td>use_so8C.py</td><td>test na memory leak</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so8C.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so8C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>39</td><td>so9.go</td><td>funkce zpracovávající pole s&nbsp;prvky typu <strong>int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so9.go">https://github.com/tisnik/go-root/blob/master/article_86/so9.go</a></td></tr>
+<tr><td>40</td><td>so9.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so9.h">https://github.com/tisnik/go-root/blob/master/article_86/so9.h</a></td></tr>
+<tr><td>41</td><td>use_so9.c</td><td>volání funkce <strong>sum</strong> z&nbsp;céčka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so9.c">https://github.com/tisnik/go-root/blob/master/article_86/use_so9.c</a></td></tr>
+<tr><td>42</td><td>use_so9A.py</td><td>předání pole z&nbsp;Pythonu do Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so9A.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so9A.py</a></td></tr>
+<tr><td>43</td><td>use_so9B.py</td><td>předání pole získaného ze seznamu z&nbsp;Pythonu do Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so9B.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so9B.py</a></td></tr>
+<tr><td>44</td><td>use_so9C.py</td><td>pokus o vytvoření pole z&nbsp;nekompatibilních hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so9C.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so9C.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>45</td><td>so10.go</td><td>funkce zpracovávající pole s&nbsp;prvky typu <strong>double</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so10.go">https://github.com/tisnik/go-root/blob/master/article_86/so10.go</a></td></tr>
+<tr><td>46</td><td>so10.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so10.h">https://github.com/tisnik/go-root/blob/master/article_86/so10.h</a></td></tr>
+<tr><td>47</td><td>use_so10A.py</td><td>volání nativní funkce akceptující pole z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so10.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so10.py</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>48</td><td>so11.go</td><td>funkce zpracovávající strukturu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so11.go">https://github.com/tisnik/go-root/blob/master/article_86/so11.go</a></td></tr>
+<tr><td>49</td><td>so11.h</td><td>vygenerovaný hlavičkový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/so11.h">https://github.com/tisnik/go-root/blob/master/article_86/so11.h</a></td></tr>
+<tr><td>50</td><td>use_so11.c</td><td>volání funkce <strong>length</strong> z&nbsp;céčka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so11.c">https://github.com/tisnik/go-root/blob/master/article_86/use_so11.c</a></td></tr>
+<tr><td>51</td><td>use_so11.py</td><td>volání funkce <strong>length</strong> z&nbsp;Pythonu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_86/use_so11.py">https://github.com/tisnik/go-root/blob/master/article_86/use_so11.py</a></td></tr>
+</table>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>ctypes &ndash; A foreign function library for Python<br />
+<a href="https://docs.python.org/3/library/ctypes.html">https://docs.python.org/3/library/ctypes.html</a>
+</li>
+
+<li>Kooperace mezi kódem psaným v&nbsp;Go a C: cgo<br />
+<a href="https://www.root.cz/clanky/kooperace-mezi-kodem-psanym-v-go-a-c-cgo/">https://www.root.cz/clanky/kooperace-mezi-kodem-psanym-v-go-a-c-cgo/</a>
+</li>
+
+<li>cgo &ndash; Introduction<br />
+<a href="https://zchee.github.io/golang-wiki/cgo/">https://zchee.github.io/golang-wiki/cgo/</a>
+</li>
+
+<li>Introduction to cgo (wiki)<br />
+<a href="https://github.com/golang/go/wiki/cgo">https://github.com/golang/go/wiki/cgo</a>
+</li>
+
+<li>C? Go? Cgo!<br />
+<a href="https://go.dev/blog/cgo">https://go.dev/blog/cgo</a>
+</li>
+
+<li>ctypes return a string from c function<br />
+<a href="https://newbedev.com/ctypes-return-a-string-from-c-function">https://newbedev.com/ctypes-return-a-string-from-c-function</a>
+</li>
+
+<li>cgo: Passing a slice/array pointer between Go/C<br />
+<a href="https://groups.google.com/g/Golang-Nuts/c/DXCIP6pMMN0">https://groups.google.com/g/Golang-Nuts/c/DXCIP6pMMN0</a>
+</li>
+
+<li>cgo-struct-array<br />
+<a href="https://github.com/llgoer/cgo-struct-array">https://github.com/llgoer/cgo-struct-array</a>
+</li>
+
+<li>C structs and Pointers<br />
+<a href="https://www.programiz.com/c-programming/c-structures-pointers">https://www.programiz.com/c-programming/c-structures-pointers</a>
+</li>
+
+<li>Pass struct and array of structs to C function from Go<br />
+<a href="https://stackoverflow.com/questions/19910647/pass-struct-and-array-of-structs-to-c-function-from-go">https://stackoverflow.com/questions/19910647/pass-struct-and-array-of-structs-to-c-function-from-go</a>
+</li>
+
+<li>dlopen(3) — Linux manual page<br />
+<a href="https://man7.org/linux/man-pages/man3/dlopen.3.html">https://man7.org/linux/man-pages/man3/dlopen.3.html</a>
+</li>
+
+<li>dlclose(3p) — Linux manual page<br />
+<a href="https://man7.org/linux/man-pages/man3/dlclose.3p.html">https://man7.org/linux/man-pages/man3/dlclose.3p.html</a>
+</li>
+
+<li>dlsym(3) — Linux manual page<br />
+<a href="https://man7.org/linux/man-pages/man3/dlsym.3.html">https://man7.org/linux/man-pages/man3/dlsym.3.html</a>
+</li>
+
+<li>How to correctly assign a pointer returned by dlsym into a variable of function pointer type?<br />
+<a href="https://stackoverflow.com/questions/36384195/how-to-correctly-assign-a-pointer-returned-by-dlsym-into-a-variable-of-function">https://stackoverflow.com/questions/36384195/how-to-correctly-assign-a-pointer-returned-by-dlsym-into-a-variable-of-function</a>
+</li>
+
+<li>Faster Python with Go shared objects (the easy way)<br />
+<a href="https://blog.kchung.co/faster-python-with-go-shared-objects/">https://blog.kchung.co/faster-python-with-go-shared-objects/</a>
+</li>
+
+<li>Programovací jazyk Rust: použití FFI pro volání funkcí z&nbsp;nativních knihoven<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pro-volani-funkci-z-nativnich-knihoven/">https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pro-volani-funkci-z-nativnich-knihoven/</a>
+</li>
+
+<li>Programovací jazyk Rust: použití FFI pro volání funkcí z&nbsp;nativních knihoven (2. část)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pro-volani-funkci-z-nativnich-knihoven-2-cast/">https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pro-volani-funkci-z-nativnich-knihoven-2-cast/</a>
+</li>
+
+<li>Programovací jazyk Rust: použití FFI při předávání struktur<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pri-predavani-struktur/">https://www.root.cz/clanky/programovaci-jazyk-rust-pouziti-ffi-pri-predavani-struktur/</a>
+</li>
+
+<li>GNU C Library: Integers<br />
+<a href="https://www.gnu.org/softwa­re/libc/manual/html_node/In­tegers.html">https://www.gnu.org/softwa­re/libc/manual/html_node/In­tegers.html</a>
+</li>
+
+<li>Position-independent code<br />
+<a href="https://cs.wikipedia.org/wiki/Position-independent_code">https://cs.wikipedia.org/wiki/Position-independent_code</a>
+</li>
+
+<li>Creating a shared and static library with the gnu compiler [gcc]<br />
+<a href="http://www.adp-gmbh.ch/cpp/gcc/create_lib.html">http://www.adp-gmbh.ch/cpp/gcc/create_lib.html</a>
+</li>
+
+<li>FFI: Foreign Function Interface<br />
+<a href="https://doc.rust-lang.org/book/ffi.html">https://doc.rust-lang.org/book/ffi.html</a>
+</li>
+
+<li>Primitive Type pointer<br />
+<a href="https://doc.rust-lang.org/std/primitive.pointer.html">https://doc.rust-lang.org/std/primitive.pointer.html</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
