@@ -1,0 +1,1527 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Standardní šablonovací systém jazyka Go (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Standardní šablonovací systém jazyka Go (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku dokončíme popis standardního šablonovacího systému programovacího jazyka Go, který je představován knihovnou text/template. Jedná se o až překvapivě výkonný a taktéž rozšiřitelný šablonovací systém umožňující například volání uživatelských funkcí atd.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Standardní šablonovací systém programovacího jazyka Go (dokončení)</a></p>
+<p><a href="#k02">2. Naformátování hodnot funkcí <strong>fmt.Sprintf</strong> volanou přímo ze šablony</a></p>
+<p><a href="#k03">3. Podmínky v&nbsp;šablonách</a></p>
+<p><a href="#k04">4. Praktické otestování podmínky v&nbsp;šabloně</a></p>
+<p><a href="#k05">5. Plná podmínka typu <strong>if-then-else</strong> v&nbsp;šabloně</a></p>
+<p><a href="#k06">6. Volání metod z&nbsp;šablony</a></p>
+<p><a href="#k07">7. Pokus o přístup k&nbsp;privátní metodě z&nbsp;šablony</a></p>
+<p><a href="#k08">8. Kolony (<i>pipeline</i>) v&nbsp;šabloně</a></p>
+<p><a href="#k09">9. Blok <strong>with</strong> a proměnné v&nbsp;šablonách</a></p>
+<p><a href="#k10">10. Definice pojmenované šablony</a></p>
+<p><a href="#k11">11. Předání funkce do šablony, vyvolání funkce v&nbsp;šabloně</a></p>
+<p><a href="#k12">12. Kombinace předchozích možností &ndash; blok <strong>with</strong> a předání i použití funkcí v&nbsp;šabloně</a></p>
+<p><a href="#k13">13. Dvourozměrná pole v&nbsp;šablonách</a></p>
+<p><a href="#k14">14. Vytištění tabulky malé násobilky</a></p>
+<p><a href="#k15">15. Vylepšení předchozího demonstračního příkladu</a></p>
+<p><a href="#k16">16. Přístup k&nbsp;poli, které je uloženo jako prvek datové struktury</a></p>
+<p><a href="#k17">17. Závěr</a></p>
+<p><a href="#k18">18. Další šablonovací systémy dostupné pro jazyk Go</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Standardní šablonovací systém programovacího jazyka Go (dokončení)</h2>
+
+<p>V&nbsp;závěru <a
+href="https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go/">úvodního
+článku o standardním šablonovacím systému programovacího jazyka Go</a> jsme si
+ukázali, že přímo v&nbsp;šabloně je možné definovat oblast, která se má
+opakovat pro všechny prvky získané ze vstupních dat. Tato v&nbsp;praxi velmi
+užitečná funkcionalita je založena na použití značek &bdquo;{{range
+<i>selektor</i>}}&ldquo; a &bdquo;{{end}}&ldquo;. <i>Selektorem</i> je přitom
+myšleno určení opakujících se prvků ve vstupních datech. Prozatím zde využijeme
+tečku (<i>dot</i>), ale v&nbsp;navazujících kapitolách si ukážeme, že lze
+iterovat i přes všechny hodnoty vybraného prvku apod. Vše, co je zapsáno mezi
+značkami &bdquo;{{range}}&ldquo; a &bdquo;{{end}}&ldquo; (tedy jak běžný text,
+tak i značky šablony), bude opakováno tolikrát, kolik prvků je nalezeno ve
+vstupních datech. Přístup k&nbsp;hodnotám těchto prvků je opět proveden
+s&nbsp;využitím nám již dobře známé tečkové notace, tedy například:</p>
+
+<pre>
+<strong>{{range .}}</strong>Jméno {{.Name}} {{.Surname}}
+Popularita {{.Popularity}}
+---
+<strong>{{end}}</strong>
+</pre>
+
+<p>Tato šablona byla použita v&nbsp;následujícím demonstračním příkladu,
+s&nbsp;nímž jsme se taktéž seznámili již minule:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "template15.txt"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 1},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 3},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+Jméno Eliška Najbrtová
+Popularita 4
+---
+Jméno Jenny Suk
+Popularita 3
+---
+Jméno Anička Šafářová
+Popularita 1
+---
+Jméno Sváťa Pulec
+Popularita 3
+---
+Jméno Blažej Motyčka
+Popularita 8
+---
+Jméno Eda Wasserfall
+Popularita 3
+---
+Jméno Přemysl Hájek
+Popularita 10
+---
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_79/template15.go">https://github.com/tisnik/go-root/blob/master/article_79/template15.go</a>.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Naformátování hodnot funkcí <strong>fmt.Sprintf</strong> volanou přímo ze šablony</h2>
+
+<p>V&nbsp;mnoha případech by se hodilo hodnoty, které se vkládají do šablony,
+nějakým způsobem naformátovat, což se týká například numerických hodnot,
+řetězců s&nbsp;různou délkou vstupu apod. Autoři šablonovacích systémů
+přistupují k&nbsp;tomuto problému z&nbsp;různých stran, většinou přidáním
+dalších znaků se speciálním významem do doménově specifického šablonovacího
+jazyka. V&nbsp;případě standardního šablonovacího systému programovacího jazyka
+Go je tomu ovšem jinak, protože pro naformátování se většinou používá
+standardní funkce <strong>fmt.Printf</strong> přesněji řečeno
+resp.&nbsp;<strong>fmt.Sprintf</strong>. Volání této funkce v&nbsp;šabloně se
+však provádí bez závorek okolo parametrů, například následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno <strong>{{printf "%-15s" .Name}}</strong> <strong>{{printf "%-15s" .Surname}}</strong> Popularita <strong>{{printf "%2d" .Popularity}</strong>}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>To například znamená, že následující část šablony:</p>
+
+<pre>
+{{printf "%-15s" .Name}}
+</pre>
+
+<p>Vlastně odpovídá volání:</p>
+
+<pre>
+fmt.Sprintf("%-15s", item.Name)
+</pre>
+
+<p>V&nbsp;případě, že výše uvedenou šablonu použijeme v&nbsp;demonstračním
+příkladu, bude výstup naformátován tímto způsobem:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita  4
+Jméno Jenny           Suk             Popularita  3
+Jméno Anička          Šafářová        Popularita  1
+Jméno Sváťa           Pulec           Popularita  3
+Jméno Blažej          Motyčka         Popularita  8
+Jméno Eda             Wasserfall      Popularita  3
+Jméno Přemysl         Hájek           Popularita 10
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template16.go">https://github.com/tisnik/go-root/blob/master/article_80/template16.go</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti je možné takto jednoduše
+volat jen několik málo funkcí, jejichž jmenné aliasy jsou vypsány
+v&nbsp;následující tabulce:</div></p>
+
+<table>
+<tr><th>Jméno v&nbsp;šabloně</th><th>Volaná funkce</th></tr>
+<tr><td>print</td><td>fmt.Sprint</td></tr>
+<tr><td>printf</td><td>fmt.Sprintf</td></tr>
+<tr><td>println</td><td>fmt.Sprintln</td></tr>
+<tr><td>urlquery</td><td>přeformátování řetězce tak, aby ho bylo možné použít v&nbsp;URL</td></tr>
+</table>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Podmínky v&nbsp;šablonách</h2>
+
+<p>Mnohdy se taktéž setkáme s&nbsp;nutností použít v&nbsp;šablonách podmínku,
+což znamená, že určitá část textu bude ve výsledku použita pouze při splnění
+nějaké podmínky (a popř.&nbsp;jiná při nesplnění té samé podmínky). Příkladem
+může být například šablona, která je součástí dokumentace/nápovědy ke
+standardnímu šablonovacímu systému jazyka Go:</p>
+
+<pre>
+Dear {{.Name}},
+<strong>{{if .Attended}}</strong>
+It was a pleasure to see you at the wedding.
+<strong>{{else}}</strong>
+It is a shame you couldn't make it to the wedding.
+<strong>{{end}}</strong>
+{{end}}
+Best wishes,
+Josie
+</pre>
+
+<p>V&nbsp;podmínce se mohou volat funkce, které odpovídají standardním relačním
+operátorům:</p>
+
+<table>
+<tr><th>Funkce</th><th>Odpovídá výrazu</th></tr>
+<tr><td>eq</td><td>arg1 == arg2</td></tr>
+<tr><td>ne</td><td>arg1 != arg2</td></tr>
+<tr><td>lt</td><td>arg1 &lt; arg2</td></tr>
+<tr><td>le</td><td>arg1 &lt;= arg2</td></tr>
+<tr><td>gt</td><td>arg1 &gt; arg2</td></tr>
+<tr><td>ge</td><td>arg1 &gt;= arg2</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: důležité je vědět, které hodnoty se
+vyhodnotí jako pravda a které jako nepravda. Za nepravdu jsou považovány
+hodnoty <strong>0</strong>, <strong>false</strong>, <strong>nil</strong> a
+taktéž řetězce, pole, řezy a mapy s&nbsp;nulovou délkou resp.&nbsp;nulovým
+počtem prvků (což je odlišné od standardní sémantiky jazyka Go!). Ostatní
+hodnoty jsou považovány za pravdivé.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Praktické otestování podmínky v&nbsp;šabloně</h2>
+
+<p>Podívejme se nyní na praktický způsob použití šablony s&nbsp;podmínkou.
+Budeme rozlišovat, zda je popularita role v&nbsp;Cimrmanovských hrách známá či
+nikoli. Použijeme přitom explicitní test, zda je zapsaná hodnota ostře větší
+než nula:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} <strong>{{if gt .Popularity 0}}</strong> Popularita {{printf "%2d" .Popularity}} <strong>{{end}}</strong>
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Zdrojový kód demonstračního příkladu se změní jen nepatrně &ndash; pozměníme
+hodnoty prvků <strong>Popularity</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "template17.txt"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek by měl vypadat následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová        Popularita  4 
+Jméno Jenny           Suk              Popularita  3 
+Jméno Anička          Šafářová        
+Jméno Sváťa           Pulec            Popularita  3 
+Jméno Blažej          Motyčka          Popularita  8 
+Jméno Eda             Wasserfall      
+Jméno Přemysl         Hájek            Popularita 10 
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template17.go">https://github.com/tisnik/go-root/blob/master/article_80/template17.go</a>.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Plná podmínka typu <strong>if-then-else</strong> v&nbsp;šabloně</h2>
+
+<p>V&nbsp;šabloně lze dále použít úplnou podmínku, tj.&nbsp;určit, který text
+se má přidat do výsledku ve chvíli, kdy nějaká podmínka je splněna a který text
+se má naopak přidat v&nbsp;případě nesplnění podmínky. V&nbsp;praxi to může
+vypadat například následovně &ndash; rozlišíme, zda je popularita role známá či
+neznámá:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita <strong>{{if gt .Popularity 0}}</strong> {{printf "%2d" .Popularity}} <strong>{{else}}</strong> neznámá <strong>{{end}}</strong>
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Výsledek běhu předchozího demonstračního příkladu ve chvíli, kdy se mu předá
+upravená šablona s&nbsp;plnou podmínkou typu <strong>if-then-else</strong>:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita   4 
+Jméno Jenny           Suk             Popularita   3 
+Jméno Anička          Šafářová        Popularita  neznámá 
+Jméno Sváťa           Pulec           Popularita   3 
+Jméno Blažej          Motyčka         Popularita   8 
+Jméno Eda             Wasserfall      Popularita  neznámá 
+Jméno Přemysl         Hájek           Popularita  10 
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template18.go">https://github.com/tisnik/go-root/blob/master/article_80/template18.go</a>.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Volání metod z&nbsp;šablony</h2>
+
+<p>Připomeňme si, že data, která jsou předána ve chvíli, kdy je nutné šablonu
+aplikovat, jsou z&nbsp;šablony přístupná přes &bdquo;tečku&ldquo; a že je možné
+přistupovat k&nbsp;atributům či prvkům vstupní datové struktury. V&nbsp;případě
+polí, řezů či map lze tedy použít iteraci přes všechny prvky:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{<strong>range .</strong>}}...
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Uvnitř této (de facto) smyčky se k&nbsp;prvkům a jejich atributům opět
+přistupuje přes tečku:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" <strong>.Name</strong>}} {{printf "%-15s" <strong>.Surname</strong>}}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Můžeme však zavolat i <i>metodu</i> definovanou pro danou strukturu, a to
+následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita {{<strong>.GetPopularity</strong>}}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě se předpokládá, že
+metoda je bez parametrů a vrací přímo hodnotu, kterou je možné přepsat do
+šablony &ndash; typicky tedy řetězec.</div></p>
+
+<p>Podívejme se nyní na příklad použití v&nbsp;případě, že pro nám již známou
+datovou strukturu <strong>Role</strong> definujeme metodu nazvanou
+<strong>GetPopularity</strong>, která je bez parametrů a vrací řetězec:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "template19.txt"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func (role Role) <strong>GetPopularity</strong>() string {
+        if role.Popularity &lt;= 0 {
+                return "Nezadáno"
+        } else {
+                return fmt.Sprintf("%d", role.Popularity)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek aplikace této šablony by měl vypadat následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita 4
+Jméno Jenny           Suk             Popularita 3
+Jméno Anička          Šafářová        Popularita Nezadáno
+Jméno Sváťa           Pulec           Popularita 3
+Jméno Blažej          Motyčka         Popularita 8
+Jméno Eda             Wasserfall      Popularita Nezadáno
+Jméno Přemysl         Hájek           Popularita 10
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: vlastně jsme tak přenesli podmínku
+z&nbsp;šablony do programového kódu, což může být v&nbsp;některých případech
+lepší řešení.</div></p>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template19.go">https://github.com/tisnik/go-root/blob/master/article_80/template19.go</a>.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Pokus o přístup k&nbsp;privátní metodě z&nbsp;šablony</h2>
+
+<p>Minule jsme si kromě dalších informací řekli i to, že v&nbsp;šabloně není
+možné přistupovat k&nbsp;privátním atributům resp.&nbsp;k&nbsp;prvkům datové
+struktury, tj.&nbsp;k&nbsp;takovým položkám, jejichž jména začínají malým
+písmenem. Totéž ovšem platí i pro metody &ndash; pokud je metoda privátní,
+tj.&nbsp;když její jméno začíná malým písmenem, nebude možné takovou metodu
+přímo z&nbsp;šablony zavolat.</p>
+
+<p>Toto chování si můžeme snadno otestovat změnou šablony:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita {{<strong>.getPopularity</strong>}}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>A nepatrnou modifikací zdrojového kódu demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "template20.txt"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func (role Role) <strong>getPopularity</strong>() string {
+        if role.Popularity &lt;= 0 {
+                return "Nezadáno"
+        } else {
+                return fmt.Sprintf("%d", role.Popularity)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Tento problém nebude zjištěn při překladu (<i>compile time</i>), ale až po
+spuštění programu (<i>runtime</i>):</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita panic: template: template20.txt:2:84: executing "template20.txt" at &lt;.getPopularity&gt;: can't evaluate field getPopularity in type main.Role
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/ptisnovs/temp/y/template20.go:46 +0xeb
+exit status 2
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template20.go">https://github.com/tisnik/go-root/blob/master/article_80/template20.go</a>.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Kolony (<i>pipeline</i>) v&nbsp;šabloně</h2>
+
+<p>Ve chvíli, kdy je nutné nějakým způsobem zpracovat určitou datovou položku
+větším množstvím funkcí, lze využít další velmi zajímavou vlastnost
+šablonovacího systému programovacího jazyka Go &ndash; pro postupné
+zpracovávání dat je totiž možné definovat kolony (<i>pipeline</i>), které se
+způsobem zápisu a vlastně i svým chováním podobají klasickým Unixovým kolonám.
+Kolony se zapisují znakem &bdquo;|&ldquo; a umožňují výsledek jedné operace
+převést do operace další (což je typicky volání nějaké funkce).</p>
+
+<p>Podívejme se nyní na to, jak může vypadat jednoduchá kolona, v&nbsp;níž
+hodnotu získanou metodou <strong>Role.GetPopularily()</strong> (která vrací
+řetězec) necháme naformátovat funkcí <strong>fmt.Sprintf</strong>:</p>
+
+<pre>
+.GetPopularity | printf "%10s"
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že návratová hodnota
+metody je předána druhé funkci jako poslední parametr.</div></p>
+
+<p>Výše uvedenou kolonu lze snadno zakomponovat do šablony, a to takto:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita {{<strong>.GetPopularity | printf "%10s"</strong>}}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Výsledek aplikace šablony na vstupní data, včetně naformátování posledního
+sloupce funkcí <strong>fmt.Sprintf</strong>:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita          4
+Jméno Jenny           Suk             Popularita          3
+Jméno Anička          Šafářová        Popularita   Nezadáno
+Jméno Sváťa           Pulec           Popularita          3
+Jméno Blažej          Motyčka         Popularita          8
+Jméno Eda             Wasserfall      Popularita   Nezadáno
+Jméno Přemysl         Hájek           Popularita         10
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template21.go">https://github.com/tisnik/go-root/blob/master/article_80/template21.go</a>.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Blok <strong>with</strong> a proměnné v&nbsp;šablonách</h2>
+
+<p>Další zajímavou a pro složitější šablony i užitečnou vlastností je podpora
+pro definici bloků v&nbsp;šabloně, přičemž v&nbsp;rámci bloku je možné použít
+(a to přímo v&nbsp;šabloně) proměnné. Blok začíná značkou obsahující slovo
+<strong>with</strong> a končí značkou <strong>{{end}}</strong>, tedy například
+následovně:</p>
+
+<pre>
+{{<strong>with</strong> ...}}
+...
+...
+...
+{{<strong>end</strong>}}
+</pre>
+
+<p>V&nbsp;bloku <strong>with</strong> lze definovat proměnné, například jim
+přiřadit hodnotu nějakého datového prvku, hodnotu výsledku volání metody
+atd.:</p>
+
+<pre>
+{{<strong>with $x := .VolanáMetoda</strong> ...}}
+...
+...
+...
+{{<strong>end</strong>}}
+</pre>
+
+<p>Podívejme se nyní, jak lze upravit předchozí příklad, v&nbsp;němž byla
+použita kolona (<i>pipeline</i>). Úprava bude spočívat v&nbsp;tom, že hodnotu
+vrácenou metodou <strong>Role.GetPopularity</strong> uložíme do proměnné
+<strong>x</strong> platné v&nbsp;rámci bloku a posléze ji předáme funkci
+<strong>printf</strong> (tedy ve skutečnosti funkci
+<strong>fmt.Sprintf</strong>). Výsledná šablona bude vypadat takto:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita {{<strong>with $x := .GetPopularity</strong>}}{{<strong>printf "%10s" $x</strong>}}{{end}}
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Výsledek aplikace této šablony by měl být totožný s&nbsp;předchozím
+demonstračním příkladem, o čemž se ostatně můžeme velmi snadno přesvědčit:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová       Popularita          4
+Jméno Jenny           Suk             Popularita          3
+Jméno Anička          Šafářová        Popularita   Nezadáno
+Jméno Sváťa           Pulec           Popularita          3
+Jméno Blažej          Motyčka         Popularita          8
+Jméno Eda             Wasserfall      Popularita   Nezadáno
+Jméno Přemysl         Hájek           Popularita         10
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template22.go">https://github.com/tisnik/go-root/blob/master/article_80/template22.go</a>.</p>
+
+<p>Alternativně je možné šablonu napsat s&nbsp;využitím kolony v&nbsp;bloku,
+tedy následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+{{range .}}Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} Popularita <strong>{{with $x := .GetPopularity}}{{$x | printf "%10s"}}{{end}}</strong>
+{{end}}
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template23.go">https://github.com/tisnik/go-root/blob/master/article_80/template23.go</a>.</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Definice pojmenované šablony</h2>
+
+<p>Další vlastností standardního šablonovacího systému programovacího jazyka Go
+je podpora pro definici pojmenované šablony, kterou je posléze možné použít
+v&nbsp;jiné šabloně. Pojmenovaná šablona se vytváří s&nbsp;využitím značky
+<strong>block</strong>; nutné je přitom uvést jméno šablony i celou kolonu
+určující, jaká data se budou zpracovávat. Přitom každé vyvolání šablony může
+teoreticky pracovat s&nbsp;různými daty:</p>
+
+<pre>
+{{block "jméno šablony" kolona/pipeline}} libovolný obsah {{end}}
+</pre>
+
+<p>Tento zápis se rozloží na definici šablony a na její zavolání:</p>
+
+<pre>
+{{define "jméno šablony"}} libovolný obsah {{end}}
+{{template "jméno šablony" kolona/pipeline}}
+</pre>
+
+<p>Ukažme si nyní základní způsob použití pojmenované šablony v&nbsp;nepatrně
+upraveném demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `Roles:<strong>{{block "roles" .}}</strong>{{"\n"}}{{range .}}{{println "-" .Name "\t" .Surname}}{{end}}<strong>{{end}}</strong>`
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("template").Parse(templateValue))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek po spuštění je nepatrně odlišný od předchozích příkladů:</p>
+
+<pre>
+Roles:
+- Eliška         Najbrtová
+- Jenny          Suk
+- Anička         Šafářová
+- Sváťa          Pulec
+- Blažej         Motyčka
+- Eda    Wasserfall
+- Přemysl        Hájek
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pro úplnost by bylo vhodné naformátovat
+první sloupec na předem zadaný počet znaků.</div></p>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template24.go">https://github.com/tisnik/go-root/blob/master/article_80/template24.go</a>.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Předání funkce do šablony, vyvolání funkce v&nbsp;šabloně</h2>
+
+<p>Představme si, že je požadováno, aby se ve výsledném dokumentu tvořeném
+šablonou vypsala všechna jména předaná v&nbsp;řezu:</p>
+
+<pre>
+roles := []string{
+        "Eliška Najbrtová",
+        "Jenny Suk",
+        "Anička Šafářová",
+        "Sváťa Pulec",
+        "Blažej Motyčka",
+        "Eda Wasserfall",
+        "Přemysl Hájek",
+}
+</pre>
+
+<p>Přitom by se jména měla vypsat na jediný řádek a oddělena by měla být čárkou
+(navíc by šablona měla být funkční i pro prázdný vstup):</p>
+
+<pre>
+Names: Eliška Najbrtová, Jenny Suk, Anička Šafářová, Sváťa Pulec, Blažej Motyčka, Eda Wasserfall, Přemysl Hájek
+</pre>
+
+<p>Samozřejmě je možné použít značku <strong>range</strong> a vhodným způsobem
+zařídit, aby se <i>za</i> posledním prvkem již čárka nevypisovala, ovšem
+existuje i jednodušší a především hotové a ověřené řešení &ndash; použít funkci
+<strong>strings.join</strong>, která je určena přesně pro provedení této
+operace. Chceme být tedy schopni zavolat funkci <strong>strings.join</strong>
+stejně, jako již umíme volat funkci <strong>fmt.Sprintf</strong>:</p>
+
+<pre>
+templateValue = `Names: {{join . ", "}}`
+</pre>
+
+<p>I to je ve standardním šablonovacím systému jazyka Go možné, protože při
+konstrukci šablony je možné předat mapu (libovolných) funkcí, včetně jejich
+jmen &ndash; ty se mohou lišit od skutečných jmen funkcí, protože jména
+v&nbsp;šablonách jsou vyhodnocována v&nbsp;době běhu (<i>runtime</i>) a nikoli
+v&nbsp;době překladu:</p>
+
+<pre>
+<i>// mapa funkcí použitých v šabloně</i>
+funcs := <strong>template.FuncMap{"join": strings.Join}</strong>
+</pre>
+
+<p>Předání jmen funkcí při konstrukci šablony:</p>
+
+<pre>
+tmpl := template.Must(template.New("template")<strong>.Funcs(funcs).</strong>Parse(templateValue))
+</pre>
+
+<p>Samotná šablona se nyní zredukuje na volání příslušné funkce s&nbsp;předáním
+dat:</p>
+
+<pre>
+templateValue = `Names: {{<strong>join . ", "</strong>}}`
+</pre>
+
+<p>Pro úplnost si ukažme úplný zdrojový kód takto upraveného demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "strings"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `Names: {{<strong>join . ", "</strong>}}`
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// mapa funkcí použitých v šabloně</i>
+        funcs := <strong>template.FuncMap{"join": strings.Join}</strong>
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("template")<strong>.Funcs(funcs).</strong>Parse(templateValue))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []string{
+                "Eliška Najbrtová",
+                "Jenny Suk",
+                "Anička Šafářová",
+                "Sváťa Pulec",
+                "Blažej Motyčka",
+                "Eda Wasserfall",
+                "Přemysl Hájek",
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Po spuštění si můžeme velmi snadno ověřit, že výsledky odpovídají zadání (a
+to i pro prázdný vstup):</p>
+
+<pre>
+Names: Eliška Najbrtová, Jenny Suk, Anička Šafářová, Sváťa Pulec, Blažej Motyčka, Eda Wasserfall, Přemysl Hájek
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template25.go">https://github.com/tisnik/go-root/blob/master/article_80/template25.go</a>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Kombinace předchozích možností &ndash; blok <strong>with</strong> a předání i použití funkcí v&nbsp;šabloně</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu zkombinujeme některé možnosti, které
+byly popsány v&nbsp;předchozích kapitolách. Zejména budeme z&nbsp;šablony volat
+dvojici funkcí (konkrétně funkce <strong>asNames</strong> a standardní funkci
+<strong>strings.Join</strong> a navíc použijeme i blok <strong>with</strong>,
+ve kterém vytvoříme a naplníme proměnnou <strong>names</strong>. Jedná se
+skutečně o kombinaci již známých postupů, takže si bez dalšího podrobnějšího
+popisu ukážeme, jak bude vypadat šablona i zdrojový kód demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "strings"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `Names: {{with $names := asNames .}}{{join $names ", "}}{{end}}`
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+<i>// převod rolí na řez se jmény rolí</i>
+func <strong>asNames</strong>(roles []Role) []string {
+        var r []string
+        for _, role := range roles {
+                r = append(r, role.Name)
+        }
+        return r
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// mapa funkcí použitých v šabloně</i>
+        funcs := template.FuncMap{
+                "asNames": asNames,
+                "join":    strings.Join}
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("template").Funcs(funcs).Parse(templateValue))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledkem běhu tohoto příkladu bude stejný výstup, jaký byl ukázán
+v&nbsp;předchozí kapitole, tedy:</p>
+
+<pre>
+Names: Eliška, Jenny, Anička, Sváťa, Blažej, Eda, Přemysl
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template26.go">https://github.com/tisnik/go-root/blob/master/article_80/template26.go</a>.</p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Dvourozměrná pole v&nbsp;šablonách</h2>
+
+<p>Doposud jsme do šablon předávali buď jednoduché (skalární) hodnoty, záznamy
+(<i>struct</i>) nebo pole resp.&nbsp;řezy (<i>slice</i>). Pochopitelně nám však
+nic nebrání v&nbsp;použití dvourozměrných polí, která jsou v&nbsp;určitých
+oblastech dominantním datovým typem (ostatně viz paralelně běžící miniseriál o
+&bdquo;array programmingu&ldquo;). Práce &nbsp;dvourozměrnými poli typicky vede
+k&nbsp;použití zanořených značek &bdquo;{{range}}&ldquo;, což vlastně znamená,
+že se interně pracuje s&nbsp;dvojicí vnořených programových smyček. To si
+ostatně ukážeme v&nbsp;navazující trojici kapitol.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Vytištění tabulky malé násobilky</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu se pokusíme s&nbsp;využitím šablony
+vytisknout tabulku malé násobilky. Vstupními daty je v&nbsp;tomto případě
+dvourozměrná tabulka s&nbsp;malou násobilkou, která je v&nbsp;jazyce Go
+reprezentována běžným dvourozměrným polem:</p>
+
+<pre>
+<i>// tabulka s malou násobilkou</i>
+var multiplyTable [N][N]int
+</pre>
+
+<p>V&nbsp;případě, že nejsou zadány žádné speciální požadavky na formát
+jednotlivých řádků tabulky, může být šablona zredukována na pouhou jednu
+smyčku:</p>
+
+<pre>
+templateValue = `<strong>{{range .}}{{.}}</strong>
+<strong>{{end}}`</strong>
+</pre>
+
+<p>Je tomu tak z&nbsp;toho důvodu, že v&nbsp;rámci šablony lze vytisknout obsah
+jednorozměrného pole (neboli vektoru) &ndash; uvnitř smyčky je
+v&nbsp;&bdquo;tečce&ldquo; uložen vždy právě celý řádek tabulky.</p>
+
+<p>Úplný zdrojový kód tohoto příkladu by mohl vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `<strong>{{range .}}{{.}}</strong>
+<strong>{{end}}</strong>`
+)
+&nbsp;
+func <strong>main</strong>() {
+        const N = 10
+&nbsp;
+        <i>// tabulka s malou násobilkou</i>
+        var multiplyTable [N][N]int
+&nbsp;
+        <i>// naplnění tabulky</i>
+        for j := 0; j &lt; N; j++ {
+                for i := 0; i &lt; N; i++ {
+                        multiplyTable[j][i] = (i + 1) * (j + 1)
+                }
+        }
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("multiply_table").Parse(templateValue))
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, multiplyTable)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>A výsledek získaný po spuštění sice není příliš pěkný, ovšem alespoň získáme
+všechny prvky tabulky s&nbsp;malou násobilkou:</p>
+
+<pre>
+[1 2 3 4 5 6 7 8 9 10]
+[2 4 6 8 10 12 14 16 18 20]
+[3 6 9 12 15 18 21 24 27 30]
+[4 8 12 16 20 24 28 32 36 40]
+[5 10 15 20 25 30 35 40 45 50]
+[6 12 18 24 30 36 42 48 54 60]
+[7 14 21 28 35 42 49 56 63 70]
+[8 16 24 32 40 48 56 64 72 80]
+[9 18 27 36 45 54 63 72 81 90]
+[10 20 30 40 50 60 70 80 90 100]
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template27.go">https://github.com/tisnik/go-root/blob/master/article_80/template27.go</a>.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Vylepšení předchozího demonstračního příkladu</h2>
+
+<p>Výsledek předchozího příkladu ve skutečnosti nebyl příliš pěkný, protože
+hodnoty ve sloupcích nebyly zarovnány. Z&nbsp;tohoto důvodu je nutné tabulku
+vytisknout poněkud odlišným způsobem &ndash; pomocí vnořených smyček. Nejprve
+budeme pro totožná vstupní data, jako tomu bylo v&nbsp;předchozím příkladu,
+procházet všemi řádky:</p>
+
+<pre>
+<strong>{{range .}}</strong>
+...
+...
+...
+<strong>{{end}}</strong>
+</pre>
+
+<p>Uvnitř vnější smyčky odpovídá &bdquo;tečka&ldquo; celému řádku, tedy
+jednorozměrnému vektoru. Nic nám tedy nezabraňuje postupně procházet i prvky
+tohoto vektoru (nyní ovšem bez odřádkování):</p>
+
+<pre>
+{{range .}}<strong>{{range .}}</strong>...<strong>{{end}}</strong>
+{{end}}`
+</pre>
+
+<p>Nyní nám již zbývá hodnoty vektoru vhodným způsobem naformátovat a oddělit
+od sebe (mezerou). Pro malou násobilku postačuje naformátování hodnot na tři
+místa:</p>
+
+<pre>
+{{range .}}{{range .}}<strong>{{printf "%3d" .}} </strong>{{end}}
+{{end}}`
+</pre>
+
+<p>Celý postup je použit v&nbsp;dalším, dnes již předposledním, demonstračním
+příkladu, jehož zdrojový kód vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `{{range .}}{{range .}}{{printf "%3d" .}} {{end}}
+{{end}}`
+)
+&nbsp;
+func <strong>main</strong>() {
+        const N = 10
+&nbsp;
+        <i>// tabulka s malou násobilkou</i>
+        var multiplyTable [N][N]int
+&nbsp;
+        <i>// naplnění tabulky</i>
+        for j := 0; j &lt; N; j++ {
+                for i := 0; i &lt; N; i++ {
+                        multiplyTable[j][i] = (i + 1) * (j + 1)
+                }
+        }
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("multiply_table").Parse(templateValue))
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, multiplyTable)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Nyní bude výsledek odlišný od předchozího příkladu, protože všechny hodnoty
+v&nbsp;jednotlivých sloupcích budou zarovnány na čtyři znaky:</p>
+
+<pre>
+  1   2   3   4   5   6   7   8   9  10 
+  2   4   6   8  10  12  14  16  18  20 
+  3   6   9  12  15  18  21  24  27  30 
+  4   8  12  16  20  24  28  32  36  40 
+  5  10  15  20  25  30  35  40  45  50 
+  6  12  18  24  30  36  42  48  54  60 
+  7  14  21  28  35  42  49  56  63  70 
+  8  16  24  32  40  48  56  64  72  80 
+  9  18  27  36  45  54  63  72  81  90 
+ 10  20  30  40  50  60  70  80  90 100 
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template28.go">https://github.com/tisnik/go-root/blob/master/article_80/template28.go</a>.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Přístup k&nbsp;poli, které je uloženo jako prvek datové struktury</h2>
+
+<p>Pole se nemusí do šablony předávat přímo, ale může být součástí složitější
+datové struktury &ndash; typicky záznamu (<i>struct, record</i>). Podívejme se
+nyní na jednoduchou variantu, v&nbsp;níž je použit záznam obsahující jako svůj
+(jediný) prvek právě dvourozměrné pole:</p>
+
+<pre>
+type <strong>MultiplyTable</strong> struct {
+        Values [N][N]int
+}
+</pre>
+
+<p>Práce s&nbsp;touto strukturou je triviální, pouze postačuje změnit šablonu
+z&nbsp;této podoby:</p>
+
+<pre>
+{{range <strong>.</strong>}}{{range .}}{{printf "%3d" .}} {{end}}
+{{end}}`
+</pre>
+
+<p>Na:</p>
+
+<pre>
+{{range <strong>.Values</strong>}}{{range .}}{{printf "%3d" .}} {{end}}
+{{end}}`
+</pre>
+
+<p>Nic dalšího není v&nbsp;šabloně nutné modifikovat:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateValue = `{{range .Values}}{{range .}}{{printf "%3d" .}} {{end}}
+{{end}}`
+)
+&nbsp;
+const N = 10
+&nbsp;
+type <strong>MultiplyTable</strong> struct {
+        Values [N][N]int
+}
+&nbsp;
+func <strong>main</strong>() {
+&nbsp;
+        <i>// tabulka s malou násobilkou</i>
+        var multiplyTable MultiplyTable
+&nbsp;
+        <i>// naplnění tabulky</i>
+        for j := 0; j &lt; N; j++ {
+                for i := 0; i &lt; N; i++ {
+                        multiplyTable.Values[j][i] = (i + 1) * (j + 1)
+                }
+        }
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.New("multiply_table").Parse(templateValue))
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, multiplyTable)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledky získané po spuštění tohoto příkladu by měly být totožné
+s&nbsp;příkladem předchozím, tedy:</p>
+
+<pre>
+  1   2   3   4   5   6   7   8   9  10 
+  2   4   6   8  10  12  14  16  18  20 
+  3   6   9  12  15  18  21  24  27  30 
+  4   8  12  16  20  24  28  32  36  40 
+  5  10  15  20  25  30  35  40  45  50 
+  6  12  18  24  30  36  42  48  54  60 
+  7  14  21  28  35  42  49  56  63  70 
+  8  16  24  32  40  48  56  64  72  80 
+  9  18  27  36  45  54  63  72  81  90 
+ 10  20  30  40  50  60  70  80  90 100 
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template29.go">https://github.com/tisnik/go-root/blob/master/article_80/template29.go</a>.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Závěr</h2>
+
+<p><a
+href="https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go/">Minule</a>
+a dnes jsme si popsali velkou část funkcionality standardního balíčku
+<strong>text/template</strong>. Jak (doufejme) bylo z&nbsp;příkladů patrné,
+jedná se o poměrně propracovaný šablonovací systém, který je navíc rozšiřitelný
+díky tomu, že je možné přímo volat metody datové struktury předané do šablony a
+taktéž je možné zaregistrovat prakticky libovolné množství uživatelských
+funkcí, které je možné ze šablony přímo volat. Zapomenout nesmíme na podporu
+proměnných, kolon (pipeline), podmínek, smyček atd. Jednou z&nbsp;nevýhod
+tohoto systému je fakt, že všechny kontroly struktury šablony jsou provedeny až
+v&nbsp;čase běhu, takže zde není možné využít kontroly prováděné překladačem
+jazyka Go (a jeho typovým systémem). Samotný balíček
+<strong>text/template</strong> je ještě více rozpracován v&nbsp;dalším
+standardním balíčku <strong>html/template</strong>, kterému bude věnován
+samostatný článek.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Další šablonovací systémy dostupné pro jazyk Go</h2>
+
+<p>Pro programovací jazyk Go vzniklo i poměrně velké množství dalších
+šablonovacích systémů, které se od sebe odlišují funkcionalitou, podporou
+různých výstupních formátů, použitým značkovacím jazykem, mírou NIH syndromu
+atd. V&nbsp;následující tabulce jsou uvedeny ty nejznámější šablonovací
+systémy, tj.&nbsp;systémy s&nbsp;největším množstvím &bdquo;hvězdiček&ldquo; na
+GitHubu:</p>
+
+<table>
+<tr><th>#</th><th>Název šablonovacího systému</th></tr>
+<tr><td> 0</td><td>ace</td></tr>
+<tr><td> 1</td><td>amber</td></tr>
+<tr><td> 2</td><td>damsel</td></tr>
+<tr><td> 3</td><td>ego</td></tr>
+<tr><td> 4</td><td>extemplate</td></tr>
+<tr><td> 5</td><td>fasttemplate</td></tr>
+<tr><td> 6</td><td>gofpdf</td></tr>
+<tr><td> 7</td><td>gospin</td></tr>
+<tr><td> 8</td><td>goview</td></tr>
+<tr><td> 9</td><td>hero</td></tr>
+<tr><td>10</td><td>jet</td></tr>
+<tr><td>11</td><td>kasia</td></tr>
+<tr><td>12</td><td>liquid</td></tr>
+<tr><td>13</td><td>maroto</td></tr>
+<tr><td>14</td><td>mustache</td></tr>
+<tr><td>15</td><td>pongo2</td></tr>
+<tr><td>16</td><td>quicktemplate</td></tr>
+<tr><td>17</td><td>raymond</td></tr>
+<tr><td>18</td><td>Razor</td></tr>
+<tr><td>19</td><td>Soy</td></tr>
+<tr><td>20</td><td>sprig</td></tr>
+<tr><td>21</td><td>velvet</td></tr>
+</table>
+
+<p>K&nbsp;vybraným šablonovacím systémům se ještě vrátíme v&nbsp;některém
+z&nbsp;dalších dílů <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a>.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go/">minule</a>
+i dnes použitých demonstračních příkladů byly uloženy do nového Git repositáře,
+který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>template01.go</td><td>vytvoření a aplikace šablony obsahující pouze statický text, kontrola chyby při <strong>Parse</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template01.go">https://github.com/tisnik/go-root/blob/master/article_79/template01.go</a></td></tr>
+<tr><td> 2</td><td>template02.go</td><td>zavolání metody <strong>ExecuteTemplate</strong> namísto <strong>Execute</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template02.go">https://github.com/tisnik/go-root/blob/master/article_79/template02.go</a></td></tr>
+<tr><td> 3</td><td>template03.go</td><td>zápis výsledného textu do bufferu převedeného na řetězec přes buffer</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template03.go">https://github.com/tisnik/go-root/blob/master/article_79/template03.go</a></td></tr>
+<tr><td> 4</td><td>template04.go</td><td>konstrukce šablony pomocí <strong>template.Must</strong> s&nbsp;automatickou kontrolou chyby</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template04.go">https://github.com/tisnik/go-root/blob/master/article_79/template04.go</a></td></tr>
+<tr><td> 5</td><td>template05.go</td><td>skutečná šablona produkující text na základě předaných dat &ndash; jednoduchý text</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template05.go">https://github.com/tisnik/go-root/blob/master/article_79/template05.go</a></td></tr>
+<tr><td> 6</td><td>template06.go</td><td>vícenásobné použití vstupních dat v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template06.go">https://github.com/tisnik/go-root/blob/master/article_79/template06.go</a></td></tr>
+<tr><td> 7</td><td>template07.go</td><td>skutečná šablona produkující text na základě předaných dat, předání datové struktury</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template07.go">https://github.com/tisnik/go-root/blob/master/article_79/template07.go</a></td></tr>
+<tr><td> 8</td><td>template08.go</td><td>šablona, na kterou se aplikuje nekompatibilní datová struktura</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template08.go">https://github.com/tisnik/go-root/blob/master/article_79/template08.go</a></td></tr>
+<tr><td> 9</td><td>template09.go</td><td>textová data, kontrola korektního použití Unicode</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template09.go">https://github.com/tisnik/go-root/blob/master/article_79/template09.go</a></td></tr>
+<tr><td>10</td><td>template10.go</td><td>postupná aplikace šablony na data uložená v&nbsp;řezu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template10.go">https://github.com/tisnik/go-root/blob/master/article_79/template10.go</a></td></tr>
+<tr><td>11</td><td>template11.go</td><td>pokus o přístup k&nbsp;prvkům šablony, které jsou privátní</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template11.go">https://github.com/tisnik/go-root/blob/master/article_79/template11.go</a></td></tr>
+<tr><td>12</td><td>template12.go</td><td>opakování (range) v&nbsp;šabloně a práce s&nbsp;poli</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template12.go">https://github.com/tisnik/go-root/blob/master/article_79/template12.go</a></td></tr>
+<tr><td>13</td><td>template13.go</td><td>šablona uložená v&nbsp;souboru &ndash; problém s&nbsp;pojmenováním šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template13.go">https://github.com/tisnik/go-root/blob/master/article_79/template13.go</a></td></tr>
+<tr><td>14</td><td>template14.go</td><td>šablona uložená v&nbsp;souboru &ndash; korektní příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template14.go">https://github.com/tisnik/go-root/blob/master/article_79/template14.go</a></td></tr>
+<tr><td>15</td><td>template15.go</td><td>šablona uložená v&nbsp;souboru &ndash; korektní příklad, přímé volání <strong>ParseFiles</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_79/template15.go">https://github.com/tisnik/go-root/blob/master/article_79/template15.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>template16.go</td><td>naformátování hodnot funkcí <strong>fmt.Printf</strong> volanou přímo ze šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template16.go">https://github.com/tisnik/go-root/blob/master/article_80/template16.go</a></td></tr>
+<tr><td>17</td><td>template17.go</td><td>praktické otestování podmínky v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template17.go">https://github.com/tisnik/go-root/blob/master/article_80/template17.go</a></td></tr>
+<tr><td>18</td><td>template18.go</td><td>plná podmínka typu <strong>if-then-else</strong> v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template18.go">https://github.com/tisnik/go-root/blob/master/article_80/template18.go</a></td></tr>
+<tr><td>19</td><td>template19.go</td><td>volání metod z&nbsp;šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template19.go">https://github.com/tisnik/go-root/blob/master/article_80/template19.go</a></td></tr>
+<tr><td>20</td><td>template20.go</td><td>pokus o přístup k&nbsp;privátní metodě z&nbsp;šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template20.go">https://github.com/tisnik/go-root/blob/master/article_80/template20.go</a></td></tr>
+<tr><td>21</td><td>template21.go</td><td>kolony (<i>pipeline</i>) v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template21.go">https://github.com/tisnik/go-root/blob/master/article_80/template21.go</a></td></tr>
+<tr><td>22</td><td>template22.go</td><td>blok <strong>with</strong> a proměnné v&nbsp;šablonách</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template22.go">https://github.com/tisnik/go-root/blob/master/article_80/template22.go</a></td></tr>
+<tr><td>23</td><td>template23.go</td><td>alternativa k&nbsp;předchozímu demonstračnímu příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template23.go">https://github.com/tisnik/go-root/blob/master/article_80/template23.go</a></td></tr>
+<tr><td>24</td><td>template24.go</td><td>definice pojmenované šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template24.go">https://github.com/tisnik/go-root/blob/master/article_80/template24.go</a></td></tr>
+<tr><td>25</td><td>template25.go</td><td>předání funkce do šablony, vyvolání funkce v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template25.go">https://github.com/tisnik/go-root/blob/master/article_80/template25.go</a></td></tr>
+<tr><td>26</td><td>template26.go</td><td>kombinace předchozích možností &ndash; blok <strong>with</strong> a předání i použití funkcí v&nbsp;šabloně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template26.go">https://github.com/tisnik/go-root/blob/master/article_80/template26.go</a></td></tr>
+<tr><td>27</td><td>template27.go</td><td>vytištění tabulky malé násobilky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template27.go">https://github.com/tisnik/go-root/blob/master/article_80/template27.go</a></td></tr>
+<tr><td>28</td><td>template28.go</td><td>vylepšení předchozího demonstračního příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template28.go">https://github.com/tisnik/go-root/blob/master/article_80/template28.go</a></td></tr>
+<tr><td>29</td><td>template29.go</td><td>přístup k&nbsp;poli, které je uloženo jako prvek datové struktury</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_80/template29.go">https://github.com/tisnik/go-root/blob/master/article_80/template29.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Awesome Go<br />
+<a href="https://awesome-go.com/">https://awesome-go.com/</a>
+</li>
+
+<li>Template Engines for Go<br />
+<a href="https://awesome-go.com/#template-engines">https://awesome-go.com/#template-engines</a>
+</li>
+
+<li>Mail merge<br />
+<a href="https://en.wikipedia.org/wiki/Mail_merge">https://en.wikipedia.org/wiki/Mail_merge</a>
+</li>
+
+<li>Template processor<br />
+<a href="https://en.wikipedia.org/wiki/Template_processor">https://en.wikipedia.org/wiki/Template_processor</a>
+</li>
+
+<li>Text/template<br />
+<a href="https://pkg.go.dev/text/template">https://pkg.go.dev/text/template</a>
+</li>
+
+<li>Go Template Engines<br />
+<a href="https://go.libhunt.com/categories/556-template-engines">https://go.libhunt.com/categories/556-template-engines</a>
+</li>
+
+<li>Template Engines<br />
+<a href="https://reposhub.com/go/template-engines">https://reposhub.com/go/template-engines</a>
+</li>
+
+<li>GoLang Templating Made Easy<br />
+<a href="https://awkwardferny.medium.com/golang-templating-made-easy-4d69d663c558">https://awkwardferny.medium.com/golang-templating-made-easy-4d69d663c558</a>
+</li>
+
+<li>Templates in GoLang<br />
+<a href="https://golangdocs.com/templates-in-golang">https://golangdocs.com/templates-in-golang</a>
+</li>
+
+<li>What are the best template engines for Go apart from "html/template"?<br />
+<a href="https://www.quora.com/What-are-the-best-template-engines-for-Go-apart-from-html-template?share=1">https://www.quora.com/What-are-the-best-template-engines-for-Go-apart-from-html-template?share=1</a>
+</li>
+
+<li>Ace - HTML template engine for Go<br />
+<a href="https://github.com/yosssi/ace">https://github.com/yosssi/ace</a>
+</li>
+
+<li>amber<br />
+<a href="https://github.com/eknkc/amber">https://github.com/eknkc/amber</a>
+</li>
+
+<li>quicktemplate<br />
+<a href="https://github.com/valyala/quicktemplate">https://github.com/valyala/quicktemplate</a>
+</li>
+
+<li>Šablonovací systém <i>ace</i><br />
+<a href="https://github.com/yosssi/ace">https://github.com/yosssi/ace</a>
+</li>
+
+<li>Šablonovací systém <i>amber</i><br />
+<a href="https://github.com/eknkc/amber">https://github.com/eknkc/amber</a>
+</li>
+
+<li>Šablonovací systém <i>damsel</i><br />
+<a href="https://github.com/dskinner/damsel">https://github.com/dskinner/damsel</a>
+</li>
+
+<li>Šablonovací systém <i>ego</i><br />
+<a href="https://github.com/benbjohnson/ego">https://github.com/benbjohnson/ego</a>
+</li>
+
+<li>Šablonovací systém <i>extemplate</i><br />
+<a href="https://github.com/dannyvankooten/extemplate">https://github.com/dannyvankooten/extemplate</a>
+</li>
+
+<li>Šablonovací systém <i>fasttemplate</i><br />
+<a href="https://github.com/valyala/fasttemplate">https://github.com/valyala/fasttemplate</a>
+</li>
+
+<li>Šablonovací systém <i>gofpdf</i><br />
+<a href="https://github.com/jung-kurt/gofpdf">https://github.com/jung-kurt/gofpdf</a>
+</li>
+
+<li>Šablonovací systém <i>gospin</i><br />
+<a href="https://github.com/m1/gospin">https://github.com/m1/gospin</a>
+</li>
+
+<li>Šablonovací systém <i>goview</i><br />
+<a href="https://github.com/foolin/goview">https://github.com/foolin/goview</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
