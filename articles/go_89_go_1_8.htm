@@ -1,0 +1,1658 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Dlouho očekávaná novinka v Go 1.8 - generické datové typy (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Dlouho očekávaná novinka v Go 1.8 - generické datové typy (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na úvodní článek o typových parametrech, typových množinách, generických datových typech a generických funkcích dnes navážeme. Ukážeme si další vlastnosti typového systému jazyka Go 1.18 a taktéž některá omezení, která generické funkce a především generické metody mají.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Typové parametry v&nbsp;roli datových typů v&nbsp;těle funkce</a></p>
+<p><a href="#k02">2. Kontrola, zda jsou argumenty funkce i návratové hodnoty stejného typu</a></p>
+<p><a href="#k03">3. Větší množství typových parametrů v&nbsp;deklaraci funkce</a></p>
+<p><a href="#k04">4. Přetypování s&nbsp;využitím typového parametru</a></p>
+<p><a href="#k05">5. Příprava pro tvorbu generické funkce <strong>pow</strong></a></p>
+<p><a href="#k06">6. Generická varianta funkce <strong>pow</strong></a></p>
+<p><a href="#k07">7. Úprava hlavičky funkce &ndash; povolení exponentu reprezentovaného celým číslem</a></p>
+<p><a href="#k08">8. Typová množina odvozená od jiné typové množiny</a></p>
+<p><a href="#k09">9. Generické funkce a přístup k&nbsp;prvkům struktur</a></p>
+<p><a href="#k10">10. Existující kontejnery a generické datové typy</a></p>
+<p><a href="#k11">11. Generické datové typy a rozhraní</a></p>
+<p><a href="#k12">12. Mnohdy se lze obejít bez generických typů</a></p>
+<p><a href="#k13">13. Generické řezy (<i>slices</i>)</a></p>
+<p><a href="#k14">14. Vlastní generický datový typ &bdquo;řez s&nbsp;prvky typu XYZ&ldquo;</a></p>
+<p><a href="#k15">15. Metody nového generického datového typu &bdquo;řez s&nbsp;prvky typu XYZ&ldquo;</a></p>
+<p><a href="#k16">16. Co je lepší &ndash; metoda generického typu nebo funkce generického typu?</a></p>
+<p><a href="#k17">17. Tvorba vlastních kontejnerů</a></p>
+<p><a href="#k18">18. Jednosměrně vázaný seznam</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Typové parametry v&nbsp;roli datových typů v&nbsp;těle funkce</h2>
+
+<p>Na <a
+href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/">předchozí
+článek</a> o typových parametrech, typových množinách, generických datových
+typech a generických funkcích dnes navážeme. Ukážeme si (nyní již
+v&nbsp;poněkud větší stručnosti) některé další vlastnosti typového systému
+jazyka Go verze 1.18 a taktéž některá (poměrně zásadní omezení), která prozatím
+generické funkce a především generické metody mají.</p>
+
+<p>Nejprve se podívejme na další možné způsoby použití <i>typových
+parametrů</i>. Víme již, že tyto parametry se zapisují za jméno funkce a uvádí
+se v&nbsp;hranatých závorkách:</p>
+
+<pre>
+func <strong>foo[T any]</strong>() {
+       ...
+       ...
+       ...
+}
+</pre>
+
+<p>Typový parametr <strong>T</strong> vystupuje v&nbsp;roli datového typu při
+deklaraci argumentů funkce:</p>
+
+<pre>
+func <strong>bar[T any]</strong>(argument1 T, argument2 int, argument3 []T) {
+       ...
+       ...
+       ...
+}
+</pre>
+
+<p>Může se používat i pro deklaraci typu výstupní hodnoty či hodnot:</p>
+
+<pre>
+func <strong>baz[T any]</strong>(argument1 T, argument2 int, argument3 []T) <strong>T</strong> {
+       ...
+       ...
+       ...
+       return argument1
+}
+</pre>
+
+<p>To však není vše, protože uvnitř těla funkce vystupuje typový parametr jako
+plnohodnotný identifikátor datového typu. To znamená, že můžeme deklarovat
+lokální proměnné tohoto typu:</p>
+
+<pre>
+func <strong>xyzzy[T any]</strong>(x, y T, z *T, w []T) {
+        var a T
+        var b *T
+        var c []T
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Ukažme si to na praktickém příkladu, v&nbsp;němž upravíme nám již známou
+funkci <strong>add</strong> tak, aby se v&nbsp;jejím těle použily dvě lokální
+proměnné typu <strong>T</strong>, kde konkrétní typ <strong>T</strong> je
+odvozen až ve chvíli, kdy překladač narazí na volání této funkce:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>numeric</strong> interface {
+        int | float64
+}
+&nbsp;
+func <strong>add[T numeric]</strong>(x T, y T) T {
+        var first T = x
+        var second T = y
+        return first + second
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(add(1, 2))
+        fmt.Println(add(3.14, 6.28))
+}
+</pre>
+
+<p>Tento příklad je bez problémů přeložitelný a spustitelný:</p>
+
+<pre>
+$ <strong>go run 16_add_type_parameters.go</strong>
+&nbsp;
+3
+9.42
+</pre>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Kontrola, zda jsou argumenty funkce i návratové hodnoty stejného typu</h2>
+
+<p>Podívejme se ještě jednou na deklaraci funkce <strong>add</strong>:</p>
+
+<pre>
+func <strong>add[T numeric]</strong>(x T, y T) T {
+        return x + y
+}
+</pre>
+
+<p>Takový zápis určuje, že oba argumenty musí být stejného typu, ovšem tento
+typ může být při konkrétním volání funkce <strong>int</strong> nebo
+<strong>float64</strong>. Navíc je určeno, že výsledná hodnota funkce je
+stejného konkrétního typu, jako typy obou argumentů. Překladač navíc
+(pochopitelně) zkontroluje, zda je možné operátor + použít pro každou kombinaci
+typů parametrů.</p>
+
+<p>To ovšem v&nbsp;důsledku znamená, že typy argumentů nelze míchat,
+tj.&nbsp;nelze například jako první argument použít <strong>int</strong> a jako
+argument druhý <strong>float64</strong> (i když oba typy evidentně patří do
+typové množiny <strong>numeric</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>numeric</strong> interface {
+        int | float64
+}
+&nbsp;
+func <strong>add[T numeric]</strong>(x T, y T) T {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(<u>add(1, 3.14)</u>)
+        fmt.Println(<u>add(3.14, 1)</u>)
+}
+</pre>
+
+<p>Překladač v&nbsp;tomto případě (zcela korektně) zahlásí chybu, a to
+konkrétně chybu v&nbsp;kódu, v&nbsp;němž se funkce volá:</p>
+
+<pre>
+$ <strong>go run 17_add_type_parameters.go</strong>
+&nbsp;
+./17_add_type_parameters.go:14:21: default type float64 of 3.14 does not match inferred type int for T
+./17_add_type_parameters.go:15:24: default type int of 1 does not match inferred type float64 for T
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Větší množství typových parametrů v&nbsp;deklaraci funkce</h2>
+
+<p>V&nbsp;případě, že opravdu budeme chtít, aby nějaká funkce akceptovala
+argumenty s&nbsp;generickými typy, ovšem aby bylo možné pro (každý) argument
+použít odlišný generický typ, je nutné upravit zápis typového parametru.
+Namísto jednoho typového parametru jich deklarujeme větší množství.
+V&nbsp;konkrétním případě funkce <strong>add</strong> by celý zápis mohl
+vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>numeric</strong> interface {
+        int | float64
+}
+&nbsp;
+func <strong>add[T numeric, U numeric]</strong>(x T, y U) T {
+        return x + y
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(<u>add(1, 3.14)</u>)
+        fmt.Println(<u>add(3.14, 1)</u>)
+}
+</pre>
+
+<p>Tento příklad sice stále není přeložitelný, ovšem již jsme se přiblížili ke
+kýženému výsledku:</p>
+
+<pre>
+$ <strong>go run 18_add_type_parameters.go</strong>
+&nbsp;
+./18_add_type_parameters.go:10:9: invalid operation: x + y (mismatched types T and U)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že nyní se chyba hlásí na
+zcela odlišném místě, konkrétně u operátoru <strong>+</strong>, což dává smysl,
+protože Go neumožňuje libovolně kombinovat různé numerické operandy
+v&nbsp;aritmetických výrazech.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Přetypování s&nbsp;využitím typového parametru</h2>
+
+<p>Připomeňme si, že v&nbsp;programovacím jazyku Go se přetypování zapisuje
+stejným způsobem jako volání funkce, jejíž jméno odpovídá výslednému datovému
+typu:</p>
+
+<pre>
+x = <strong>float64(y)</strong>
+</pre>
+
+<p>Ve funkci s&nbsp;typovým parametrem je možné pro přetypování použít i tento
+parametr, což je ukázáno v&nbsp;další variantě funkce <strong>add</strong>,
+která nyní akceptuje argumenty různých typů, které jsou však po přetypování
+kompatibilní s&nbsp;operátorem <strong>+</strong> a současně i
+s&nbsp;požadovaným typem výsledné hodnoty <strong>T</strong> (obě podmínky jsou
+testovány překladačem):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>numeric</strong> interface {
+        int | float64
+}
+&nbsp;
+func <strong>add[T numeric, U numeric]</strong>(x T, y U) T {
+        return x + T(y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(add(1, 3.14))
+        fmt.Println(add(3.14, 1))
+}
+</pre>
+
+<p>Tento příklad již bude spustitelný</p>
+
+<pre>
+$ <strong>go run 19_add_type_parameters.go</strong>
+&nbsp;
+4
+4.140000000000001
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si odlišných výsledků
+vypsaných tímto příkladem. V&nbsp;prvním případě jsme nejdříve převedli hodnotu
+3.14 na celé číslo typu <strong>int</strong> a poté ho sečetli s&nbsp;prvním
+parametrem typu <strong>int</strong>, takže výsledkem je hodnota typu
+<strong>int</strong>. Ve druhém případě se naopak hodnota 1 převedla na typ
+<strong>float64</strong> a výsledkem je opět hodnota <strong>float64</strong>,
+se všemi z&nbsp;toho plynoucími důsledky (nemožnost přesně reprezentovat
+výsledek atd.)</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Příprava pro tvorbu generické funkce <strong>pow</strong></h2>
+
+<p>Ve standardním balíčku <strong>math</strong> nalezneme &ndash; pochopitelně
+kromě dalších užitečných funkcí &ndash; i funkci nazvanou <strong>pow</strong>,
+která umožňuje provést výpočet x<sup>y</sup>. Jedná se o užitečnou funkci, jež
+je ovšem navržena takovým způsobem, že jejími argumenty jsou hodnoty typu
+<strong>float64</strong> a výsledkem je taktéž hodnota typu
+<strong>float64</strong>. To je poměrně nešikovné v&nbsp;případě, že
+(například) budeme chtít provádět výpočty s&nbsp;hodnotami typu
+<strong>float32</strong> či s&nbsp;celočíselnými datovými typy (a to není zcela
+nepraktické &ndash; příkladem je gama korekce rastrových obrazů).</p>
+
+<p>Můžeme se tedy pokusit o vytvoření generické varianty této funkce. Začneme
+jejím &bdquo;obalením&ldquo; do vlastní funkce nazvané taktéž
+<strong>pow</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+func <strong>pow</strong>(x float64, y float64) float64 {
+        return math.Pow(x, y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+}
+</pre>
+
+<p>Výsledek (jen pro kontrolu, zda je zdrojový kód sémanticky správný):</p>
+
+<pre>
+0
+0.25
+1
+2.25
+4
+6.25
+9
+12.25
+16
+20.25
+</pre>
+
+<p>Ve starších verzích Go bychom museli pro <i>každou kombinaci</i> typů
+argumentů vytvořit vlastní variantu této funkce,což je pochopitelně nešikovné a
+počet kombinací dost významně roste s&nbsp;každým dalším datovým typem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+func <strong>pow32</strong>(x float32, y float32) float32 {
+        return float32(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>pow64</strong>(x float64, y float64) float64 {
+        return math.Pow(x, y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow32(x, 2))
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow64(x, 2))
+        }
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+0
+0.25
+1
+2.25
+4
+6.25
+9
+12.25
+16
+20.25
+&nbsp;
+0
+0.25
+1
+2.25
+4
+6.25
+9
+12.25
+16
+20.25
+</pre>
+
+<p>Zobrazit lze i typy výsledků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+func <strong>pow32</strong>(x float32, y float32) float32 {
+        return float32(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>pow64</strong>(x float64, y float64) float64 {
+        return math.Pow(x, y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                result := pow32(x, 2)
+                fmt.Printf("%T %v\n", result, result)
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                result := pow64(x, 2)
+                fmt.Printf("%T %v\n", result, result)
+        }
+}
+</pre>
+
+<p>Nyní se vypíše:</p>
+
+<pre>
+float32 0
+float32 0.25
+float32 1
+float32 2.25
+float32 4
+float32 6.25
+float32 9
+float32 12.25
+float32 16
+float32 20.25
+&nbsp;
+float64 0
+float64 0.25
+float64 1
+float64 2.25
+float64 4
+float64 6.25
+float64 9
+float64 12.25
+float64 16
+float64 20.25
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Generická varianta funkce <strong>pow</strong></h2>
+
+<p>Nyní se můžeme pokusit o vytvoření generické varianty funkce
+<strong>pow</strong>. Prozatím budeme vyžadovat, aby oba argumenty byly
+stejného typu a současně aby byl i výsledek stejného typu. Z&nbsp;tohoto důvodu
+bude zapotřebí několika přetypování:</p>
+
+<ol>
+
+<li>Parametry předané funkce je zapotřebí přetypovat na
+<strong>float64</strong>, protože jen tyto typy akceptuje knihovní funkce
+<strong>math.pow</strong></li>
+
+<li>Výsledek je nutné přetypovat na <strong>T</strong>, protože to vyžaduje
+hlavička funkce (a zde dojde ke ztrátě přesnosti a/nebo oboru hodnot)</li>
+
+</ol>
+
+<p>První varianta generické funkce <strong>pow</strong> může vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>floats</strong> interface {
+        float32 | float64
+}
+&nbsp;
+func <strong>pow[T floats]</strong>(x T, y T) T {
+        return T(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+}
+</pre>
+
+<p>Vypočtené a vypsané výsledky:</p>
+
+<pre>
+0
+0.25
+1
+2.25
+4
+6.25
+9
+12.25
+16
+20.25
+&nbsp;
+0
+0.25
+1
+2.25
+4
+6.25
+9
+12.25
+16
+20.25
+</pre>
+
+<p>Opět se podívejme na variantu příkladu, který vypíše i typy výsledků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>floats</strong> interface {
+        float32 | float64
+}
+&nbsp;
+func <strong>pow[T floats]</strong>(x T, y T) T {
+        return T(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                result := pow(x, 2)
+                fmt.Printf("%T %v\n", result, result)
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                result := pow(x, 2)
+                fmt.Printf("%T %v\n", result, result)
+        }
+}
+</pre>
+
+<p>Nyní s&nbsp;výsledky:</p>
+
+<pre>
+float32 0
+float32 0.25
+float32 1
+float32 2.25
+float32 4
+float32 6.25
+float32 9
+float32 12.25
+float32 16
+float32 20.25
+&nbsp;
+float64 0
+float64 0.25
+float64 1
+float64 2.25
+float64 4
+float64 6.25
+float64 9
+float64 12.25
+float64 16
+float64 20.25
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Úprava hlavičky funkce &ndash; povolení exponentu reprezentovaného celým číslem</h2>
+
+<p>Generickou funkci <strong>pow</strong> lze upravit i tak, aby akceptovala
+exponent reprezentovaný celým číslem typu <strong>int</strong>. Nejprve pro
+tento účel vytvoříme novou typovou množinu:</p>
+
+<pre>
+type <strong>numeric</strong> interface {
+        float32 | float64 | int
+}
+</pre>
+
+<p>Tuto množinu použijeme jako druhý typový parametr <strong>U</strong>, tedy
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>floats</strong> interface {
+        float32 | float64
+}
+&nbsp;
+type <strong>numeric</strong> interface {
+        float32 | float64 | int
+}
+&nbsp;
+func <strong>pow[T floats, U numeric]</strong>(x T, y U) T {
+        return T(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že stále musíme provádět
+korektní přetypování argumentů na <strong>float64</strong> následované
+přetypováním výsledku na požadovaný typ.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Typová množina odvozená od jiné typové množiny</h2>
+
+<p>V&nbsp;předchozím demonstračním příkladu byly deklarovány dvě typové
+množiny:</p>
+
+<pre>
+type <strong>floats</strong> interface {
+        float32 | float64
+}
+&nbsp;
+type <strong>numeric</strong> interface {
+        float32 | float64 | int
+}
+</pre>
+
+<p>Ve skutečnosti je však <strong>floats</strong> vlastně podmnožinou množiny
+<strong>numeric</strong>, takže je možné deklaraci množiny
+<strong>numeric</strong> odvodit od množiny <strong>floats</strong> přidáním
+dalšího typu. To je skutečně v&nbsp;jazyce Go možné, protože v&nbsp;tomto
+ohledu se typové množiny chovají stejně, jako jakékoli jiné datové typy:</p>
+
+<pre>
+type <strong>numeric</strong> interface {
+        floats | int
+}
+</pre>
+
+<p>Upravená varianta předchozího příkladu by tedy mohla vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>floats</strong> interface {
+        float32 | float64
+}
+&nbsp;
+type <strong>numeric</strong> interface {
+        floats | int
+}
+&nbsp;
+func <strong>pow[T floats, U numeric]</strong>(x T, y U) T {
+        return T(math.Pow(float64(x), float64(y)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for x := float32(0.0); x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for x := 0.0; x &lt; 5.0; x += 0.5 {
+                fmt.Println(pow(x, 2))
+        }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Generické funkce a přístup k&nbsp;prvkům struktur</h2>
+
+<p>Prozatím byl typový systém jazyka Go 1.18 použitelný bez (výraznějších)
+omezení. Podívejme se však na následující demonstrační příklad, který vypadá
+sestavený syntakticky i sémanticky bezchybně. Deklarujeme v&nbsp;něm funkci
+nazvanou <strong>getName</strong>, která pro datové typy (struktury)
+<strong>Person</strong> a <strong>Employee</strong> vrátí hodnotu členu
+<strong>Name</strong>. To by mělo být možné, protože tento člen je součástí
+obou zmíněných datových struktur a typový systém by tedy měl správné chování
+odvodit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+)
+&nbsp;
+type <strong>Person</strong> struct {
+        Name    string
+        Surname string
+}
+&nbsp;
+type <strong>Employee</strong> struct {
+        Id      uint
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>getName[T Person | Employee]</strong>(x T) string {
+        return x.Name
+}
+&nbsp;
+func <strong>main</strong>() {
+        var p Person = Person{
+                Name:    "Pepek",
+                Surname: "Vyskoč",
+        }
+&nbsp;
+        fmt.Println(getName(p))
+&nbsp;
+        var e Employee = Employee{
+                Id:      42,
+                Name:    "Eda",
+                Surname: "Wasserfall",
+        }
+&nbsp;
+        fmt.Println(getName(e))
+}
+</pre>
+
+<p>Při pokusu o překlad však dojde k&nbsp;chybě:</p>
+
+<pre>
+./25_structs.go:19:11: x.Name undefined (type T has no field or method Name)
+</pre>
+
+<p>Tato chyba je způsobena tím, že typový systém Go 1.18 prozatím není
+dokonalý. <a href="https://go.dev/doc/go1.18">Slovy samotných tvůrců</a>:</p>
+
+<p><i>&bdquo;The Go compiler does not support accessing a struct field x.f
+where x is of type parameter type even if all types in the type parameter's
+type set have a field f. We may remove this restriction in Go
+1.19.&ldquo;</i></p>
+
+<p>Ve skutečnosti to však (v&nbsp;tomto konkrétním případě) není kritické
+omezení, protože můžeme jednoduše psát:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+)
+&nbsp;
+type <strong>Person</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+type <strong>Employee</strong> struct {
+        id      uint
+        name    string
+        surname string
+}
+&nbsp;
+func (person *Person) <strong>getName()</strong> string {
+        return person.name
+}
+&nbsp;
+func (employee *Employee) <strong>getName()</strong> string {
+        return employee.name
+}
+&nbsp;
+func <strong>main</strong>() {
+        var p Person = Person{
+                name:    "Pepek",
+                surname: "Vyskoč",
+        }
+&nbsp;
+        fmt.Println(p.getName())
+&nbsp;
+        var e Employee = Employee{
+                name:    "Eda",
+                surname: "Wasserfall",
+        }
+&nbsp;
+        fmt.Println(e.getName())
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Existující kontejnery a generické datové typy</h2>
+
+<p>Velmi užitečné jsou generické datové typy při práci s&nbsp;řezy
+popř.&nbsp;mapami. Pokusme se například vytvořit funkci <strong>join</strong>,
+která akceptuje řez s&nbsp;prvky jakéhokoli typu a vrátí řetězec, který bude
+obsahovat tyto prvky uvedené za sebou. První varianta (dodejme, že prozatím
+nefunkční) této funkce by mohla vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>join[T any](items []T)</strong> (result string) {
+        for _, value := range items {
+                result += value.String()
+                result += "," <i>// bylo by dobré vylepšit; nesouvisí s řešenou problematikou</i>
+        }
+        return result
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(join([]string{"first", "second"}))
+}
+</pre>
+
+<p>Alternativně lze namísto řezu použít funkci s&nbsp;proměnným počtem
+parametrů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>join[T any](items ...T)</strong> (result string) {
+        for _, value := range items {
+                result += value.String()
+                result += ","
+        }
+        return result
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println(join("first", "second"))
+}
+</pre>
+
+<p>Prozatím bude překlad obou příkladů neúspěšný, protože typ <i>any</i>
+nepodporuje metodu <strong>String</strong>:</p>
+
+<pre>
+$ <strong>go run 27_join.go </strong>
+&nbsp;
+./27_join.go:7:19: value.String undefined (type T has no field or method String)
+&nbsp;
+&nbsp;
+$ go run 28_better_join.go 
+&nbsp;
+./28_better_join.go:7:19: value.String undefined (type T has no field or method String)
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Generické datové typy a rozhraní</h2>
+
+<p>Předchozí demonstrační příklady nebylo možné přeložit z&nbsp;toho důvodu, že
+typ <strong>any</strong> nepodporoval metodu <strong>String</strong> volanou
+v&nbsp;naší funkci <strong>join</strong>. Ovšem nic nám nebrání v&nbsp;tom,
+abychom si definovali rozhraní s&nbsp;předpisem této metody:</p>
+
+<pre>
+type <strong>TextLike</strong> interface {
+        String() string
+}
+</pre>
+
+<p>Takové rozhraní může být uspokojeno například strukturou
+<strong>Employee</strong>:</p>
+
+<pre>
+type <strong>Employee</strong> struct {
+        name    string
+        surname string
+}
+</pre>
+
+<p>Postačuje pouze definovat metodu <strong>String</strong> pro tuto datovou
+strukturu (a tedy nový datový typ):</p>
+
+<pre>
+func (employee Employee) <strong>String()</strong> string {
+        return employee.name + " " + employee.surname
+}
+</pre>
+
+<p>Nyní již bude postačovat nepatrně změnit typový parametr funkce
+<strong>join</strong>, a to konkrétně na typ <strong>TextLike</strong>:</p>
+
+<pre>
+func <strong>join[T TextLike]</strong>(items ...T) (result string) {
+        for _, value := range items {
+                result += value.String()
+                result += ","
+        }
+        return result
+}
+</pre>
+
+<p>Následující varianta příkladu již bude plně funkční a přeložitelná:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>TextLike</strong> interface {
+        String() string
+}
+&nbsp;
+type <strong>Employee</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func (employee Employee) <strong>String()</strong> string {
+        return employee.name + " " + employee.surname
+}
+&nbsp;
+func <strong>join[T TextLike]</strong>(items ...T) (result string) {
+        for _, value := range items {
+                result += value.String()
+                result += ","
+        }
+        return result
+}
+&nbsp;
+func <strong>main</strong>() {
+        var e1 Employee = Employee{
+                name:    "Pepek",
+                surname: "Vyskoč",
+        }
+&nbsp;
+        var e2 Employee = Employee{
+                name:    "Eda",
+                surname: "Wasserfall",
+        }
+&nbsp;
+        fmt.Println(join(e1, e2))
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Mnohdy se lze obejít bez generických typů</h2>
+
+<p>Ve skutečnosti však byl předchozí demonstrační příklad zbytečně komplikovaný
+&ndash; obejdeme se v&nbsp;něm bez použití typových parametrů a vystačíme si
+pouze s&nbsp;koncepcí struktur a rozhraní, tedy se &bdquo;starým dobrým
+Go&ldquo;. Ostatně se o tom můžete přesvědčit sami:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>TextLike</strong> interface {
+        String() string
+}
+&nbsp;
+type <strong>Employee</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func (employee Employee) <strong>String()</strong> string {
+        return employee.name + " " + employee.surname
+}
+&nbsp;
+func <strong>join</strong>(items ...TextLike) (result string) {
+        for _, value := range items {
+                result += value.String()
+                result += ","
+        }
+        return result
+}
+&nbsp;
+func <strong>main</strong>() {
+        var e1 Employee = Employee{
+                name:    "Pepek",
+                surname: "Vyskoč",
+        }
+&nbsp;
+        var e2 Employee = Employee{
+                name:    "Eda",
+                surname: "Wasserfall",
+        }
+&nbsp;
+        fmt.Println(join(e1, e2))
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Generické řezy (<i>slices</i>)</h2>
+
+<p>Poměrně zajímavých vlastností můžeme dosáhnout kombinací řezů
+s&nbsp;generickými datovými typy. Nyní je totiž možné vytvářet
+&bdquo;plnohodnotné&ldquo; funkce určené pro práci s&nbsp;řezy. Příkladem mohou
+být funkce, jejichž jména jsem si vypůjčil z&nbsp;LISPu &ndash;
+<strong>car</strong> získá a vrátí první prvek z&nbsp;řezu,
+<strong>cdr</strong> vrátí řez bez prvního prvku. Návratová hodnota první
+funkce je tedy <strong>T</strong> a druhé funkce <strong>[]T</strong> pro
+vstupní argument, jenž je typu <strong>[]T</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>car[T any]</strong>(s []T) T {
+        return s[0]
+}
+&nbsp;
+func <strong>cdr[T any]</strong>(s []T) []T {
+        return s[1:]
+}
+&nbsp;
+func <strong>main</strong>() {
+        s := <strong>[]int{1, 2, 3}</strong>
+        fmt.Println(s)
+        fmt.Println(car(s))
+        fmt.Println(cdr(s))
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu získáme následující výstup:</p>
+
+<pre>
+[1 2 3]
+1
+[2 3]
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Vlastní generický datový typ &bdquo;řez s&nbsp;prvky typu XYZ&ldquo;</h2>
+
+<p>Nic nám pochopitelně nebrání v&nbsp;deklaraci nového generického datového
+typu nazvaného například <strong>Slice</strong>, který bude možné použít
+namísto <strong>[T any]</strong>:</p>
+
+<pre>
+type <strong>Slice[T any]</strong> []T
+</pre>
+
+<p>Tento typ se používá velmi snadno:</p>
+
+<pre>
+s := <strong>Slice[int]{1, 2, 3}</strong>
+</pre>
+
+<p>namísto:</p>
+
+<pre>
+s := <strong>[]int{1, 2, 3}</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že v&nbsp;obou případech
+je již v&nbsp;době překladu zřejmé, jakého prvku budou prvky uložené
+v&nbsp;řezu, takže překladač může připravit příslušné varianty funkcí
+<strong>car</strong> a <strong>cdr</strong>.</div></p>
+
+<p>Opět se podívejme na úplný zdrojový kód demonstračního příkladu, v&nbsp;němž
+je nový typ použit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Slice[T any]</strong> []T
+&nbsp;
+func <strong>car[T any]</strong>(s Slice[T]) T {
+        return s[0]
+}
+&nbsp;
+func <strong>cdr[T any]</strong>(s Slice[T]) []T {
+        return s[1:]
+}
+&nbsp;
+func <strong>main</strong>() {
+        s := Slice[int]{1, 2, 3}
+&nbsp;
+        fmt.Println(s)
+        fmt.Println(car(s))
+        fmt.Println(cdr(s))
+}
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto demonstračního příkladu bude totožný
+s&nbsp;příkladem předchozím:</p>
+
+<pre>
+[1 2 3]
+1
+[2 3]
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Metody nového generického datového typu &bdquo;řez s&nbsp;prvky typu XYZ&ldquo;</h2>
+
+<p>Vzhledem k&nbsp;tomu, že jsme si definovali nový datový typ, nic nám nebrání
+v&nbsp;tom, abychom pro něj definovali vlastní metody. Příkladem může být
+metoda nazvaná <strong>length</strong>, která vrátí počet prvků v&nbsp;řezu.
+Z&nbsp;historických důvodů se přitom vrací hodnota typu <strong>int</strong> a
+nikoli <strong>uint</strong>:</p>
+
+<pre>
+func (s Slice[T]) <strong>length()</strong> int {
+        return len(s)
+}
+</pre>
+
+<p>Příklad použití:</p>
+
+<pre>
+s := <strong>Slice[int]{1, 2, 3}</strong>
+&nbsp;
+&nbsp;
+fmt.Println(len(s))
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: stejným způsobem by bylo možné
+<strong>car</strong> a <strong>cdr</strong> přepsat do podoby metod.</div></p>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Slice[T any]</strong> []T
+&nbsp;
+func <strong>car[T any]</strong>(s Slice[T]) T {
+        return s[0]
+}
+&nbsp;
+func <strong>cdr[T any]</strong>(s Slice[T]) []T {
+        return s[1:]
+}
+&nbsp;
+func (s Slice[T]) <strong>length()</strong> int {
+        return len(s)
+}
+&nbsp;
+func <strong>main</strong>() {
+        s := Slice[int]{1, 2, 3}
+&nbsp;
+        fmt.Println(s)
+        fmt.Println(car(s))
+        fmt.Println(cdr(s))
+&nbsp;
+        fmt.Println()
+&nbsp;
+        fmt.Println(len(s))
+        fmt.Println(len(cdr(s)))
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Co je lepší &ndash; metoda generického typu nebo funkce generického typu?</h2>
+
+<p>V&nbsp;Go 1.18 lze pro generické datové struktury typu <i>řez (slice)</i>
+deklarovat jak metody, tak i běžné funkce. Syntakticky se volání metod a funkcí
+odlišuje pouze v&nbsp;tom, zda bude kontejner zapsán před jméno metody nebo
+naopak jako první parametr funkce. Záleží tedy pouze na dohodnuté štábní
+kultuře, který přístup se použije, což ostatně můžeme vidět na příkladu
+metody/funkce <strong>Print</strong>, která má vytisknout obsah řezu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Slice[T any]</strong> []T
+&nbsp;
+func (s Slice[T]) <strong>Print()</strong> {
+        for _, value := range s {
+                fmt.Println(value)
+        }
+}
+&nbsp;
+func <strong>Print[T any]</strong>(s Slice[T]) {
+        for _, value := range s {
+                fmt.Println(value)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        s := Slice[int]{1, 2, 3}
+&nbsp;
+        Print(s)
+&nbsp;
+        fmt.Println()
+&nbsp;
+        s.Print()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pravděpodobně bude příjemnější volání
+metod, a to díky možnostem automatického nabízení jmen dostupných metod
+v&nbsp;integrovaných vývojových prostředích.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Tvorba vlastních kontejnerů</h2>
+
+<p>Pravděpodobně první věcí, která prakticky každého vývojáře
+v&nbsp;souvislosti s&nbsp;generickými datovými typy napadne, je realizace
+vlastních kontejnerů, tedy datových typů, jenž umožňují uložení většího
+množství hodnot. Příkladem takových kontejnerů jsou jednosměrně i obousměrně
+vázané seznamy, stromy (těch existuje minimálně několik desítek), různé
+varianty front, zásobníků, kruhových bufferů a map, množin a multimnožin.
+Přitom funkce resp.&nbsp;metody definované pro tyto kontejnery budou typově
+bezpečné a obejdou se bez použití <strong>interface{}</strong>, které bylo
+v&nbsp;předchozích verzích Go nutné. V&nbsp;souvislosti s&nbsp;Go 1.18 dokonce
+již vzniklo několik knihoven s&nbsp;kontejnery, například <a
+href="https://github.com/zyedidia/generic?ref=golangexample.com">https://github.com/zyedidia/generic?ref=golangexample.com</a>.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Jednosměrně vázaný seznam</h2>
+
+<p>Podívejme se nyní na realizaci jednoho z&nbsp;nejjednodušších kontejnerů,
+konkrétně <a
+href="https://cs.wikipedia.org/wiki/Line%C3%A1rn%C3%AD_seznam">jednosměrně
+vázaného lineárního seznamu</a>. Budeme chtít konstruovat seznam, a to typově
+bezpečně, tedy specifikací, jakého typu budou jeho prvky:</p>
+
+<pre>
+list1 := NewList[int]()
+&nbsp;
+list2 := NewList[string]()
+</pre>
+
+<p>Typicky bývá jednosměrně vázaný seznam reprezentován &bdquo;hlavou&ldquo;,
+tedy ukazatelem na jeho první prvek:</p>
+
+<pre>
+<i>// Datový typ představující lineární jednosměrně vázaný seznam</i>
+type <strong>List[T any]</strong> struct {
+        Head *Item[T]
+}
+</pre>
+
+<p>Přičemž každý prvek obsahuje hodnotu a ukazatel na další prvek
+(popř.&nbsp;hodnotu <strong>nil</strong>, v&nbsp;případě, že se jedná o prvek
+poslední):</p>
+
+<pre>
+<i>// Prvek jednosměrně vázaného seznamu</i>
+type <strong>Item[T any]</strong> struct {
+        Value T
+        Next  *Item[T]
+}
+</pre>
+
+<p>Ukažme si ještě implementaci dvou metod, a to konkrétně metody pro vložení
+nového prvku na začátek seznamu (což je nejjednodušší, protože nový prvek se
+stane &bdquo;hlavou&ldquo; seznamu a naváže na sebe původní seznam) a metody
+určené pro tisk všech prvků seznamu.</p>
+
+<p>Vložení nového prvku na začátek seznamu lze realizovat poměrně přímočarým
+způsobem. Nejdříve vytvoříme nový prvek s&nbsp;využitím hodnoty (daného typu)
+předané metodě v&nbsp;parametru <strong>value</strong>. Následně se na nový
+prvek naváže původní seznam (dalším prvkem tohoto prvku tedy bude původní
+&bdquo;hlava&ldquo;) a poté se &bdquo;hlava&ldquo; seznamu upraví tak, aby
+ukazovala na nový prvek:</p>
+
+<pre>
+func (list *List[T]) <strong>Insert</strong>(value T) {
+        item := Item[T]{
+                Value: value,
+        }
+&nbsp;
+        <i>// navázání na původní hlavu seznamu</i>
+        item.Next = list.Head
+&nbsp;
+        <i>// změna pozice hlavy seznamu</i>
+        list.Head = &amp;item
+}
+</pre>
+
+<p>Tisk seznamu je realizován programovou smyčkou, která postupuje prvky od
+hlavy až do hodnoty <strong>nil</strong> uložené v&nbsp;atributu
+<strong>Next</strong> posledního prvku seznamu. Prázdný seznam nemá žádné
+prvky, proto již hlava obsahuje <strong>nil</strong> (což je korektně
+testováno):</p>
+
+<pre>
+func (list *List[Value]) <strong>Print</strong>() {
+        <i>// první prvek v seznamu (nebo nil)</i>
+        item := list.Head
+&nbsp;
+        <i>// postupný průchod dalšími navázanými prvky</i>
+        for item != nil {
+                fmt.Println(item.Value)
+&nbsp;
+                <i>// přechod na další navázaný prvek</i>
+                item = item.Next
+        }
+&nbsp;
+}
+</pre>
+
+<p>Pro úplnost si ukažme celý zdrojový kód programu s&nbsp;realizací
+seznamu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+<i>// Datový typ představující lineární jednosměrně vázaný seznam</i>
+type <strong>List[T any]</strong> struct {
+        Head *Item[T]
+}
+&nbsp;
+<i>// Prvek jednosměrně vázaného seznamu</i>
+type <strong>Item[T any]</strong> struct {
+        Value T
+        Next  *Item[T]
+}
+&nbsp;
+<i>// Konstrukce prázdného seznamu (s ukazatelem na nil)</i>
+func <strong>NewList</strong>[T any]() *List[T] {
+        return &amp;List[T]{}
+}
+&nbsp;
+<i>// Přidání nového prvku na začátek seznamu</i>
+func (list *List[T]) <strong>Insert</strong>(value T) {
+        item := Item[T]{
+                Value: value,
+        }
+&nbsp;
+        <i>// navázání na původní hlavu seznamu</i>
+        item.Next = list.Head
+&nbsp;
+        <i>// změna pozice hlavy seznamu</i>
+        list.Head = &amp;item
+}
+&nbsp;
+<i>// Tisk obsahu celého seznamu</i>
+func (list *List[Value]) <strong>Print</strong>() {
+        <i>// první prvek v seznamu (nebo nil)</i>
+        item := list.Head
+&nbsp;
+        <i>// postupný průchod dalšími navázanými prvky</i>
+        for item != nil {
+                fmt.Println(item.Value)
+&nbsp;
+                <i>// přechod na další navázaný prvek</i>
+                item = item.Next
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>main</strong>() {
+        list1 := NewList[int]()
+&nbsp;
+        list1.Insert(1)
+        list1.Insert(2)
+        list1.Insert(3)
+        list1.Insert(4)
+&nbsp;
+        list1.Print()
+&nbsp;
+        fmt.Println()
+        list2 := NewList[string]()
+&nbsp;
+        list2.Insert("first")
+        list2.Insert("second")
+        list2.Insert("third")
+        list2.Insert("fourth")
+&nbsp;
+        list2.Print()
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu je patrné, že se skutečně
+vytvořily dva samostatné seznamy. První seznam s&nbsp;prvky typu
+<strong>int</strong>, druhý seznam s&nbsp;prvky typu
+<strong>string</strong>:</p>
+
+<pre>
+4
+3
+2
+1
+&nbsp;
+fourth
+third
+second
+first
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/">minule</a>
+i dnes použitých demonstračních příkladů byly uloženy do Git repositáře, který
+je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_print.go</td><td>funkce s&nbsp;konkrétními datovými typy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/01_print.go">https://github.com/tisnik/go-root/blob/master/article_88/01_print.go</a></td></tr>
+<tr><td> 2</td><td>02_print_overload.go</td><td>pokus o přetížení funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/02_print_overload.go">https://github.com/tisnik/go-root/blob/master/article_88/02_print_overload.go</a></td></tr>
+<tr><td> 3</td><td>03_print_no_conversion.go</td><td>konverze datových typů není automatická</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/03_print_no_conversion.go">https://github.com/tisnik/go-root/blob/master/article_88/03_print_no_conversion.go</a></td></tr>
+<tr><td> 4</td><td>04_print_interface.go</td><td>použití prázdných rozhraní, které splňuje jakýkoli datový typ</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/04_print_interface.go">https://github.com/tisnik/go-root/blob/master/article_88/04_print_interface.go</a></td></tr>
+<tr><td> 5</td><td>05_generic_print.go</td><td>využití typových parametrů funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/05_generic_print.go">https://github.com/tisnik/go-root/blob/master/article_88/05_generic_print.go</a></td></tr>
+<tr><td> 6</td><td>06_type_parameter.go</td><td>explicitní volání konkrétní varianty generické funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/06_type_parameter.go">https://github.com/tisnik/go-root/blob/master/article_88/06_type_parameter.go</a></td></tr>
+<tr><td> 7</td><td>07_type_parameter_check.go</td><td>kontrola typů parametrů volané funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/07_type_parameter_check.go">https://github.com/tisnik/go-root/blob/master/article_88/07_type_parameter_check.go</a></td></tr>
+<tr><td> 8</td><td>08_comparable.go</td><td>triviální porovnání dvou hodnot typu <strong>int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/08_comparable.go">https://github.com/tisnik/go-root/blob/master/article_88/08_comparable.go</a></td></tr>
+<tr><td> 9</td><td>09_comparable_variable_types.go</td><td>sada funkcí pro porovnání dvojice hodnot různých typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/09_comparable_variable_types.go">https://github.com/tisnik/go-root/blob/master/article_88/09_comparable_variable_types.go</a></td></tr>
+<tr><td>10</td><td>10_compare_type_parameters.go</td><td>jediná funkce pro porovnání dvojice hodnot různých typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/10_compare_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_88/10_compare_type_parameters.go</a></td></tr>
+<tr><td>11</td><td>11_add_int.go</td><td>datový systém jazyka Go a přetížené operátory: součet dvou hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/11_add_int.go">https://github.com/tisnik/go-root/blob/master/article_88/11_add_int.go</a></td></tr>
+<tr><td>12</td><td>12_add_type_parameters.go</td><td>sada funkcí pro porovnání dvojice hodnot různých typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/12_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_88/12_add_type_parameters.go</a></td></tr>
+<tr><td>13</td><td>13_add_type_parameters.go</td><td>jediná funkce pro porovnání dvojice hodnot různých typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/13_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_88/13_add_type_parameters.go</a></td></tr>
+<tr><td>14</td><td>14_add_type_parameters.go</td><td></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_88/14_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_88/12_add_type_parameters.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>15</td><td>16_add_type_parameters.go</td><td>lokální proměnné s&nbsp;typem odvozeným při volání funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/16_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_89/16_add_type_parameters.go</a></td></tr>
+<tr><td>16</td><td>17_add_type_parameters.go</td><td>nekompatibilní typy obou parametrů funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/17_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_89/17_add_type_parameters.go</a></td></tr>
+<tr><td>17</td><td>18_add_type_parameters.go</td><td>dva generické typy pro dvojici parametrů funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/18_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_89/18_add_type_parameters.go</a></td></tr>
+<tr><td>18</td><td>19_add_type_parameters.go</td><td>přetypování využívající generický typ</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/19_add_type_parameters.go">https://github.com/tisnik/go-root/blob/master/article_89/19_add_type_parameters.go</a></td></tr>
+<tr><td>19</td><td>20_pow.go</td><td>negenerická funkce <strong>pow</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/20_pow.go">https://github.com/tisnik/go-root/blob/master/article_89/20_pow.go</a></td></tr>
+<tr><td>20</td><td>21_pow_floats.go</td><td>dvě negenerické funkce rozlišené jménem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/21_pow_floats.go">https://github.com/tisnik/go-root/blob/master/article_89/21_pow_floats.go</a></td></tr>
+<tr><td>21</td><td>22_pow_generic.go</td><td>generická varianta funkce <strong>pow</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/22_pow_generic.go">https://github.com/tisnik/go-root/blob/master/article_89/22_pow_generic.go</a></td></tr>
+<tr><td>22</td><td>23_pow_generic.go</td><td>generická varianta funkce <strong>pow</strong>, vylepšení datových typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/23_pow_generic.go">https://github.com/tisnik/go-root/blob/master/article_89/23_pow_generic.go</a></td></tr>
+<tr><td>23</td><td>24_pow_generic.go</td><td>generická varianta funkce <strong>pow</strong>, další vylepšení datových typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/24_pow_generic.go">https://github.com/tisnik/go-root/blob/master/article_89/24_pow_generic.go</a></td></tr>
+<tr><td>24</td><td>25_structs.go</td><td>generické typy a struktury (nefunkční příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/25_structs.go">https://github.com/tisnik/go-root/blob/master/article_89/25_structs.go</a></td></tr>
+<tr><td>25</td><td>26_structs.go</td><td>struktury a metody (funkční příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/26_structs.go">https://github.com/tisnik/go-root/blob/master/article_89/26_structs.go</a></td></tr>
+<tr><td>26</td><td>27_join.go</td><td>generická funkce <strong>join</strong> (nefunkční příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/27_join.go">https://github.com/tisnik/go-root/blob/master/article_89/27_join.go</a></td></tr>
+<tr><td>27</td><td>28_better_join.go</td><td>generická funkce <strong>join</strong> (nefunkční příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/28_better_join.go">https://github.com/tisnik/go-root/blob/master/article_89/28_better_join.go</a></td></tr>
+<tr><td>28</td><td>29_textlike_join.go</td><td>generická funkce <strong>join</strong> (funkční příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/29_textlike_join.go">https://github.com/tisnik/go-root/blob/master/article_89/29_textlike_join.go</a></td></tr>
+<tr><td>29</td><td>30_textlike_join.go</td><td>ve skutečnosti zde není genericita potřebná</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/30_textlike_join.go">https://github.com/tisnik/go-root/blob/master/article_89/30_textlike_join.go</a></td></tr>
+<tr><td>30</td><td>31_slice.go</td><td>funkce pracující s&nbsp;obecným řezem (<i>slice</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/31_slice.go">https://github.com/tisnik/go-root/blob/master/article_89/31_slice.go</a></td></tr>
+<tr><td>31</td><td>32_slice_type.go</td><td>funkce pracující s&nbsp;obecným řezem (<i>slice</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/32_slice_type.go">https://github.com/tisnik/go-root/blob/master/article_89/32_slice_type.go</a></td></tr>
+<tr><td>32</td><td>33_slice_type.go</td><td>metoda pracující s&nbsp;obecným řezem (<i>slice</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/33_slice_type.go">https://github.com/tisnik/go-root/blob/master/article_89/33_slice_type.go</a></td></tr>
+<tr><td>33</td><td>34_whats_better.go</td><td>co je lepší &ndash; metoda generického typu nebo funkce generického typu?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/34_whats_better.go">https://github.com/tisnik/go-root/blob/master/article_89/34_whats_better.go</a></td></tr>
+<tr><td>34</td><td>35_list.go</td><td>lineární jednosměrně vázaný seznam realizovaný s&nbsp;využitím generických typů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_89/35_list.go">https://github.com/tisnik/go-root/blob/master/article_89/35_list.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://go.dev/ref/spec">https://go.dev/ref/spec</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Type parameters in Go<br />
+<a href="https://bitfieldconsulting.com/golang/type-parameters">https://bitfieldconsulting.com/golang/type-parameters</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go 1.18 Release Notes<br />
+<a href="https://golang.org/doc/go1.18">https://golang.org/doc/go1.18</a>
+</li>
+
+<li>Go 1.17 Release Notes<br />
+<a href="https://golang.org/doc/go1.17">https://golang.org/doc/go1.17</a>
+</li>
+
+<li>Go 1.16 Release Notes<br />
+<a href="https://golang.org/doc/go1.16">https://golang.org/doc/go1.16</a>
+</li>
+
+<li>Go 1.15 Release Notes<br />
+<a href="https://golang.org/doc/go1.15">https://golang.org/doc/go1.15</a>
+</li>
+
+<li>Go 1.14 Release Notes<br />
+<a href="https://golang.org/doc/go1.14">https://golang.org/doc/go1.14</a>
+</li>
+
+<li>Go 1.13 Release Notes<br />
+<a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a>
+</li>
+
+<li>Go 1.12 Release Notes<br />
+<a href="https://golang.org/doc/go1.12">https://golang.org/doc/go1.12</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>A Proposal for Adding Generics to Go<br />
+<a href="https://go.dev/blog/generics-proposal">https://go.dev/blog/generics-proposal</a>
+</li>
+
+<li>Proposal: Go should have generics<br />
+<a href="https://github.com/golang/proposal/blob/master/design/15292-generics.md">https://github.com/golang/proposal/blob/master/design/15292-generics.md</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Balíček constraints<br />
+<a href="https://pkg.go.dev/golang.org/x/exp/constraints">https://pkg.go.dev/golang.org/x/exp/constraints</a>
+</li>
+
+<li>What are the libraries/tools you missed from other programming languages in Golang?<br />
+<a href="https://www.quora.com/What-are-the-libraries-tools-you-missed-from-other-programming-languages-in-Golang?share=1">https://www.quora.com/What-are-the-libraries-tools-you-missed-from-other-programming-languages-in-Golang?share=1</a>
+</li>
+
+<li>Golang Has Generics—Why I Don't Miss Generics Anymore<br />
+<a href="https://blog.jonathanoliver.com/golang-has-generics/">https://blog.jonathanoliver.com/golang-has-generics/</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>The missing slice package<br />
+<a href="https://github.com/ssoroka/slice">https://github.com/ssoroka/slice</a>
+</li>
+
+<li>Methods in Go (part I)<br />
+<a href="https://medium.com/golangspec/methods-in-go-part-i-a4e575dff860">https://medium.com/golangspec/methods-in-go-part-i-a4e575dff860</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
