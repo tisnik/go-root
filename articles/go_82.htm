@@ -1,0 +1,2310 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Lexikální a syntaktická zdrojových kódů jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Lexikální a syntaktická zdrojových kódů jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku si ukážeme, jakým způsobem je možné s využitím standardní knihovny programovacího jazyka Go provádět lexikální i syntaktickou analýzu zdrojových kódů Go, a to včetně konstrukce a zobrazení AST (abstraktního syntaktického stromu).</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Lexikální a syntaktická zdrojových kódů jazyka Go</a></p>
+<p><a href="#k02">2. Lexémy a tokeny (tokenizace)</a></p>
+<p><a href="#k03">3. Použití balíčku <strong>go/scanner</strong></a></p>
+<p><a href="#k04">4. Syntaktická analýza (parsing) a abstraktní syntaktický strom</a></p>
+<p><a href="#k05">5. Syntaktická analýza v&nbsp;Go &ndash; balíčky <strong>go/token</strong> a <strong>go/parser</strong></a></p>
+<p><a href="#k06">6. Čitelný výpis obsahu abstraktního syntaktického stromu</a></p>
+<p><a href="#k07">7. Průchod abstraktním syntaktickým stromem</a></p>
+<p><a href="#k08">8. Návrhový vzor Visitor</a></p>
+<p><a href="#k09">9. Zobrazení hloubky uzlu v&nbsp;AST</a></p>
+<p><a href="#k10">10. Koncové uzly v&nbsp;AST</a></p>
+<p><a href="#k11">11. AST zkonstruovaný pro sekvenci příkazů</a></p>
+<p><a href="#k12">12. Výrazy se závorkami a s&nbsp;různými prioritami operátorů</a></p>
+<p><a href="#k13">13. Konstrukce AST pro jediný výraz</a></p>
+<p><a href="#k14">14. Typy uzlů v&nbsp;AST</a></p>
+<p><a href="#k15">15. Podrobnější výpis informací o uzlech v&nbsp;AST</a></p>
+<p><a href="#k16">16. Složitější aritmetické výrazy, zjednodušení zobrazení AST</a></p>
+<p><a href="#k17">17. Logické výrazy</a></p>
+<p><a href="#k18">18. Výrazy obsahující operace s&nbsp;poli či řezy</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Lexikální a syntaktická zdrojových kódů jazyka Go</h2>
+
+<p><a
+href="https://www.root.cz/clanky/kontrola-potencialnich-chyb-ve-zdrojovych-kodech-go-nastroji-gosec-a-go-critic/">V&nbsp;předchozím
+článku</a> o <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacím jazyku
+Go</a> jsme se věnovali popisu nástrojů nazvaných <i>gosec</i> a
+<i>go-critic</i>. Oba zmíněné nástroje přitom pracují nad AST (abstraktním
+syntaktickým stromem), nikoli přímo nad zdrojovými kódy Go. Pro tyto účely se
+přitom využívá standardní knihovna programovacího jazyka Go, která obsahuje
+všechny potřebné nástroje, konkrétně nástroj pro lexikální analýzu i nástroj
+pro syntaktickou analýzu (v&nbsp;jejímž rámci se AST tvoří). Dnes se budeme
+zabývat právě touto velmi zajímavou a užitečnou součástí standardní knihovny
+jazyka Go. Ukážeme si, jak lze provést takzvanou <i>tokenizaci</i> a následně
+<i>parsing</i>, jehož výsledkem je AST. A samozřejmě se zmíníme i o tom, jakým
+způsobem lze abstraktním syntaktickým stromem procházet. V&nbsp;navazujícím
+článku si pak ukážeme způsob modifikace AST, což sice výše zmíněné nástroje
+neprovádí, ovšem může se jednat o dobrý základ pro (například) projekty pro
+vysokoúrovňové optimalizace, přidání dalších datových typů do jazyka, rozšíření
+sémantiky pro existující datové typy apod.</p>
+
+<p><div class="rs-tip-major">Poznámka: všechny balíčky určené pro lexikální i
+syntaktickou analýzu, které jsou součástí standardní knihovny jazyka Go, jsou
+primárně určeny pro parsing zdrojových kódů naprogramovaných přímo v&nbsp;tomto
+jazyce. Nejedná se tedy v&nbsp;žádném případě o obecné lexikální analyzátory a
+parsery. Pokud tedy například v&nbsp;projektu potřebujete zpracovávat zdrojové
+kódy vytvořené v&nbsp;jiných programovacích jazycích, je vhodnější použít
+externí balíčky navržené k&nbsp;tomuto účelu (pro Go existuje například i
+<strong>goyacc</strong>, což je nástroj odvozený od známého <i>Yaccu &ndash;
+yet another compiler compiler</i>).</div></p>
+
+<p>Při zpracování zdrojových kódů se postupně provádí jednotlivé dílčí kroky.
+Díky rozdělení celého zpracování do několika konfigurovatelných kroků je
+zajištěna velká flexibilita a možnost případného relativně snadného rozšiřování
+o další podporované jazyky, výstupní formáty, speciální filtry atd. (nehledě na
+to, že každá činnost je založena na odlišné teorii). Celý průběh zpracování
+vypadá následovně:</p>
+
+<ol>
+
+<li>Na začátku zpracování se nachází takzvaný <i>lexer</i>, který postupně
+načítá jednotlivé znaky ze vstupního řetězce (resp.&nbsp;souboru) a vytváří
+z&nbsp;nich lexikální <i>tokeny</i>. Teoreticky se pro každý programovací jazyk
+používá odlišný lexer a samozřejmě je možné v&nbsp;případě potřeby si napsat
+lexer vlastní.</li>
+
+<li>Výstup z&nbsp;lexeru může procházet libovolným počtem <i>filtrů</i>
+sloužících pro odstranění nebo (častěji) modifikaci jednotlivých tokenů; ať již
+jejich typů či přímo textu, který tvoří hodnotu tokenu. Díky existenci filtrů
+je například možné nechat si zvýraznit vybrané bílé znaky, slova se speciálním
+významem v&nbsp;komentářích (TODO:, FIX:) apod.</li>
+
+<li>Sekvence <i>tokenů</i> tvoří základ pro syntaktickou analýzu. Nástroj,
+který syntaktickou analýzu provádí, se většinou nazývá <i>parser</i> a proto se
+taktéž někdy setkáme s&nbsp;pojmem <i>parsing</i> (ten je ovšem chybně používán
+i v&nbsp;těch případech, kdy se provádí &bdquo;pouze&ldquo; lexikální analýza).
+Výsledkem parseru je vhodně zvolená datová struktura, typicky abstraktní
+syntaktický strom (AST); někdy též strom derivační.</li>
+
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: díky tomu, že se prakticky veškeré
+zpracování zdrojových textů odehrává na úrovni tokenů, není nutné, aby byl celý
+zpracovávaný zdrojový kód (nebo jeho tokenizovaná podoba) uložen
+v&nbsp;operační paměti. Je tedy možné zpracovávat i velmi rozsáhlé dokumenty, a
+to bez větších nároků na operační paměť &ndash; i to je ostatně použito
+v&nbsp;balíčku <strong>go/scanner</strong>.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Lexémy a tokeny (tokenizace)</h2>
+
+<p>První část zpracování zdrojových textů je nejzajímavější a to jak
+z&nbsp;hlediska teorie, tak i implementace (vygenerované konečné automaty
+atd.). <i>Lexer</i> totiž musí v&nbsp;sekvenci znaků tvořících zdrojový text
+najít takzvané <i>lexémy</i>, tj.&nbsp;skupiny (sousedních) znaků
+odpovídajících nějakému vzorku (použít lze gramatiku, regulární výraz či ad-hoc
+testy). Z&nbsp;lexémů se posléze tvoří již zmíněné lexikální <i>tokeny</i>, což
+je &ndash; poněkud zjednodušeně řečeno &ndash; dvojice obsahující typ tokenu
+(někdy se namísto &bdquo;typ&ldquo; používá označení &bdquo;jméno&ldquo;) a
+řetězec ze vstupního zdrojového souboru (v&nbsp;případě standardních knihoven
+jazyka Go je situace ještě nepatrně složitější, což ostatně uvidíme
+v&nbsp;dalším textu). Převodu zdrojového textu na sekvenci tokenů se
+z&nbsp;tohoto důvodu někdy říká <i>tokenizace</i>. Účelem tokenizace může
+být:</p>
+
+<ul>
+
+<li>Transformace zdrojového textu do podoby, která může být dále zpracovávána
+dalším modulem překladače (syntaktická analýza). V&nbsp;takovém případě se však
+některé tokeny mohou zahazovat; příkladem mohou být komentáře, tokeny
+představující bílé znaky apod. (opět uvidíme v&nbsp;navazující kapitole).
+Spojením lexeru a modulu pro syntaktickou analýzu vznikne <i>parser</i> (jeho
+typickým výsledkem je AST).</li>
+
+<li>Transformace zdrojového kódu pro účely zvýraznění syntaxe v&nbsp;editorech
+či prohlížečích. V&nbsp;tomto případě se žádné tokeny nezahazují, což je i
+případ knihovny Pygments určené pro ekosystém programovacího jazyka
+Python.</li>
+
+</ul>
+
+<p><div class="rs-tip-major">Poznámka: výše zmíněná <i>tokenizace</i> se
+používala například již v&nbsp;interpretrech programovacího jazyka BASIC na
+mnoha osmibitových domácích počítačích. Ovšem v&nbsp;tomto případě měly tokeny
+poněkud odlišnou strukturu, protože všechny příkazy a funkce byly většinou
+reprezentovány jednoznačným osmibitovým celým číslem, které tak současně
+představovalo jak typ tokenu, tak i jeho hodnotu. Důvod byl jednoduchý &ndash;
+v&nbsp;operační paměti byl uložen tokenizovaný kód a nikoli kód zapsaný
+uživatelem. Tento kód byl již mnohem jednodušeji zpracovatelný interpretrem,
+než původní zdrojový kód (odpadlo neustálé volání <i>lexeru</i>). Navíc se
+každý programový řádek ihned po svém zápisu automaticky normalizoval
+(odstranily se bílé znaky, zkratky příkazů se expandovaly atd.). Ostatně
+množina příkazů a funkcí byla předem známá a nebyla rozšiřitelná (až na
+uživatelské funkce dostupné jen v&nbsp;některých BASICech &ndash; a i tehdy byl
+počet funkcí omezen). Příkladem tokenizace tohoto typu mohou být tokeny použité
+v&nbsp;interpretru programovacího jazyka Atari BASIC, které skutečně přímo
+odpovídají příkazům, funkcím a operátorům tohoto jazyka. Jen pro
+zajímavost:</div></p>
+
+<table>
+<tr><th>Příkaz</th><th>Kód tokenu</th><th>Příkaz</th><th>Kód tokenu</th><th>Příkaz</th><th>Kód tokenu</th><th>Příkaz</th><th>Kód tokenu</th></tr>
+<tr><td>REM</td><td>00</td><td>NEXT</td><td>09</td><td>CLR</td><td>18</td><td>NOTE</td><td>27</td></tr>
+<tr><td>DATA</td><td>01</td><td>GOTO</td><td>10</td><td>DEG</td><td>19</td><td>POINT</td><td>28</td></tr>
+<tr><td>INPUT</td><td>02</td><td>GO TO</td><td>11</td><td>DIM</td><td>20</td><td>XIO</td><td>29</td></tr>
+<tr><td>COLOR</td><td>03</td><td>GOSUB</td><td>12</td><td>END</td><td>21</td><td>ON</td><td>30</td></tr>
+<tr><td>LIST</td><td>04</td><td>TRAP</td><td>13</td><td>NEW</td><td>22</td><td>POKE</td><td>31</td></tr>
+<tr><td>ENTER</td><td>05</td><td>BYE</td><td>14</td><td>OPEN</td><td>23</td><td>PRINT</td><td>32</td></tr>
+<tr><td>LET</td><td>06</td><td>CONT</td><td>15</td><td>LOAD</td><td>24</td><td>RAD</td><td>33</td></tr>
+<tr><td>IF</td><td>07</td><td>COM</td><td>16</td><td>SAVE</td><td>25</td><td>READ</td><td>34</td></tr>
+<tr><td>FOR</td><td>08</td><td>CLOSE</td><td>17</td><td>STATUS</td><td>26</td><td>RESTORE</td><td>35</td></tr>
+</table>
+
+<p>...atd...</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Použití balíčku <strong>go/scanner</strong></h2>
+
+<p>Tokenizaci zdrojového kódu, který by měl obsahovat pouze tokeny
+rozpoznatelné překladačem jazyka Go, lze provést relativně snadno, a to
+konkrétně s&nbsp;využitím balíčku pojmenovaného přímočaře
+<strong>go/scanner</strong>. Tento balíček obsahuje nástroj zajišťující
+postupný průchod zdrojovým kódem (který je pro obecnost reprezentován typem
+<strong>[]byte</strong> &ndash; nikoli řetězcem) s&nbsp;tím, že se postupně
+vytváří sekvence tokenů, což je datový typ definovaný ve standardním balíčku
+<strong>go/token</strong>. Celá tokenizace může vypadat následovně (tento kód
+je do značné míry inspirován příkladem <a
+href="https://pkg.go.dev/go/scanner@go1.17.5">ze standardní dokumentace jazyka
+Go</a>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který má být tokenizován</i>
+const source = `
+<u>var x int = 1    + 2 * 3 // nejlepší kód</u>
+`
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// postupné provádění tokenizace a výpis jednotlivých tokenů</i>
+        for {
+                pos, tok, lit := s.Scan()
+                <i>// byl nalezen speciální token reprezentující konec tokenizace</i>
+                if tok == token.EOF {
+                        fmt.Println("&lt;EOF&gt;")
+                        break
+                }
+                <i>// výpis obsahu tokenu</i>
+                fmt.Printf("%s\t%s\t%q\n", fset.Position(pos), tok, lit)
+        }
+
+}
+</pre>
+
+<p>Výsledek, tj.&nbsp;sekvence tokenů získána tímto příkladem, bude vypadat
+následovně:</p>
+
+<pre>
+2:1     var     "var"
+2:5     IDENT   "x"
+2:7     IDENT   "int"
+2:11    =       ""
+2:13    INT     "1"
+2:18    +       ""
+2:20    INT     "2"
+2:22    *       ""
+2:24    INT     "3"
+2:26    ;       "\n"
+2:26    COMMENT "// nejlepší kód"
+&lt;EOF&gt;
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že již byly odstraněny
+například mezery mezi jednotlivými lexikálními prvky jazyka. Ovšem konce řádků,
+které mají v&nbsp;Go syntaktický význam, jsou zachovány, přesněji jsou
+reprezentovány tokenem &bdquo;;&ldquo;.</div></p>
+
+<p>Zpracování komentářů je řízeno posledním parametrem předaným do funkce
+<strong>scanner.Init</strong>. V&nbsp;případě, že se v&nbsp;tomto parametru
+předá nulová hodnota, budou komentáře ze zpracovávaného vstupu odstraněny a
+tudíž nezískáme ani jejich tokeny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který má být tokenizován</i>
+const source = `
+<u>var x int = 1    + 2 * 3 // nejlepší kód</u>
+`
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        <strong>s.Init(file, []byte(source), nil, 0)</strong>
+&nbsp;
+        <i>// postupné provádění tokenizace a výpis jednotlivých tokenů</i>
+        for {
+                pos, tok, lit := s.Scan()
+                <i>// byl nalezen speciální token reprezentující konec tokenizace</i>
+                if tok == token.EOF {
+                        fmt.Println("&lt;EOF&gt;")
+                        break
+                }
+                <i>// výpis obsahu tokenu</i>
+                fmt.Printf("%s\t%s\t%q\n", fset.Position(pos), tok, lit)
+        }
+}
+</pre>
+
+<p>Nyní nebude token s&nbsp;komentářem generován:</p>
+
+<pre>
+2:1     var     "var"
+2:5     IDENT   "x"
+2:7     IDENT   "int"
+2:11    =       ""
+2:13    INT     "1"
+2:18    +       ""
+2:20    INT     "2"
+2:22    *       ""
+2:24    INT     "3"
+2:26    ;       "\n"
+&lt;EOF&gt;
+</pre>
+
+<p>Tokenizér resp.&nbsp;scanner neprovádí žádnou kontrolu syntaxe, takže mu lze
+předat i zcela nesmyslný zápis:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který má být tokenizován</i>
+const source = `
+<u>var x const &lt; 1 &amp;&amp; + 2 * || 3 // nejlepší kód</u>
+`
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// postupné provádění tokenizace a výpis jednotlivých tokenů</i>
+        for {
+                pos, tok, lit := s.Scan()
+                <i>// byl nalezen speciální token reprezentující konec tokenizace</i>
+                if tok == token.EOF {
+                        fmt.Println("&lt;EOF&gt;")
+                        break
+                }
+                <i>// výpis obsahu tokenu</i>
+                fmt.Printf("%s\t%s\t%q\n", fset.Position(pos), tok, lit)
+        }
+}
+</pre>
+
+<p>S&nbsp;výsledkem, který je stále platnou sekvencí korektních tokenů (i když
+je původní kód nysmyslný):</p>
+
+<pre>
+2:1     var     "var"
+2:5     IDENT   "x"
+2:7     const   "const"
+2:13    &lt;       ""
+2:15    INT     "1"
+2:17    &amp;&amp;      ""
+2:20    +       ""
+2:22    INT     "2"
+2:24    *       ""
+2:26    ||      ""
+2:29    INT     "3"
+2:31    ;       "\n"
+2:31    COMMENT "// nejlepší kód"
+&lt;EOF&gt;
+</pre>
+
+<p>Dokonce je možné tokenizéru předat i kód obsahující neznámé znaky,
+resp.&nbsp;přesněji řečeno znaky, které nemají v&nbsp;gramatice jazyka Go žádný
+význam. Zde konkrétně se jedná o pokus o použití ternárního operátoru známého
+například z&nbsp;jazyka C:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který má být tokenizován</i>
+const source = `
+<u>var x int = 2 &lt; 3 ? 10 : 20</u>
+`
+&nbsp;
+func main() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// postupné provádění tokenizace a výpis jednotlivých tokenů</i>
+        for {
+                pos, tok, lit := s.Scan()
+                <i>// byl nalezen speciální token reprezentující konec tokenizace</i>
+                if tok == token.EOF {
+                        fmt.Println("<EOF>")
+                        break
+                }
+                <i>// výpis obsahu tokenu</i>
+                fmt.Printf("%s\t%s\t%q\n", fset.Position(pos), tok, lit)
+        }
+&nbsp;
+}
+</pre>
+
+<p>V&nbsp;tomto případě se vypíše i neznámý token, a to včetně jeho
+hodnoty:</p>
+
+<pre>
+2:1     var     "var"
+2:5     IDENT   "x"
+2:7     IDENT   "int"
+2:11    =       ""
+2:13    INT     "2"
+2:15    &lt;       ""
+2:17    INT     "3"
+2:19    <u>ILLEGAL "?"</u>
+2:21    INT     "10"
+2:24    :       ""
+2:26    INT     "20"
+2:28    ;       "\n"
+<EOF>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: teoreticky je tedy možné už na úrovni
+tokenizéru rozšiřovat <i>syntaxi</i> programovacího jazyka Go o další operátory
+&ndash; i když se na této úrovni abstrakce jedná o relativně složitou operaci,
+kterou je lepší provádět až na úrovni abstraktního syntaktického stromu neboli
+AST (pokud je to možné). Podobně je tomu u nástrojů pro kontrolu kódů &ndash;
+některé operace lze efektivně provádět již na úrovni sekvence tokenů, další pak
+až nad AST.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Syntaktická analýza (parsing) a abstraktní syntaktický strom</h2>
+
+<p>Již <a href="#k01">v&nbsp;úvodní kapitole</a> jsme si řekli, že lexikální
+analýza, jejímž výsledkem je sekvence <i>tokenů</i>, tvoří základ pro
+syntaktickou analýzu. Nástroj, který syntaktickou analýzu provádí, se většinou
+nazývá <i>parser</i> a proto se taktéž někdy setkáme s&nbsp;pojmem
+<i>parsing</i> (ten je ovšem chybně používán i v&nbsp;těch případech, kdy se
+provádí &bdquo;pouze&ldquo; lexikální analýza). Výsledkem činnosti parseru je
+vhodně zvolená datová struktura, která popisuje gramatickou strukturu programu
+&ndash; tedy ne již pouhou lineární sekvenci tokenů, ale větší celky programu,
+které se (typicky rekurzivně) skládají z&nbsp;menších celků (druhým výsledkem
+může být chyba v&nbsp;případě, že zdrojový obsahuje <i>syntaktickou</i> chybu).
+Vzhledem k&nbsp;obecně rekurzivnímu charakteru této datové struktury se velmi
+často setkáme s&nbsp;použitím derivačních stromů nebo (častěji)
+s&nbsp;abstraktními syntaktickými stromy (<i>abstract syntax tree</i> neboli
+<i>AST</i>). Vytvořeným stromem je možné procházet různými způsoby, nejčastěji
+algoritmem prohledávání do hloubky (<i>depth-first search</i>). I tento
+algoritmus je již ve standardní knihovně programovacího jazyka Go implementován
+a můžeme ho přímo použít.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Syntaktická analýza v&nbsp;Go &ndash; balíčky <strong>go/token</strong> a <strong>go/parser</strong></h2>
+
+<p>Nyní jsme se již seznámili se základními informacemi o tom, co je to
+<i>abstraktní syntaktický strom</i> a z&nbsp;jakých dat (prvků, uzlů) je
+tvořen. Pojďme si tedy ukázat způsob konstrukce abstraktního datového stromu
+s&nbsp;využitím operací dostupných v&nbsp;základních knihovnách programovacího
+jazyka Go. První demonstrační příklad z&nbsp;této oblasti zajistí lexikální i
+syntaktickou analýzu předaného zdrojového kódu a tisk obsahu abstraktního
+syntaktického stromu na standardní výstup:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var answer int = 42</u>
+`
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// výpis hodnoty typu *ast.File</i>
+        fmt.Printf("%#v", f)
+}
+</pre>
+
+<p>Obsah abstraktního binárního stromu vypsaného tímto jednoduchým programem je
+však dosti nečitelný &ndash; v&nbsp;podstatě se totiž jedná o tisk
+<i>metainformací</i> o právě naparsované části kódu:</p>
+
+<pre>
+&amp;ast.File{Doc:(*ast.CommentGroup)(nil), Package:2, Name:(*ast.Ident)(0xc0000c2000), Decls:[]ast.Decl{(*ast.GenDecl)(0xc0000b6080)}, Scope:(*ast.Scope)(0xc00009e290), Imports:[]*ast.ImportSpec(nil), Unresolved:[]*ast.Ident{(*ast.Ident)(0xc0000c2040)}, Comments:[]*ast.CommentGroup(nil)}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Čitelný výpis obsahu abstraktního syntaktického stromu</h2>
+
+<p>AST je ovšem možné vypsat i způsobem, který je mnohem čitelnější, než
+předchozí jednořádkový text. K&nbsp;tomuto účelu slouží funkce nazvaná
+<strong>Print</strong> z&nbsp;balíčku <strong>go/ast</strong>. Konkrétní způsob
+zavolání této funkce vypadá následovně:</p>
+
+<pre>
+<i>// čitelný výpis obsahu abstraktního syntaktického stromu</i>
+err = ast.Print(fileSet, f)
+</pre>
+
+<p>Vidíme, že funkci je nutné předat jak strukturu reprezentující množinu
+zdrojových kódů, tak i vlastní výsledek činnosti parseru.</p>
+
+<p>Nyní je již obsah abstraktního syntaktického stromu zobrazen
+v&nbsp;čitelnější podobě, a to včetně podrobnějších informací o jednotlivých
+tokenech, které tvoří uzly tohoto stromu:</p>
+
+<pre>
+     0  *ast.File {
+     1  .  Package: 2:1
+     2  .  Name: *ast.Ident {
+     3  .  .  NamePos: 2:9
+     4  .  .  Name: "main"
+     5  .  }
+     6  .  Decls: []ast.Decl (len = 1) {
+     7  .  .  0: *ast.GenDecl {
+     8  .  .  .  TokPos: 4:1
+     9  .  .  .  Tok: var
+    10  .  .  .  Lparen: -
+    11  .  .  .  Specs: []ast.Spec (len = 1) {
+    12  .  .  .  .  0: *ast.ValueSpec {
+    13  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+    14  .  .  .  .  .  .  0: *ast.Ident {
+    15  .  .  .  .  .  .  .  NamePos: 4:5
+    16  .  .  .  .  .  .  .  Name: "answer"
+    17  .  .  .  .  .  .  .  Obj: *ast.Object {
+    18  .  .  .  .  .  .  .  .  Kind: var
+    19  .  .  .  .  .  .  .  .  Name: "answer"
+    20  .  .  .  .  .  .  .  .  Decl: *(obj @ 12)
+    21  .  .  .  .  .  .  .  .  Data: 0
+    22  .  .  .  .  .  .  .  }
+    23  .  .  .  .  .  .  }
+    24  .  .  .  .  .  }
+    25  .  .  .  .  .  Type: *ast.Ident {
+    26  .  .  .  .  .  .  NamePos: 4:12
+    27  .  .  .  .  .  .  Name: "int"
+    28  .  .  .  .  .  }
+    29  .  .  .  .  .  Values: []ast.Expr (len = 1) {
+    30  .  .  .  .  .  .  0: *ast.BasicLit {
+    31  .  .  .  .  .  .  .  ValuePos: 4:18
+    32  .  .  .  .  .  .  .  Kind: INT
+    33  .  .  .  .  .  .  .  Value: "42"
+    34  .  .  .  .  .  .  }
+    35  .  .  .  .  .  }
+    36  .  .  .  .  }
+    37  .  .  .  }
+    38  .  .  .  Rparen: -
+    39  .  .  }
+    40  .  }
+    41  .  Scope: *ast.Scope {
+    42  .  .  Objects: map[string]*ast.Object (len = 1) {
+    43  .  .  .  "answer": *(obj @ 17)
+    44  .  .  }
+    45  .  }
+    46  .  Unresolved: []*ast.Ident (len = 1) {
+    47  .  .  0: *(obj @ 25)
+    48  .  }
+    49  }
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+`
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// čitelný výpis obsahu abstraktího syntaktického stromu</i>
+        err = ast.Print(fileSet, f)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Průchod abstraktním syntaktickým stromem</h2>
+
+<p>V&nbsp;předchozích kapitolách jsme si řekli, že se abstraktním syntaktickým
+stromem může procházet, a to dokonce několika různými způsoby. Základní metoda
+spočívá procházením stromem do šířky (tedy po jednotlivých vrstvách neboli
+úrovních), druhá metoda pak průchodem do hloubky (vždy se postupuje na potomky
+právě zpracovávaného vrcholu). A právě průchod do hloubky, který dokáže velmi
+dobře vizuálně &bdquo;zviditelnit&ldquo; strukturu stromu, je implementován i
+v&nbsp;základní knihovně programovacího jazyka Go. Tento algoritmus je obsažen
+v&nbsp;balíčku <strong>go/ast</strong>, a to konkrétně funkcemi
+<strong>Inspect</strong> a <strong>Walk</strong>:</p>
+
+<pre>
+func <strong>Walk</strong>(v Visitor, node Node)
+func <strong>Inspect</strong>(node Node, f func(Node) bool)
+</pre>
+
+<p>Nejprve si vyzkoušíme metodu <strong>Inspect</strong>, které se předá
+<i>callback</i> funkce, jenž je postupně volaná pro všechny uzly AST. Pokud
+tato funkce vrátí hodnotu <strong>true</strong>, zavolá se tato funkce
+rekurzivně pro potomky daného uzlu. Potomci ovšem mohou mít hodnotu
+<strong>nil</strong>, a to v&nbsp;případě, že jejich předek je koncovým uzlem
+(listem). Postačuje nám tedy testovat, zda je uzel <strong>nil</strong> či
+nikoli a podle toho řídit průchod stromem. Nejjednodušší podoba callback funkce
+tedy může vypadat takto:</p>
+
+<pre>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return false
+        }
+&nbsp;
+        <i>// tisk typu uzlu</i>
+        fmt.Printf("%T\n", n)
+        return true
+}
+</pre>
+
+<p>Výsledek postupného volání callback funkce nazvané
+<strong>inspectCallback</strong>:</p>
+
+<pre>
+*ast.File
+*ast.Ident
+*ast.GenDecl
+*ast.ValueSpec
+*ast.Ident
+*ast.Ident
+*ast.BasicLit
+</pre>
+
+<p>Opět si ukažme úplný zdrojový kód demonstračního příkladu popsaného
+v&nbsp;této kapitole:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var answer int = 42</u>
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func inspectCallback(n ast.Node) bool {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return false
+        }
+&nbsp;
+        <i>// tisk typu uzlu</i>
+        fmt.Printf("%T\n", n)
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(f, inspectCallback)
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Návrhový vzor Visitor</h2>
+
+<p>Abstraktní syntaktické stromy jsou pojmenovány korektně, protože skutečně
+reprezentují stromovou strukturu. Tuto strukturu je možné vizualizovat, a to
+různými způsoby. Kromě použití funkce <strong>ast.Inspect</strong> můžeme
+použít i funkci <strong>ast.Walk</strong>, díky níž lze realizovat návrhový
+vzor <i>Visitor</i>. Funkci <strong>ast.Walk</strong> se předává objekt typu
+<strong>Visitor</strong>, což je datový typ nesoucí informace o hloubce
+zanoření. Tento datový typ musí mít předepsánu metodu <strong>Visit</strong>,
+které se předává uzel stromu a která vrací nový objekt typu
+<strong>Visitor</strong> určený pro zpracování dalšího poduzlu:</p>
+
+<pre>
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// ještě jsme nedosáhli jsme koncového uzlu?</i>
+        return v + 1
+}
+</pre>
+
+<p>V&nbsp;tom nejjednodušším možném případě můžeme zobrazit pouze typ uzlu,
+tj.&nbsp;o jaký token se jedná (viz zvýrazněný programový řádek):</p>
+
+<pre>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        <strong>fmt.Printf("%T\n", n)</strong>
+        return v + 1
+}
+</pre>
+
+<p>Výsledek bude vypadat následovně &ndash; zobrazí se skutečně pouze
+jednotlivé tokeny, nikoli struktura AST:</p>
+
+<pre>
+*ast.File
+*ast.Ident
+*ast.GenDecl
+*ast.ValueSpec
+*ast.Ident
+*ast.Ident
+*ast.BasicLit
+</pre>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var answer int = 42</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%T\n", n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Zobrazení hloubky uzlu v&nbsp;AST</h2>
+
+<p>Jeden ze způsobů vylepšeného zobrazení AST spočívá v&nbsp;tom, že postupně
+vypisujeme jednotlivé uzly stromu, které jsou podle hloubky odlišeny odsazením.
+Hloubku stromu je navíc možné zvýraznit i celým číslem, přičemž kořen má
+většinou hodnotu 1, uzly napojené přímo na kořen hodnotu 2 atd.</p>
+
+<pre>
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        <strong>fmt.Printf("%3d\t", v)</strong>
+        <strong>fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)</strong>
+        return v + 1
+}
+</pre>
+
+<p>S&nbsp;výsledkem, který již skutečně připomíná stromovou strukturu:</p>
+
+<pre>
+  0     *ast.File
+  1             *ast.Ident
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  3                             *ast.Ident
+  3                             *ast.BasicLit
+</pre>
+
+<p>Opět si ukažme, jak by mohl vypadat úplný zdrojový kód demonstračního
+příkladu, který AST tímto způsobem zobrazí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var answer int = 42</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Koncové uzly v&nbsp;AST</h2>
+
+<p>Pro zajímavost se podívejme, co se stane, pokud se pokusíme vypsat hodnotu
+uzlu typu <strong>nil</strong>. Víme již, že se jedná o (virtuální) potomky
+koncových uzlů stromu a přístup k&nbsp;nim máme například proto, aby bylo možné
+AST modifikovat &ndash; přidávat do něj další uzly atd. Samotný výpis
+neexistujících potomků koncových uzlů je triviální a navíc (minimálně
+v&nbsp;případě programovacího jazyka Go) i bezpečný:</p>
+
+<pre>
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if <strong>n == nil</strong> {
+&nbsp;
+                <i>// tisk pozice a typu uzlu</i>
+                fmt.Printf("%3d\t", v)
+                <strong>fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)</strong>
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, jak je s&nbsp;využitím
+funkce <strong>strings.Repeat</strong> zařízeno odsazení uzlů podle jejich
+umístění v&nbsp;AST (tedy podle vrstvy, v&nbsp;níž se uzly nachází).</div></p>
+
+<p>Nyní bude <i>pod</i> každým koncovým uzlem zobrazena ještě informace, že
+tento uzel již nemá žádné další potomky (<strong>nil</strong> má vždy o
+jedničku nižší úroveň, než koncový uzel):</p>
+
+<pre>
+  0     *ast.File
+  1             *ast.Ident
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             &lt;nil&gt;
+</pre>
+
+<p>Následuje výpis zdrojového kódu příkladu, který po svém spuštění zobrazí
+výše uvedený AST:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var answer int = 42</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+&nbsp;
+                <i>// tisk pozice a typu uzlu</i>
+                fmt.Printf("%3d\t", v)
+                fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. AST zkonstruovaný pro sekvenci příkazů</h2>
+
+<p>Abstraktní syntaktický strom je možné zkonstruovat (a zobrazit) pro
+libovolně komplikovaný zdrojový kód, popř.&nbsp;dokonce i pro celý modul.
+Ukažme si to na kódu s&nbsp;deklarací <strong>package</strong> a definicí
+trojice globálních proměnných, z&nbsp;nichž poslední je inicializována pomocí
+výrazu:</p>
+
+<pre>
+package main
+&nbsp;
+var x int = 6
+var y int = 7
+var answer int = x * y
+</pre>
+
+<p>Program, který po svém spuštění vypíše AST pro výše uvedený programový
+kód:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var x int = 6</u>
+<u>var y int = 7</u>
+<u>var answer int = x * y</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+&nbsp;
+                <i>// tisk pozice a typu uzlu</i>
+                fmt.Printf("%3d\t", v)
+                fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+<p>Nyní již bude AST relativně komplikovaný. Povšimněte si, že se stále jedná o
+strom, protože kořenovým uzlem je uzel <strong>ast.File</strong> (což původně
+ani není token):</p>
+
+<pre>
+  0     *ast.File
+  1             *ast.Ident
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BinaryExpr
+  4                                     *ast.Ident
+  5                                             &lt;nil&gt;
+  4                                     *ast.Ident
+  5                                             &lt;nil&gt;
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             &lt;nil&gt;
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Výrazy se závorkami a s&nbsp;různými prioritami operátorů</h2>
+
+<p>Pro aritmetické, logické atd. výrazy se v&nbsp;AST uzly konstruují takovým
+způsobem, aby poduzly představovaly podvýrazy s&nbsp;nižší prioritou a naopak
+&ndash; nejvyšší uzel v&nbsp;podstromu, který odpovídá výrazu, bude obsahovat
+aritmetickou či logickou operaci s&nbsp;prioritou nejvyšší. Například pro
+výraz:</p>
+
+<pre>
+(1 + x) * (2 + y)
+</pre>
+
+<p>By měl příslušný podstrom vypadat takto:</p>
+
+<pre>
+*ast.BinaryExpr
+        *ast.ParenExpr
+                *ast.BinaryExpr
+                        *ast.BasicLit
+                                &lt;nil&gt;
+                        *ast.Ident
+                                &lt;nil&gt;
+                        &lt;nil&gt;
+                &lt;nil&gt;
+        *ast.ParenExpr
+                *ast.BinaryExpr
+                        *ast.BasicLit
+                                &lt;nil&gt;
+                        *ast.Ident
+                                &lt;nil&gt;
+                        &lt;nil&gt;
+                &lt;nil&gt;
+        &lt;nil&gt;
+</pre>
+
+<p>Tento předpoklad si můžeme snadno otestovat, a to spuštěním následujícího
+demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+<u>package main</u>
+&nbsp;
+<u>var x int = 5</u>
+<u>var y int = 6</u>
+<u>var answer int = (1 + x) * (2 + y)</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+&nbsp;
+                <i>// tisk pozice a typu uzlu</i>
+                fmt.Printf("%3d\t", v)
+                fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+  0     *ast.File
+  1             *ast.Ident
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             *ast.GenDecl
+  2                     *ast.ValueSpec
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             *ast.BinaryExpr
+  4                                     *ast.ParenExpr
+  5                                             *ast.BinaryExpr
+  6                                                     *ast.BasicLit
+  7                                                             &lt;nil&gt;
+  6                                                     *ast.Ident
+  7                                                             &lt;nil&gt;
+  6                                                     &lt;nil&gt;
+  5                                             &lt;nil&gt;
+  4                                     *ast.ParenExpr
+  5                                             *ast.BinaryExpr
+  6                                                     *ast.BasicLit
+  7                                                             &lt;nil&gt;
+  6                                                     *ast.Ident
+  7                                                             &lt;nil&gt;
+  6                                                     &lt;nil&gt;
+  5                                             &lt;nil&gt;
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             &lt;nil&gt;
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Konstrukce AST pro jediný výraz</h2>
+
+<p>Prozatím jsme si ukázali, jakým způsobem lze sestrojit AST pro úplný
+zdrojový kód. Ovšem existují situace, kdy je vhodné sestrojit AST pouze pro
+jediný výraz. I to je možné, a to náhradou funkce
+<strong>parser.ParseFile</strong>:</p>
+
+<pre>
+f, err := parser.ParseFile(fileSet, "", source, parser.AllErrors)
+</pre>
+
+<p>za volání funkce <strong>parser.ParseExpr</strong>:</p>
+
+<pre>
+f, err := parser.ParseExpr(source)
+</pre>
+
+<p>V&nbsp;obou případech je v&nbsp;konstantě či proměnné
+<strong>source</strong> uložen zdrojový kód resp.&nbsp;jediný výraz (ve druhém
+případě).</p>
+
+<p>Další příklad slouží pro zobrazení AST vytvořeného pro výraz:</p>
+
+<pre>
+(1 + x) * (2 + y)
+</pre>
+
+<p>Zdrojový kód:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>(1 + x) * (2 + y)</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+&nbsp;
+                <i>// tisk pozice a typu uzlu</i>
+                fmt.Printf("%3d\t", v)
+                fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        fmt.Printf("%s%T\n", strings.Repeat("\t", int(v)), n)
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+<p>Výsledek bude vypadat následovně:</p>
+
+<pre>
+  0     *ast.BinaryExpr
+  1             *ast.ParenExpr
+  2                     *ast.BinaryExpr
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             *ast.ParenExpr
+  2                     *ast.BinaryExpr
+  3                             *ast.BasicLit
+  4                                     &lt;nil&gt;
+  3                             *ast.Ident
+  4                                     &lt;nil&gt;
+  3                             &lt;nil&gt;
+  2                     &lt;nil&gt;
+  1             &lt;nil&gt;
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Typy uzlů v&nbsp;AST</h2>
+
+<p>V&nbsp;abstraktním syntaktickém stromu se mohou nacházet různé typy uzlů.
+Některé uzly přímo odpovídají tokenům nalezeným ve zdrojovém kódu, další typy
+uzlů (například <strong>ast.File</strong>) jsou vytvořeny automaticky při
+konstrukci AST. Všechny typy uzlů jsou deklarovány přímo v&nbsp;balíčku
+<strong>go/ast</strong> a pro všechny uzly platí, že metodami
+<strong>Pos</strong> a <strong>End</strong> je možné získat jejich umístění
+v&nbsp;rámci sekvence tokenů (což je v&nbsp;některých případech důležité
+&ndash; prozatím však ne pro nás, alespoň dnes ne).</p>
+
+<p>Jedná se o tyto typy (podrobněji budou popsány příště):</p>
+
+<table>
+<tr><th>Typ uzlu v&nbsp;AST</th></tr>
+<tr><td>ArrayType</td></tr>
+<tr><td>AssignStmt</td></tr>
+<tr><td>BadDecl</td></tr>
+<tr><td>BadExpr</td></tr>
+<tr><td>BadStmt</td></tr>
+<tr><td>BasicLit</td></tr>
+<tr><td>BinaryExpr</td></tr>
+<tr><td>BlockStmt</td></tr>
+<tr><td>BranchStmt</td></tr>
+<tr><td>CallExpr</td></tr>
+<tr><td>CaseClause</td></tr>
+<tr><td>ChanDir</td></tr>
+<tr><td>ChanType</td></tr>
+<tr><td>CommClause</td></tr>
+<tr><td>Comment</td></tr>
+<tr><td>CommentGroup</td></tr>
+<tr><td>CompositeLit</td></tr>
+<tr><td>Decl</td></tr>
+<tr><td>DeclStmt</td></tr>
+<tr><td>DeferStmt</td></tr>
+<tr><td>Ellipsis</td></tr>
+<tr><td>EmptyStmt</td></tr>
+<tr><td>Expr</td></tr>
+<tr><td>ExprStmt</td></tr>
+<tr><td>Field</td></tr>
+<tr><td>FieldFilter</td></tr>
+<tr><td>FieldList</td></tr>
+<tr><td>File</td></tr>
+<tr><td>Filter</td></tr>
+<tr><td>ForStmt</td></tr>
+<tr><td>FuncDecl</td></tr>
+<tr><td>FuncLit</td></tr>
+<tr><td>FuncType</td></tr>
+<tr><td>GenDecl</td></tr>
+<tr><td>GoStmt</td></tr>
+<tr><td>Ident</td></tr>
+<tr><td>IfStmt</td></tr>
+<tr><td>ImportSpec</td></tr>
+<tr><td>Importer</td></tr>
+<tr><td>IncDecStmt</td></tr>
+<tr><td>IndexExpr</td></tr>
+<tr><td>InterfaceType</td></tr>
+<tr><td>KeyValueExpr</td></tr>
+<tr><td>LabeledStmt</td></tr>
+<tr><td>MapType</td></tr>
+<tr><td>MergeMode</td></tr>
+<tr><td>Node</td></tr>
+<tr><td>ObjKind</td></tr>
+<tr><td>Package</td></tr>
+<tr><td>ParenExpr</td></tr>
+<tr><td>RangeStmt</td></tr>
+<tr><td>ReturnStmt</td></tr>
+<tr><td>Scope</td></tr>
+<tr><td>SelectStmt</td></tr>
+<tr><td>SelectorExpr</td></tr>
+<tr><td>SendStmt</td></tr>
+<tr><td>SliceExpr</td></tr>
+<tr><td>Spec</td></tr>
+<tr><td>StarExpr</td></tr>
+<tr><td>Stmt</td></tr>
+<tr><td>StructType</td></tr>
+<tr><td>SwitchStmt</td></tr>
+<tr><td>TypeAssertExpr</td></tr>
+<tr><td>TypeSpec</td></tr>
+<tr><td>TypeSwitchStmt</td></tr>
+<tr><td>UnaryExpr</td></tr>
+<tr><td>ValueSpec</td></tr>
+</table>
+
+<p>Při průchodu AST lze na základě typu konkrétního uzlu zvolit, jaké informace
+se vypíšou popř.&nbsp;jak se daný uzel zpracuje. Nejjednodušší (i když nesnadno
+rozšiřitelný) je následující přístup spočívající v&nbsp;rozeskoku podle typu
+uzlu:</p>
+
+<pre>
+switch x := n.(type) {
+case *ast.BasicLit:
+        s = "Literal: " + x.Value
+case *ast.Ident:
+        s = "Identifier: " + x.Name
+case *ast.BinaryExpr:
+        s = "Binary operator: " + x.Op.String()
+case *ast.ParenExpr:
+        s = "Expression in parenthesis"
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: připomeňme si, že v&nbsp;Go není nutné
+explicitně použít příkaz <strong>break</strong> pro ukončení jednotlivých
+větví.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Podrobnější výpis informací o uzlech v&nbsp;AST</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu jsou postupně vypisovány jednotlivé
+uzly z&nbsp;AST, přičemž u čtyř známých typů uzlů (což je konkrétně literál,
+identifikátor, binární operátor a závorky) jsou vypisovány i podrobnější
+informace. Opět budeme vypisovat AST pro jednoduchý aritmetický výraz:</p>
+
+<pre>
+(1 + x) * (2 + y)
+</pre>
+
+<p>Zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>(1 + x) * (2 + y)</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = "Literal: " + x.Value
+        case *ast.Ident:
+                s = "Identifier: " + x.Name
+        case *ast.BinaryExpr:
+                s = "Binary operator: " + x.Op.String()
+        case *ast.ParenExpr:
+                s = "Expression in parenthesis"
+        }
+&nbsp;
+        indent := strings.Repeat("\t", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+<p>A výsledkem činnosti tohoto příkladu je již velmi čitelný obsah AST:</p>
+
+<pre>
+  0     Binary operator: *
+  1             Expression in parenthesis
+  2                     Binary operator: +
+  3                             Literal: 1
+  3                             Identifier: x
+  1             Expression in parenthesis
+  2                     Binary operator: +
+  3                             Literal: 2
+  3                             Identifier: y
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Složitější aritmetické výrazy, zjednodušení zobrazení AST</h2>
+
+<p>Aritmetické výrazy mohou být pochopitelně složitější, mohou obsahovat unární
+operátory atd. Opět si tedy ukážeme příklad převodu výrazu na AST. Tentokrát se
+bude jednat o tento výraz:</p>
+
+<pre>
+((1 + x * 2) * -(2 + y / -z)) % (x + -y + -z)
+</pre>
+
+<p>Do zdrojového kódu je nutné do rozeskoku (<strong>switch</strong>) přidat
+další větev, tentokrát pro unární operátor(y):</p>
+
+<pre>
+case *ast.UnaryExpr:
+        s = "Unary operator: " + x.Op.String()
+</pre>
+
+<p>Úplný zdrojový kód:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>((1 + x * 2) * -(2 + y / -z)) % (x + -y + -z)</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = "Literal: " + x.Value
+        case *ast.Ident:
+                s = "Identifier: " + x.Name
+        case *ast.UnaryExpr:
+                s = "Unary operator: " + x.Op.String()
+        case *ast.BinaryExpr:
+                s = "Binary operator: " + x.Op.String()
+        case *ast.ParenExpr:
+                s = "Expression in parenthesis"
+        }
+&nbsp;
+        indent := strings.Repeat("\t", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+<p>A výsledek, tedy AST (povšimněte si, že unární operátory mají skutečně jen
+jediný přímý poduzel):</p>
+
+<pre>
+  e     Binary operator: %
+  1             Expression in parenthesis
+  2                     Binary operator: *
+  3                             Expression in parenthesis
+  4                                     Binary operator: +
+  5                                             Literal: 1
+  5                                             Binary operator: *
+  6                                                     Identifier: x
+  6                                                     Literal: 2
+  3                             Unary operator: -
+  4                                     Expression in parenthesis
+  5                                             Binary operator: +
+  6                                                     Literal: 2
+  6                                                     Binary operator: /
+  7                                                             Identifier: y
+  7                                                             Unary operator: -
+  8                                                                     Identifier: z
+  1             Expression in parenthesis
+  2                     Binary operator: +
+  3                             Binary operator: +
+  4                                     Identifier: x
+  4                                     Unary operator: -
+  5                                             Identifier: y
+  3                             Unary operator: -
+  4                                     Identifier: z
+</pre>
+
+<p>Poměrně často se setkáme se zjednodušenou podobou AST, v&nbsp;níž se u
+operátorů pouze vypisují jejich jména a u hodnot pouze hodnoty popř.&nbsp;jména
+identifikátorů:</p>
+
+<pre>
+  0     %
+  1       (
+  2         *
+  3           (
+  4             +
+  5               1
+  5               *
+  6                 x
+  6                 2
+  3           -
+  4             (
+  5               +
+  6                 2
+  6                 /
+  7                   y
+  7                   -
+  8                     z
+  1       (
+  2         +
+  3           +
+  4             x
+  4             -
+  5               y
+  3           -
+  4             z
+</pre>
+
+<p>Tohoto způsobu zobrazení lze dosáhnout velmi snadno, pouze úpravou příkazů
+v&nbsp;rozeskoku <strong>switch</strong>:</p>
+
+<pre>
+switch x := n.(type) {
+case *ast.BasicLit:
+        s = x.Value
+case *ast.Ident:
+        s = x.Name
+case *ast.UnaryExpr:
+        s = x.Op.String()
+case *ast.BinaryExpr:
+        s = x.Op.String()
+case *ast.ParenExpr:
+        s = "("
+}
+</pre>
+
+<p>Pro úplnost je uveden i celý zdrojový kód takto upraveného demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>((1 + x * 2) * -(2 + y / -z)) % (x + -y + -z)</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+        case *ast.BinaryExpr:
+                s = x.Op.String()
+        case *ast.ParenExpr:
+                s = "("
+        }
+&nbsp;
+        indent := strings.Repeat("  ", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Logické výrazy</h2>
+
+<p>Samozřejmě je možné vytvořit a nechat si zobrazit AST i pro logický výraz,
+například pro tento jednoduchý výraz obsahující dvojici logických operací:</p>
+
+<pre>
+a &amp;&amp; b || c
+</pre>
+
+<p>Zjednodušená podoba AST by v&nbsp;tomto případě mohla vypadat
+následovně:</p>
+
+<pre>
+  0     ||
+  1       &amp;&amp;
+  2         a
+  2         b
+  1       c
+</pre>
+
+<p>Tento AST byl vypsán následujícím prográmkem. Sami si můžete otestovat, jak
+se AST změní přidáním negace, závorek atd.:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>a &amp;&amp; b || c</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+        case *ast.BinaryExpr:
+                s = x.Op.String()
+        case *ast.ParenExpr:
+                s = "("
+        }
+&nbsp;
+        indent := strings.Repeat("  ", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Výrazy obsahující operace s&nbsp;poli či řezy</h2>
+
+<p>Ve výrazech, a to jak výrazech aritmetických, tak i logických, je
+pochopitelně možné použít operace s&nbsp;poli či s&nbsp;řezy (<i>slice</i>).
+Indexy jsou opět počítány, a to aritmetickým podvýrazem, o čemž se můžeme
+snadno přesvědčit, pokud si necháme vytvořit AST například pro tento výraz (kde
+není zřejmé, zda se jedná o součet či konkatenaci):</p>
+
+<pre>
+array1[10] + array2[x] + array3[a*b+c*d]
+</pre>
+
+<p>AST tohoto výrazu by ve své zjednodušené podobě mohl vypadat například
+takto:</p>
+
+<pre>
+  0     +
+  1       +
+  2         [
+  3           array1
+  3           10
+  2         [
+  3           array2
+  3           x
+  1       [
+  2         array3
+  2         +
+  3           *
+  4             a
+  4             b
+  3           *
+  4             c
+  4             d
+</pre>
+
+<p>Aby bylo možné tento AST zobrazit, je nutné opět rozšířit rozvětvení
+v&nbsp;příkazu <strong>switch</strong> o novou větev, konkrétně o větev
+<strong>ast.IndexExpr</strong>:</p>
+
+<pre>
+switch x := n.(type) {
+case *ast.BasicLit:
+        s = x.Value
+case *ast.Ident:
+        s = x.Name
+case *ast.UnaryExpr:
+        s = x.Op.String()
+case *ast.BinaryExpr:
+        s = x.Op.String()
+case *ast.IndexExpr:
+        s = "["
+case *ast.ParenExpr:
+        s = "("
+}
+</pre>
+
+<p>Úplný zdrojový kód dnešního posledního demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+array1[10] + array2[x] + array3[a*b+c*d]
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+        case *ast.BinaryExpr:
+                s = x.Op.String()
+        case *ast.IndexExpr:
+                s = "["
+        case *ast.ParenExpr:
+                s = "("
+        }
+&nbsp;
+        indent := strings.Repeat("  ", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>ast01.go</td><td>syntaktická analýza v&nbsp;Go &ndash; balíčky <strong>go/token</strong> a <strong>go/parser</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast01.go">https://github.com/tisnik/go-root/blob/master/article_82/ast01.go</a></td></tr>
+<tr><td> 2</td><td>ast02.go</td><td>čitelný výpis obsahu abstraktního syntaktického stromu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast02.go">https://github.com/tisnik/go-root/blob/master/article_82/ast02.go</a></td></tr>
+<tr><td> 3</td><td>ast03.go</td><td>průchod abstraktním syntaktickým stromem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast03.go">https://github.com/tisnik/go-root/blob/master/article_82/ast03.go</a></td></tr>
+<tr><td> 4</td><td>ast04.go</td><td>návrhový vzor Visitor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast04.go">https://github.com/tisnik/go-root/blob/master/article_82/ast04.go</a></td></tr>
+<tr><td> 5</td><td>ast05.go</td><td>zobrazení hloubky uzlu v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast05.go">https://github.com/tisnik/go-root/blob/master/article_82/ast05.go</a></td></tr>
+<tr><td> 6</td><td>ast06.go</td><td>koncové uzly v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast06.go">https://github.com/tisnik/go-root/blob/master/article_82/ast06.go</a></td></tr>
+<tr><td> 7</td><td>ast07.go</td><td>AST zkonstruovaný pro sekvenci příkazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast07.go">https://github.com/tisnik/go-root/blob/master/article_82/ast07.go</a></td></tr>
+<tr><td> 8</td><td>ast08.go</td><td>výrazy se závorkami a s&nbsp;různými prioritami operátorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast08.go">https://github.com/tisnik/go-root/blob/master/article_82/ast08.go</a></td></tr>
+<tr><td> 9</td><td>ast09.go</td><td>konstrukce AST pro jediný výraz</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast09.go">https://github.com/tisnik/go-root/blob/master/article_82/ast09.go</a></td></tr>
+<tr><td>10</td><td>ast10.go</td><td>typy uzlů v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast10.go">https://github.com/tisnik/go-root/blob/master/article_82/ast10.go</a></td></tr>
+<tr><td>11</td><td>ast11.go</td><td>podrobnější výpis informací o uzlech v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast11.go">https://github.com/tisnik/go-root/blob/master/article_82/ast11.go</a></td></tr>
+<tr><td>12</td><td>ast12.go</td><td>složitější aritmetické výrazy, zjednodušení zobrazení AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast12.go">https://github.com/tisnik/go-root/blob/master/article_82/ast12.go</a></td></tr>
+<tr><td>13</td><td>ast13.go</td><td>logické výrazy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast13.go">https://github.com/tisnik/go-root/blob/master/article_82/ast13.go</a></td></tr>
+<tr><td>14</td><td>ast14.go</td><td>výrazy obsahující operace s&nbsp;poli či řezy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast14.go">https://github.com/tisnik/go-root/blob/master/article_82/ast14.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>15</td><td>lexer1.go</td><td>tokenizace zdrojového kódu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer1.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer1.go</a></td></tr>
+<tr><td>16</td><td>lexer2.go</td><td>zahození komentářů při tokenizaci</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer2.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer2.go</a></td></tr>
+<tr><td>17</td><td>lexer3.go</td><td>tokenizace nesmyslné sekvence identifikátorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer3.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer3.go</a></td></tr>
+<tr><td>18</td><td>lexer4.go</td><td>tokenizace kódu s&nbsp;neznámými symboly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer4.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer4.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Abstract syntax tree<br />
+<a href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">https://en.wikipedia.org/wiki/Abstract_syntax_tree</a>
+</li>
+
+<li>Lexical analysis<br />
+<a href="https://en.wikipedia.org/wiki/Lexical_analysis">https://en.wikipedia.org/wiki/Lexical_analysis</a>
+</li>
+
+<li>Parser<br />
+<a href="https://en.wikipedia.org/wiki/Parsing#Parser">https://en.wikipedia.org/wiki/Parsing#Parser</a>
+</li>
+
+<li>Golang AST Package<br />
+<a href="https://golangdocs.com/golang-ast-package">https://golangdocs.com/golang-ast-package</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/ast</strong><br />
+<a href="https://pkg.go.dev/go/ast">https://pkg.go.dev/go/ast</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/scanner</strong><br />
+<a href="https://pkg.go.dev/go/scanner">https://pkg.go.dev/go/scanner</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/parser</strong><br />
+<a href="https://pkg.go.dev/go/parser">https://pkg.go.dev/go/parser</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/token</strong><br />
+<a href="https://pkg.go.dev/go/token">https://pkg.go.dev/go/token</a>
+</li>
+
+<li>AP8, IN8 Regulární jazyky<br />
+<a href="http://statnice.dqd.cz/home:inf:ap8">http://statnice.dqd.cz/home:inf:ap8</a>
+</li>
+
+<li>AP9, IN9 Konečné automaty<br />
+<a href="http://statnice.dqd.cz/home:inf:ap9">http://statnice.dqd.cz/home:inf:ap9</a>
+</li>
+
+<li>AP10, IN10 Bezkontextové jazyky<br />
+<a href="http://statnice.dqd.cz/home:inf:ap10">http://statnice.dqd.cz/home:inf:ap10</a>
+</li>
+
+<li>AP11, IN11 Zásobníkové automaty, Syntaktická analýza<br />
+<a href="http://statnice.dqd.cz/home:inf:ap11">http://statnice.dqd.cz/home:inf:ap11</a>
+</li>
+
+<li>Introduction to YACC<br />
+<a href="https://www.geeksforgeeks.org/introduction-to-yacc/">https://www.geeksforgeeks.org/introduction-to-yacc/</a>
+</li>
+
+<li>Introduction of Lexical Analysis<br />
+<a href="https://www.geeksforgeeks.org/introduction-of-lexical-analysis/?ref=lbp">https://www.geeksforgeeks.org/introduction-of-lexical-analysis/?ref=lbp</a>
+</li>
+
+<li>Tvorba grafů a diagramů s využitím doménově specifického jazyka nástroje Graphviz<br />
+<a href="https://www.root.cz/clanky/tvorba-grafu-a-diagramu-s-vyuzitim-domenove-specifickeho-jazyka-nastroje-graphviz/">https://www.root.cz/clanky/tvorba-grafu-a-diagramu-s-vyuzitim-domenove-specifickeho-jazyka-nastroje-graphviz/</a>
+</li>
+
+<li>Popis příkazu <strong>gofmt</strong><br />
+<a href="https://pkg.go.dev/cmd/gofmt">https://pkg.go.dev/cmd/gofmt</a>
+</li>
+
+<li>Popis příkazu <strong>govet</strong><br />
+<a href="https://pkg.go.dev/cmd/vet">https://pkg.go.dev/cmd/vet</a>
+</li>
+
+<li>Repositář nástroje <strong>errcheck</strong><br />
+<a href="https://github.com/kisielk/errcheck">https://github.com/kisielk/errcheck</a>
+</li>
+
+<li>Repositář nástroje <strong>goconst</strong><br />
+<a href="https://github.com/jgautheron/goconst">https://github.com/jgautheron/goconst</a>
+</li>
+
+<li>Repositář nástroje <strong>gocyclo</strong><br />
+<a href="https://github.com/fzipp/gocyclo">https://github.com/fzipp/gocyclo</a>
+</li>
+
+<li>Repositář nástroje <strong>ineffassign</strong><br />
+<a href="https://github.com/gordonklaus/ineffassign">https://github.com/gordonklaus/ineffassign</a>
+</li>
+
+<li>Repositář nástroje <strong>gosec</strong><br />
+<a href="https://github.com/securego/gosec">https://github.com/securego/gosec</a>
+</li>
+
+<li>Repositář nástroje <strong>go-critic</strong><br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Seznam testů prováděných nástrojem <strong>go-critic</strong><br />
+<a href="https://go-critic.com/overview">https://go-critic.com/overview</a>
+</li>
+
+<li>Welcome go-critic<br />
+<a href="https://itnext.io/welcome-go-critic-a26b6e30f1c6">https://itnext.io/welcome-go-critic-a26b6e30f1c6</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
