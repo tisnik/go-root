@@ -1,0 +1,2112 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Lexikální a syntaktická zdrojových kódů jazyka Go (2.část)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Lexikální a syntaktická zdrojových kódů jazyka Go (2.část)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na předchozí článek o jazyce Go, v němž jsme se zabývali balíčky určenými pro lexikální a syntaktickou analýzu, dnes navážeme. Ukážeme si, jak je možné rekurzivně procházet AST, realizaci algoritmu pro převod výrazů z infixové notace na notaci postfixovou i způsob detekce volání funkcí v AST.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Lexikální a syntaktická zdrojových kódů jazyka Go (2.část)</a></p>
+<p><a href="#k02">2. Automatický průchod AST s&nbsp;výpisem aritmetických výrazů a podvýrazů</a></p>
+<p><a href="#k03">3. Explicitní průchod stromem &ndash; rekurzivní algoritmus</a></p>
+<p><a href="#k04">4. Rekurzivní průchod stromem s&nbsp;rekonstrukcí aritmetického výrazu v&nbsp;infixové podobě</a></p>
+<p><a href="#k05">5. Rozšíření předchozího kódu o zpracování výrazů se závorkami</a></p>
+<p><a href="#k06">6. Převod výrazů z&nbsp;infixové notace do notace postfixové</a></p>
+<p><a href="#k07">7. Převrácená polská notace</a></p>
+<p><a href="#k08">8. Algoritmus shunting-yard</a></p>
+<p><a href="#k09">9. Realizace algoritmu shunting-yard pro aritmetické výrazy programovacího jazyka Go</a></p>
+<p><a href="#k10">10. Realizace výpočtu aritmetického výrazu popsaného pomocí RPN</a></p>
+<p><a href="#k11">11. Algoritmus shunting-yard pro logické výrazy doplněné o porovnání (relační operátory)</a></p>
+<p><a href="#k12">12. Závorky v&nbsp;logických výrazech</a></p>
+<p><a href="#k13">13. Detekce volání funkcí při zpracování AST</a></p>
+<p><a href="#k14">14. Základní informace o argumentech volané funkce</a></p>
+<p><a href="#k15">15. Podrobnější informace o argumentech volané funkce</a></p>
+<p><a href="#k16">16. Informace o argumentech typu pole či řez (nějakého typu)</a></p>
+<p><a href="#k17">17. Rozlišení volání funkce od volání metody</a></p>
+<p><a href="#k18">18. Obsah navazujícího článku</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Lexikální a syntaktická zdrojových kódů jazyka Go (2.část)</h2>
+
+<p><a
+href="https://www.root.cz/clanky/lexikalni-a-syntakticka-zdrojovych-kodu-jazyka-go/">V&nbsp;předchozím
+článku</a> jsme si řekli základní informace o balíčcích ze standardní knihovny
+programovacího jazyka Go, které slouží k&nbsp;lexikální i syntaktické analýze
+zdrojových kódů Go popř.&nbsp;jednotlivých výrazů. Připomeňme si, že tyto
+balíčky se jmenují <strong>go/scanner</strong>, <strong>go/ast</strong> a
+<strong>go/token</strong>. Taktéž jsme si ukázali získání sekvence tokenů ze
+zdrojového kódu a dokonce i konstrukci AST (abstraktního syntaktického stromu).
+Umíme též tímto stromem procházet, a to konkrétně pomocí již implementovaného
+algoritmu pro průchod stromem do hloubky (postačuje tento algoritmus využít; je
+založen na návrhovém vzoru <i>visitor</i>). Dnes si ukážeme, jakým způsobem je
+možné rekurzivně procházet AST, dále pak realizaci algoritmu pro převod výrazů
+z&nbsp;infixové notace na notaci postfixovou (RPN) a nakonec i způsob detekce
+volání funkcí v&nbsp;AST.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Automatický průchod AST s&nbsp;výpisem aritmetických výrazů a podvýrazů</h2>
+
+<p>Dnešní první demonstrační příklad, který do značné míry vychází
+z&nbsp;příkladů, které jsme si uvedli minule, ukazuje, jakým způsobem je možné
+automaticky procházet AST, přičemž se budou vypisovat informace o těch uzlech,
+které tvoří aritmetické výrazy obsahující základní aritmetické operace (těch je
+v&nbsp;Go pět), numerické konstanty a proměnné. Příklad takového výrazu:</p>
+
+<pre>
+1 + 2 * 3 + x + y * z - 1
+</pre>
+
+<p>Po konstrukci AST je možné zahájit průchod AST zavoláním funkce
+<strong>ast.Walk</strong>, tj.&nbsp;funkce, která je již předpřipravena ve
+standardním balíčku <strong>go/ast</strong>:</p>
+
+<pre>
+<i>// hodnota typu visitor</i>
+var v visitor
+&nbsp;
+<i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+ast.Walk(v, f)
+</pre>
+
+<p>AST se prochází metodou do hloubky a pro každý navštívený uzel stromu se
+zavolá funkce <strong>Visit</strong>, které se předá právě zpracovávaný uzel
+popř.&nbsp;hodnota <strong>nil</strong>. Rozeznávat se budou uzly čtyř typů
+(což je hodně zjednodušené):</p>
+
+<table>
+<tr><th>Typ uzlu</th><th>Popis</th></tr>
+<tr><td>ast.BasicLit</td><td>konstanta/číselný literál</td></tr>
+<tr><td>ast.Ident</td><td>identifikátor (typicky identifikátor funkce)</td></tr>
+<tr><td>ast.UnaryExpr</td><td>unární operátor</td></tr>
+<tr><td>ast.BinaryExpr</td><td>binární operátor</td></tr>
+</table>
+
+<p>Pro lepší pochopení struktury AST se u každého navštíveného uzlu vypisuje i
+aktuální hloubka stromu a symbol uzlu je odsazen na základě zjištěné hloubky.
+Následuje ukázka, jakým způsobem bude zobrazen AST odpovídající výše
+zobrazenému aritmetickému výrazu:</p>
+
+<pre>
+  0     -
+  1       +
+  2         +
+  3           +
+  4             1
+  4             *
+  5               2
+  5               3
+  3           x
+  2         *
+  3           y
+  3           z
+  1       1
+</pre>
+
+<p>Úplný zdrojový kód dnešního prvního demonstračního příkladu vypadá
+takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>1 + 2 * 3 + x + y * z - 1</u>
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type visitor int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        <i>// převod uzlu do tisknutelné podoby</i>
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+        case *ast.BinaryExpr:
+                s = x.Op.String()
+        }
+&nbsp;
+        <i>// tisk obsahu uzlu</i>
+        indent := strings.Repeat("  ", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// hodnota typu visitor</i>
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Explicitní průchod stromem &ndash; rekurzivní algoritmus</h2>
+
+<p>Pro lepší pochopení metody (resp.&nbsp;přesněji řečeno metod) průchodu AST
+nebudeme v&nbsp;dalších příkladech používat funkci <strong>ast.Walk</strong>
+z&nbsp;balíčku <strong>go/ast</strong>. Namísto toho budeme rekurzivní průchod
+AST realizovat vlastním kódem. To znamená, že po konstrukci AST zavoláme
+<i>vlastní</i> funkci <strong>walk</strong>, které se předá kořenový uzel:</p>
+
+<pre>
+<i>// konstrukce parseru a parsing zdrojového kódu</i>
+node, err := parser.ParseExpr(source)
+if err != nil {
+        log.Fatal(err)
+}
+&nbsp;
+<i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+walk(node)
+</pre>
+
+<p>Nyní je nutné rekurzi (neboli zpracování poduzlů) realizovat vlastními
+silami. To bude prozatím jednoduché &ndash; pro unární operátory zpracujeme
+jeden poduzel, pro binární operátory pak poduzly dva. První poduzel je
+představován položkou <strong>ast.Node.X</strong>, druhý pak položkou
+<strong>ast.Node.Y</strong>. Rekurzivní volání funkce <strong>node</strong>
+v&nbsp;případě uzlů představujících unární a binární operátory je
+zvýrazněno:</p>
+
+<pre>
+func <strong>walk</strong>(node ast.Node) {
+        ...
+        ...
+        ...
+&nbsp;
+        <i>// převod uzlu do tisknutelné podoby a rekurzivní průchod poduzly</i>
+        switch x := node.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+                <strong>walk(x.X)</strong>
+        case *ast.BinaryExpr:
+                <strong>walk(x.X)</strong>
+                s = x.Op.String()
+                <strong>walk(x.Y)</strong>
+        }
+&nbsp;
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, na jakém místě je
+umístěno rekurzivní volání u binárního operátoru. Tuto techniku plně využijeme
+v&nbsp;následující kapitole.</div></p>
+
+<p>Opět si pochopitelně ukážeme úplný zdrojový kód dnešního druhého
+demonstračního příkladu, jenž vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>1 + 2 * 3 + x + y * z - 1</u>
+`
+&nbsp;
+func <strong>walk</strong>(node ast.Node) {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if node == nil {
+                return
+        }
+&nbsp;
+        var s string
+&nbsp;
+        <i>// převod uzlu do tisknutelné podoby a rekurzivní průchod poduzly</i>
+        switch x := node.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+                walk(x.X)
+        case *ast.BinaryExpr:
+                walk(x.X)
+                s = x.Op.String()
+                walk(x.Y)
+        }
+&nbsp;
+        <i>// tisk obsahu uzlu</i>
+        if s != "" {
+                fmt.Printf("%s ", s)
+        } else {
+                fmt.Printf("%T ", node)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        node, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        walk(node)
+}
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že výpis obsahu navštíveného uzlu je proveden až po
+průchodu poduzly (samozřejmě jen pokud existují), bude vypsaná struktura do
+značné míry odpovídat postfixové notaci (RPN), k&nbsp;níž se dnes ještě
+vrátíme:</p>
+
+<pre>
+1 2 3 * + x + y z * + 1 -
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Rekurzivní průchod stromem s&nbsp;rekonstrukcí aritmetického výrazu v&nbsp;infixové podobě</h2>
+
+<p>Nepatrnou úpravou demonstračního příkladu <a href="#k03">z&nbsp;předchozí
+kapitoly</a> je možné zajistit, aby se AST představující naparsovaný
+aritmetický výraz vypsal v&nbsp;původní infixové podobě. Kostru
+s&nbsp;rekurzivním průchodem poduzly již máme vytvořenou, takže pouze postačuje
+zajistit, aby se hodnota uzlu vypsala nikoli <i>až</i> po průchodu poduzlem,
+ale před rekurzivním zavoláním funkce <strong>walk</strong> pro průchod daným
+poduzlem. Celá funkce tak bude (poněkud paradoxně) ještě jednodušší:</p>
+
+<pre>
+func <strong>walk</strong>(node ast.Node) {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if node == nil {
+                return
+        }
+&nbsp;
+        <i>// tisk hodnoty uzlu a rekurzivní průchod poduzly</i>
+        switch x := node.(type) {
+        case *ast.BasicLit:
+                fmt.Printf("%s ", x.Value)
+        case *ast.Ident:
+                fmt.Printf("%s ", x.Name)
+        case *ast.UnaryExpr:
+                fmt.Printf("%s ", x.Op.String())
+                <strong>walk(x.X)</strong>
+        case *ast.BinaryExpr:
+                <strong>walk(x.X)</strong>
+                fmt.Printf("%s ", x.Op.String())
+                <strong>walk(x.Y)</strong>
+        }
+}
+</pre>
+
+<p>Použitím této rekurzivní funkce lze původní aritmetický výraz plně
+zrekonstruovat do této podoby:</p>
+
+<pre>
+1 + 2 * 3 + x + y * z - 1
+</pre>
+
+<p>Opět si ukažme úplný výpis zdrojového kódu tohoto demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>1 + 2 * 3 + x + y * z - 1</u>
+`
+&nbsp;
+func <strong>walk</strong>(node ast.Node) {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if node == nil {
+                return
+        }
+&nbsp;
+        <i>// tisk hodnoty uzlu a rekurzivní průchod poduzly</i>
+        switch x := node.(type) {
+        case *ast.BasicLit:
+                fmt.Printf("%s ", x.Value)
+        case *ast.Ident:
+                fmt.Printf("%s ", x.Name)
+        case *ast.UnaryExpr:
+                fmt.Printf("%s ", x.Op.String())
+                walk(x.X)
+        case *ast.BinaryExpr:
+                walk(x.X)
+                fmt.Printf("%s ", x.Op.String())
+                walk(x.Y)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        node, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        walk(node)
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Rozšíření předchozího kódu o zpracování výrazů se závorkami</h2>
+
+<p>Nepatrnou úpravou demonstračního příkladu popsaného <a
+href="#k04">v&nbsp;předchozí kapitole</a> lze zajistit, aby se korektně
+zpracovaly i aritmetické výrazy obsahující závorky, které pochopitelně mění
+prioritu a tím i tvar vytvořeného AST, kterým se prochází. V&nbsp;případě, že
+se narazí na uzel představující závorky (což je konkrétně uzel typu
+<strong>ast.ParenExpr</strong>, postačuje vypsat levou závorku, rekurzivně
+zpracovat (jediný) poduzel a následně vypsat pravou závorku:</p>
+
+<pre>
+<i>// tisk hodnoty uzlu a rekurzivní průchod poduzly</i>
+switch x := node.(type) {
+case *ast.BasicLit:
+        fmt.Printf("%s ", x.Value)
+case *ast.Ident:
+        fmt.Printf("%s ", x.Name)
+case *ast.UnaryExpr:
+        fmt.Printf("%s ", x.Op.String())
+        <strong>walk(x.X)</strong>
+case *ast.BinaryExpr:
+        <strong>walk(x.X)</strong>
+        fmt.Printf("%s ", x.Op.String())
+        <strong>walk(x.Y)</strong>
+case <strong>*ast.ParenExpr:</strong>
+        fmt.Printf("(")
+        <strong>walk(x.X)</strong>
+        fmt.Printf("\<u>b</u>) ")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: řídicí znak \b je vypsán proto, aby se
+smazala mezera za posledním operátorem (jedná se o špinavý trik).</div></p>
+
+<p>Následuje ukázka, jak bude vypadat výsledný výraz vypsaný rekurzivní funkcí
+<strong>walk</strong>, jejíž nejdůležitější část jsme si právě popsali:</p>
+
+<pre>
+1 + 2 * (3 + x) + y * (z - 1)
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+<u>1 + 2 * (3 + x) + y * (z - 1)</u>
+`
+&nbsp;
+func <strong>walk</strong>(node ast.Node) {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if node == nil {
+                return
+        }
+&nbsp;
+        <i>// tisk hodnoty uzlu a rekurzivní průchod poduzly</i>
+        switch x := node.(type) {
+        case *ast.BasicLit:
+                fmt.Printf("%s ", x.Value)
+        case *ast.Ident:
+                fmt.Printf("%s ", x.Name)
+        case *ast.UnaryExpr:
+                fmt.Printf("%s ", x.Op.String())
+                walk(x.X)
+        case *ast.BinaryExpr:
+                walk(x.X)
+                fmt.Printf("%s ", x.Op.String())
+                walk(x.Y)
+        case *ast.ParenExpr:
+                fmt.Printf("(")
+                walk(x.X)
+                fmt.Printf("\b) ")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        node, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        walk(node)
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Převod výrazů z&nbsp;infixové notace do notace postfixové</h2>
+
+<p>Ve druhé části dnešního článku se poněkud odkloníme od technik založených na
+zpracování AST. Ukážeme si totiž, jakým způsobem je možné provádět převody
+aritmetických a logických výrazů z&nbsp;infixové notace do notace postfixové
+(neboli použít RPN &ndash; převrácenou polskou notaci). Tato operace může být
+užitečná například při implementaci vlastního interpretru, virtuálního stroje
+atd.</p>
+
+<p>Na začátek si připomeňme, jaké operátory vlastně v&nbsp;programovacím jazyce
+Go existují, aby bylo patrné, na jaké problémy lze při převodu výrazů
+narazit:</p>
+
+<table>
+<tr><th>Konstanta</th><th>Odpovídající operátor</th></tr>
+<tr><td>ADD</td><td>+</td></tr>
+<tr><td>SUB</td><td>-</td></tr>
+<tr><td>MUL</td><td>*</td></tr>
+<tr><td>QUO</td><td>/</td></tr>
+<tr><td>REM</td><td>%</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>AND</td><td>&amp;</td></tr>
+<tr><td>OR</td><td>|</td></tr>
+<tr><td>XOR</td><td>^</td></tr>
+<tr><td>SHL</td><td>&lt;&lt;</td></tr>
+<tr><td>SHR</td><td>&gt;&gt;</td></tr>
+<tr><td>AND_NOT</td><td>&amp;^</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>LAND</td><td>&amp;&amp;</td></tr>
+<tr><td>LOR</td><td>||</td></tr>
+<tr><td>ARROW</td><td><-</td></tr>
+<tr><td>INC</td><td>++</td></tr>
+<tr><td>DEC</td><td>--</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>EQL</td><td>==</td></tr>
+<tr><td>LSS</td><td>&lt;</td></tr>
+<tr><td>GTR</td><td>&gt;</td></tr>
+<tr><td>ASSIGN</td><td>=</td></tr>
+<tr><td>NOT</td><td>!</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>NEQ</td><td>!=</td></tr>
+<tr><td>LEQ</td><td>&lt;=</td></tr>
+<tr><td>GEQ</td><td>&gt;=</td></tr>
+<tr><td>DEFINE</td><td>:=</td></tr>
+</table>
+
+<p>Výše uvedené operátory se od sebe odlišují především prioritou a taktéž
+asociativitou, tj.&nbsp;pořadím provedení operací se stejnou prioritou &ndash;
+zda se postupuje směrem zleva doprava (většina klasických binárních operátorů)
+či zprava doleva (operátory s&nbsp;přiřazením).</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Převrácená polská notace</h2>
+
+<p>V&nbsp;předchozím textu jsme se krátce zmínili o <i>RPN</i> neboli o
+převrácené (reverzní) polské notaci, která se taktéž nazývá notace
+<i>postfixová</i>. Jedná se o jednotný způsob zápisu matematických výrazů,
+v&nbsp;němž vždy operátor následuje až za všemi svými operandy. Tím se, kromě
+dalších věcí, odstraňuje nutnost použití závorek, které určují prioritu,
+protože v&nbsp;RPN je priorita určena způsobem řazení operandů a operátorů.
+Dále je v&nbsp;RPN zcela přesně určeno, kdy se operace vykoná &ndash; konkrétně
+ihned poté, co je přijat její token. RPN má své (prakticky) nezastupitelné
+místo v&nbsp;informatice, protože se používá například v&nbsp;oblasti
+překladačů, v&nbsp;instrukčních sadách některých virtuálních strojů atd.
+Aritmetické i logické výrazy zapsané s&nbsp;využitím RPN se navíc velmi snadno
+programově vyhodnocují, takže RPN může být použita i jako mezistupeň
+v&nbsp;interpretrech nebo například v&nbsp;SW kalkulačkách.</p>
+
+<p>Ukažme si jednoduchý příklad dvou aritmetických výrazů zapsaných
+s&nbsp;využitím infixové notace:</p>
+
+<pre>
+a+b&times;c
+(a+b)&times;c
+</pre>
+
+<p>Při použití postfixové notace však nejsou závorky ve výrazech
+<strong>nikdy</strong> zapotřebí, protože se priorita operací vyjadřuje přímo
+posloupností operátorů. Výše uvedené dva výrazy lze tedy do postfixové notace
+přepsat následovně:</p>
+
+<pre>
+a b c * +   nebo též   b c * a +
+a b + c *   nebo též   c a b + *
+</pre>
+
+<p>Povšimněte si, že u výše uvedených RPN výrazů s&nbsp;proměnnými
+<strong>a</strong>, <strong>b</strong> a <strong>c</strong> napsaných na levé
+straně se oproti infixové notaci nemění pořadí operátorů. Toho se velmi často
+využívá při algoritmickém převodu mezi infixovou a postfixovou notací a také
+při ručním zápisu RPN výrazů. Tento převod provádí vlastně mnohý překladač či
+interpret programovacího jazyka, a to buď přímo (mimochodem většinou opět
+s&nbsp;využitím zásobníku, do kterého jsou ukládány kódy požadovaných
+matematických operací a pozice závorek &ndash; viz další odstavce), nebo
+takzvaným rekurzivním sestupem podle gramatických pravidel daného jazyka.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Algoritmus shunting-yard</h2>
+
+<p>Podívejme se tedy, jakým způsobem je možné převést aritmetický výraz
+odpovídající syntaxi programovacího jazyka Go do postfixové notace. Samotný
+algoritmus převodu mezi běžnou infixovou notací a notací postfixovou navrhl E.
+Dijkstra a nazývá se <i>algoritmus shunting-yard</i> (česky snad seřaďovací
+nádraží, konkrétně by se jednalo o nádraží vybavené úvratí). Tento algoritmus
+je založen na postupném načítání <i>tokenů</i> reprezentujících jak
+aritmetické/logické operace, tak i jejich operandy a popř.&nbsp;i volání funkcí
+a závorky ovlivňující prioritu prováděných operací. Tyto tokeny jsou
+v&nbsp;případě operandů posílány přímo na výstup, ovšem tokeny reprezentující
+operandy, závorky a funkce jsou zpracovávány odlišně &ndash; buď jsou odloženy
+na zásobník (jehož reálnou obdobou je právě úvrať na seřaďovacím nádraží) nebo
+naopak zajistí postupné vyzvedávání starších operandů z&nbsp;tohoto zásobníku a
+jejich poslání na výstup. Úplný popis tohoto algoritmu, který naleznete
+například <a
+href="https://cs.wikipedia.org/wiki/Algoritmus_shunting-yard#Detailn%C3%AD_popis_algoritmu">zde</a>,
+obsahuje i rozlišení operátorů asociativních zleva a zprava.</p>
+
+<p><div class="rs-tip-major">Poznámka: důležitá je zde zmínka o tom, že tento
+algoritmus pracuje nad sekvencí <i>tokenů</i>. Není tedy nutné vůbec
+konstruovat AST a dokonce se tokeny ze sekvence vždy pouze načítají, nikdy
+nevrací (naopak některé jiné algoritmy mohou vyžadovat vrácení posledního
+tokenu do vstupní sekvence).</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Realizace algoritmu shunting-yard pro aritmetické výrazy programovacího jazyka Go</h2>
+
+<p>Výše popsaný algoritmus <i>shunting-yard</i> můžeme zjednodušit
+v&nbsp;případě, že není nutné rozlišit mezi použitím operátorů asociativních
+zleva a zprava. Příkladem je opět programovací jazyk Go, který v&nbsp;sadě
+základních aritmetických operátorů má pouze operátory asociativní zleva (není
+zde například operátor pro umocnění atd.). Navíc může algoritmus pracovat přímo
+nad tokeny získanými již minule popsanou tokenizací &ndash; tedy výsledkem
+práce balíčku nazvaného <strong>go/scanner</strong> (a jak již víme: bez
+vracení tokenů). Jedna z&nbsp;možných implementací algoritmu
+<i>shunting-yard</i> tedy může vypadat následovně. Všechny části jsou poměrně
+dopodrobna okomentovány:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// výraz, který se má převést na RPN</i>
+const source = `
+<u>1 + 2 * (3 + x) + y * (z - 1)</u>
+`
+&nbsp;
+func <strong>toRPN</strong>(s scanner.Scanner) {
+        var operators = map[token.Token]int{
+                token.MUL: 2,
+                token.QUO: 2,
+                token.REM: 2,
+                token.ADD: 1,
+                token.SUB: 1,
+        }
+&nbsp;
+        <i>// interně používaný zásobník pro operátory s nižší prioritou</i>
+        var stack []token.Token
+&nbsp;
+        <i>// postupné provádění tokenizace a zpracování jednotlivých tokenů</i>
+loop:
+        for {
+                _, tok, lit := s.Scan()
+                switch tok {
+                case token.INT:
+                        <i>// celé číslo přímo vypsat</i>
+                        fallthrough
+                case token.FLOAT:
+                        <i>// číslo s plovoucí čárkou přímo vypsat</i>
+                        fallthrough
+                case token.IDENT:
+                        <i>// identifikátor taktéž přímo vypsat</i>
+                        fmt.Printf("%v ", lit)
+                case token.LPAREN:
+                        <i>// levá závorka se uloží na zásobník (bez výpisu)</i>
+                        stack = append(stack, tok)
+                case token.RPAREN:
+                        <i>// pravá závorka zahájí zpracování zásobníku až do první nalezené levé závorky</i>
+                        var tok token.Token
+                        for {
+                                <i>// přečtení prvku ze zásobníku - operace POP</i>
+                                tok, stack = stack[len(stack)-1], stack[:len(stack)-1]
+                                if tok == token.LPAREN {
+                                        <i>// odstranění levé závorky</i>
+                                        break
+                                }
+                                <i>// ostatní tokeny získané ze zásobníku se vypíšou</i>
+                                fmt.Printf("%v ", tok)
+                        }
+                case token.EOF:
+                        <i>// speciální token reprezentující konec tokenizace</i>
+                        break loop
+                default:
+                        priority1, isOperator := operators[tok]
+                        if isOperator {
+                                <i>// průchod prvky na zásobníku</i>
+                                for len(stack) &gt; 0 {
+                                        <i>// operace TOP</i>
+                                        tok := stack[len(stack)-1]
+                                        <i>// získat prioritu operátoru přečteného ze zásobníku</i>
+                                        priority2 := operators[tok]
+&nbsp;
+                                        if priority1 &gt; priority2 {
+                                                <i>// větší priorita nového operátoru -&gt; konec</i>
+                                                <i>// (pouze ho později uložíme na zásobník)</i>
+                                                break
+                                        }
+&nbsp;
+                                        <i>// menší či stejná priorita nového operátoru -&gt;</i>
+                                        <i>// vypsat předchozí operátor nalezený na zásobníku</i>
+                                        <i>// a odstranit tento operátor ze zásobníku</i>
+                                        stack = stack[:len(stack)-1] <i>// POP</i>
+                                        fmt.Printf("%s ", tok)
+                                }
+&nbsp;
+                                <i>// uložit nově načtený operátor na zásobník</i>
+                                stack = append(stack, tok)
+                        }
+                }
+        }
+        <i>// vyprázdnění obsahu zásobníku</i>
+        for len(stack) &gt; 0 {
+                fmt.Printf("%s ", stack[len(stack)-1])
+                stack = stack[:len(stack)-1]
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// převod výrazu do RPN</i>
+        toRPN(s)
+}
+</pre>
+
+<p>Po spuštění demonstračního příkladu se provede převod následujícího výrazu
+zapsaného s&nbsp;využitím klasické infixové notace:</p>
+
+<pre>
+1 + 2 * (3 + x) + y * (z - 1)
+</pre>
+
+<p>Do notace postfixové neboli RPN:</p>
+
+<pre>
+1 2 3 x + * + y z 1 - * +
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Realizace výpočtu aritmetického výrazu popsaného pomocí RPN</h2>
+
+<p>Následný výpočet takto získaného výrazu (<strong>1 2 3 x + * + y z 1 - *
++</strong>) by probíhal následovně:</p>
+
+<ol>
+
+<li>Je načten token obsahující hodnotu symbolu z&nbsp;výrazu reprezentovaného
+v&nbsp;postfixové notaci (RPN).</li>
+
+<li>V&nbsp;případě, že se jedná o číselnou hodnotu, je tato hodnota uložena na
+zásobník (nazývaný zásobník operandů, protože obsahuje operandy prováděných
+operací).</li>
+
+<li>Pokud se jedná o proměnnou, je její jméno uloženo na zásobník (při
+skutečném vyhodnocování výrazů lze v&nbsp;tomto okamžiku nahradit jméno
+proměnné jejím obsahem buď nyní, nebo až v&nbsp;dalším kroku).</li>
+
+<li>V&nbsp;případě, že se jedná o operátor, jsou ze zásobníku (přesněji ze
+zásobníku operandů) vyzvednuty oba operandy, operace se provede a výsledek se
+opět uloží na zásobník.</li>
+
+<li>Na konci bude na zásobníku uložena jediná hodnota, kterou je výsledek.</li>
+
+</ol>
+
+<p><div class="rs-tip-major">Poznámka: realizace tohoto algoritmu může být
+v&nbsp;objektovém kódu realizována v&nbsp;pouhých několika desítkách bajtů;
+proto ostatně nalezneme RPN v&nbsp;mnoha virtuálních strojích.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Algoritmus shunting-yard pro logické výrazy doplněné o porovnání (relační operátory)</h2>
+
+<p>Programovací jazyk Go nenabízí programátorům pouze aritmetické operátory,
+ale například i operátory určené pro provádění logických operací, operátory pro
+operace bitové atd. Všechny podporované operátory jsou vypsány
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><td>aritmetické</td><td>+</td><td>-</td><td>*</td><td>/</td><td>%</td><td>&nbsp;</td></tr>
+<tr><td>aritmetické s&nbsp;přiřazením</td><td>+=</td><td>-=</td><td>*=</td><td>/=</td><td>%=</td><td>&nbsp;</td></tr>
+<tr><td>logické</td><td>&amp;&amp;</td><td>||</td><td>!</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>posuny a bitové operace</td><td>&lt;&lt;</td><td>&gt;&gt;</td><td>&amp;</td><td>|</td><td>^</td><td>&amp;^</td></tr>
+<tr><td>posuny a bitové operace s přiřazením</td><td>&lt;&lt;=</td><td>&gt;&gt;=</td><td>&amp;=</td><td>|=</td><td>^=</td><td>&amp;^=</td></tr>
+<tr><td>relační</td><td>==</td><td>!=</td><td>&lt;</td><td>&lt;=</td><td>&gt;</td><td>&gt;=</td></tr>
+<tr><td>operace s adresami</td><td>*</td><td>&amp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>unární operátory</td><td>+</td><td>-</td><td>^</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>další operátory</td><td>&lt;-</td><td>:=</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+<p>Často se setkáme s&nbsp;logickými operacemi, které mohou obsahovat i
+porovnávání (komparaci) hodnot realizované relačními operátory.
+V&nbsp;programovacím jazyku Go nalezneme tři operátory, které jsou
+aplikovatelné na logické (pravdivostní) hodnoty <strong>true</strong> a
+<strong>false</strong>. Jedná se o logickou negaci, logický součin a logický
+součet. Tyto tři operátory se zapisují následujícím způsobem (u binárních
+operátorů existuje i možnost jejich kombinace s&nbsp;přiřazením):</p>
+
+<table>
+<tr><th>Operátor</th><th>Kombinace s&nbsp;přiřazením</th><th>Význam</th></tr>
+<tr><td>!</td><td>&nbsp;</td><td>negace pravdivostní hodnoty</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>&amp;&amp;</td><td>&amp;&amp;=</td><td>logický součin dvou pravdivostních hodnot</td></tr>
+<tr><td>||</td><td>||=</td><td>logický součet dvou pravdivostních hodnot</td></tr>
+</table>
+
+<p>Nabídka <i>relačních operátorů</i> v&nbsp;programovacím jazyce Go by nás
+neměla ničím nepřekvapit: k&nbsp;dispozici je všech šest základních operátorů
+pro test na rovnost, nerovnost, větší než, menší než a kombinací větší nebo
+rovno a menší nebo rovno. Těchto šest operátorů lze použít pro všechny
+celočíselné datové typy i pro datové typy s&nbsp;plovoucí řádovou čárkou. Kromě
+toho ovšem můžeme porovnávat i řetězce.</p>
+
+<p>Nicméně se nyní vraťme k&nbsp;poněkud jednoduššímu problému, konkrétně
+k&nbsp;převodu logických výrazů, v&nbsp;nichž se mohou vyskytovat i porovnání,
+do postfixové notace neboli do RPN. Podobně jako u aritmetických operací, i u
+operací logických se rozlišují priority. Nejvyšší prioritu má logický součin,
+nižší prioritu pak logický součet. Asociativita je v&nbsp;obou případech zleva
+doprava. Porovnání (relační operátory) mají vyšší prioritu než operátory
+logické a jejich asociativita je opět zleva doprava, čímž se nám situace
+zjednodušuje, neboť můžeme použít prakticky stejný algoritmus, jako u
+aritmetických operací &ndash; vlastně se změní pouze tabulky
+s&nbsp;podporovanými operátory (resp.&nbsp;jejich tokeny). To je ostatně velmi
+dobře patrné i při pohledu na zdrojový kód dalšího demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// výraz, který se má převést na RPN</i>
+const source = `
+<u>a&lt;0 || b&gt;10 &amp;&amp; c!=0</u>
+`
+&nbsp;
+func <strong>toRPN</strong>(s scanner.Scanner) {
+        var operators = map[token.Token]int{
+                token.EQL:  3,
+                token.LSS:  3,
+                token.GTR:  3,
+                token.NEQ:  3,
+                token.LEQ:  3,
+                token.GEQ:  3,
+                token.LAND: 2,
+                token.LOR:  1,
+        }
+&nbsp;
+        <i>// interně používaný zásobník pro operátory s nižší prioritou</i>
+        var stack []token.Token
+&nbsp;
+        <i>// postupné provádění tokenizace a zpracování jednotlivých tokenů</i>
+loop:
+        for {
+                _, tok, lit := s.Scan()
+                switch tok {
+                case token.INT:
+                        <i>// celé číslo přímo vypsat</i>
+                        fallthrough
+                case token.FLOAT:
+                        <i>// číslo s plovoucí čárkou přímo vypsat</i>
+                        fallthrough
+                case token.IDENT:
+                        <i>// identifikátor taktéž přímo vypsat</i>
+                        fmt.Printf("%v ", lit)
+                case token.LPAREN:
+                        <i>// levá závorka se uloží na zásobník (bez výpisu)</i>
+                        stack = append(stack, tok)
+                case token.RPAREN:
+                        <i>// pravá závorka zahájí zpracování zásobníku až do první nalezené levé závorky</i>
+                        var tok token.Token
+                        for {
+                                <i>// přečtení prvku ze zásobníku - operace POP</i>
+                                tok, stack = stack[len(stack)-1], stack[:len(stack)-1]
+                                if tok == token.LPAREN {
+                                        <i>// odstranění levé závorky</i>
+                                        break
+                                }
+                                <i>// ostatní tokeny získané ze zásobníku se vypíšou</i>
+                                fmt.Printf("%v ", tok)
+                        }
+                case token.EOF:
+                        <i>// speciální token reprezentující konec tokenizace</i>
+                        break loop
+                default:
+                        priority1, isOperator := operators[tok]
+                        if isOperator {
+                                <i>// průchod prvky na zásobníku</i>
+                                for len(stack) &gt; 0 {
+                                        <i>// operace TOP</i>
+                                        tok := stack[len(stack)-1]
+                                        <i>// získat prioritu operátoru přečteného ze zásobníku</i>
+                                        priority2 := operators[tok]
+&nbsp;
+                                        if priority1 &gt; priority2 {
+                                                <i>// větší priorita nového operátoru -&gt; konec</i>
+                                                <i>// (pouze ho později uložíme na zásobník)</i>
+                                                break
+                                        }
+&nbsp;
+                                        <i>// menší či stejná priorita nového operátoru -&gt;</i>
+                                        <i>// vypsat předchozí operátor nalezený na zásobníku</i>
+                                        <i>// a odstranit tento operátor ze zásobníku</i>
+                                        stack = stack[:len(stack)-1] <i>// POP</i>
+                                        fmt.Printf("%s ", tok)
+                                }
+&nbsp;
+                                <i>// uložit nově načtený operátor na zásobník</i>
+                                stack = append(stack, tok)
+                        }
+                }
+        }
+        <i>// vyprázdnění obsahu zásobníku</i>
+        for len(stack) &gt; 0 {
+                fmt.Printf("%s ", stack[len(stack)-1])
+                stack = stack[:len(stack)-1]
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// převod výrazu do RPN</i>
+        toRPN(s)
+}
+</pre>
+
+<p>Výsledkem získaným po spuštění tohoto příkladu bude výraz v&nbsp;postfixové
+notaci:</p>
+
+<pre>
+a 0 &lt; b 10 &gt; c 0 != &amp;&amp; ||
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Závorky v&nbsp;logických výrazech</h2>
+
+<p>Pochopitelně je možné i v&nbsp;logických výrazech používat závorky a měnit
+tak prioritu prováděných operací. Můžeme si to snadno vyzkoušet, a to konkrétně
+náhradou následujícího logického výrazu:</p>
+
+<pre>
+a&lt;0 || b&gt;10 &amp;&amp; c!=0
+</pre>
+
+<p>za výraz:</p>
+
+<pre>
+(a&lt;0 || b&gt;10) &amp;&amp; c!=0
+</pre>
+
+<p>Výsledky, tj.&nbsp;generovaný výraz zapsaný v&nbsp;převrácené polské notaci,
+se budou odlišovat. Původní výraz bez závorek bude převeden na:</p>
+
+<pre>
+a 0 &lt; b 10 &gt; c 0 != &amp;&amp; ||
+</pre>
+
+<p>Výraz se závorkami bude naopak převeden na:</p>
+
+<pre>
+a 0 &lt; b 10 &gt; || c 0 != &amp;&amp;
+</pre>
+
+<p>Vše si opět snadno otestujeme:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "go/scanner"
+        "go/token"
+)
+&nbsp;
+<i>// výraz, který se má převést na RPN</i>
+const source = `
+<u>(a&lt;0 || b&gt;10) &amp;&amp; c!=0</u>
+`
+&nbsp;
+func <strong>toRPN</strong>(s scanner.Scanner) {
+        var operators = map[token.Token]int{
+                token.EQL:  3,
+                token.LSS:  3,
+                token.GTR:  3,
+                token.NEQ:  3,
+                token.LEQ:  3,
+                token.GEQ:  3,
+                token.LAND: 2,
+                token.LOR:  1,
+        }
+&nbsp;
+        <i>// interně používaný zásobník pro operátory s nižší prioritou</i>
+        var stack []token.Token
+&nbsp;
+        <i>// postupné provádění tokenizace a zpracování jednotlivých tokenů</i>
+loop:
+        for {
+                _, tok, lit := s.Scan()
+                switch tok {
+                case token.INT:
+                        <i>// celé číslo přímo vypsat</i>
+                        fallthrough
+                case token.FLOAT:
+                        <i>// číslo s plovoucí čárkou přímo vypsat</i>
+                        fallthrough
+                case token.IDENT:
+                        <i>// identifikátor taktéž přímo vypsat</i>
+                        fmt.Printf("%v ", lit)
+                case token.LPAREN:
+                        <i>// levá závorka se uloží na zásobník (bez výpisu)</i>
+                        stack = append(stack, tok)
+                case token.RPAREN:
+                        <i>// pravá závorka zahájí zpracování zásobníku až do první nalezené levé závorky</i>
+                        var tok token.Token
+                        for {
+                                <i>// přečtení prvku ze zásobníku - operace POP</i>
+                                tok, stack = stack[len(stack)-1], stack[:len(stack)-1]
+                                if tok == token.LPAREN {
+                                        // odstranění levé závorky
+                                        break
+                                }
+                                <i>// ostatní tokeny získané ze zásobníku se vypíšou</i>
+                                fmt.Printf("%v ", tok)
+                        }
+                case token.EOF:
+                        <i>// speciální token reprezentující konec tokenizace</i>
+                        break loop
+                default:
+                        priority1, isOperator := operators[tok]
+                        if isOperator {
+                                <i>// průchod prvky na zásobníku</i>
+                                for len(stack) &gt; 0 {
+                                        <i>// operace TOP</i>
+                                        tok := stack[len(stack)-1]
+                                        <i>// získat prioritu operátoru přečteného ze zásobníku</i>
+                                        priority2 := operators[tok]
+&nbsp;
+                                        if priority1 &gt; priority2 {
+                                                <i>// větší priorita nového operátoru -&gt; konec</i>
+                                                <i>// (pouze ho později uložíme na zásobník)</i>
+                                                break
+                                        }
+&nbsp;
+                                        <i>// menší či stejná priorita nového operátoru -&gt;</i>
+                                        <i>// vypsat předchozí operátor nalezený na zásobníku</i>
+                                        <i>// a odstranit tento operátor ze zásobníku</i>
+                                        stack = stack[:len(stack)-1] // POP
+                                        fmt.Printf("%s ", tok)
+                                }
+&nbsp;
+                                <i>// uložit nově načtený operátor na zásobník</i>
+                                stack = append(stack, tok)
+                        }
+                }
+        }
+        <i>// vyprázdnění obsahu zásobníku</i>
+        for len(stack) &gt; 0 {
+                fmt.Printf("%s ", stack[len(stack)-1])
+                stack = stack[:len(stack)-1]
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// objekt představující scanner</i>
+        var s scanner.Scanner
+&nbsp;
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fset := token.NewFileSet()
+&nbsp;
+        <i>// přidání informace o zdrojovém kódu</i>
+        file := fset.AddFile("", fset.Base(), len(source))
+&nbsp;
+        <i>// inicializace scanneru</i>
+        s.Init(file, []byte(source), nil, scanner.ScanComments)
+&nbsp;
+        <i>// převod výrazu do RPN</i>
+        toRPN(s)
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Detekce volání funkcí při zpracování AST</h2>
+
+<p>Ve třetí části dnešního článku si ukážeme, jakým způsobem je možné průchodem
+AST zjistit, jaké funkce popř.&nbsp;metody se volají a jaké mají parametry. Pro
+jednoduchost budeme počítat s&nbsp;tím, že se volají implicitně dostupné
+funkce, tj.&nbsp;funkce, které jsou standardní a u nichž není nutné uvádět
+název balíčku. Příklad takového kódu:</p>
+
+<pre>
+package main
+&nbsp;
+var answer int = 42
+var x []int = make([]int, 10)
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+</pre>
+
+<p>Vidíme, že v&nbsp;tomto jednoduchém příkladu jsou funkce volány ve chvíli,
+kdy je zapotřebí (pochopitelně v&nbsp;runtime) vypočítat hodnotu nějakého
+výrazu. Některé z&nbsp;volaných funkcí mají jediný parametr, další funkce pak
+dva parametry. Poněkud speciálním případem je volání funkce
+<strong>make</strong>, které se v&nbsp;prvním parametru předává přímo datový
+typ, podobně jako je tomu u funkce <strong>new</strong> (tyto funkce byly před
+Go verze 1.17 vlastně pseudofunkcemi, protože je nebylo možné plně deklarovat).
+Pro jednoduchost začneme pouze detekcí volání funkce, bez zpracování informací
+o parametrech popř.&nbsp;o objektu, pro který je volaná metoda.</p>
+
+<p>V&nbsp;AST je volání funkce reprezentováno uzlem typu
+<strong>CallExpr</strong>, který obsahuje jméno volané funkce v&nbsp;atributu
+<strong>Fun</strong> informace o volané funkci (tedy mj.&nbsp;i její jméno).
+Pokud budeme potřebovat pouze vytisknout jména volaných funkcí, bude průchod
+AST dosti triviální:</p>
+
+<pre>
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis základní informace o volané funkci</i>
+                fmt.Println(funcCall.Fun)
+        }
+        return true
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: relativně snadno lze příklad rozšířit i
+o další případ. Tím je volání funkce ve chvíli, kdy je zapotřebí vypočítat
+parametr jiné funkce. Jedná se tedy například o následující programový
+kód:</div></p>
+
+<pre>
+x = foo(bar(a), baz(b))
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu, který zjistí všechna volání
+funkcí, může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+var x []int = make([]int, 10)
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis základní informace o volané funkci</i>
+                fmt.Println(funcCall.Fun)
+        }
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        file, err := parser.ParseFile(fileSet, "", source, parser.ParseComments)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(file, inspectCallback)
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+make
+len
+cap
+len
+cap
+append
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Základní informace o argumentech volané funkce</h2>
+
+<p>Každé volání funkce je v&nbsp;AST reprezentováno tímto uzlem:</p>
+
+<pre>
+type <strong>CallExpr</strong> struct {
+        Fun      Expr      <i>// function expression</i>
+        Lparen   token.Pos <i>// position of "("</i>
+        Args     []Expr    <i>// function arguments; or nil</i>
+        Ellipsis token.Pos <i>// position of "..." (token.NoPos if there is no "...")</i>
+        Rparen   token.Pos <i>// position of ")"</i>
+}
+</pre>
+
+<p>Z&nbsp;atributů tohoto uzlu lze snadno zjistit, že kromě jména funkce (a
+dalších informací o volané funkci) můžeme přečíst informaci o argumentech
+předávaných volané funkci. Tyto argumenty jsou uloženy v&nbsp;řezu
+<strong>Args</strong>. V&nbsp;případě, že se funkci žádné argumenty nepředávají
+(například funkci <strong>println</strong>), bude v&nbsp;tomto atributu uložena
+hodnota <strong>nil</strong>. Základní informace o předávaných argumentech
+&ndash; tedy o jejich pozici (indexu), názvu a typu, lze při průchodu AST
+vypsat následovně:</p>
+
+<pre>
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis podrobnějších informací o volané funkci</i>
+                fmt.Printf("Function: %s ", funcCall.Fun)
+                fmt.Printf("with %d arguments:\n", len(funcCall.Args))
+                <i>// výpis informací o argumentech funkce</i>
+                for i, arg := range <strong>funcCall.Args</strong> {
+                        fmt.Printf("\t%d\t%T\t%s\n", i, arg, arg)
+                }
+                fmt.Println()
+        }
+        return true
+}
+</pre>
+
+<p>Výsledek pro všechny volané funkce ve zpracovávaném úseku zdrojového
+kódu:</p>
+
+<pre>
+Function: make with 2 arguments:
+        0       *ast.ArrayType  &amp;{%!s(token.Pos=55) <nil> int}
+        1       *ast.BasicLit   &amp;{%!s(token.Pos=62) INT 10}
+&nbsp;
+Function: len with 1 arguments:
+        0       *ast.Ident      x
+&nbsp;
+Function: cap with 1 arguments:
+        0       *ast.Ident      x
+&nbsp;
+Function: len with 1 arguments:
+        0       *ast.Ident      x
+&nbsp;
+Function: cap with 1 arguments:
+        0       *ast.Ident      x
+&nbsp;
+Function: append with 2 arguments:
+        0       *ast.Ident      x
+        1       *ast.BasicLit   &amp;{%!s(token.Pos=138) INT 10}
+</pre>
+
+<p>Opět si pro úplnost ukažme celý zdrojový kód tohoto demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+var x []int = make([]int, 10)
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis podrobnějších informací o volané funkci</i>
+                fmt.Printf("Function: %s ", funcCall.Fun)
+                fmt.Printf("with %d arguments:\n", len(funcCall.Args))
+                <i>// výpis informací o argumentech funkce</i>
+                for i, arg := range funcCall.Args {
+                        fmt.Printf("\t%d\t%T\t%s\n", i, arg, arg)
+                }
+                fmt.Println()
+        }
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        file, err := parser.ParseFile(fileSet, "", source, parser.ParseComments)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(file, inspectCallback)
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Podrobnější informace o argumentech volané funkce</h2>
+
+<p>Argumenty volané funkce jsou obecně zapsány formou výrazu, takže pro jeho
+&bdquo;rozklíčování&ldquo; by bylo nutné provést rekurzivní analýzu poduzlů
+uložených v&nbsp;<strong>funcCall.Args</strong>. Nicméně prozatím se můžeme
+spokojit s&nbsp;rozlišením jednodušších typů argumentů, konkrétně
+s&nbsp;argumenty předávanými formou konstanty (resp.&nbsp;literálu) a argumenty
+uloženými v&nbsp;proměnných. Hodnoty resp.&nbsp;jména proměnných lze vypsat
+velmi snadno, a to nepatrnou úpravou programové smyčky, v&nbsp;níž se argumenty
+vypisují:</p>
+
+<pre>
+for i, arg := <strong>range funcCall.Args</strong> {
+        fmt.Printf("\t%d\t", i+1)
+        switch v := arg.(type) {
+        case *ast.BasicLit:
+                fmt.Printf("Constant: %s\n", v.Value)
+        case *ast.Ident:
+                fmt.Printf("Variable: '%s'\n", v.Name)
+        default:
+                fmt.Println("Unrecognized type")
+        }
+}
+</pre>
+
+<p>Úplný kód upraveného demonstračního příkladu bude vypadat takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+var x []int = make([]int, 10)
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis podrobnějších informací o volané funkci</i>
+                fmt.Printf("Function: %s ", funcCall.Fun)
+                fmt.Printf("with %d arguments:\n", len(funcCall.Args))
+                <i>// výpis informací o argumentech funkce</i>
+                for i, arg := range funcCall.Args {
+                        fmt.Printf("\t%d\t", i+1)
+                        switch v := arg.(type) {
+                        case *ast.BasicLit:
+                                fmt.Printf("Constant: %s\n", v.Value)
+                        case *ast.Ident:
+                                fmt.Printf("Variable: '%s'\n", v.Name)
+                        default:
+                                fmt.Println("Unrecognized type")
+                        }
+                }
+                fmt.Println()
+        }
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        file, err := parser.ParseFile(fileSet, "", source, parser.ParseComments)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(file, inspectCallback)
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+Function: make with 2 arguments:
+        1       Unrecognized type
+        2       Constant: 10
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable: 'x'
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable: 'x'
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable: 'x'
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable: 'x'
+&nbsp;
+Function: append with 2 arguments:
+        1       Variable: 'x'
+        2       Constant: 10
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Informace o argumentech typu pole či řez (nějakého typu)</h2>
+
+<p>Nyní si ukážeme, jakým způsobem lze zjistit volání funkcí, jimž se předávají
+pole nebo řezy. Analyzovat budeme tento (umělý) úsek zdrojového kódu, který
+vznikl rozšířením kódu z&nbsp;předchozích dvou kapitol:</p>
+
+<pre>
+package main
+&nbsp;
+var answer int = 42
+&nbsp;
+var x []int = make([]int, 10)
+var x2 []float = make([]float, 10)
+var x3 []T = make([]T, 20)
+&nbsp;
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+var b = foo([10]int)
+var c = bar(x, y, z, 1, 1.0, 1i, "foo", 'b')
+&nbsp;
+var d = c.baz(1, 2, x)
+</pre>
+
+<p>V&nbsp;případě, že se předává hodnota typu pole nebo řez, bude takový
+argument představován uzlem <strong>ast.ArrayType</strong>. Tento uzel obsahuje
+i položku nazvanou <strong>Len</strong>. V&nbsp;případě, že je argumentem pole,
+bude tato položka obsahovat (podle očekávání) délku pole, ovšem v&nbsp;případě
+řezu je položka rovna <strong>nil</strong>, aby bylo možné rozlišit mezi polem
+s&nbsp;nulovou délkou a řezem. Navíc je v&nbsp;položce <strong>Elt</strong>
+uložen typ prvků předávaného řezu nebo pole:</p>
+
+<pre>
+<i>// výpis informací o argumentech funkce</i>
+for i, arg := <strong>range funcCall.Args</strong> {
+        fmt.Printf("\t%d\t", i+1)
+        switch v := arg.(type) {
+        case *ast.BasicLit:
+                fmt.Printf("Constant %s of type %s\n", v.Value, v.Kind)
+        case *ast.Ident:
+                fmt.Printf("Variable %s\n", v.Name)
+        case *ast.ArrayType:
+                if v.Len == nil {
+                        fmt.Printf("Slice of %s\n", v.Elt)
+                } else {
+                        fmt.Printf("Array of %s\n", v.Elt)
+                }
+        default:
+                fmt.Printf("Unrecognized type %T\n", v)
+        }
+}
+</pre>
+
+<p>Po těchto úpravách dostaneme ještě přesnější informace o předávaných
+argumentech volané funkci:</p>
+
+<pre>
+Function: make with 2 arguments:
+        1       Slice of int
+        2       Constant 10 of type INT
+&nbsp;
+Function: make with 2 arguments:
+        1       Slice of float
+        2       Constant 10 of type INT
+&nbsp;
+Function: make with 2 arguments:
+        1       Slice of T
+        2       Constant 20 of type INT
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: append with 2 arguments:
+        1       Variable x
+        2       Constant 10 of type INT
+&nbsp;
+Function: foo with 1 arguments:
+        1       Array of int
+&nbsp;
+Function: bar with 8 arguments:
+        1       Variable x
+        2       Variable y
+        3       Variable z
+        4       Constant 1 of type INT
+        5       Constant 1.0 of type FLOAT
+        6       Constant 1i of type IMAG
+        7       Constant "foo" of type STRING
+        8       Constant 'b' of type CHAR
+&nbsp;
+Function: &amp;{c baz} with 3 arguments:
+        1       Constant 1 of type INT
+        2       Constant 2 of type INT
+        3       Variable x
+</pre>
+
+<p>Úplný zdrojový kód takto upraveného příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+&nbsp;
+var x []int = make([]int, 10)
+var x2 []float = make([]float, 10)
+var x3 []T = make([]T, 20)
+&nbsp;
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+var b = foo([10]int)
+var c = bar(x, y, z, 1, 1.0, 1i, "foo", 'b')
+&nbsp;
+var d = c.baz(1, 2, x)
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func <strong>inspectCallback</strong>(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                <i>// výpis podrobnějších informací o volané funkci</i>
+                fmt.Printf("Function: %s ", funcCall.Fun)
+                fmt.Printf("with %d arguments:\n", len(funcCall.Args))
+                <i>// výpis informací o argumentech funkce</i>
+                for i, arg := range funcCall.Args {
+                        fmt.Printf("\t%d\t", i+1)
+                        switch v := arg.(type) {
+                        case *ast.BasicLit:
+                                fmt.Printf("Constant %s of type %s\n", v.Value, v.Kind)
+                        case *ast.Ident:
+                                fmt.Printf("Variable %s\n", v.Name)
+                        case *ast.ArrayType:
+                                if v.Len == nil {
+                                        fmt.Printf("Slice of %s\n", v.Elt)
+                                } else {
+                                        fmt.Printf("Array of %s\n", v.Elt)
+                                }
+                        default:
+                                fmt.Printf("Unrecognized type %T\n", v)
+                        }
+                }
+                fmt.Println()
+        }
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        file, err := parser.ParseFile(fileSet, "", source, parser.ParseComments)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(file, inspectCallback)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Rozlišení volání funkce od volání metody</h2>
+
+<p>Předchozí příklady je pochopitelně možné ještě dále rozšiřovat, například
+rozlišit, kdy se volá běžná funkce a kdy metoda:</p>
+
+<pre>
+var c = bar(x, y, z, 1, 1.0, 1i, "foo", 'b')
+&nbsp;
+var d = c.baz(1, 2, x)
+</pre>
+
+<p>Pokud rozlišení provádět nebudeme, vypíše se při volání metody:</p>
+
+<pre>
+Function: &amp;{c baz} with 3 arguments:
+        1       Constant 1 of type INT
+        2       Constant 2 of type INT
+        3       Variable x
+</pre>
+
+<p>V&nbsp;případě, že je uzel představující volanou funkci typu
+<strong>ast.SelectorExpr</strong>, bude se jednat o volání metody a tento uzel
+bude obsahovat položky <strong>Sel.Name</strong> se jménem metody a
+<strong>X</strong> s&nbsp;typem (protože <strong>ast.SelectorExpr</strong> je
+odvozen od typu <strong>ast.Expr</strong>. Můžeme tedy provést test na typ uzlu
+a na základě výsledku buď vypsat informace o volané metodě nebo o běžné
+funkci:</p>
+
+<pre>
+method, ok := funcCall.Fun.(*ast.SelectorExpr)
+if ok {
+        fmt.Printf("Method: %s for type %s ", method.Sel.Name, method.X)
+} else {
+        fmt.Printf("Function: %s ", funcCall.Fun)
+}
+</pre>
+
+<p>Výše uvedenou podmínku jednoduše zapracujeme do existujícího kódu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "go/ast"
+        "go/parser"
+        "go/token"
+)
+&nbsp;
+<i>// zdrojový kód, který se má naparsovat</i>
+const source = `
+package main
+&nbsp;
+var answer int = 42
+&nbsp;
+var x []int = make([]int, 10)
+var x2 []float = make([]float, 10)
+var x3 []T = make([]T, 20)
+&nbsp;
+var y = len(x)
+var z = cap(x)
+var w = len(x) + cap(x)
+var a = append(x, 10)
+var b = foo([10]int)
+var c = bar(x, y, z, 1, 1.0, 1i, "foo", 'b')
+&nbsp;
+var d = c.baz(1, 2, x)
+`
+&nbsp;
+<i>// funkce volaná při průchodu AST</i>
+func inspectCallback(n ast.Node) bool {
+        <i>// pokud se jedná o volání funkce, vrátí se hodnota + true</i>
+        funcCall, ok := n.(*ast.CallExpr)
+        if ok {
+                method, ok := funcCall.Fun.(*ast.SelectorExpr)
+                if ok {
+                        fmt.Printf("Method: %s for type %s ", method.Sel.Name, method.X)
+                } else {
+                        fmt.Printf("Function: %s ", funcCall.Fun)
+                }
+                <i>// výpis podrobnějších informací o volané funkci</i>
+                fmt.Printf("with %d arguments:\n", len(funcCall.Args))
+                <i>// výpis informací o argumentech funkce</i>
+                for i, arg := range funcCall.Args {
+                        fmt.Printf("\t%d\t", i+1)
+                        switch v := arg.(type) {
+                        case *ast.BasicLit:
+                                fmt.Printf("Constant %s of type %s\n", v.Value, v.Kind)
+                        case *ast.Ident:
+                                fmt.Printf("Variable %s\n", v.Name)
+                        case *ast.ArrayType:
+                                if v.Len == nil {
+                                        fmt.Printf("Slice of %s\n", v.Elt)
+                                } else {
+                                        fmt.Printf("Array of %s\n", v.Elt)
+                                }
+                        default:
+                                fmt.Printf("Unrecognized type %T\n", v)
+                        }
+                }
+                fmt.Println()
+        }
+        return true
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura reprezentující množinu zdrojových kódů</i>
+        fileSet := token.NewFileSet()
+&nbsp;
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        file, err := parser.ParseFile(fileSet, "", source, parser.ParseComments)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Inspect(file, inspectCallback)
+}
+</pre>
+
+<p>Výsledkem bude korektní rozlišení, že se volá funkce resp.&nbsp;metoda:</p>
+
+<pre>
+Function: make with 2 arguments:
+        1       Slice of int
+        2       Constant 10 of type INT
+&nbsp;
+Function: make with 2 arguments:
+        1       Slice of float
+        2       Constant 10 of type INT
+&nbsp;
+Function: make with 2 arguments:
+        1       Slice of T
+        2       Constant 20 of type INT
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: len with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: cap with 1 arguments:
+        1       Variable x
+&nbsp;
+Function: append with 2 arguments:
+        1       Variable x
+        2       Constant 10 of type INT
+&nbsp;
+Function: foo with 1 arguments:
+        1       Array of int
+&nbsp;
+Function: bar with 8 arguments:
+        1       Variable x
+        2       Variable y
+        3       Variable z
+        4       Constant 1 of type INT
+        5       Constant 1.0 of type FLOAT
+        6       Constant 1i of type IMAG
+        7       Constant "foo" of type STRING
+        8       Constant 'b' of type CHAR
+&nbsp;
+Method: baz for type c with 3 arguments:
+        1       Constant 1 of type INT
+        2       Constant 2 of type INT
+        3       Variable x
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Obsah navazujícího článku</h2>
+
+<p>V&nbsp;navazujícím článku se ještě jednou budeme zabývat problematikou
+lexikální a syntaktické analýzy založené na balíčcích umístěných ve jmenném
+prostoru <strong>go</strong>. Ukážeme si praktické příklady, například to,
+jakým způsobem je možné detekovat některé problematické části kódu stylem,
+jakým to provádí nástroj <i>gocritic</i>, který byl popsán v&nbsp;článku <a
+href="https://www.root.cz/clanky/kontrola-potencialnich-chyb-ve-zdrojovych-kodech-go-nastroji-gosec-a-go-critic/">Kontrola
+potenciálních chyb ve zdrojových kódech Go nástroji gosec a go-critic</a>.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/lexikalni-a-syntakticka-zdrojovych-kodu-jazyka-go/">minule</a>
+i dnes použitých demonstračních příkladů byly uloženy do nového Git repositáře,
+který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>ast01.go</td><td>syntaktická analýza v&nbsp;Go &ndash; balíčky <strong>go/token</strong> a <strong>go/parser</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast01.go">https://github.com/tisnik/go-root/blob/master/article_82/ast01.go</a></td></tr>
+<tr><td> 2</td><td>ast02.go</td><td>čitelný výpis obsahu abstraktního syntaktického stromu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast02.go">https://github.com/tisnik/go-root/blob/master/article_82/ast02.go</a></td></tr>
+<tr><td> 3</td><td>ast03.go</td><td>průchod abstraktním syntaktickým stromem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast03.go">https://github.com/tisnik/go-root/blob/master/article_82/ast03.go</a></td></tr>
+<tr><td> 4</td><td>ast04.go</td><td>návrhový vzor Visitor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast04.go">https://github.com/tisnik/go-root/blob/master/article_82/ast04.go</a></td></tr>
+<tr><td> 5</td><td>ast05.go</td><td>zobrazení hloubky uzlu v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast05.go">https://github.com/tisnik/go-root/blob/master/article_82/ast05.go</a></td></tr>
+<tr><td> 6</td><td>ast06.go</td><td>koncové uzly v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast06.go">https://github.com/tisnik/go-root/blob/master/article_82/ast06.go</a></td></tr>
+<tr><td> 7</td><td>ast07.go</td><td>AST zkonstruovaný pro sekvenci příkazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast07.go">https://github.com/tisnik/go-root/blob/master/article_82/ast07.go</a></td></tr>
+<tr><td> 8</td><td>ast08.go</td><td>výrazy se závorkami a s&nbsp;různými prioritami operátorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast08.go">https://github.com/tisnik/go-root/blob/master/article_82/ast08.go</a></td></tr>
+<tr><td> 9</td><td>ast09.go</td><td>konstrukce AST pro jediný výraz</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast09.go">https://github.com/tisnik/go-root/blob/master/article_82/ast09.go</a></td></tr>
+<tr><td>10</td><td>ast10.go</td><td>typy uzlů v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast10.go">https://github.com/tisnik/go-root/blob/master/article_82/ast10.go</a></td></tr>
+<tr><td>11</td><td>ast11.go</td><td>podrobnější výpis informací o uzlech v&nbsp;AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast11.go">https://github.com/tisnik/go-root/blob/master/article_82/ast11.go</a></td></tr>
+<tr><td>12</td><td>ast12.go</td><td>složitější aritmetické výrazy, zjednodušení zobrazení AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast12.go">https://github.com/tisnik/go-root/blob/master/article_82/ast12.go</a></td></tr>
+<tr><td>13</td><td>ast13.go</td><td>logické výrazy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast13.go">https://github.com/tisnik/go-root/blob/master/article_82/ast13.go</a></td></tr>
+<tr><td>14</td><td>ast14.go</td><td>výrazy obsahující operace s&nbsp;poli či řezy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/ast14.go">https://github.com/tisnik/go-root/blob/master/article_82/ast14.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>15</td><td>lexer1.go</td><td>tokenizace zdrojového kódu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer1.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer1.go</a></td></tr>
+<tr><td>16</td><td>lexer2.go</td><td>zahození komentářů při tokenizaci</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer2.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer2.go</a></td></tr>
+<tr><td>17</td><td>lexer3.go</td><td>tokenizace nesmyslné sekvence identifikátorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer3.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer3.go</a></td></tr>
+<tr><td>18</td><td>lexer4.go</td><td>tokenizace kódu s&nbsp;neznámými symboly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_82/lexer4.go">https://github.com/tisnik/go-root/blob/master/article_82/lexer4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>walk1.go</td><td>automatický průchod AST s&nbsp;výpisem aritmetických výrazů a podvýrazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/walk1.go">https://github.com/tisnik/go-root/blob/master/article_83/walk1.go</a></td></tr>
+<tr><td>20</td><td>walk2.go</td><td>explicitní průchod stromem &ndash; rekurzivní algoritmus</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/walk2.go">https://github.com/tisnik/go-root/blob/master/article_83/walk2.go</a></td></tr>
+<tr><td>21</td><td>walk3.go</td><td>rekurzivní průchod stromem s&nbsp;rekonstrukcí aritmetického výrazu v&nbsp;infixové podobě</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/walk3.go">https://github.com/tisnik/go-root/blob/master/article_83/walk3.go</a></td></tr>
+<tr><td>22</td><td>walk4.go</td><td>rozšíření předchozího kódu o zpracování výrazů se závorkami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/walk4.go">https://github.com/tisnik/go-root/blob/master/article_83/walk4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>23</td><td>rpn1.go</td><td>převod aritmetických výrazů z&nbsp;infixové notace do notace postfixové</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/rpn1.go">https://github.com/tisnik/go-root/blob/master/article_83/rpn1.go</a></td></tr>
+<tr><td>24</td><td>rpn2.go</td><td>převod logických výrazů z&nbsp;infixové notace do notace postfixové</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/rpn2.go">https://github.com/tisnik/go-root/blob/master/article_83/rpn2.go</a></td></tr>
+<tr><td>25</td><td>rpn3.go</td><td>nepatrná úprava &ndash; logický výraz se závorkami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/rpn3.go">https://github.com/tisnik/go-root/blob/master/article_83/rpn3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>26</td><td>func_call_1.go</td><td>detekce volání funkcí při zpracování AST</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/func_call_1.go">https://github.com/tisnik/go-root/blob/master/article_83/func_call_1.go</a></td></tr>
+<tr><td>27</td><td>func_call_2.go</td><td>základní informace o argumentech volané funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/func_call_2.go">https://github.com/tisnik/go-root/blob/master/article_83/func_call_2.go</a></td></tr>
+<tr><td>28</td><td>func_call_3.go</td><td>podrobnější informace o argumentech volané funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/func_call_3.go">https://github.com/tisnik/go-root/blob/master/article_83/func_call_3.go</a></td></tr>
+<tr><td>29</td><td>func_call_4.go</td><td>informace o argumentech typu pole či řez (nějakého typu)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/func_call_4.go">https://github.com/tisnik/go-root/blob/master/article_83/func_call_4.go</a></td></tr>
+<tr><td>30</td><td>func_call_5.go</td><td>rozlišení volání funkce od volání metody</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/func_call_5.go">https://github.com/tisnik/go-root/blob/master/article_83/func_call_5.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>31</td><td>condition1.go</td><td>praktický příklad: detekce zápisu &bdquo;yoda výrazů&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/condition1.go">https://github.com/tisnik/go-root/blob/master/article_83/condition1.go</a></td></tr>
+<tr><td>32</td><td>condition2.go</td><td>praktický příklad: detekce zápisu &bdquo;yoda výrazů&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_83/condition2.go">https://github.com/tisnik/go-root/blob/master/article_83/condition2.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Cool Stuff With Go’s AST Package Pt 1<br />
+<a href="https://medium.com/swlh/cool-stuff-with-gos-ast-package-pt-1-981460cddcd7">https://medium.com/swlh/cool-stuff-with-gos-ast-package-pt-1-981460cddcd7</a>
+</li>
+
+<li>Cool Stuff With Go’s AST Package Pt 2<br />
+<a href="https://medium.com/swlh/cool-stuff-with-gos-ast-package-pt-2-e4d39ab7e9db">https://medium.com/swlh/cool-stuff-with-gos-ast-package-pt-2-e4d39ab7e9db</a>
+</li>
+
+<li>Code generation in Go using abstract syntax trees (AST)<br />
+<a href="https://blog.stein.wtf/posts/go-abstract-syntax-tree-code-generation">https://blog.stein.wtf/posts/go-abstract-syntax-tree-code-generation</a>
+</li>
+
+<li>Shunting-yard algorithm<br />
+<a href="https://en.wikipedia.org/wiki/Shunting-yard_algorithm">https://en.wikipedia.org/wiki/Shunting-yard_algorithm</a>
+</li>
+
+<li>Abstract syntax tree<br />
+<a href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">https://en.wikipedia.org/wiki/Abstract_syntax_tree</a>
+</li>
+
+<li>Lexical analysis<br />
+<a href="https://en.wikipedia.org/wiki/Lexical_analysis">https://en.wikipedia.org/wiki/Lexical_analysis</a>
+</li>
+
+<li>Parser<br />
+<a href="https://en.wikipedia.org/wiki/Parsing#Parser">https://en.wikipedia.org/wiki/Parsing#Parser</a>
+</li>
+
+<li>Golang AST Package<br />
+<a href="https://golangdocs.com/golang-ast-package">https://golangdocs.com/golang-ast-package</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/ast</strong><br />
+<a href="https://pkg.go.dev/go/ast">https://pkg.go.dev/go/ast</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/scanner</strong><br />
+<a href="https://pkg.go.dev/go/scanner">https://pkg.go.dev/go/scanner</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/parser</strong><br />
+<a href="https://pkg.go.dev/go/parser">https://pkg.go.dev/go/parser</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>go/token</strong><br />
+<a href="https://pkg.go.dev/go/token">https://pkg.go.dev/go/token</a>
+</li>
+
+<li>AP8, IN8 Regulární jazyky<br />
+<a href="http://statnice.dqd.cz/home:inf:ap8">http://statnice.dqd.cz/home:inf:ap8</a>
+</li>
+
+<li>AP9, IN9 Konečné automaty<br />
+<a href="http://statnice.dqd.cz/home:inf:ap9">http://statnice.dqd.cz/home:inf:ap9</a>
+</li>
+
+<li>AP10, IN10 Bezkontextové jazyky<br />
+<a href="http://statnice.dqd.cz/home:inf:ap10">http://statnice.dqd.cz/home:inf:ap10</a>
+</li>
+
+<li>AP11, IN11 Zásobníkové automaty, Syntaktická analýza<br />
+<a href="http://statnice.dqd.cz/home:inf:ap11">http://statnice.dqd.cz/home:inf:ap11</a>
+</li>
+
+<li>Introduction to YACC<br />
+<a href="https://www.geeksforgeeks.org/introduction-to-yacc/">https://www.geeksforgeeks.org/introduction-to-yacc/</a>
+</li>
+
+<li>Introduction of Lexical Analysis<br />
+<a href="https://www.geeksforgeeks.org/introduction-of-lexical-analysis/?ref=lbp">https://www.geeksforgeeks.org/introduction-of-lexical-analysis/?ref=lbp</a>
+</li>
+
+<li>Tvorba grafů a diagramů s využitím doménově specifického jazyka nástroje Graphviz<br />
+<a href="https://www.root.cz/clanky/tvorba-grafu-a-diagramu-s-vyuzitim-domenove-specifickeho-jazyka-nastroje-graphviz/">https://www.root.cz/clanky/tvorba-grafu-a-diagramu-s-vyuzitim-domenove-specifickeho-jazyka-nastroje-graphviz/</a>
+</li>
+
+<li>Popis příkazu <strong>gofmt</strong><br />
+<a href="https://pkg.go.dev/cmd/gofmt">https://pkg.go.dev/cmd/gofmt</a>
+</li>
+
+<li>Popis příkazu <strong>govet</strong><br />
+<a href="https://pkg.go.dev/cmd/vet">https://pkg.go.dev/cmd/vet</a>
+</li>
+
+<li>Repositář nástroje <strong>errcheck</strong><br />
+<a href="https://github.com/kisielk/errcheck">https://github.com/kisielk/errcheck</a>
+</li>
+
+<li>Repositář nástroje <strong>goconst</strong><br />
+<a href="https://github.com/jgautheron/goconst">https://github.com/jgautheron/goconst</a>
+</li>
+
+<li>Repositář nástroje <strong>gocyclo</strong><br />
+<a href="https://github.com/fzipp/gocyclo">https://github.com/fzipp/gocyclo</a>
+</li>
+
+<li>Repositář nástroje <strong>ineffassign</strong><br />
+<a href="https://github.com/gordonklaus/ineffassign">https://github.com/gordonklaus/ineffassign</a>
+</li>
+
+<li>Repositář nástroje <strong>gosec</strong><br />
+<a href="https://github.com/securego/gosec">https://github.com/securego/gosec</a>
+</li>
+
+<li>Repositář nástroje <strong>go-critic</strong><br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Seznam testů prováděných nástrojem <strong>go-critic</strong><br />
+<a href="https://go-critic.com/overview">https://go-critic.com/overview</a>
+</li>
+
+<li>Welcome go-critic<br />
+<a href="https://itnext.io/welcome-go-critic-a26b6e30f1c6">https://itnext.io/welcome-go-critic-a26b6e30f1c6</a>
+</li>
+
+<li>Využití knihovny Pygments (nejenom) pro obarvení zdrojových kódů<br />
+<a href="https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/">https://www.root.cz/clanky/vyuziti-knihovny-pygments-nejenom-pro-obarveni-zdrojovych-kodu/</a>
+</li>
+
+<li>LR syntaktický analyzátor<br />
+<a href="https://cs.wikipedia.org/wiki/LR_syntaktick%C3%BD_analyz%C3%A1tor">https://cs.wikipedia.org/wiki/LR_syntaktick%C3%BD_analyz%C3%A1tor</a>
+</li>
+
+<li>Kategorie:Algoritmy syntaktické analýzy<br />
+<a href="https://cs.wikipedia.org/wiki/Kategorie:Algoritmy_syntaktick%C3%A9_anal%C3%BDzy">https://cs.wikipedia.org/wiki/Kategorie:Algoritmy_syntaktick%C3%A9_anal%C3%BDzy</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
