@@ -1,0 +1,1919 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Standardní šablonovací systém jazyka Go a šablony HTML stránek</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Standardní šablonovací systém jazyka Go a šablony HTML stránek</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na dva předchozí články, v&nbsp;nichž jsme si ukázali možnosti standardního šablonovacího systému programovacího jazyka Go, dnes navážeme. Ukážeme si totiž, jakým způsobem je možné použít HTML šablony a jak je lze zaintegovat do služeb postavených na HTTP serveru.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Standardní šablonovací systém jazyka Go a šablony HTML stránek</a></p>
+<p><a href="#k02">2. Textové šablony vs. HTML šablony</a></p>
+<p><a href="#k03">3. Krátké zopakování &ndash; jednoduchá textová šablona a výsledek po její aplikaci</a></p>
+<p><a href="#k04">4. Balíček <strong>text/template</strong> a HTML šablona</a></p>
+<p><a href="#k05">5. Použití balíčku <strong>html/template</strong> namísto <strong>text/template</strong></a></p>
+<p><a href="#k06">6. Problematika XSS a balíčku <strong>text/template</strong></a></p>
+<p><a href="#k07">7. Zabránění XSS aplikací šablony přes balíček <strong>html/template</strong></a></p>
+<p><a href="#k08">8. Kontext, ve kterém se data do HTML stránky vkládají při aplikaci šablony</a></p>
+<p><a href="#k09">9. HTML šablony a HTTP server realizovaný v&nbsp;jazyce Go</a></p>
+<p><a href="#k10">10. Ukázka jednoduchého serveru, který poskytuje pouze statické stránky</a></p>
+<p><a href="#k11">11. HTTP server a aplikace HTML šablon</a></p>
+<p><a href="#k12">12. Benchmark: rychlost načtení a aplikace šablon</a></p>
+<p><a href="#k13">13. Vytvoření šablon pouze při inicializaci HTTP serveru</a></p>
+<p><a href="#k14">14. Detekce modifikace šablon</a></p>
+<p><a href="#k15">15. Příklad detekce změn v&nbsp;souborech</a></p>
+<p><a href="#k16">16. HTTP server detekující změny šablon</a></p>
+<p><a href="#k17">17. Úplný zdrojový kód serveru</a></p>
+<p><a href="#k18">18. Závěr</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Standardní šablonovací systém jazyka Go a šablony HTML stránek</h2>
+
+<p>Na dva předchozí články [<a
+href="https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go/">1</a>]
+[<a
+href="https://www.root.cz/clanky/standardni-sablonovaci-system-jazyka-go-dokonceni/">2</a>],
+v&nbsp;nichž jsme si ukázali možnosti standardního šablonovacího systému <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacího jazyka
+Go</a>, dnes navážeme. Ukážeme si totiž, jakým způsobem je možné použít HTML
+šablony. Ve skutečnosti totiž ve <a href="https://pkg.go.dev/std">standardní
+knihovně jazyka Go</a> existuje kromě standardního šablonovacího systému <a
+href="https://pkg.go.dev/text/template">text/template</a> i odvozená varianta
+nazvaná <a href="https://pkg.go.dev/html/template">html/template</a>. Ta je
+určena pro aplikaci šablon HTML stránek. Ovšem ve skutečnosti se nemusí jednat
+pouze o čisté HTML, protože šablonovací systém dokáže pracovat například i
+s&nbsp;CSS (tedy s&nbsp;kaskádními styly).</p>
+
+<p>Ve druhé části dnešního článku si ukážeme, jak lze šablony použít přímo
+v&nbsp;<i>backendu</i>, tedy ve webovém serveru, který bude generovat HTML
+stránky či jejich části a posílat je klientovi (nebude se tedy jednat o dnes
+tak populární SPA). Taktéž si vysvětlíme, jak zařídit, aby se šablony nemusely
+načítat při každém požadavku klienta a současně aby bylo možné šablony měnit za
+běhu serveru (což je velmi užitečné, a to nejenom při vývoji).</p>
+
+<p><div class="rs-tip-major">Poznámka: většina dále uvedených demonstračních
+příkladů je založena pouze na standardní knihovně programovacího jazyka Go.
+Pouze dva příklady s&nbsp;detekcí změny textu šablony využívají externí
+knihovnu (relativně malou). Konkrétně se jedná o knihovnu <a
+href="https://pkg.go.dev/github.com/fsnotify/fsnotify">fsnotify/fsnotify</a>.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Textové šablony vs. HTML šablony</h2>
+
+<p>Jak se však od sebe vlastně odlišuje balíček <strong>text/template</strong>
+od balíčku <strong>html/template</strong>? Šablonovací systém implementovaný
+v&nbsp;balíčku <strong>text/template</strong> jednoduše aplikuje šablonu na
+předaná data, přičemž se nesnaží žádným způsobem &bdquo;rozumět&ldquo; šabloně
+či datům &ndash; předpokládá se, že jak samotná šablona, tak i předávaná data
+jsou v&nbsp;takové podobě, že nedojde k&nbsp;žádným problematickým jevům
+&ndash; například že se &bdquo;rozhodí&ldquo; výsledný dokument kvůli nějakému
+znaku se speciálním významem, který je součástí dat.</p>
+
+<p>U balíčku <strong>html/template</strong> je tomu jinak, protože se
+předpokládá, že výsledkem aplikace šablony má být HTML stránka, jež bude
+zobrazena ve webovém prohlížeči uživatele. A současně se předpokládá, že data
+mohou pocházet z&nbsp;neověřeného zdroje (například mohou být zadána
+potenciálním útočníkem). Balíček <strong>html/template</strong> je tedy
+navržen takovým způsobem, aby vhodným způsobem upravil data před jejich
+vložením do šablony tak, aby výsledná HTML stránka byla (do značné míry)
+korektní. Cílem je zabránit jak &bdquo;pouhému&ldquo; špatnému zobrazení
+stránky (například pokud do dat někdo omylem vloží neuzavřený HTML prvek), tak
+i útokům typu <a
+href="https://en.wikipedia.org/wiki/Cross-site_scripting">XSS</a>.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Krátké zopakování &ndash; jednoduchá textová šablona a výsledek po její aplikaci</h2>
+
+<p>Připomeňme si, jak může vypadat jednoduchá (čistě textová) šablona, která je
+zpracovatelná balíčkem <strong>text/template</strong>. Konkrétně se jedná o
+šablonu, která je aplikovatelná na pole (resp.&nbsp;řez) obsahující záznamy
+s&nbsp;prvky pojmenovanými <strong>Name</strong>, <strong>Surname</strong> a
+<strong>Popularity</strong>. Při aplikaci šablony se postupně prochází
+jednotlivými záznamy a pro každý záznam se vygenerují tři textové řádky
+(poslední řádek bude prázdný). Povšimněte si, že přímo ze šablony je možné
+volat například standardní funkci <strong>str.Printf</strong> popř.&nbsp;použít
+podmínky:</p>
+
+<pre>
+--------------------------------------------------------------------
+<strong>{{range .}}</strong>Jméno {{printf "%-15s" .Name}} {{printf "%-15s" .Surname}} <strong>{{if gt .Popularity 0}}</strong> Popularita {{printf "%2d" .Popularity}} <strong>{{end}}</strong>
+<strong>{{end}}</strong>
+--------------------------------------------------------------------
+</pre>
+
+<p>Šablonu budeme aplikovat na pole/řez se záznamy typu:</p>
+
+<pre>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+</pre>
+
+<p>Konkrétně se bude jednat o následující záznamy:</p>
+
+<pre>
+roles := []Role{
+        Role{"Eliška", "Najbrtová", 4},
+        Role{"Jenny", "Suk", 3},
+        Role{"Anička", "Šafářová", 0},
+        Role{"Sváťa", "Pulec", 3},
+        Role{"Blažej", "Motyčka", 8},
+        Role{"Eda", "Wasserfall", 0},
+        Role{"Přemysl", "Hájek", 10},
+}
+</pre>
+
+<p>Podívejme se nyní na úplný zdrojový kód demonstračního příkladu, v&nbsp;němž
+je implementováno načtení šablony i její aplikace na předaná data:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "template17.txt"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto demonstračního příkladu by měl vypadat
+následovně:</p>
+
+<pre>
+--------------------------------------------------------------------
+Jméno Eliška          Najbrtová        Popularita  4 
+Jméno Jenny           Suk              Popularita  3 
+Jméno Anička          Šafářová        
+Jméno Sváťa           Pulec            Popularita  3 
+Jméno Blažej          Motyčka          Popularita  8 
+Jméno Eda             Wasserfall      
+Jméno Přemysl         Hájek            Popularita 10 
+&nbsp;
+--------------------------------------------------------------------
+</pre>
+
+<p>Úplný zdrojový kód demonstračního příkladu z&nbsp;této kapitoly je dostupný
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_80/template17.go">https://github.com/tisnik/go-root/blob/master/article_80/template17.go</a>.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Balíček <strong>text/template</strong> a HTML šablona</h2>
+
+<p>Samozřejmě nám nic nebrání v&nbsp;tom použít balíček
+<strong>text/template</strong> společně s&nbsp;HTML šablonou. Můžeme například
+předchozí textovou šablonu nahradit za šablonu, která obsahuje kostru HTML
+stránky. Díky tomu, že HTML používá jiné speciální znaky než šablonovací systém
+Go, je realizace takové šablony snadná:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+<strong>{{range .}}</strong>
+            &lt;tr&gt;&lt;td&gt;<strong>{{.Name}}</strong>&lt;/td&gt;&lt;td&gt;<strong>{{.Surname}}</strong>&lt;/td&gt;&lt;td&gt;<strong>{{if gt .Popularity 0}}{{.Popularity}}{{else}}</strong>&amp;times;<strong>{{end}}</strong>&lt;/td&gt;&lt;/tr&gt;
+<strong>{{end}}</strong>
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti je do šablony ještě
+přidána větev &bdquo;else&ldquo;, aby se vyplnily všechny buňky HTML
+tabulky.</div></p>
+
+<p>Samotný zdrojový kód příkladu se &ndash; až na odlišné jméno šablony &ndash;
+nebude odlišovat od příkladu, který byl popsán v&nbsp;předchozí kapitole:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "html_template01.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek, tedy vygenerovaná HTML stránka, odpovídá očekávání:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eliška&lt;/td&gt;&lt;td&gt;Najbrtová&lt;/td&gt;&lt;td&gt;4&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Jenny&lt;/td&gt;&lt;td&gt;Suk&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Anička&lt;/td&gt;&lt;td&gt;Šafářová&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Sváťa&lt;/td&gt;&lt;td&gt;Pulec&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Blažej&lt;/td&gt;&lt;td&gt;Motyčka&lt;/td&gt;&lt;td&gt;8&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eda&lt;/td&gt;&lt;td&gt;Wasserfall&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Přemysl&lt;/td&gt;&lt;td&gt;Hájek&lt;/td&gt;&lt;td&gt;10&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-1.png" class="image-562159" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="603" height="438" />
+<p><i>Obrázek 1: Vygenerovaná HTML stránka po zobrazení ve webovém
+prohlížeči.</i></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Použití balíčku <strong>html/template</strong> namísto <strong>text/template</strong></h2>
+
+<p>Náhrada balíčku <strong>text/template</strong> za balíček
+<strong>html/template</strong> je triviální, protože se jedná pouze o změnu
+jména balíčku, který je importován. Konkrétně namísto zvýrazněného importu:</p>
+
+<pre>
+import (
+        "os"
+        <strong>"text/template"</strong>
+)
+</pre>
+
+<p>použijeme:</p>
+
+<pre>
+import (
+        <strong>"html/template"</strong>
+        "os"
+)
+</pre>
+
+<p>Žádné další změny není nutné ve zdrojovém kódu provádět, o čemž se ostatně
+můžeme velmi snadno přesvědčit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        <strong>"html/template"</strong>
+        "os"
+)
+&nbsp;
+const (
+        templateFilename = "html_template02.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Použitá šablona se taktéž nezmění:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+{{range .}}
+            &lt;tr&gt;&lt;td&gt;{{.Name}}&lt;/td&gt;&lt;td&gt;{{.Surname}}&lt;/td&gt;&lt;td&gt;{{if gt .Popularity 0}}{{.Popularity}}{{else}}&amp;times;{{end}}&lt;/td&gt;&lt;/tr&gt;
+{{end}}
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Výsledek aplikace šablony:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eliška&lt;/td&gt;&lt;td&gt;Najbrtová&lt;/td&gt;&lt;td&gt;4&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Jenny&lt;/td&gt;&lt;td&gt;Suk&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Anička&lt;/td&gt;&lt;td&gt;Šafářová&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Sváťa&lt;/td&gt;&lt;td&gt;Pulec&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Blažej&lt;/td&gt;&lt;td&gt;Motyčka&lt;/td&gt;&lt;td&gt;8&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eda&lt;/td&gt;&lt;td&gt;Wasserfall&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Přemysl&lt;/td&gt;&lt;td&gt;Hájek&lt;/td&gt;&lt;td&gt;10&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-2.png" class="image-562160" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="603" height="438" />
+<p><i>Obrázek 2: Vygenerovaná HTML stránka po zobrazení ve webovém
+prohlížeči (naprosto shodná s&nbsp;prvním HTML stránkou).</i></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Problematika XSS a balíčku <strong>text/template</strong></h2>
+
+<p>V&nbsp;úvodních kapitolách jsme si řekli, že balíček
+<strong>html/template</strong> se od balíčku <strong>text/template</strong>
+liší především v&nbsp;tom ohledu, že zabraňuje tomu, aby se do výsledné HTML
+stránky (popř.&nbsp;do CSS souboru) vložily při aplikaci šablony takové údaje,
+které by mohly vést ke XSS (<i>Cross-site scripting</i>). Ostatně velmi
+jednoduché XSS si můžeme vytvořit sami. Nepatrně upravíme záznamy, na které
+bude aplikována šablona. Původní záznamy vypadaly takto:</p>
+
+<pre>
+roles := []Role{
+        Role{"Eliška", "Najbrtová", 4},
+        Role{"Jenny", "Suk", 3},
+        Role{"Anička", "Šafářová", 0},
+        Role{"Sváťa", "Pulec", 3},
+        Role{"Blažej", "Motyčka", 8},
+        Role{"Eda", "Wasserfall", 0},
+        Role{"Přemysl", "Hájek", 10},
+}
+</pre>
+
+<p>V&nbsp;nové verzi záznamů je v&nbsp;jednom řetězci uložena HTML značka
+s&nbsp;kódem v&nbsp;JavaScriptu:</p>
+
+<pre>
+roles := []Role{
+        Role{"Eliška", "Najbrtová", 4},
+        Role{"Jenny", "Suk", 3},
+        Role{"Anička", "Šafářová", 0},
+        Role{"Sváťa", "Pulec", 3},
+        Role{"Blažej", "&lt;script&gt;alert('you have been pwned')&lt;/script&gt;", 8},
+        Role{"Eda", "Wasserfall", 0},
+        Role{"Přemysl", "Hájek", 10},
+}
+</pre>
+
+<p>Nejprve použijeme běžnou šablonu aplikovanou přes balíček
+<strong>text/template</strong>. Výsledkem bude tato HTML stránka. Povšimněte
+si, že značka <strong>script</strong> se stala nedílnou součástí této
+stránky:</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eliška&lt;/td&gt;&lt;td&gt;Najbrtová&lt;/td&gt;&lt;td&gt;4&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Jenny&lt;/td&gt;&lt;td&gt;Suk&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Anička&lt;/td&gt;&lt;td&gt;Šafářová&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Sváťa&lt;/td&gt;&lt;td&gt;Pulec&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Blažej&lt;/td&gt;&lt;td&gt;&lt;script&gt;alert('you have been pwned')&lt;/script&gt;&lt;/td&gt;&lt;td&gt;8&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Eda&lt;/td&gt;&lt;td&gt;Wasserfall&lt;/td&gt;&lt;td&gt;&amp;times;&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+            &lt;tr&gt;&lt;td&gt;Přemysl&lt;/td&gt;&lt;td&gt;Hájek&lt;/td&gt;&lt;td&gt;10&lt;/td&gt;&lt;/tr&gt;
+&nbsp;
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>A v&nbsp;důsledku toho se po otevření stránky v&nbsp;prohlížeči zobrazí
+výsledek činnosti tohoto skriptu:</p>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-3.png" class="image-562161" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="559" height="610" />
+<p><i>Obrázek 3: Toto s&nbsp;velkou pravděpodobností není očekávané
+chování.</i></p>
+
+<p>Pro úplnost doplníme jak zdrojový kód, tak i použitou šablonu, i když se
+prakticky neliší od předchozích příkladů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "os"
+        "text/template"
+)
+&nbsp;
+const (
+        templateFilename = "html_template03.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "&lt;script&gt;alert('you have been pwned')&lt;/script&gt;", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Role ve hře Švestka&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Role ve hře Švestka&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;&lt;th&gt;Jméno&lt;/th&gt;&lt;th&gt;Příjmení&lt;/th&gt;&lt;th&gt;Popularita&lt;/th&gt;&lt;/tr&gt;
+{{range .}}
+            &lt;tr&gt;&lt;td&gt;{{.Name}}&lt;/td&gt;&lt;td&gt;{{.Surname}}&lt;/td&gt;&lt;td&gt;{{if gt .Popularity 0}}{{.Popularity}}{{else}}&amp;times;{{end}}&lt;/td&gt;&lt;/tr&gt;
+{{end}}
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Zabránění XSS aplikací šablony přes balíček <strong>html/template</strong></h2>
+
+<p>V&nbsp;případě, že namísto aplikace šablony nabízené balíčkem
+<strong>text/template</strong> využijeme balíček
+<strong>html/template</strong>, bude výše uvedenému XSS zabráněno, protože nyní
+se šablonovací systém bude snažit porozumět kontextu, ve kterém data do šablony
+vkládá. Ostatně si to můžeme velmi snadno ověřit:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "html/template"
+        "os"
+)
+&nbsp;
+const (
+        templateFilename = "html_template04.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "&lt;script&gt;alert('you have been pwned')&lt;/script&gt;", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Výsledek bude nyní vypadat následovně:</p>
+
+<pre>
+<html>
+    <head>
+        <title>Role ve hře Švestka</title>
+    </head>
+    <body>
+        <h1>Role ve hře Švestka</h1>
+        <table>
+            <tr><th>Jméno</th><th>Příjmení</th><th>Popularita</th></tr>
+&nbsp;
+            <tr><td>Eliška</td><td>Najbrtová</td><td>4</td></tr>
+&nbsp;
+            <tr><td>Jenny</td><td>Suk</td><td>3</td></tr>
+&nbsp;
+            <tr><td>Anička</td><td>Šafářová</td><td>&amp;times;</td></tr>
+&nbsp;
+            <tr><td>Sváťa</td><td>Pulec</td><td>3</td></tr>
+&nbsp;
+            <tr><td>Blažej</td><td>&lt;script&gt;alert(&#39;you have been pwned&#39;)&lt;/script&gt;</td><td>8</td></tr>
+&nbsp;
+            <tr><td>Eda</td><td>Wasserfall</td><td>&amp;times;</td></tr>
+&nbsp;
+            <tr><td>Přemysl</td><td>Hájek</td><td>10</td></tr>
+&nbsp;
+        </table>
+    </body>
+</html>
+</pre>
+
+<p>Nyní již bude zobrazení HTML stránky korektní, resp.&nbsp;přesněji řečeno
+k&times;XSS nedošlo:</p>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-4.png" class="image-562162" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="853" height="436" />
+<p><i>Obrázek 4: Korektní zobrazení HTML stránky.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Kontext, ve kterém se data do HTML stránky vkládají při aplikaci šablony</h2>
+
+<p>Při aplikaci šablony balíčkem <strong>html/template</strong> dokáže
+šablonovací systém rozeznat kontext, ve kterém se data do HTML stránky
+vkládají. Například je rozeznáváno, zda mají být data uložena do HTML značek
+(což jsme si ukázali výše) nebo do odkazů (URL). Týká se to i detektoru XSS.
+V&nbsp;následujícím demonstračním příkladu je ukázáno, jak se stejné vstupní
+údaje do výsledné HTML stránky propíšou odlišně, pokud se bude jednat o běžný
+text nebo o část URL.</p>
+
+<p>Samotný program pro aplikaci šablony na sedm záznamů představujících vstupní
+data vypadá stejně, jako tomu bylo i v&nbsp;předchozí kapitole:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "html/template"
+        "os"
+)
+&nbsp;
+const (
+        templateFilename = "html_template05.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření nové šablony</i>
+        tmpl := template.Must(template.ParseFiles(templateFilename))
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(os.Stdout, roles)
+        if err != nil {
+                panic(err)
+        }
+}
+</pre>
+
+<p>Odlišná je však samotná šablona. Povšimněte si, že nyní se atributy
+(položky) <strong>Name</strong> a <strong>Surname</strong> používají při
+konstrukci odkazu a posléze i přímo pro vložení jména postavy do tabulky:</p>
+
+<pre>
+<html>
+    <head>
+        <title>Role ve hře Švestka</title>
+    </head>
+    <body>
+        <h1>Role ve hře Švestka</h1>
+        <table>
+            <tr><th>Jméno</th><th>Příjmení</th><th>Popularita</th></tr>
+{{range .}}
+            <tr><td>{{.Name}}</td><td><a href="https://duckduckgo.com/?q={{.Name}} {{.Surname}}">{{.Surname}}</a></td><td>{{if gt .Popularity 0}}{{.Popularity}}{{else}}&amp;times;{{end}}</td></tr>
+{{end}}
+        </table>
+    </body>
+</html>
+</pre>
+
+<p>Po aplikaci šablony je patrné, že odkazy obsahují jinak zakódovaná jména (+
+příjmení), než samotné buňky tabulky. Podobně by se postupovalo i při detekci
+XSS:</p>
+
+<pre>
+<html>
+    <head>
+        <title>Role ve hře Švestka</title>
+    </head>
+    <body>
+        <h1>Role ve hře Švestka</h1>
+        <table>
+            <tr><th>Jméno</th><th>Příjmení</th><th>Popularita</th></tr>
+&nbsp;
+            <tr><td>Eliška</td><td><a href="https://duckduckgo.com/?q=Eli%c5%a1ka Najbrtov%c3%a1">Najbrtová</a></td><td>4</td></tr>
+&nbsp;
+            <tr><td>Jenny</td><td><a href="https://duckduckgo.com/?q=Jenny Suk">Suk</a></td><td>3</td></tr>
+&nbsp;
+            <tr><td>Anička</td><td><a href="https://duckduckgo.com/?q=Ani%c4%8dka %c5%a0af%c3%a1%c5%99ov%c3%a1">Šafářová</a></td><td>&amp;times;</td></tr>
+&nbsp;
+            <tr><td>Sváťa</td><td><a href="https://duckduckgo.com/?q=Sv%c3%a1%c5%a5a Pulec">Pulec</a></td><td>3</td></tr>
+&nbsp;
+            <tr><td>Blažej</td><td><a href="https://duckduckgo.com/?q=Bla%c5%beej Moty%c4%8dka">Motyčka</a></td><td>8</td></tr>
+&nbsp;
+            <tr><td>Eda</td><td><a href="https://duckduckgo.com/?q=Eda Wasserfall">Wasserfall</a></td><td>&amp;times;</td></tr>
+&nbsp;
+            <tr><td>Přemysl</td><td><a href="https://duckduckgo.com/?q=P%c5%99emysl H%c3%a1jek">Hájek</a></td><td>10</td></tr>
+&nbsp;
+        </table>
+    </body>
+</html>
+</pre>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-5.png" class="image-562163" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="570" height="431" />
+<p><i>Obrázek 5: Výsledná stránka po svém zobrazení v&nbsp;HTML prohlížeči.</i></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. HTML šablony a HTTP server realizovaný v&nbsp;jazyce Go</h2>
+
+<p>Šablony, jejichž výsledkem má být HTML stránka, lze použít například při
+generování statických webů. Ovšem mnohem zajímavější je využití šablon ve
+chvíli, kdy je přímo v&nbsp;jazyce Go implementován HTTP server (a pro tyto
+účely se jazyk Go používá velmi často). V&nbsp;následujících kapitolách si
+ukážeme několik příkladů HTTP serverů:</p>
+
+<ol>
+
+<li>HTTP server, který posílá (vybrané) <i>statické</i> HTML stránky
+popř.&nbsp;další typy souborů. Tyto stránky mohou vzniknout například aplikací
+šablon.</li>
+
+<li>HTTP server, který posílá <i>dynamicky</i> vytvořenou HTML stránku na
+základě šablony. Přitom je šablona vždy (tj.&nbsp;pro každý požadavek) znovu
+načtena ze souboru, což se hodí zejména při vývoji.</li>
+
+<li>HTTP server, který taktéž posílá dynamicky vytvořenou HTML stránku, ovšem
+samotná šablona je načtena jedenkrát, konkrétně během inicializace serveru.
+Ovšem šablona je pochopitelně znovu a znovu aplikována pro každý požadavek.
+Jedná se sice o jednoduché řešení, ovšem v&nbsp;praxi nemusí vždy
+vyhovovat.</li>
+
+<li>A konečně HTTP server, který šablonu načte ve chvíli, kdy je změněna. Jedná
+se sice o nejsložitější řešení, ovšem taktéž nejpraktičtější &ndash; šablonu
+není nutné znovunačítat při každém požadavku od uživatele, ovšem na druhou
+stranu je (většinou) vhodné reagovat na to, že šablonu někdo modifikuje.</li>
+
+</ol>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Ukázka jednoduchého serveru, který poskytuje pouze statické stránky</h2>
+
+<p>Programovací jazyk Go obsahuje podporu pro tvorbu HTTP serverů přímo ve
+standardní knihovně, konkrétně v&nbsp;balíčku <strong>net/http</strong>.
+Vytvoření skutečného a plnohodnotného serveru je v&nbsp;tomto případě otázkou
+několika řádků zdrojového kódu. Základem je funkce <strong>HandleFunc</strong>,
+která nám umožňuje zaregistrovat obslužnou funkci (<i>handler</i>)
+v&nbsp;případě, že je server volán s&nbsp;určitým URL (<i>endpointem</i>).
+Můžeme si například zaregistrovat handler pro endpoint /:</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+</pre>
+
+<p>Hlavička funkce <strong>HandleFunc</strong> přitom vypadá následovně:</p>
+
+<pre>
+func <strong>HandleFunc</strong>(pattern string, handler func(ResponseWriter, *Request))
+</pre>
+
+<p>Povšimněte si, že druhým parametrem této funkce je jiná funkce (onen
+handler) s&nbsp;hlavičkou:</p>
+
+<pre>
+func <strong>MujHandler</strong>(ResponseWriter, *Request)
+</pre>
+
+<p>Konkrétně může implementace našeho handleru poslat na výstup (typu
+<strong>ResponseWriter</strong>) jednoduchý text, který bude zaslán klientovi
+v&nbsp;celé HTTP odpovědi (s&nbsp;hlavičkami, stavovým kódem, délkou atd.
+atd.):</p>
+
+<pre>
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+</pre>
+
+<p>Popř.&nbsp;můžeme klientovi poslat stránku načtenou ze souboru (zde prozatím
+velmi jednoduše &ndash; bez vyrovnávací paměti):</p>
+
+<pre>
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        log.Printf("Sending static file %s", filename)
+&nbsp;
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+</pre>
+
+<p>Existuje i snadnější možnost kombinující handler, ovšem upravený tak, aby
+přímo předávat statický obsah:</p>
+
+<pre>
+func <strong>filesEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        url := request.URL.Path[len("/files/"):]
+        println("Serving file from URL: " + url)
+        http.ServeFile(writer, request, url)
+}
+</pre>
+
+<p>Pro čistě statické soubory je ovšem výhodnější použít
+<strong>http.FileServer</strong> a odstranit tak značnou část předchozího
+kódu:</p>
+
+<pre>
+fileServer := http.FileServer(http.Dir("./www"))
+http.Handle("/resources/", http.StripPrefix("/resources", fileServer))
+</pre>
+
+<p>Následně již stačí server spustit na určeném portu:</p>
+
+<pre>
+http.ListenAndServe(":8000", nil)
+</pre>
+
+<p>Úplná implementace jednoduchého HTTP serveru může vypadat takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "io/ioutil"
+        "log"
+        "net/http"
+)
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        log.Printf("Sending static file %s", filename)
+&nbsp;
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        const address = ":8080"
+&nbsp;
+        log.Printf("Starting server on address %s", address)
+&nbsp;
+        http.HandleFunc("/", staticPage("index.html"))
+        http.HandleFunc("/missing", staticPage("missing.html"))
+        http.ListenAndServe(address, nil)
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/0/golang-html-templates-6.png" class="image-562164" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="485" height="278" />
+<p><i>Obrázek 6: Otestování HTTP serveru v&nbsp;prohlížeči.</i></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. HTTP server a aplikace HTML šablon</h2>
+
+<p>Nyní již můžeme spojit znalosti o šablonovacím systému se znalostmi o tvorbě
+HTTP serverů. V&nbsp;nové variantě HTTP serveru zaregistrujeme handler vyvolaný
+při přístupu na koncový bod <strong>/roles</strong>:</p>
+
+<pre>
+http.HandleFunc("/roles", rolesHandler("html_template05.htm", roles))
+</pre>
+
+<p>Můžeme vidět, že tento handler bude volán s&nbsp;uvedením jména souboru se
+šablonou a současně i s&nbsp;daty, které se mají šabloně předat. Handler tedy
+provede načtení šablony, aplikaci šablony a výsledek (což bude obsah dynamicky
+generované HTML stránky) pošle uživateli:</p>
+
+<pre>
+func <strong>rolesHandler</strong>(templateFilename string, roles []Role) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                log.Printf("Constructing template from file %s", templateFilename)
+&nbsp;
+                <i>// vytvoření nové šablony</i>
+                tmpl, err := template.ParseFiles(templateFilename)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Template can't be constructed: %v", err)
+                        return
+                }
+&nbsp;
+                log.Printf("Application template for %d data records", len(roles))
+                <i>// aplikace šablony - přepis hodnot</i>
+                err = tmpl.Execute(writer, roles)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Error executing template: %v", err)
+                        return
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: šablona je načtena pro každý požadavek
+(<i>request</i>) od klienta, což má své výhody (vždy se použije poslední verze
+šablony), ale i nevýhody (neustálé mnohdy zbytečné načítání). Řešení si ukážeme
+v&nbsp;dalším textu. Dalším nedostatkem je, že se v&nbsp;jediné funkci
+<strong>rolesHandler</strong> provádí tři operace, které by bylo vhodnější
+rozdělit &ndash; případný refaktoring popř.&nbsp;implementaci nějaké formy MVC
+ponechám na laskavém čtenáři.</div></p>
+
+<p>Úplný zdrojový kód takto upraveného HTTP serveru vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "io/ioutil"
+        "log"
+        "net/http"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        log.Printf("Sending static file %s", filename)
+&nbsp;
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+&nbsp;
+func <strong>rolesHandler</strong>(templateFilename string, roles []Role) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                log.Printf("Constructing template from file %s", templateFilename)
+&nbsp;
+                <i>// vytvoření nové šablony</i>
+                tmpl, err := template.ParseFiles(templateFilename)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Template can't be constructed: %v", err)
+                        return
+                }
+&nbsp;
+                log.Printf("Application template for %d data records", len(roles))
+                <i>// aplikace šablony - přepis hodnot</i>
+                err = tmpl.Execute(writer, roles)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Error executing template: %v", err)
+                        return
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        const address = ":8080"
+&nbsp;
+        log.Printf("Starting server on address %s", address)
+&nbsp;
+        http.HandleFunc("/", staticPage("index.html"))
+        http.HandleFunc("/missing", staticPage("missing.html"))
+        http.HandleFunc("/roles", rolesHandler("html_template05.htm", roles))
+        http.ListenAndServe(address, nil)
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Benchmark: rychlost načtení a aplikace šablon</h2>
+
+<p>Varianta HTTP serveru ukázaná <a href="#k11">v&nbsp;předchozí kapitole</a>
+načítala a aplikovala šablonu v&nbsp;každém požadavku. Bylo by tedy dobré
+vědět, jak rychlé jsou vlastně tyto dvě operace a jaké odezvy
+popř.&nbsp;propustnost (<i>throughput</i>) můžeme od takto navrženého serveru
+očekávat. Přiblížení k&nbsp;reálným číslům nám může dát benchmark
+naprogramovaný s&nbsp;využitím standardního balíčku <strong>testing</strong>.
+Nejprve vytvoříme hlavní modul s&nbsp;funkcemi, které budeme v&nbsp;benchmarku
+spouštět; konkrétně s&nbsp;funkcemi pro načtení šablony a pro její
+aplikaci:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bytes"
+        "fmt"
+        "html/template"
+)
+&nbsp;
+const (
+        templateFilename = "html_template05.htm"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>readTemplate</strong>(templateFilename string) *template.Template {
+        <i>// vytvoření nové šablony</i>
+        return template.Must(template.ParseFiles(templateFilename))
+}
+&nbsp;
+func <strong>applyTemplate</strong>(tmpl *template.Template, roles []Role) int {
+        buffer := new(bytes.Buffer)
+        <i>// aplikace šablony - přepis hodnot</i>
+        err := tmpl.Execute(buffer, roles)
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        return buffer.Len()
+}
+</pre>
+
+<p>Tyto dvě funkce budeme spouštět z&nbsp;benchmarku. Pro zajímavost si
+otestujeme i rychlost provádění obou zmíněných operací. Samotný benchmark může
+vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+func <strong>BenchmarkReadTemplate</strong>(b *testing.B) {
+        for i := 0; i &lt; b.N; i++ {
+                tmpl := readTemplate("./html_template05.htm")
+                if tmpl == nil {
+                        b.Fatal("Template was not created")
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkApplyTemplate</strong>(b *testing.B) {
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// načtení šablony (jen jedenkrát)</i>
+        tmpl := readTemplate("./html_template05.htm")
+&nbsp;
+        <i>// samotný benchmark</i>
+        for i := 0; i &lt; b.N; i++ {
+                length := applyTemplate(tmpl, roles)
+                if length &lt;= 0 {
+                        b.Fatal("Don't work")
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkReadAndApplyTemplate(b *testing.B) {</strong>
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        <i>// samotný benchmark</i>
+        for i := 0; i &lt; b.N; i++ {
+                tmpl := readTemplate("./html_template05.htm")
+                if tmpl == nil {
+                        b.Fatal("Template was not created")
+                }
+&nbsp;
+                length := applyTemplate(tmpl, roles)
+                if length &lt;= 0 {
+                        b.Fatal("Don't work")
+                }
+        }
+}
+</pre>
+
+<p>Benchmark spustíme tímto příkazem:</p>
+
+<pre>
+$ <strong>go test -bench=.</strong>
+</pre>
+
+<p>Výsledky dosažené na notebooku s&nbsp;mikroprocesorem i7:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: template
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkReadTemplate-8                    44815             26499 ns/op
+BenchmarkApplyTemplate-8                   22891             53443 ns/op
+BenchmarkReadAndApplyTemplate-8            10000            122381 ns/op
+PASS
+ok      template        4.451s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;výsledků je mj.&nbsp;patrné, že
+načtení a na něj navazující aplikace šablony se podle očekávání vykoná pomaleji
+než aplikace již dopředu načtené šablony. Teoreticky lze provést přibližně 8100
+těchto operací za sekundu, ovšem nutno podotknout, že se jedná o relativně malé
+šablony i malé množství dat (záznamů).</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Vytvoření šablon pouze při inicializaci HTTP serveru</h2>
+
+<p>V&nbsp;případě, že šablony nebudou měněny často, lze čas vyřizování
+požadavků zkrátit, a to takovým způsobem, že se šablony načtou již při
+inicializaci serveru. Poté již bude docházet pouze k&nbsp;jejich aplikaci.
+V&nbsp;případě, že se šablona změní (tedy pokud někdo modifikuje její soubor),
+nebude tato změna HTTP serverem vůbec reflektována.</p>
+
+<p>Ve zdrojovém kódu je nutné změnit handler <strong>rolesHandler</strong>, a
+to takovým způsobem, že se mu namísto jména souboru se šablonou předá přímo již
+načtená šablona:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "io/ioutil"
+        "log"
+        "net/http"
+)
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        log.Printf("Sending static file %s", filename)
+&nbsp;
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+&nbsp;
+func <strong>rolesHandler</strong>(tmpl *template.Template, roles []Role) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+&nbsp;
+                log.Printf("Application template for %d data records", len(roles))
+                <i>// aplikace šablony - přepis hodnot</i>
+                err := tmpl.Execute(writer, roles)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Error executing template: %v", err)
+                        return
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        const templateFilename = "html_template05.htm"
+&nbsp;
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        log.Printf("Constructing template from file %s", templateFilename)
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl, err := template.ParseFiles(templateFilename)
+        if err != nil {
+                log.Fatalf("Template can't be constructed: %v", err)
+                return
+        }
+&nbsp;
+        const address = ":8080"
+&nbsp;
+        log.Printf("Starting server on address %s", address)
+&nbsp;
+        http.HandleFunc("/", staticPage("index.html"))
+        http.HandleFunc("/missing", staticPage("missing.html"))
+        http.HandleFunc("/roles", rolesHandler(tmpl, roles))
+        http.ListenAndServe(address, nil)
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Detekce modifikace šablon</h2>
+
+<p>Prozatím jsme si ukázali dvě varianty HTTP serverů. V&nbsp;první variantě
+byla šablona načítána pro každý požadavek (a tudíž se reflektovaly všechny
+změny, ovšem na úkor neustále prováděných načítání); ve variantě druhé se pak
+šablona načetla při inicializaci serveru a její následné úpravy vůbec nebyly
+reflektovány. V&nbsp;praxi by však bylo vhodné oba přístupy nějakým způsobem
+zkombinovat, konkrétně dosáhnout toho, aby změny šablon byly reflektovány, ale
+aby šablony nebylo nutné načítat při každém zpracování požadavku. Řešení
+pochopitelně existuje a je založeno na sledování změn souborů se šablonou.
+Teoreticky by bylo možné využít standardní balíček <strong>os</strong>
+s&nbsp;funkcí <strong>Stat</strong> a sledovat čas modifikace souborů, ovšem
+výhodnější bude využít možnosti nabízené jádrem systému &ndash; to totiž
+umožňuje sledovat změny provedené ve sledovaných souborech (kde soubor je
+v&nbsp;tomto případě na Linuxu identifikován i-uzlem).</p>
+
+<p>Tato funkcionalita je implementovaná v&nbsp;knihovně
+<strong>fsnotify/fsnotify</strong>, kterou využijeme v&nbsp;dalších dvou
+příkladech. Nejdříve je nutné vytvořit projekt, který tuto knihovnu využívá,
+takže po příkazu <strong>go mod init</strong> provedeme úpravu tohoto
+souboru:</p>
+
+<pre>
+module fsnotify-test
+&nbsp;
+go 1.17
+&nbsp;
+require (
+        github.com/fsnotify/fsnotify v1.5.1 // indirect
+        golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+)
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Příklad detekce změn v&nbsp;souborech</h2>
+
+<p>Knihovna <strong>fsnotify/fsnotify</strong> je založena na sledování změn
+v&nbsp;souboru, který je identifikován svým i-uzlem. To ovšem znamená, že není
+možné sledovat přímo konkrétní soubor se šablonou, protože textové editory při
+ukládání typicky původní soubor přejmenují a změny uloží do souboru nového.
+Sledovat je tedy nutné změny v&nbsp;adresáři, v&nbsp;němž se soubor nachází.
+Zajímat nás budou zápisy do tohoto speciálního souboru (adresáře jsou
+z&nbsp;pohledu systému taktéž soubory). Pokud k&nbsp;zápisu dojde, zjistíme
+jméno změněného souboru přímo z&nbsp;události, kterou knihovna
+<strong>fsnotify/fsnotify</strong> vytvoří:</p>
+
+<pre>
+select {
+case event, ok := &lt;-watcher.Events:
+        if !ok {
+                return
+        }
+        log.Println("event:", event)
+        if event.Op&amp;fsnotify.Write == fsnotify.Write {
+                log.Println("modified file:", event.Name)
+                if filename == event.Name {
+                        log.Println("Template change detected")
+                }
+        }
+case err, ok := &lt;-watcher.Errors:
+        if !ok {
+                return
+        }
+        log.Println("error:", err)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pokud by se sledovaly změny konkrétního
+souboru, vše by zdánlivě fungovalo až do druhé změny. Tehdy totiž (typicky) již
+nový soubor má odlišný i-uzel &ndash; opět doporučuji si vše
+vyzkoušet.</div></p>
+
+<p>Program, který bude sledovat změny souboru
+<strong>html_template06.htm</strong> může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/fsnotify/fsnotify"
+)
+&nbsp;
+const templateFilename = "./html_template06.htm"
+&nbsp;
+func <strong>startWatcher</strong>(directory string, filename string) {
+        log.Print("Starting watcher")
+&nbsp;
+        watcher, err := fsnotify.NewWatcher()
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer watcher.Close()
+&nbsp;
+        log.Printf("Watching directory %s", directory)
+&nbsp;
+        err = watcher.Add(directory)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for {
+                select {
+                case event, ok := &lt;-watcher.Events:
+                        if !ok {
+                                return
+                        }
+                        log.Println("event:", event)
+                        if event.Op&amp;fsnotify.Write == fsnotify.Write {
+                                log.Println("modified file:", event.Name)
+                                if filename == event.Name {
+                                        log.Println("Template change detected")
+                                }
+                        }
+                case err, ok := &lt;-watcher.Errors:
+                        if !ok {
+                                return
+                        }
+                        log.Println("error:", err)
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        startWatcher(".", templateFilename)
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. HTTP server detekující změny šablon</h2>
+
+<p>Knihovnu <strong>fsnotify/fsnotify</strong> můžeme integrovat do HTTP
+serveru a zajistit tak, aby se šablony načetly až ve chvíli, kdy skutečně dojde
+k&nbsp;jejich změně. Samotný detektor změn bude spuštěn ve vlastní gorutině a
+informace o změněných souborech bude posílat do kanálu
+<strong>changed</strong>:</p>
+
+<pre>
+changed := make(chan string)
+<strong>go</strong> startWatcher(".", templateFilename, changed)
+</pre>
+
+<p>Samotná implementace gorutiny vychází z&nbsp;příkladu uvedeného <a
+href="#k15">výše</a>. Přidán je pouze kanál, do něhož jsou posílána jména
+změněných souborů:</p>
+
+<pre>
+func <strong>startWatcher</strong>(directory string, filename string, changed chan string) {
+        log.Print("Starting watcher")
+&nbsp;
+        watcher, err := fsnotify.NewWatcher()
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer watcher.Close()
+&nbsp;
+        log.Printf("Watching directory %s", directory)
+&nbsp;
+        err = watcher.Add(directory)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for {
+                select {
+                case event, ok := &lt;-watcher.Events:
+                        if !ok {
+                                return
+                        }
+                        log.Println("event:", event)
+                        if event.Op&amp;fsnotify.Write == fsnotify.Write {
+                                log.Println("modified file:", event.Name)
+                                if filename == event.Name {
+                                        log.Println("Template change detected")
+                                        <strong>changed &lt;- filename</strong>
+                                }
+                        }
+                case err, ok := &lt;-watcher.Errors:
+                        if !ok {
+                                return
+                        }
+                        log.Println("error:", err)
+                }
+        }
+}
+</pre>
+
+<p>Změnit se ovšem musí i samotný handler, který nejprve otestuje, jestli došlo
+k&nbsp;modifikaci šablony a pokud ano, tuto šablonu načte (nekontroluje se však
+jméno souboru &ndash; tuto část resp.&nbsp;podmínku je však triviální
+přidat):</p>
+
+<pre>
+func <strong>rolesHandler</strong>(tmpl *template.Template, roles []Role, changed chan string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                select {
+                case filename := &lt;-changed:
+                        log.Printf("Have to reload template from file %s", filename)
+                        tmpl = loadTemplate(filename)
+                default:
+                        log.Print("Using old template")
+                }
+&nbsp;
+                log.Printf("Application template for %d data records", len(roles))
+                <i>// aplikace šablony - přepis hodnot</i>
+                err := tmpl.Execute(writer, roles)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Error executing template: %v", err)
+                        return
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Úplný zdrojový kód serveru</h2>
+
+<p>Úplný zdrojový kód serveru popsaného v&nbsp;předchozí kapitole bude vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "html/template"
+        "io/ioutil"
+        "log"
+        "net/http"
+&nbsp;
+        "github.com/fsnotify/fsnotify"
+)
+&nbsp;
+const templateFilename = "./html_template06.htm"
+&nbsp;
+<i>// datový typ, jehož prvky budou vypisovány v šabloně</i>
+type <strong>Role</strong> struct {
+        Name       string
+        Surname    string
+        Popularity int
+}
+&nbsp;
+func <strong>sendStaticPage</strong>(writer http.ResponseWriter, filename string) {
+        log.Printf("Sending static file %s", filename)
+&nbsp;
+        body, err := ioutil.ReadFile(filename)
+        if err == nil {
+                fmt.Fprint(writer, string(body))
+        } else {
+                writer.WriteHeader(http.StatusNotFound)
+                fmt.Fprint(writer, "Not found!")
+        }
+}
+&nbsp;
+func <strong>staticPage</strong>(filename string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                sendStaticPage(writer, filename)
+        }
+}
+&nbsp;
+func <strong>rolesHandler</strong>(tmpl *template.Template, roles []Role, changed chan string) func(writer http.ResponseWriter, request *http.Request) {
+        return func(writer http.ResponseWriter, request *http.Request) {
+                select {
+                case filename := &lt;-changed:
+                        log.Printf("Have to reload template from file %s", filename)
+                        tmpl = loadTemplate(filename)
+                default:
+                        log.Print("Using old template")
+                }
+&nbsp;
+                log.Printf("Application template for %d data records", len(roles))
+                <i>// aplikace šablony - přepis hodnot</i>
+                err := tmpl.Execute(writer, roles)
+                if err != nil {
+                        writer.WriteHeader(http.StatusInternalServerError)
+                        log.Printf("Error executing template: %v", err)
+                        return
+                }
+        }
+}
+&nbsp;
+func <strong>loadTemplate</strong>(templateFilename string) *template.Template {
+        log.Printf("Constructing template from file %s", templateFilename)
+&nbsp;
+        <i>// vytvoření nové šablony</i>
+        tmpl, err := template.ParseFiles(templateFilename)
+        if err != nil {
+                log.Fatalf("Template can't be constructed: %v", err)
+                return nil
+        }
+&nbsp;
+        return tmpl
+}
+&nbsp;
+func <strong>startWatcher</strong>(directory string, filename string, changed chan string) {
+        log.Print("Starting watcher")
+&nbsp;
+        watcher, err := fsnotify.NewWatcher()
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer watcher.Close()
+&nbsp;
+        log.Printf("Watching directory %s", directory)
+&nbsp;
+        err = watcher.Add(directory)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for {
+                select {
+                case event, ok := &lt;-watcher.Events:
+                        if !ok {
+                                return
+                        }
+                        log.Println("event:", event)
+                        if event.Op&amp;fsnotify.Write == fsnotify.Write {
+                                log.Println("modified file:", event.Name)
+                                if filename == event.Name {
+                                        log.Println("Template change detected")
+                                        changed &lt;- filename
+                                }
+                        }
+                case err, ok := &lt;-watcher.Errors:
+                        if !ok {
+                                return
+                        }
+                        log.Println("error:", err)
+                }
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// tyto hodnoty budou použity při aplikaci šablony</i>
+        roles := []Role{
+                Role{"Eliška", "Najbrtová", 4},
+                Role{"Jenny", "Suk", 3},
+                Role{"Anička", "Šafářová", 0},
+                Role{"Sváťa", "Pulec", 3},
+                Role{"Blažej", "Motyčka", 8},
+                Role{"Eda", "Wasserfall", 0},
+                Role{"Přemysl", "Hájek", 10},
+        }
+&nbsp;
+        changed := make(chan string)
+        go startWatcher(".", templateFilename, changed)
+&nbsp;
+        tmpl := loadTemplate(templateFilename)
+&nbsp;
+        const address = ":8080"
+&nbsp;
+        log.Printf("Starting server on address %s", address)
+&nbsp;
+        http.HandleFunc("/", staticPage("index.html"))
+        http.HandleFunc("/missing", staticPage("missing.html"))
+        http.HandleFunc("/roles", rolesHandler(tmpl, roles, changed))
+        http.ListenAndServe(address, nil)
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Závěr</h2>
+
+<p>Většinou zjistíte, že neustálé načítání šablon aplikaci nijak zásadně
+nezpomaluje, přesněji řečeno že onen pověstný <i>bottleneck</i> se nachází
+v&nbsp;jiné části HTTP serveru. Popř.&nbsp;si infrastruktura vyžádá, že změny
+šablon vůbec nemohou být provedeny bez &bdquo;otočení&ldquo; uzlu s&nbsp;HTTP
+serverem. Nicméně i přesto může být užitečné tuto část HTTP serveru
+(resp.&nbsp;celé služby) sledovat a například exportovat formou metrik pro
+Prometheus.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly
+uloženy do nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý,
+dnes má přibližně stovku kilobajtů), můžete namísto toho použít odkazy
+na jednotlivé demonstrační příklady, které naleznete v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>text_template01.go</td><td>aplikace textové šablony na pole/řez záznamů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/text_template01.go">https://github.com/tisnik/go-root/blob/master/article_87/text_template01.go</a></td></tr>
+<tr><td> 2</td><td>text_template01.txt</td><td>textová šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/text_template01.txt">https://github.com/tisnik/go-root/blob/master/article_87/text_template01.txt</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>html_template01.go</td><td>aplikace HTML šablony balíčkem <strong>text/template</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template01.go">https://github.com/tisnik/go-root/blob/master/article_87/html_template01.go</a></td></tr>
+<tr><td> 4</td><td>html_template01.htm</td><td>HTML šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template01.htm">https://github.com/tisnik/go-root/blob/master/article_87/html_template01.htm</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>html_template02.go</td><td>aplikace HTML šablony balíčkem <strong>html/template</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template02.go">https://github.com/tisnik/go-root/blob/master/article_87/html_template02.go</a></td></tr>
+<tr><td> 6</td><td>html_template02.htm</td><td>HTML šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template02.htm">https://github.com/tisnik/go-root/blob/master/article_87/html_template02.htm</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>html_template03.go</td><td>aplikace HTML šablony s&nbsp;daty obsahujícími přípravu pro XSS</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template03.go">https://github.com/tisnik/go-root/blob/master/article_87/html_template03.go</a></td></tr>
+<tr><td> 8</td><td>html_template03.htm</td><td>HTML šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template03.htm">https://github.com/tisnik/go-root/blob/master/article_87/html_template03.htm</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>html_template04.go</td><td>aplikace HTML šablony s&nbsp;daty obsahujícími přípravu pro XSS</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template04.go">https://github.com/tisnik/go-root/blob/master/article_87/html_template04.go</a></td></tr>
+<tr><td>10</td><td>html_template04.htm</td><td>HTML šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template04.htm">https://github.com/tisnik/go-root/blob/master/article_87/html_template04.htm</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>html_template05.go </td><td>vkládání dat do HTML stránky v&nbsp;různém kontextu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template05.go">https://github.com/tisnik/go-root/blob/master/article_87/html_template05.go</a></td></tr>
+<tr><td>12</td><td>html_template05.htm</td><td>HTML šablona použitá v&nbsp;tomto demonstračním příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/html_template05.htm">https://github.com/tisnik/go-root/blob/master/article_87/html_template05.htm</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>static_pages.go</td><td>HTTP server se statickými stránkami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/static_pages.go">https://github.com/tisnik/go-root/blob/master/article_87/static_pages.go</a></td></tr>
+<tr><td>14</td><td>template_pages.go</td><td>HTTP server aplikující šablony na předaná data</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/template_pages.go">https://github.com/tisnik/go-root/blob/master/article_87/template_pages.go</a></td></tr>
+<tr><td>15</td><td>template_pages2.go</td><td>HTTP server aplikující šablony na předaná data, cache šablon</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/template_pages2.go">https://github.com/tisnik/go-root/blob/master/article_87/template_pages2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>fsnotify/</td><td>detekce změny souboru s&nbsp;využitím knihovny <strong>fsnotify/fsnotify</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/fsnotify/">https://github.com/tisnik/go-root/blob/master/article_87/fsnotify/</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>17</td><td>template_pages3/</td><td>implementace HTTP serveru, který dokáže automaticky načíst upravené šablony</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/template_pages3/">https://github.com/tisnik/go-root/blob/master/article_87/template_pages3/</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>18</td><td>benchmark/</td><td>benchmark měřící rychlost načítání šablon i aplikace šablon</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_87/benchmark/">https://github.com/tisnik/go-root/blob/master/article_87/benchmark/</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Dokumentace ke knihovně fsnotify<br />
+<a href="https://pkg.go.dev/github.com/fsnotify/fsnotify">https://pkg.go.dev/github.com/fsnotify/fsnotify</a>
+</li>
+
+<li>Cross-site scripting<br />
+<a href="https://en.wikipedia.org/wiki/Cross-site_scripting">https://en.wikipedia.org/wiki/Cross-site_scripting</a>
+</li>
+
+<li>5 Real-World Cross Site Scripting Examples<br />
+<a href="https://websitesecuritystore.com/blog/real-world-cross-site-scripting-examples/">https://websitesecuritystore.com/blog/real-world-cross-site-scripting-examples/</a>
+</li>
+
+<li>Cross Site Scripting (XSS) Attack Tutorial with Examples, Types &amp; Prevention<br />
+<a href="https://www.softwaretestinghelp.com/cross-site-scripting-xss-attack-test/">https://www.softwaretestinghelp.com/cross-site-scripting-xss-attack-test/</a>
+</li>
+
+<li>Dokumentace ke standardní knihovně jazyka Go<br />
+<a href="https://pkg.go.dev/std">https://pkg.go.dev/std</a>
+</li>
+
+<li>Awesome Go<br />
+<a href="https://awesome-go.com/">https://awesome-go.com/</a>
+</li>
+
+<li>Template Engines for Go<br />
+<a href="https://awesome-go.com/#template-engines">https://awesome-go.com/#template-engines</a>
+</li>
+
+<li>Mail merge<br />
+<a href="https://en.wikipedia.org/wiki/Mail_merge">https://en.wikipedia.org/wiki/Mail_merge</a>
+</li>
+
+<li>Template processor<br />
+<a href="https://en.wikipedia.org/wiki/Template_processor">https://en.wikipedia.org/wiki/Template_processor</a>
+</li>
+
+<li>Text/template<br />
+<a href="https://pkg.go.dev/text/template">https://pkg.go.dev/text/template</a>
+</li>
+
+<li>Go Template Engines<br />
+<a href="https://go.libhunt.com/categories/556-template-engines">https://go.libhunt.com/categories/556-template-engines</a>
+</li>
+
+<li>Template Engines<br />
+<a href="https://reposhub.com/go/template-engines">https://reposhub.com/go/template-engines</a>
+</li>
+
+<li>GoLang Templating Made Easy<br />
+<a href="https://awkwardferny.medium.com/golang-templating-made-easy-4d69d663c558">https://awkwardferny.medium.com/golang-templating-made-easy-4d69d663c558</a>
+</li>
+
+<li>Templates in GoLang<br />
+<a href="https://golangdocs.com/templates-in-golang">https://golangdocs.com/templates-in-golang</a>
+</li>
+
+<li>What are the best template engines for Go apart from "html/template"?<br />
+<a href="https://www.quora.com/What-are-the-best-template-engines-for-Go-apart-from-html-template?share=1">https://www.quora.com/What-are-the-best-template-engines-for-Go-apart-from-html-template?share=1</a>
+</li>
+
+<li>Ace - HTML template engine for Go<br />
+<a href="https://github.com/yosssi/ace">https://github.com/yosssi/ace</a>
+</li>
+
+<li>amber<br />
+<a href="https://github.com/eknkc/amber">https://github.com/eknkc/amber</a>
+</li>
+
+<li>quicktemplate<br />
+<a href="https://github.com/valyala/quicktemplate">https://github.com/valyala/quicktemplate</a>
+</li>
+
+<li>Šablonovací systém <i>ace</i><br />
+<a href="https://github.com/yosssi/ace">https://github.com/yosssi/ace</a>
+</li>
+
+<li>Šablonovací systém <i>amber</i><br />
+<a href="https://github.com/eknkc/amber">https://github.com/eknkc/amber</a>
+</li>
+
+<li>Šablonovací systém <i>damsel</i><br />
+<a href="https://github.com/dskinner/damsel">https://github.com/dskinner/damsel</a>
+</li>
+
+<li>Šablonovací systém <i>ego</i><br />
+<a href="https://github.com/benbjohnson/ego">https://github.com/benbjohnson/ego</a>
+</li>
+
+<li>Šablonovací systém <i>extemplate</i><br />
+<a href="https://github.com/dannyvankooten/extemplate">https://github.com/dannyvankooten/extemplate</a>
+</li>
+
+<li>Šablonovací systém <i>fasttemplate</i><br />
+<a href="https://github.com/valyala/fasttemplate">https://github.com/valyala/fasttemplate</a>
+</li>
+
+<li>Šablonovací systém <i>gofpdf</i><br />
+<a href="https://github.com/jung-kurt/gofpdf">https://github.com/jung-kurt/gofpdf</a>
+</li>
+
+<li>Šablonovací systém <i>gospin</i><br />
+<a href="https://github.com/m1/gospin">https://github.com/m1/gospin</a>
+</li>
+
+<li>Šablonovací systém <i>goview</i><br />
+<a href="https://github.com/foolin/goview">https://github.com/foolin/goview</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
