@@ -1,0 +1,1583 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Kontrola potenciálních chyb ve zdrojových kódech Go nástroji gosec a go-critic</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Kontrola potenciálních chyb ve zdrojových kódech Go nástroji gosec a go-critic</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V osmdesáté první části seriálu o programovacím jazyce Go se seznámíme s dvojicí nástrojů určených pro statickou analýzu kódu a pro hledání potenciálních problémů. Tyto nástroje se jmenují gosec a go-critic.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Kontrola potenciálních chyb ve zdrojových kódech nástroji <i>gosec</i> a <i>go-critic</i></a></p>
+<p><a href="#k02">2. Použití nástroje <i>gosec</i></a></p>
+<p><a href="#k03">3. První demonstrační příklad s&nbsp;několika problematickými rysy</a></p>
+<p><a href="#k04">4. Výsledky analýzy zdrojového kódu prvního demonstračního příkladu nástrojem <i>gosec</i></a></p>
+<p><a href="#k05">5. Označení bloků či jednotlivých příkazů, u kterých se mají vybrané problémy ignorovat</a></p>
+<p><a href="#k06">6. Druhý demonstrační příklad s&nbsp;několika problematickými rysy</a></p>
+<p><a href="#k07">7. Výsledky analýzy zdrojového kódu druhého demonstračního příkladu nástrojem <i>gosec</i></a></p>
+<p><a href="#k08">8. Třetí demonstrační příklad s&nbsp;několika problematickými rysy</a></p>
+<p><a href="#k09">9. Výsledky analýzy zdrojového kódu třetího demonstračního příkladu nástrojem <i>gosec</i></a></p>
+<p><a href="#k10">10. Použití nástroje <i>go-critic</i></a></p>
+<p><a href="#k11">11. Čtvrtý demonstrační příklad s&nbsp;několika problematickými rysy</a></p>
+<p><a href="#k12">12. Výsledky analýzy zdrojového kódu čtvrtého demonstračního příkladu nástrojem <i>go-critic</i></a></p>
+<p><a href="#k13">13. Pátý demonstrační příklad s&nbsp;několika problematickými rysy s&nbsp;výsledkem jeho analýzy</a></p>
+<p><a href="#k14">14. Šestý demonstrační příklad s&nbsp;několika problematickými rysy s&nbsp;výsledkem jeho analýzy</a></p>
+<p><a href="#k15">15. Příklad obsahující problematické části detekované oběma nástroji</a></p>
+<p><a href="#k16">16. Kód, který nebude vykonán optimálně</a></p>
+<p><a href="#k17">17. Kontrola zdrojových kódů knihoven jazyka Go nástrojem <i>go-critic</i></a></p>
+<p><a href="#k18">18. Statistika na závěr</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Kontrola potenciálních chyb ve zdrojových kódech nástroji <i>gosec</i> a <i>go-critic</i></h2>
+
+<p>Samotný <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovací jazyk
+Go</a> je navržen velmi konzervativně, což bylo ostatně patrné <a
+href="https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/">i
+z&nbsp;článku o (ne)používaní generických datových typů, funkcí a metod</a>
+(což se pravděpodobně změní v&nbsp;Go 2, ostatně si můžete nové vlastnosti
+vyzkoušet již <a href="https://go.dev/blog/go1.18beta1">v&nbsp;Go 1.18
+Beta</a>). To pochopitelně některým vývojářům nemusí vyhovovat, na čemž ale ve
+skutečnosti nemusí být vůbec nic špatného &ndash; ideální univerzálně přijímaný
+programovací jazyk totiž neexistoval, neexistuje a pravděpodobně ani nikdy
+existovat nebude, protože některé vlastnosti jazyků jsou protichůdné. Ovšem
+samotný programovací jazyk je jen jednou (i když pochopitelně velmi důležitou)
+součástí celého ekosystému, který kromě překladače (někdy interpretru) obsahuje
+i vývojová prostředí a ladicí nástroje, ale i další pomocné nástroje a utility.
+Mezi tyto nástroje patří i utility určené pro kontrolu kvality zdrojových kódů,
+odhalování různých chyb nerozpoznaných překladačem, potenciálních chyb, špatně
+strukturovaného kódu, nedodržování zavedených idiomů atd. Jedním z&nbsp;těchto
+nástrojů je <i>go-critic</i>, který si dnes popíšeme; další nástroje, i když
+úžeji zaměřené, již byly popsány v&nbsp;šedesáté části seriálu o Go.</p>
+
+<p>Samostatnou kapitolu tvoří nástroje sloužící k&nbsp;odhalení potenciálních
+bezpečnostních problémů. I těchto nástrojů existuje <a
+href="https://github.com/guardrailsio/awesome-golang-security">relativně velké
+množství</a> a jedním z&nbsp;nejdůležitějších projektů (navíc stále aktivně
+vyvíjeným) z&nbsp;této skupiny &ndash; nástrojem <i>gosec</i> &ndash; se budeme
+zabývat dnes.</p>
+
+<p><div class="rs-tip-major">Poznámka: oba dnes popisované nástroje, tedy jak
+<i>gosec</i>, tak i <i>go-critic</i>, pracují nad AST, nikoli přímo nad
+zdrojovými kódy Go. Využívá se přitom standardní knihovna jazyka Go, která
+potřebné nástroje obsahuje. Těmito nástroji se budeme zabývat
+v&nbsp;samostatném článku.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Použití nástroje <i>gosec</i></h2>
+
+<p>V&nbsp;první polovině dnešního článku se budeme zabývat možnostmi, které nám
+nabízí nástroj nazvaný příznačně <i>gosec</i>. Tento nástroj dokáže najít ve
+zdrojových kódech potenciální bezpečnostní problémy. Například se to týká
+konstrukce cest k&nbsp;souborům na základě &bdquo;podivně&ldquo; získaných
+údajů (třeba přes REST API), skládání SQL dotazů, přímé použití tokenů
+v&nbsp;programovém kódu (i v&nbsp;testech) popř.&nbsp;použití algoritmů, které
+již dnes nejsou považovány za bezpečné. Typickým příkladem takového algoritmu
+je <a href="https://en.wikipedia.org/wiki/MD5">MD5</a>.</p>
+
+<p>Instalace nástroje <i>gosec</i> je přímočará:</p>
+
+<pre>
+$ <strong>go install github.com/securego/gosec/v2/cmd/gosec@latest</strong>
+</pre>
+
+<p>Pro lepší představu o možnostech nástroje <i>gosec</i> jsou pod tímto
+odstavcem vypsána všechna pravidla aplikovaná na zdrojové kódy. Tato pravidla
+jsou určena pro hledání potenciálních bezpečnostních chyb:</p>
+
+<table>
+<tr><th>Pravidlo</th><th>Popis pravidla</th></tr>
+<tr><td>G101</td><td>Look for hard coded credentials</td></tr>
+<tr><td>G102</td><td>Bind to all interfaces</td></tr>
+<tr><td>G103</td><td>Audit the use of unsafe block</td></tr>
+<tr><td>G104</td><td>Audit errors not checked</td></tr>
+<tr><td>G106</td><td>Audit the use of ssh.InsecureIgnoreHostKey</td></tr>
+<tr><td>G107</td><td>Url provided to HTTP request as taint input</td></tr>
+<tr><td>G108</td><td>Profiling endpoint automatically exposed on /debug/pprof</td></tr>
+<tr><td>G109</td><td>Potential Integer overflow made by strconv.Atoi result conversion to int16/32</td></tr>
+<tr><td>G110</td><td>Potential DoS vulnerability via decompression bomb</td></tr>
+<tr><td>G201</td><td>SQL query construction using format string</td></tr>
+<tr><td>G202</td><td>SQL query construction using string concatenation</td></tr>
+<tr><td>G203</td><td>Use of unescaped data in HTML templates</td></tr>
+<tr><td>G204</td><td>Audit use of command execution</td></tr>
+<tr><td>G301</td><td>Poor file permissions used when creating a directory</td></tr>
+<tr><td>G302</td><td>Poor file permissions used with chmod</td></tr>
+<tr><td>G303</td><td>Creating tempfile using a predictable path</td></tr>
+<tr><td>G304</td><td>File path provided as taint input</td></tr>
+<tr><td>G305</td><td>File traversal when extracting zip/tar archive</td></tr>
+<tr><td>G306</td><td>Poor file permissions used when writing to a new file</td></tr>
+<tr><td>G307</td><td>Deferring a method which returns an error</td></tr>
+<tr><td>G401</td><td>Detect the usage of DES, RC4, MD5 or SHA1</td></tr>
+<tr><td>G402</td><td>Look for bad TLS connection settings</td></tr>
+<tr><td>G403</td><td>Ensure minimum RSA key length of 2048 bits</td></tr>
+<tr><td>G404</td><td>Insecure random number source (rand)</td></tr>
+<tr><td>G501</td><td>Import blocklist: crypto/md5</td></tr>
+<tr><td>G502</td><td>Import blocklist: crypto/des</td></tr>
+<tr><td>G503</td><td>Import blocklist: crypto/rc4</td></tr>
+<tr><td>G504</td><td>Import blocklist: net/http/cgi</td></tr>
+<tr><td>G505</td><td>Import blocklist: crypto/sha1</td></tr>
+<tr><td>G601</td><td>Implicit memory aliasing of items from a range statement</td></tr>
+</table>
+
+<p>Některé typické problémy, které lze nalézt ve zdrojových kódech reálných
+projektů, budou ukázány v&nbsp;navazujících kapitolách.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. První demonstrační příklad s&nbsp;několika problematickými rysy</h2>
+
+<p>Pro zjištění některých vlastností nástroje <i>gosec</i> i chyb
+resp.&nbsp;spíše řečeno potenciálních chyb, které dokáže detekovat, použijeme
+následující demonstrační příklad, který byl získán ze skutečného projektu (a do
+značné míry byl zkrácen). Funkce <strong>readPipelineLogFile</strong> má
+sloužit pro načtení logovacích informací, přičemž každý řádek v&nbsp;logu
+obsahuje datovou strukturu <strong>PipelineLogEntry</strong> uloženou ve
+formátu JSON:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "encoding/json"
+        "log"
+        "os"
+)
+&nbsp;
+<i>// PipelineLogEntry represents one log entry (record) read from log file.</i>
+type <strong>PipelineLogEntry</strong> struct {
+        Level    string `json:"levelname"`
+        Time     string `json:"asctime"`
+        Name     string `json:"name"`
+        Filename string `json:"filename"`
+        Message  string `json:"message"`
+}
+&nbsp;
+func <strong>readPipelineLogFile</strong>(filename string) ([]PipelineLogEntry, error) {
+        entries := []PipelineLogEntry{}
+&nbsp;
+        file, err := os.Open(filename)
+        if err != nil {
+                return entries, err
+        }
+&nbsp;
+        defer file.Close()
+&nbsp;
+        scanner := bufio.NewScanner(file)
+        for scanner.Scan() {
+                entry := PipelineLogEntry{}
+                err = json.Unmarshal([]byte(scanner.Text()), &amp;entry)
+                if err != nil {
+                        log.Println(err)
+                } else {
+                        entries = append(entries, entry)
+                }
+        }
+&nbsp;
+        if err := scanner.Err(); err != nil {
+                return entries, err
+        }
+&nbsp;
+        return entries, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        readPipelineLogFile("foobar")
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se v&nbsp;popisované
+funkci důsledně kontrolují všechny chyby, které mohou nastat, vstupní soubor
+s&nbsp;logy se zavírá atd.  &ndash; mohlo by se tedy zdát, že je vše
+v&nbsp;naprostém pořádku.</div></p>
+
+<p>Zdrojový kód tohoto příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gosec_issues_1.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_1.go</a>.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Výsledky analýzy zdrojového kódu prvního demonstračního příkladu nástrojem <i>gosec</i></h2>
+
+<p>Spuštění analýzy nástrojem <i>gosec</i> je snadná &ndash; pouze se tomuto
+nástroji předá název balíčku popř.&nbsp; &bdquo;./...&ldquo; (bez uvozovek) pro
+kontrolu všech balíčků umístěných v&nbsp;aktuálním adresáři či
+podadresářích:</p>
+
+<pre>
+$ <strong>gosec ./...</strong>
+</pre>
+
+<p>V&nbsp;případě, že máte nainstalovánu poslední verzi nástroje <i>gosec</i>,
+měly by výsledky analýzy zdrojového kódu z&nbsp;předchozí kapitoly vypadat
+takto:</p>
+
+<pre>
+[gosec] 2021/12/13 13:02:14 Including rules: default
+[gosec] 2021/12/13 13:02:14 Excluding rules: default
+[gosec] 2021/12/13 13:02:14 Import directory: /home/ptisnovs/temp/z
+[gosec] 2021/12/13 13:02:14 Checking package: main
+[gosec] 2021/12/13 13:02:14 Checking file: /home/ptisnovs/temp/z/gosec_issues_1.go
+&nbsp;
+Results:
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1.go:22] - G304 (CWE-22): Potential file inclusion via variable (Confidence: HIGH, Severity: MEDIUM)
+    21: 
+  &gt; 22:         file, err := os.Open(filename)
+    23:         if err != nil {
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1.go:27] - G307 (CWE-703): Deferring unsafe method "Close" on type "*os.File" (Confidence: HIGH, Severity: MEDIUM)
+    26: 
+  &gt; 27:         defer file.Close()
+    28: 
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1.go:48] - G104 (CWE-703): Errors unhandled. (Confidence: HIGH, Severity: LOW)
+    47: func main() {
+  &gt; 48:         readPipelineLogFile("foobar")
+    49: }
+&nbsp;
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 49
+  Nosec  : 0
+  Issues : 3
+</pre>
+
+<p>Alternativně je možné si vyžádat výstup ve formátu JSON, který je snáze strojově zpracovatelný:</p>
+
+<pre>
+$ <strong>gosec -fmt=json -out=report.json ./...</strong>
+</pre>
+
+<p>V&nbsp;tomto případě bude výsledek vypadat následovně:</p>
+
+<pre>
+{
+        "Golang errors": {},
+        "Issues": [
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "22",
+                                "url": "https://cwe.mitre.org/data/definitions/22.html"
+                        },
+                        "rule_id": "G304",
+                        "details": "Potential file inclusion via variable",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_1.go",
+                        "code": "21: \n22: \tfile, err := os.Open(filename)\n23: \tif err != nil {\n",
+                        "line": "22",
+                        "column": "15",
+                        "nosec": false,
+                        "suppressions": null
+                },
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "703",
+                                "url": "https://cwe.mitre.org/data/definitions/703.html"
+                        },
+                        "rule_id": "G307",
+                        "details": "Deferring unsafe method \"Close\" on type \"*os.File\"",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_1.go",
+                        "code": "26: \n27: \tdefer file.Close()\n28: \n",
+                        "line": "27",
+                        "column": "2",
+                        "nosec": false,
+                        "suppressions": null
+                },
+                {
+                        "severity": "LOW",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "703",
+                                "url": "https://cwe.mitre.org/data/definitions/703.html"
+                        },
+                        "rule_id": "G104",
+                        "details": "Errors unhandled.",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_1.go",
+                        "code": "47: func main() {\n48: \treadPipelineLogFile(\"foobar\")\n49: }\n",
+                        "line": "48",
+                        "column": "2",
+                        "nosec": false,
+                        "suppressions": null
+                }
+        ],
+        "Stats": {
+                "files": 1,
+                "lines": 49,
+                "nosec": 0,
+                "found": 3
+        },
+        "GosecVersion": "dev"
+}
+</pre>
+
+<p>Podívejme se nyní na jednotlivé problémy, které byly detekovány:</p>
+
+<pre>
+[/home/ptisnovs/temp/z/gosec_issues_1.go:22] - G304 (CWE-22): Potential file inclusion via variable (Confidence: HIGH, Severity: MEDIUM)
+    21: 
+  &gt; 22:         file, err := os.Open(filename)
+    23:         if err != nil {
+</pre>
+
+<p>Toto je obecný problém se střední závažností, který souvisí s&nbsp;tím, že
+funkci lze zavolat s&nbsp;libovolným řetězcem, který je použit jako název
+souboru. Pokud by byl řetězec získán způsobem, jenž je dostupný potenciálnímu
+útočníkovi (například z&nbsp;REST API), mohlo by to vést k&nbsp;závažnějším
+komplikacím.</p>
+
+<pre>
+[/home/ptisnovs/temp/z/gosec_issues_1.go:27] - G307 (CWE-703): Deferring unsafe method "Close" on type "*os.File" (Confidence: HIGH, Severity: MEDIUM)
+    26: 
+  &gt; 27:         defer file.Close()
+    28: 
+</pre>
+
+<p>Tento problém má opět střední závažnost a souvisí s&nbsp;tím, že se soubor
+uzavírá až v&nbsp;bloku <strong>defer</strong>, což je v&nbsp;některých
+případech příliš pozdě. Tento problém je velmi pěkně popsán v&nbsp;článku <a
+href="https://www.joeshaw.org/dont-defer-close-on-writable-files/">Don't defer
+Close() on writable files</a>. Tomuto zajímavému problému se budeme věnovat
+v&nbsp;samostatném textu.</p>
+
+<pre>
+[/home/ptisnovs/temp/z/gosec_issues_1.go:48] - G104 (CWE-703): Errors unhandled. (Confidence: HIGH, Severity: LOW)
+    47: func main() {
+  &gt; 48:         readPipelineLogFile("foobar")
+    49: }
+</pre>
+
+<p>Třetí potenciální problém je detekovatelný i dalšími nástroji &ndash;
+nekontrolujeme návratovou chybovou hodnotu. Jedná se o podobný antipattern,
+jakým je použití prázdného bloku <strong>catch</strong> nebo
+<strong>except</strong> v&nbsp;jazycích podporujících práci
+s&nbsp;výjimkami.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Označení bloků či jednotlivých příkazů, u kterých se mají vybrané problémy ignorovat</h2>
+
+<p>V&nbsp;některých situacích ovšem skutečně potřebujeme (například) vytvořit
+jméno souboru z&nbsp;nekonstantních řetězců (řetězcových literálů); podobně
+jako se někdy (!) skládají či formátují SQL dotazy. V&nbsp;takových případech
+by bylo vhodné mít možnost označit příslušné příkazy nebo bloky, aby je nástroj
+<i>gosec</i> ignoroval. To je skutečně možné. K&nbsp;tomuto účelu se používají
+komentáře obsahující slovo &bdquo;gosec&ldquo;, za kterým následuje jméno
+pravidla, které chceme zakázat. Tento komentář může být přidán k&nbsp;příkazu,
+bloku, před volání funkce atd. Podívejme se na příklad použití &ndash; viz
+podtržené části zdrojového kódu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "encoding/json"
+        "log"
+        "os"
+)
+&nbsp;
+<i>// PipelineLogEntry represents one log entry (record) read from log file.</i>
+type <strong>PipelineLogEntry</strong> struct {
+        Level    string `json:"levelname"`
+        Time     string `json:"asctime"`
+        Name     string `json:"name"`
+        Filename string `json:"filename"`
+        Message  string `json:"message"`
+}
+&nbsp;
+func <strong>readPipelineLogFile</strong>(filename string) ([]PipelineLogEntry, error) {
+        entries := []PipelineLogEntry{}
+&nbsp;
+        file, err := os.Open(filename) <u>// #nosec G304</u>
+        if err != nil {
+                return entries, err
+        }
+&nbsp;
+        <u>// #nosec G307</u>
+        defer file.Close()
+&nbsp;
+        scanner := bufio.NewScanner(file)
+        for scanner.Scan() {
+                entry := PipelineLogEntry{}
+                err = json.Unmarshal([]byte(scanner.Text()), &amp;entry)
+                if err != nil {
+                        log.Println(err)
+                } else {
+                        entries = append(entries, entry)
+                }
+        }
+&nbsp;
+        if err := scanner.Err(); err != nil {
+                return entries, err
+        }
+&nbsp;
+        return entries, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        <u>// #nosec G104</u>
+        readPipelineLogFile("foobar")
+}
+</pre>
+
+<p>Zdrojový kód tohoto příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gosec_issues_1_nosec">https://github.com/tisnik/wccode/blob/master/gosec_issues_1_nosec.go</a>.</p>
+
+<p>Nyní by již kontrola neměla odhalit žádné problémy:</p>
+
+<pre>
+$ <strong>gosec ./...</strong>
+&nbsp;
+[gosec] 2021/12/14 12:37:03 Including rules: default
+[gosec] 2021/12/14 12:37:03 Excluding rules: default
+[gosec] 2021/12/14 12:37:03 Import directory: /home/ptisnovs/temp/z
+[gosec] 2021/12/14 12:37:03 Checking package: main
+[gosec] 2021/12/14 12:37:03 Checking file: /home/ptisnovs/temp/z/gosec_issues_1_nosec.go
+Results:
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 51
+  Nosec  : 3
+  Issues : 0
+</pre>
+
+<p>Zákaz aplikace pravidel komentářem &bdquo;// gosec&ldquo; lze ovšem
+zakázat (pokud například nedůvěřujete určitému projektu):</p>
+
+<pre>
+$ <strong>gosec -nosec ./...</strong>
+</pre>
+
+<pre>
+[gosec] 2021/12/14 12:37:31 Including rules: default
+[gosec] 2021/12/14 12:37:31 Excluding rules: default
+[gosec] 2021/12/14 12:37:31 Import directory: /home/ptisnovs/temp/z
+[gosec] 2021/12/14 12:37:31 Checking package: main
+[gosec] 2021/12/14 12:37:31 Checking file: /home/ptisnovs/temp/z/gosec_issues_1_nosec.go
+Results:
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1_nosec.go:22] - G304 (CWE-22): Potential file inclusion via variable (Confidence: HIGH, Severity: MEDIUM)
+    21: 
+  &gt; 22:         file, err := os.Open(filename) // #nosec G304
+    23:         if err != nil {
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1_nosec.go:28] - G307 (CWE-703): Deferring unsafe method "Close" on type "*os.File" (Confidence: HIGH, Severity: MEDIUM)
+    27:         // #nosec G307
+  &gt; 28:         defer file.Close()
+    29: 
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_1_nosec.go:50] - G104 (CWE-703): Errors unhandled. (Confidence: HIGH, Severity: LOW)
+    49:         // #nosec G104
+  &gt; 50:         readPipelineLogFile("foobar")
+    51: }
+&nbsp;
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 51
+  Nosec  : 0
+  Issues : 3
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Druhý demonstrační příklad s&nbsp;několika problematickými rysy</h2>
+
+<p><a href="#k02">Ve druhé kapitole</a> jsme si řekli, že nástroj <i>gosec</i>
+dokáže zjistit i použití algoritmů, které již nejsou považovány za bezpečné.
+Konkrétně se jedná o následující pravidla:</p>
+
+<table>
+<tr><th>Pravidlo</th><th>Popis pravidla</th></tr>
+<tr><td>G401</td><td>Detect the usage of DES, RC4, MD5 or SHA1</td></tr>
+<tr><td>G403</td><td>Ensure minimum RSA key length of 2048 bits</td></tr>
+<tr><td>G404</td><td>Insecure random number source (rand)</td></tr>
+<tr><td>G501</td><td>Import blocklist: crypto/md5</td></tr>
+<tr><td>G502</td><td>Import blocklist: crypto/des</td></tr>
+<tr><td>G503</td><td>Import blocklist: crypto/rc4</td></tr>
+<tr><td>G504</td><td>Import blocklist: net/http/cgi</td></tr>
+<tr><td>G505</td><td>Import blocklist: crypto/sha1</td></tr>
+</table>
+
+<p>Vlastnosti <i>gosec</i> v&nbsp;této oblasti si ověříme následujícím,
+tentokrát velmi krátkým kódem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "crypto/md5"
+        "fmt"
+        "io"
+)
+&nbsp;
+func <strong>main</strong>() {
+        hash := md5.New()
+&nbsp;
+        io.WriteString(hash, "Příliš žluťoučký kůň")
+        fmt.Printf("%x", hash.Sum(nil))
+}
+</pre>
+
+<p>Zdrojový kód tohoto příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gosec_issues_2.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_2.go</a>.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Výsledky analýzy zdrojového kódu druhého demonstračního příkladu nástrojem <i>gosec</i></h2>
+
+<p>Opět se podívejme na to, jaké výsledky získáme analýzou zdrojového kódu
+představeného <a href="#k06">v&nbsp;předchozí kapitole</a>. Spustíme nástroj
+<i>gosec</i> s&nbsp;parametrem &bdquo;./...&ldquo;:</p>
+
+<pre>
+$ <strong>gosec ./...</strong>
+</pre>
+
+<p>V&nbsp;případě, že je nainstalována poslední verze nástroje <i>gosec</i>,
+vypíše se trojice potenciálních problémů:</p>
+
+<pre>
+Results:
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_2.go:10] - G401 (CWE-326): Use of weak cryptographic primitive (Confidence: HIGH, Severity: MEDIUM)
+    9: func main() {
+  &gt; 10:         hash := md5.New()
+    11: 
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_2.go:4] - G501 (CWE-327): Blocklisted import crypto/md5: weak cryptographic primitive (Confidence: HIGH, Severity: MEDIUM)
+    3: import (
+  &gt; 4:  "crypto/md5"
+    5:  "fmt"
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gosec_issues_2.go:12] - G104 (CWE-703): Errors unhandled. (Confidence: HIGH, Severity: LOW)
+    11: 
+  &gt; 12:         io.WriteString(hash, "Příliš žluťoučký kůň")
+    13:         fmt.Printf("%x", hash.Sum(nil))
+&nbsp;
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 14
+  Nosec  : 0
+  Issues : 3
+</pre>
+
+<p>Všechny tři potenciální problémy jsou snadno pochopitelné &ndash; zjistilo
+se, že se importuje a dokonce i používá algoritmus <strong>MD5</strong> a
+navíc, že není provedena kontrola, zda nedošlo k&nbsp;nějaké chybě při volání
+funkce <strong>io.WriteString</strong> (což popravdě řečeno ignoruje relativně
+velká část programů).</p>
+
+<p>Alternativně pochopitelně opět můžeme žádat výstup ve formátu strojově
+zpracovatelného formátu JSON, a to nepatrně upraveným zavoláním:</p>
+
+<pre>
+$ <strong>gosec -fmt=json -out=report.json ./...</strong>
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+{
+        "Golang errors": {},
+        "Issues": [
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "326",
+                                "url": "https://cwe.mitre.org/data/definitions/326.html"
+                        },
+                        "rule_id": "G401",
+                        "details": "Use of weak cryptographic primitive",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_2.go",
+                        "code": "9: func main() {\n10: \thash := md5.New()\n11: \n",
+                        "line": "10",
+                        "column": "10",
+                        "nosec": false,
+                        "suppressions": null
+                },
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "327",
+                                "url": "https://cwe.mitre.org/data/definitions/327.html"
+                        },
+                        "rule_id": "G501",
+                        "details": "Blocklisted import crypto/md5: weak cryptographic primitive",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_2.go",
+                        "code": "3: import (\n4: \t\"crypto/md5\"\n5: \t\"fmt\"\n",
+                        "line": "4",
+                        "column": "2",
+                        "nosec": false,
+                        "suppressions": null
+                },
+                {
+                        "severity": "LOW",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "703",
+                                "url": "https://cwe.mitre.org/data/definitions/703.html"
+                        },
+                        "rule_id": "G104",
+                        "details": "Errors unhandled.",
+                        "file": "/home/ptisnovs/temp/z/gosec_issues_2.go",
+                        "code": "11: \n12: \tio.WriteString(hash, \"Příliš žluťoučký kůň\")\n13: \tfmt.Printf(\"%x\", hash.Sum(nil))\n",
+                        "line": "12",
+                        "column": "2",
+                        "nosec": false,
+                        "suppressions": null
+                }
+        ],
+        "Stats": {
+                "files": 1,
+                "lines": 14,
+                "nosec": 0,
+                "found": 3
+        },
+        "GosecVersion": "dev"
+}
+</pre>
+
+<p>Jen pro zajímavost si ukažme, jak se jednotlivá pravidla zakážou &ndash;
+nyní pro celý program popř.&nbsp;pro příkaz <strong>import</strong>:</p>
+
+<pre>
+<u>// #nosec G401</u>
+<u>// #nosec G104</u>
+package <strong>main</strong>
+&nbsp;
+import (
+        "crypto/md5" <u>// #nosec G501</u>
+        "fmt"
+        "io"
+)
+&nbsp;
+func <strong>main() {</strong>
+        hash := md5.New()
+&nbsp;
+        io.WriteString(hash, "Příliš žluťoučký kůň")
+        fmt.Printf("%x", hash.Sum(nil))
+}
+</pre>
+
+<p>Další kontrola již proběhne bez detekce chyb:</p>
+
+<pre>
+[gosec] 2021/12/14 12:38:39 Including rules: default
+[gosec] 2021/12/14 12:38:39 Excluding rules: default
+[gosec] 2021/12/14 12:38:39 Import directory: /home/ptisnovs/temp/z
+[gosec] 2021/12/14 12:38:39 Checking package: main
+[gosec] 2021/12/14 12:38:39 Checking file: /home/ptisnovs/temp/z/gosec_issues_2_nosec.go
+Results:
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 16
+  Nosec  : 2
+  Issues : 0
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Třetí demonstrační příklad s&nbsp;několika problematickými rysy</h2>
+
+<p>Třetí demonstrační příklad, který si dnes ukážeme a který budeme analyzovat,
+není stoprocentně založen na reálných zdrojových kódech, ovšem ukazuje, jak
+nástroj <i>gosec</i> dokáže odhalit potenciální problémy, které vznikají při
+skládání SQL dotazů. Předchozí verze nástroje <i>gosec</i> varovaly před
+jakýmkoli skládáním SQL z&nbsp;nekonstantních řetězců, nová verze je ovšem již
+chytřejší a některé operace již ignoruje. Nicméně se podívejme na příklad
+s&nbsp;několika SQL dotazy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "fmt"
+        "os"
+)
+&nbsp;
+func <strong>foo</strong>(arg string) {
+        db, err := sql.Open("sqlite3", ":memory:")
+        if err != nil {
+                panic(err)
+        }
+        rows, err := db.Query("SELECT * FROM foo WHERE name = " + arg)
+&nbsp;
+        if err != nil {
+                panic(err)
+        }
+        defer rows.Close()
+}
+&nbsp;
+func <strong>bar</strong>(arg string) {
+        db, err := sql.Open("sqlite3", ":memory:")
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        query := fmt.Sprintf("select * from foo where name = '%s'", arg)
+&nbsp;
+        rows, err := db.Query(query)
+        if err != nil {
+                panic(err)
+        }
+        defer rows.Close()
+}
+&nbsp;
+func <strong>main</strong>() {
+        foo("foo")
+        bar("bar")
+}
+</pre>
+
+<p>Zdrojový kód tohoto příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gosec_issues_3.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_3.go</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: pokud si příklad chcete přeložit a
+spustit (k&nbsp;čemuž ovšem není důvod), bude nutné ještě naimportovat ovladač
+(<i>driver</i>) zajišťující připojení k&nbsp;databázi a komunikaci
+s&nbsp;databází.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Výsledky analýzy zdrojového kódu třetího demonstračního příkladu nástrojem <i>gosec</i></h2>
+
+<p>Zjištění potenciálních problémů ve zdrojovém kódu opět zajistí tento
+příkaz:</p>
+
+<pre>
+$ <strong>gosec ./...</strong>
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+Results:
+&nbsp;
+Golang errors in file: [/home/ptisnovs/temp/z/gocritic_gosec_issues.go]:
+&nbsp;
+  &gt; [line 6 : column 2] - "os" imported but not used
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gocritic_gosec_issues.go:28] - G201 (CWE-89): SQL string formatting (Confidence: HIGH, Severity: MEDIUM)
+    27: 
+  &gt; 28:         query := fmt.Sprintf("select * from foo where name = '%s'", arg)
+    29: 
+&nbsp;
+&nbsp;
+&nbsp;
+[/home/ptisnovs/temp/z/gocritic_gosec_issues.go:14] - G202 (CWE-89): SQL string concatenation (Confidence: HIGH, Severity: MEDIUM)
+    13:         }
+  &gt; 14:         rows, err := db.Query("SELECT * FROM foo WHERE name = " + arg)
+    15: 
+&nbsp;
+&nbsp;
+&nbsp;
+Summary:
+  Gosec  : dev
+  Files  : 1
+  Lines  : 40
+  Nosec  : 0
+  Issues : 2
+</pre>
+
+<p>Nejzajímavější jsou chyby získané pravidly <strong>G201</strong> a
+<strong>G202</strong>. První pravidlo zjistilo, že se SQL dotaz získává
+formátováním řetězce, což může, ale taktéž nemusí být problematické. Druhé
+pravidlo detekovalo použití argumentu, který je do funkce předán a tedy obecně
+není možné zaručit, odkud se jeho obsah získá.</p>
+
+<p>Pro úplnost si ještě ukažme výstup z&nbsp;nástroje <i>gosec</i> ve formátu
+JSON:</p>
+
+<pre>
+{
+        "Golang errors": {
+                "/home/ptisnovs/temp/z/gocritic_gosec_issues.go": [
+                        {
+                                "line": 6,
+                                "column": 2,
+                                "error": "\"os\" imported but not used"
+                        }
+                ]
+        },
+        "Issues": [
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "89",
+                                "url": "https://cwe.mitre.org/data/definitions/89.html"
+                        },
+                        "rule_id": "G201",
+                        "details": "SQL string formatting",
+                        "file": "/home/ptisnovs/temp/z/gocritic_gosec_issues.go",
+                        "code": "27: \n28: \tquery := fmt.Sprintf(\"select * from foo where name = '%s'\", arg)\n29: \n",
+                        "line": "28",
+                        "column": "11",
+                        "nosec": false,
+                        "suppressions": null
+                },
+                {
+                        "severity": "MEDIUM",
+                        "confidence": "HIGH",
+                        "cwe": {
+                                "id": "89",
+                                "url": "https://cwe.mitre.org/data/definitions/89.html"
+                        },
+                        "rule_id": "G202",
+                        "details": "SQL string concatenation",
+                        "file": "/home/ptisnovs/temp/z/gocritic_gosec_issues.go",
+                        "code": "13: \t}\n14: \trows, err := db.Query(\"SELECT * FROM foo WHERE name = \" + arg)\n15: \n",
+                        "line": "14",
+                        "column": "24",
+                        "nosec": false,
+                        "suppressions": null
+                }
+        ],
+        "Stats": {
+                "files": 1,
+                "lines": 40,
+                "nosec": 0,
+                "found": 2
+        },
+        "GosecVersion": "dev"
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Použití nástroje <i>go-critic</i></h2>
+
+<p><i>&bdquo;There is never too much static code analysis. Try it out.&ldquo;</i></p>
+
+<p>Nástroj <i>gosec</i>, jehož základní vlastnosti jsme si ukázali
+v&nbsp;předchozích kapitolách, je striktně určen pro hledání potenciálních
+bezpečnostních problémů ve zdrojových kódech. Druhý dnes představený nástroj se
+jmenuje <i>go-critic</i> a jeho zaměření je mnohem větší, protože slouží jak
+pro hledání reálných i potenciálních chyb, tak i těch částí kódu, které nemusí
+být vykonány efektivně. Taktéž ovšem slouží pro detekci kódu, který není napsán
+idiomaticky. Všechna pravidla resp.&nbsp;všechny (potenciální) problémy, které
+tento nástroj dokáže detekovat, jsou vypsány na stránce <a
+href="https://go-critic.com/overview">Checks overview</a>.</p>
+
+<p>Oba dva zmíněné nástroje ovšem mají společný základ, protože provádí
+statickou analýzu kódu na základě zkonstruovaného AST.</p>
+
+<p>Instalace nástroje <i>go-critic</i> je triviální:</p>
+
+<pre>
+$ <strong>GO111MODULE=on go get -v -u github.com/go-critic/go-critic/cmd/gocritic</strong>
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Čtvrtý demonstrační příklad s&nbsp;několika problematickými rysy</h2>
+
+<p>Ve čtvrtém demonstračním příkladu, který vypadá zdánlivě zcela
+v&nbsp;pořádku, je naschvál ponecháno několik problematických rysů, které budou
+nástrojem <i>go-critic</i> odhaleny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+import "strings"
+&nbsp;
+func <strong>printMessages</strong>(Format string, message1 string, message2 string) {
+        <i>//fmt.Printf("%s %s\n", message1, message2)</i>
+&nbsp;
+        if len(message1) != 0 &amp;&amp; len(message2) != 0 {
+                fmt.Printf(Format, strings.Replace(message1, " ", "", -1), message2)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        const fmt = "%s %s\n"
+&nbsp;
+        for i := 0; 10 &gt; i; i = i + 1 {
+                printMessages(fmt, "Hello ", "world")
+        }
+}
+</pre>
+
+<p>Zdrojový kód tohoto demonstračního příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_1.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_1.go</a>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Výsledky analýzy zdrojového kódu čtvrtého demonstračního příkladu nástrojem <i>go-critic</i></h2>
+
+<p>Nástroj <i>gocritic</i> se spouští s&nbsp;odlišnými parametry. Především je
+nutné předat parametr/příkaz <strong>check</strong> a následně lze
+s&nbsp;využitím parametrů <strong>-enable</strong> a <strong>-disable</strong>
+určit, která pravidla se mají použít a která popř.&nbsp;ne. Můžeme dokonce
+povolit všechna pravidla s&nbsp;využitím přepínače
+<strong>-enableAll</strong>:</p>
+
+<pre>
+$ <strong>gocritic check -enableAll ./...</strong>
+</pre>
+
+<p>Výsledky pro demonstrační příklad z&nbsp;předchozí kapitoly budou vypadat
+takto:</p>
+
+<pre>
+./gocritic_issues_1.go:17:22: assignOp: replace `i = i + 1` with `i++`
+./gocritic_issues_1.go:6:20: captLocal: `Format' should not be capitalized
+./gocritic_issues_1.go:7:2: commentFormatting: put a space between `//` and comment text
+./gocritic_issues_1.go:7:2: commentedOutCode: may want to remove commented-out code
+./gocritic_issues_1.go:9:5: emptyStringTest: replace `len(message1) != 0` with `message1 != ""`
+./gocritic_issues_1.go:9:27: emptyStringTest: replace `len(message2) != 0` with `message2 != ""`
+./gocritic_issues_1.go:15:8: importShadow: shadow of imported package 'fmt'
+./gocritic_issues_1.go:6:1: paramTypeCombine: func(Format string, message1 string, message2 string) could be replaced with func(Format, message1, message2 string)
+./gocritic_issues_1.go:10:22: wrapperFunc: use strings.ReplaceAll method in `strings.Replace(message1, " ", "", -1)`
+./gocritic_issues_1.go:17:14: yodaStyleExpr: consider to change order in expression to i &lt;= 10
+</pre>
+
+<p>Většina problémů resp.&nbsp;určitých nedostatků nalezených v&nbsp;kódu (a to
+velmi krátkém!) je snadno pochopitelná:</p>
+
+<ol>
+<li>Náhrada složitého výrazu i = i + 1 za idiomatičtější i++</li>
+<li>Parametr je vždy lokální a tudíž by měl začínat velkým písmenem</li>
+<li>Za znakem uvozujícím komentář se píše mezera</li>
+<li>Detekce zakomentovaného kódu &ndash; ten nemá co v&nbsp;repositáři pohledávat :-)</li>
+<li>Zajímavá a užitečná je detekce neidiomatického testu na prázdný řetězec &ndash; <strong>emptyStringTest</strong></li>
+<li>Dále je konstanta, proměnná či parametr pojmenován stejně jako importovaný balíček &ndash; což se mi popravdě stává prakticky neustále</li>
+<li>Detekce, že parametry se stejným typem mohou mít uveden typ společně (a to je zrovna u hlaviček funkcí užitečné)</li>
+<li>Další velmi užitečná je detekce použití zbytečně univerzálních funkcí namísto funkce speciální &ndash; <strong>strings.Replace/ReplaceAll</strong></li>
+<li>A konečně použití podmínky <strong>10 &gt; i</strong> namísto přece jen čitelnější varianty <strong>i &lt; = 10</strong></li>
+</ol>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Pátý demonstrační příklad s&nbsp;několika problematickými rysy s&nbsp;výsledkem jeho analýzy</h2>
+
+<p>Další demonstrační příklad obsahuje velmi zajímavou chybu (která se tam
+navíc může dostat kdykoli později). Prozatím nebudu prozrazovat jakou &ndash;
+nejprve se na zdrojový kód příkladu podívejte; výsledky analýzy budou uvedeny
+až pod zdrojovým kódem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "encoding/json"
+        "log"
+        "os"
+)
+&nbsp;
+<i>// PipelineLogEntry represents one log entry (record) read from log file.</i>
+type <strong>PipelineLogEntry</strong> struct {
+        Level    string `json:"levelname"`
+        Time     string `json:"asctime"`
+        Name     string `json:"name"`
+        Filename string `json:"filename"`
+        Message  string `json:"message"`
+}
+&nbsp;
+func <strong>readPipelineLogFile</strong>(filename string) ([]PipelineLogEntry, error) {
+        entries := []PipelineLogEntry{}
+&nbsp;
+        file, err := os.Open(filename)
+        if err != nil {
+                return entries, err
+        }
+&nbsp;
+        defer func() {
+                err := file.Close()
+&nbsp;
+                if err != nil {
+                        log.Println(err)
+                }
+        }()
+&nbsp;
+        scanner := bufio.NewScanner(file)
+        for scanner.Scan() {
+                entry := PipelineLogEntry{}
+                err = json.Unmarshal([]byte(scanner.Text()), &amp;entry)
+                if err != nil {
+                        log.Fatal(err)
+                } else {
+                        entries = append(entries, entry)
+                }
+        }
+&nbsp;
+        if err := scanner.Err(); err != nil {
+                return entries, err
+        }
+&nbsp;
+        return entries, nil
+}
+&nbsp;
+func <strong>main</strong>() {
+        readPipelineLogFile("foobar")
+}
+</pre>
+
+<p>Zdrojový kód tohoto demonstračního příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_2.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_2.go</a>.</p>
+
+<p>Pokusme se nyní zjistit potenciální problémy v&nbsp;kódu tohoto
+příkladu:</p>
+
+<pre>
+$ <strong>gocritic check -enableAll ./...</strong>
+</pre>
+
+<p>Výsledkem je detekce chyby, která nemusí být na první pohled viditelná
+&ndash; pokud se totiž zavolá funkce <strong>log.Fatal</strong>, neprovede se
+již blok (resp.&nbsp;anonymní funkce) definovaná
+v&nbsp;<strong>defer</strong>:</p>
+
+<pre>
+./gocritic_issues_2.go:40:4: exitAfterDefer: log.Fatal will exit, and `defer func(){...}(...)` will not run
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Šestý demonstrační příklad s&nbsp;několika problematickými rysy s&nbsp;výsledkem jeho analýzy</h2>
+
+<p>I další demonstrační příklad vypadá zdánlivě neškodně, ovšem na
+následujících několika řádcích nalezneme neuvěřitelných devět problematických
+rysů. Nejdříve se opět podívejme na zdrojový kód tohoto příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>new</strong>(len int, cap int) ([]int, int) {
+        vals := make([]int, len)
+        for i := 0; cap &gt; i; i = i + 1 {
+                vals = append(vals, i)
+                vals = append(vals, i*2)
+        }
+        return vals, len + cap
+}
+&nbsp;
+func <strong>main</strong>() {
+        vals, _ := new(0, 010)
+        fmt.Println(vals)
+        for i := 0; i &lt; len(vals); i++ {
+                vals[i] = 0
+        }
+
+}
+</pre>
+
+<p>Výsledek běhu nástroje <i>go-critic</i>:</p>
+
+<pre>
+./gocritic_issues_3.go:8:3: appendCombine: can combine chain of 2 appends into one
+./gocritic_issues_3.go:7:23: assignOp: replace `i = i + 1` with `i++`
+./gocritic_issues_3.go:5:10: builtinShadow: shadowing of predeclared identifier: len
+./gocritic_issues_3.go:5:19: builtinShadow: shadowing of predeclared identifier: cap
+./gocritic_issues_3.go:5:6: builtinShadowDecl: shadowing of predeclared identifier: new
+./gocritic_issues_3.go:15:13: octalLiteral: suspicious octal args in `new(0, 010)`
+./gocritic_issues_3.go:5:1: paramTypeCombine: func(len int, cap int) ([]int, int) could be replaced with func(len, cap int) ([]int, int)
+./gocritic_issues_3.go:17:2: sliceClear: rewrite as for-range so compiler can recognize this pattern
+./gocritic_issues_3.go:5:1: unnamedResult: consider giving a name to these results
+</pre>
+
+<p>Některé z&nbsp;potenciálních problémů už jsme mohli vidět v&nbsp;předchozích
+kapitolách:</p>
+
+<ol>
+<li>Náhrada složitého výrazu i = i + 1 za idiomatičtější i++</li>
+<li>Dále je konstanta, proměnná či parametr pojmenován stejně jako importovaný balíček &ndash; což se mi popravdě stává prakticky neustále</li>
+<li>Detekce, že parametry se stejným typem mohou mít uveden typ společně (a to je zrovna u hlaviček funkcí užitečné)</li>
+</ol>
+
+<p>To jsou však jen triviality. Zajímavé jsou další problematická místa
+kódu:</p>
+
+<ol>
+
+<li>Použití osmičkových hodnot začínajících pouze na nulu a nikoli dvojicí
+znaků 0o (což je mnohem lepší, protože programátor dává explicitně najevo svoje
+úmysly). Mimochodem &ndash; tyto problémy lze nalézt i přímo ve zdrojových
+kódech standardní knihovny jazyka Go.</li>
+
+<li>Pokus o vymazání řezu (nebo pole) počítanou smyčkou <strong>for</strong>,
+zatímco překladač dokáže rozeznat a optimalizovat smyčku typu
+<strong>for-each</strong></li>
+
+</ol>
+
+<p>Zdrojový kód tohoto demonstračního příkladu získáte na adrese <a
+href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_3.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_3.go</a>.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Příklad obsahující problematické části detekované oběma nástroji</h2>
+
+<p>Další příklad již známe, protože jsme se s&nbsp;ním setkali v&nbsp;části
+věnované nástroji <i>gosec</i>. Vyzkoušejme si tedy, jaké potenciální problémy
+(a zda vůbec jaké) v&nbsp;tomto zdrojovém kódu nalezne <i>go-critic</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+        "fmt"
+        "os"
+)
+&nbsp;
+func <strong>foo</strong>(arg string) {
+        db, err := sql.Open("sqlite3", ":memory:")
+        if err != nil {
+                panic(err)
+        }
+        rows, err := db.Query("SELECT * FROM foo WHERE name = " + arg)
+&nbsp;
+        if err != nil {
+                panic(err)
+        }
+        defer rows.Close()
+}
+&nbsp;
+func <strong>bar</strong>(arg string) {
+        db, err := sql.Open("sqlite3", ":memory:")
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        query := fmt.Sprintf("select * from foo where name = '%s'", arg)
+&nbsp;
+        rows, err := db.Query(query)
+        if err != nil {
+                panic(err)
+        }
+        defer rows.Close()
+}
+&nbsp;
+func <strong>main</strong>() {
+        foo("foo")
+        bar("bar")
+}
+</pre>
+
+<p>Výsledek možná není překvapující &ndash; používá se <strong>defer</strong>
+přímo na konci funkce, což je zbytečné (i když touto konstrukcí může
+programátor naznačovat, kdy se má příkaz vykonat):</p>
+
+<pre>
+./gocritic_gosec_issues.go:19:2: unnecessaryDefer: defer rows.Close() is placed just before return
+./gocritic_gosec_issues.go:34:2: unnecessaryDefer: defer rows.Close() is placed just before return
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: kupodivu se zrovna tento (velmi malý)
+problém objevuje i v&nbsp;produkčním kódu, což je pravděpodobně výsledek
+postupného přepisu funkcí, kdy se <strong>defer</strong> postupně posunuje
+směrem ke konci funkce.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Kód, který nebude vykonán optimálně</h2>
+
+<p>Užitečné mohou být i informace o tom, že nějaká část programového kódu
+nebude vykonána optimálně. Můžeme si to ostatně velmi snadno otestovat.
+Předpokládejme, že v&nbsp;programu pracujeme s&nbsp;touto jednoduchou datovou
+strukturou:</p>
+
+<pre>
+<i>// KafkaMessageLogEntry represents one log entry (record) read from log file.</i>
+type <strong>KafkaMessageLogEntry</strong> struct {
+        Level        string `json:"level"`
+        Time         string `json:"time"`
+        Message      string `json:"message"`
+        Type         string `json:"type"`
+        Error        string `json:"error"`
+        Topic        string `json:"topic"`
+        Offset       int    `json:"offset"`
+        Group        string `json:"group"`
+        Organization int    `json:"organization"`
+        Cluster      string `json:"cluster"`
+}
+</pre>
+
+<p>Funkce <strong>printReadEntry</strong> bude akceptovat tuto datovou
+strukturu jako parametr:</p>
+
+<pre>
+func <strong>printReadEntry</strong>(entry KafkaMessageLogEntry) {
+        fmt.Printf("%s %s %s %d %d %s\n", entry.Time, entry.Group, entry.Topic, entry.Offset, entry.Organization, entry.Cluster)
+}
+</pre>
+
+<p>To ovšem nemusí být optimální, protože nástroj <i>go-critic</i> odvodil, že
+při každém volání této funkce se bude muset přesunout 144 bajtů na zásobník,
+takže by mohlo být lepší pouze předat ukazatel na strukturu:</p>
+
+<pre>
+./temp/analyser.go:167:21: hugeParam: entry is heavy (144 bytes); consider passing it by pointer
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;hlediska <i>sémantiky</i> je
+pochopitelně lepší NEpoužívat ukazatel.</div></p>
+
+<p>V&nbsp;další funkci je detekováno, že se v&nbsp;každé iteraci oněch 144
+bajtů zkopíruje do lokální proměnné <strong>entry</strong>, což opět není
+optimální:</p>
+
+<pre>
+func <strong>filterConsumedMessages</strong>(entries []KafkaMessageLogEntry) []KafkaMessageLogEntry {
+        consumed := []KafkaMessageLogEntry{}
+&nbsp;
+        for _, entry := range entries {
+                if entry.Message == "Consumed" &amp;&amp; entry.Group != "" {
+                        consumed = append(consumed, entry)
+                }
+        }
+        return consumed
+}
+</pre>
+
+<p>Výsledek detekce:</p>
+
+<pre>
+./temp/analyser.go:124:2: rangeValCopy: each iteration copies 144 bytes (consider pointers or indexing)
+</pre>
+
+<p>Řešení by mohlo spočívat v&nbsp;tom, že by se vytvořila proměnná typu
+ukazatel na strukturu &ndash; v&nbsp;tomto ohledu bohužel jazyk Go neposkytuje
+lepší prostředky jak určit, že se sice má iterovat přes hodnoty
+v&nbsp;poli/řezu, ale stačí nám získat pouze ukazatel na prvek.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Kontrola zdrojových kódů knihoven jazyka Go nástrojem <i>go-critic</i></h2>
+
+<p>Pro zajímavost se můžeme pokusit o provedení kontroly zdrojových kódů
+dodávaných přímo s&nbsp;programovacím jazykem Go. Po instalaci Go se totiž
+v&nbsp;podadresáři <strong>src</strong> nachází mj.&nbsp;i zdrojové kódy ke
+standardním knihovnám, a to včetně jednotkových testů. Analýza s&nbsp;využitím
+nástrojů <i>gosec</i> a <i>go-critic</i> sice bude nějakou dobu trvat, ale
+uvidíme, že i přes velký rozsah těchto kódů (necelé dva miliony řádků) je
+nalezeno jen minimum potenciálních problémů &ndash; a to navíc mnohdy
+&bdquo;pouze&ldquo; v&nbsp;testech, v&nbsp;nichž se někdy musí ohýbat pravidla
+jak psát efektivní, idiomatický a korektní kód.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Statistika na závěr</h2>
+
+<p>Zdrojové kódy uložené v&nbsp;adresáři <strong>src</strong> (standardní, dnes
+již poněkud zastaralá instalace Go 1.17.1) mají 1903007 řádků a nástroj
+<i>go-critic</i> v&nbsp;nich nalezl pouze 2861 potenciálních problémů, většinou
+ovšem jen netypicky zapsaných výrazů. Celou statistiku je možné
+z&nbsp;nalezených problémů vygenerovat tímto jednoduchým skriptem:</p>
+
+<pre>
+from collections import Counter
+&nbsp;
+counter = Counter()
+&nbsp;
+with open("results.txt") as fin:
+    for i, line in enumerate(fin):
+        type = line.split(" ")[1][:-1]
+        counter[type] += 1
+&nbsp;
+for cnt, type in counter.most_common(30):
+    print(cnt, type)
+</pre>
+
+<p>Následuje tabulka s&nbsp;třiceti nejčastějšími typy problémů. Povšimněte si,
+že se skutečně většinou jedná o &bdquo;otočené&ldquo; operandy, parametry,
+jejichž typy lze zapsat jen jednou, popř.&nbsp;o detekci toho, že interní
+identifikátor se jmenuje stejně jako importovaný balíček:</p>
+
+<table>
+<tr><th>Test/problém</th><th>Počet případů</th></tr>
+<tr><td>yodaStyleExpr</td><td>358</td></tr>
+<tr><td>paramTypeCombine</td><td>237</td></tr>
+<tr><td>importShadow</td><td>208</td></tr>
+<tr><td>unnamedResult</td><td>207</td></tr>
+<tr><td>commentedOutCode</td><td>166</td></tr>
+<tr><td>builtinShadow</td><td>166</td></tr>
+<tr><td>ifElseChain</td><td>145</td></tr>
+<tr><td>typeUnparen</td><td>128</td></tr>
+<tr><td>emptyStringTest</td><td>127</td></tr>
+<tr><td>singleCaseSwitch</td><td>93</td></tr>
+<tr><td>octalLiteral</td><td>85</td></tr>
+<tr><td>captLocal</td><td>83</td></tr>
+<tr><td>assignOp</td><td>69</td></tr>
+<tr><td>hugeParam</td><td>64</td></tr>
+<tr><td>commentFormatting</td><td>64</td></tr>
+<tr><td>exitAfterDefer</td><td>59</td></tr>
+<tr><td>preferStringWriter</td><td>58</td></tr>
+<tr><td>redundantSprint</td><td>36</td></tr>
+<tr><td>unslice</td><td>34</td></tr>
+<tr><td>initClause</td><td>33</td></tr>
+<tr><td>elseif</td><td>32</td></tr>
+<tr><td>sloppyReassign</td><td>31</td></tr>
+<tr><td>filepathJoin</td><td>26</td></tr>
+<tr><td>httpNoBody</td><td>23</td></tr>
+<tr><td>preferWriteByte</td><td>22</td></tr>
+<tr><td>unlambda</td><td>21</td></tr>
+<tr><td>dupImport</td><td>18</td></tr>
+<tr><td>ptrToRefParam</td><td>17</td></tr>
+<tr><td>appendCombine</td><td>16</td></tr>
+<tr><td>nestingReduce</td><td>16</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: zajímavý je výskyt problémů typu
+<strong>exitAfterDefer</strong>, který se mimochodem hojně vyskytoval i
+v&nbsp;našich zdrojových kódech :-)</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech minule i dnes použitých demonstračních příkladů byly
+uloženy do staronového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/wccode">https://github.com/tisnik/wccode</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_missing_package.go</td><td>nekorektní zdrojový kód, v&nbsp;němž chybí deklarace balíčku</td><td><a href="https://github.com/tisnik/wccode/blob/master/01_missing_package.go">https://github.com/tisnik/wccode/blob/master/01_missing_package.go</a></td></tr>
+<tr><td> 2</td><td>02_parenthesis.go</td><td>chybně umístěná otevírací bloková závorka</td><td><a href="https://github.com/tisnik/wccode/blob/master/02_parenthesis.go">https://github.com/tisnik/wccode/blob/master/02_parenthesis.go</a></td></tr>
+<tr><td> 3</td><td>03_bad_syntax.go</td><td>chybně umístěné otevírací i uzavírací blokové závorky</td><td><a href="https://github.com/tisnik/wccode/blob/master/03_bad_syntax.go">https://github.com/tisnik/wccode/blob/master/03_bad_syntax.go</a></td></tr>
+<tr><td> 4</td><td>04_before_transform.go</td><td>zdrojový kód před transformací nástrojem <strong>gofmt</strong></td><td><a href="https://github.com/tisnik/wccode/blob/master/04_before_transform.go">https://github.com/tisnik/wccode/blob/master/04_before_transform.go</a></td></tr>
+<tr><td> 5</td><td>05_after_transform.go</td><td>zdrojový kód po transformaci nástrojem <strong>gofmt</strong></td><td><a href="https://github.com/tisnik/wccode/blob/master/05_after_transform.go">https://github.com/tisnik/wccode/blob/master/05_after_transform.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>06_integer_signed_types_checks.go</td><td>kontrola celočíselných konstant překladačem</td><td><a href="https://github.com/tisnik/wccode/blob/master/06_integer_signed_types_checks.go">https://github.com/tisnik/wccode/blob/master/06_integer_signed_types_checks.go</a></td></tr>
+<tr><td> 7</td><td>07_improper_conversion.go</td><td>kontrola prováděná při typových konverzích (celočíselné datové typy)</td><td><a href="https://github.com/tisnik/wccode/blob/master/07_improper_conversion.go">https://github.com/tisnik/wccode/blob/master/07_improper_conversion.go</a></td></tr>
+<tr><td> 8</td><td>08_fp_types_checks.go</td><td>kontrola prováděná při typových konverzích (typy s&nbsp;plovoucí řádovou čárkou)</td><td><a href="https://github.com/tisnik/wccode/blob/master/08_fp_types_checks.go">https://github.com/tisnik/wccode/blob/master/08_fp_types_checks.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>09_nil_map.go</td><td>pokus o zápis do takzvané nulové mapy (<i>nil map</i>)</td><td><a href="https://github.com/tisnik/wccode/blob/master/09_nil_map.go">https://github.com/tisnik/wccode/blob/master/09_nil_map.go</a></td></tr>
+<tr><td>10</td><td>10_nil_pointer.go</td><td>pokus o přístup do struktury přes nulový ukazatel (<i>nil pointer</i>)</td><td><a href="https://github.com/tisnik/wccode/blob/master/10_nil_pointer.go">https://github.com/tisnik/wccode/blob/master/10_nil_pointer.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>11_unreachable_code.go</td><td>zdrojový kód, jehož části nejsou dosažitelné</td><td><a href="https://github.com/tisnik/wccode/blob/master/11_unreachable_code.go">https://github.com/tisnik/wccode/blob/master/11_unreachable_code.go</a></td></tr>
+<tr><td>12</td><td>12_shift.go</td><td>použití bitového posunu o 70 bitů v&nbsp;64bitové proměnné</td><td><a href="https://github.com/tisnik/wccode/blob/master/12_shift.go">https://github.com/tisnik/wccode/blob/master/12_shift.go</a></td></tr>
+<tr><td>13</td><td>13_printf_checks.go</td><td>kontrola parametrů funkce <strong>fmt.Printf</strong></td><td><a href="https://github.com/tisnik/wccode/blob/master/13_printf_checks.go">https://github.com/tisnik/wccode/blob/master/13_printf_checks.go</a></td></tr>
+<tr><td>14</td><td>14_sprintf_checks.go</td><td>kontrola parametrů funkce <strong>fmt.Sprintf</strong> i její návratové hodnoty</td><td><a href="https://github.com/tisnik/wccode/blob/master/14_sprintf_checks.go">https://github.com/tisnik/wccode/blob/master/14_sprintf_checks.go</a></td></tr>
+<tr><td>15</td><td>15_read_byte_methods.go</td><td>kontrola signatury metody ze známého rozhraní</td><td><a href="https://github.com/tisnik/wccode/blob/master/15_read_byte_methods.go">https://github.com/tisnik/wccode/blob/master/15_read_byte_methods.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>16_simple_server.go</td><td>jednoduchý HTTP server, ne všechny chybové kódy jsou ošetřeny</td><td><a href="https://github.com/tisnik/wccode/blob/master/16_simple_server.go">https://github.com/tisnik/wccode/blob/master/16_simple_server.go</a></td></tr>
+<tr><td>17</td><td>17_png_output.go</td><td>zápis do PNG, opět ne všechny chybové kódy jsou ošetřeny</td><td><a href="https://github.com/tisnik/wccode/blob/master/17_png_output.go">https://github.com/tisnik/wccode/blob/master/17_png_output.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>18</td><td>18_cyclomatic_complexity.go</td><td>kód pro měření cyklomatické složitosti</td><td><a href="https://github.com/tisnik/wccode/blob/master/18_cyclomatic_complexity.go">https://github.com/tisnik/wccode/blob/master/18_cyclomatic_complexity.go</a></td></tr>
+<tr><td>19</td><td>19_cyclomatic_complexity.go</td><td>kód pro měření cyklomatické složitosti</td><td><a href="https://github.com/tisnik/wccode/blob/master/19_cyclomatic_complexity.go">https://github.com/tisnik/wccode/blob/master/19_cyclomatic_complexity.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>20</td><td>gosec_issues_1.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástrojem <i>gosec</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gosec_issues_1.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_1.go</a></td></tr>
+<tr><td>21</td><td>gosec_issues_2.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástrojem <i>gosec</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gosec_issues_2.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_2.go</a></td></tr>
+<tr><td>22</td><td>gosec_issues_1_nosec.go</td><td>použití poznámky <strong>#nosec</strong> pro různé bloky kódu</td><td><a href="https://github.com/tisnik/wccode/blob/master/gosec_issues_1_nosec.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_1_nosec.go</a></td></tr>
+<tr><td>23</td><td>gosec_issues_2_nosec.go</td><td>použití poznámky <strong>#nosec</strong> pro různé bloky kódu</td><td><a href="https://github.com/tisnik/wccode/blob/master/gosec_issues_2_nosec.go">https://github.com/tisnik/wccode/blob/master/gosec_issues_2_nosec.go</a></td></tr>
+<tr><td>24</td><td>gocritic_issues_1.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástrojem <i>go-critic</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_1.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_1.go</a></td></tr>
+<tr><td>25</td><td>gocritic_issues_2.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástrojem <i>go-critic</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_2.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_2.go</a></td></tr>
+<tr><td>26</td><td>gocritic_issues_3.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástrojem <i>go-critic</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gocritic_issues_3.go">https://github.com/tisnik/wccode/blob/master/gocritic_issues_3.go</a></td></tr>
+<tr><td>27</td><td>gocritic_gosec_issues.go</td><td>zdrojový kód s&nbsp;několika problémy detekovatelnými nástroji <i>gosec</i> i <i>go-critic</i></td><td><a href="https://github.com/tisnik/wccode/blob/master/gocritic_gosec_issues.go">https://github.com/tisnik/wccode/blob/master/gocritic_gosec_issues.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>28</td><td>stat.py</td><td>statistika potenciálních problémů nalezených ve zdrojových kódech knihoven pro jazyk Go</td><td><a href="https://github.com/tisnik/wccode/blob/master/stat.py">https://github.com/tisnik/wccode/blob/master/stat.py</a></td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: tyto příklady nebyly zařazeny do <a
+href="https://github.com/tisnik/go-root">repositáře používaného pro příklady
+z&nbsp;tohoto seriálu</a>, a to mj.&nbsp;i z&nbsp;toho důvodu, aby nějakým
+omylem neposloužily ke studijním účelům :-)</div></p>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Popis příkazu <strong>gofmt</strong><br />
+<a href="https://pkg.go.dev/cmd/gofmt">https://pkg.go.dev/cmd/gofmt</a>
+</li>
+
+<li>Popis příkazu <strong>govet</strong><br />
+<a href="https://pkg.go.dev/cmd/vet">https://pkg.go.dev/cmd/vet</a>
+</li>
+
+<li>Repositář nástroje <strong>errcheck</strong><br />
+<a href="https://github.com/kisielk/errcheck">https://github.com/kisielk/errcheck</a>
+</li>
+
+<li>Repositář nástroje <strong>goconst</strong><br />
+<a href="https://github.com/jgautheron/goconst">https://github.com/jgautheron/goconst</a>
+</li>
+
+<li>Repositář nástroje <strong>gocyclo</strong><br />
+<a href="https://github.com/fzipp/gocyclo">https://github.com/fzipp/gocyclo</a>
+</li>
+
+<li>Repositář nástroje <strong>ineffassign</strong><br />
+<a href="https://github.com/gordonklaus/ineffassign">https://github.com/gordonklaus/ineffassign</a>
+</li>
+
+<li>Repositář nástroje <strong>gosec</strong><br />
+<a href="https://github.com/securego/gosec">https://github.com/securego/gosec</a>
+</li>
+
+<li>Repositář nástroje <strong>go-critic</strong><br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Seznam testů prováděných nástrojem <strong>go-critic</strong><br />
+<a href="https://go-critic.com/overview">https://go-critic.com/overview</a>
+</li>
+
+<li>Welcome go-critic<br />
+<a href="https://itnext.io/welcome-go-critic-a26b6e30f1c6">https://itnext.io/welcome-go-critic-a26b6e30f1c6</a>
+</li>
+
+<li>Don't defer Close() on writable files<br />
+<a href="https://www.joeshaw.org/dont-defer-close-on-writable-files/">https://www.joeshaw.org/dont-defer-close-on-writable-files/</a>
+</li>
+
+<li>5 Gotchas of Defer in Go — Part I<br />
+<a href="https://blog.learngoprogramming.com/gotchas-of-defer-in-go-1-8d070894cb01">https://blog.learngoprogramming.com/gotchas-of-defer-in-go-1-8d070894cb01</a>
+</li>
+
+<li>Golang Guide: A List of Top Golang Frameworks, IDEs &amp; Tools<br />
+<a href="https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/">https://blog.intelligentbee.com/2017/08/14/golang-guide-list-top-golang-frameworks-ides-tools/</a>
+</li>
+
+<li>What is the point of slice type in Go?<br />
+<a href="https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go">https://stackoverflow.com/questions/2098874/what-is-the-point-of-slice-type-in-go</a>
+</li>
+
+<li>The curious case of Golang array and slices<br />
+<a href="https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335">https://medium.com/@hackintoshrao/the-curious-case-of-golang-array-and-slices-2565491d4335</a>
+</li>
+
+<li>Introduction to Slices in Golang<br />
+<a href="https://www.callicoder.com/golang-slices/">https://www.callicoder.com/golang-slices/</a>
+</li>
+
+<li>Golang: Understanding 'null' and nil<br />
+<a href="https://newfivefour.com/golang-null-nil.html">https://newfivefour.com/golang-null-nil.html</a>
+</li>
+
+<li>What does nil mean in golang?<br />
+<a href="https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang">https://stackoverflow.com/questions/35983118/what-does-nil-mean-in-golang</a>
+</li>
+
+<li>nils In Go<br />
+<a href="https://go101.org/article/nil.html">https://go101.org/article/nil.html</a>
+</li>
+
+<li>Go slices are not dynamic arrays<br />
+<a href="https://appliedgo.net/slices/">https://appliedgo.net/slices/</a>
+</li>
+
+<li>The zero value of a slice is not nil<br />
+<a href="https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil">https://stackoverflow.com/questions/30806931/the-zero-value-of-a-slice-is-not-nil</a>
+</li>
+
+<li>Go-tcha: When nil != nil<br />
+<a href="https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic">https://dev.to/pauljlucas/go-tcha-when-nil--nil-hic</a>
+</li>
+
+<li>Nils in Go<br />
+<a href="https://www.doxsey.net/blog/nils-in-go">https://www.doxsey.net/blog/nils-in-go</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
