@@ -1,0 +1,1825 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vývoj služeb postavených na systému Apache Kafka v jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vývoj služeb postavených na systému Apache Kafka v jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Dnes si ukážeme, jak lze použít základní funkce Apache Kafky v jazyku Go. Demonstrační příklady budou využívat dvě knihovny, a to konkrétně confluent-kafka-go a Sarama. Důležitým tématem je však i testování aplikací, které jsou založeny na Kafce; zejména se to týká jednotkových testů.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vývoj služeb postavených na systému Apache Kafka v&nbsp;jazyku Go</a></p>
+<p><a href="#k02">2. Knihovna <strong>confluent-kafka-go</strong> (Confluent's Golang Client for Apache Kafka)</a></p>
+<p><a href="#k03">3. Producent zpráv založený na knihovně <strong>confluent-kafka-go</strong></a></p>
+<p><a href="#k04">4. Úplný zdrojový kód producenta zpráv</a></p>
+<p><a href="#k05">5. Konzument zpráv založený na knihovně <strong>confluent-kafka-go</strong></a></p>
+<p><a href="#k06">6. Úplný zdrojový kód konzumenta zpráv</a></p>
+<p><a href="#k07">7. Knihovna <strong>Sarama</strong></a></p>
+<p><a href="#k08">8. Producent zpráv založený na knihovně <strong>Sarama</strong></a></p>
+<p><a href="#k09">9. Úplný zdrojový kód producenta zpráv</a></p>
+<p><a href="#k10">10. Konzument zpráv založený na knihovně <strong>Sarama</strong></a></p>
+<p><a href="#k11">11. Modulární podoba aplikace představující producenta zpráv</a></p>
+<p><a href="#k12">12. Využití nového rozhraní i jeho implementace</a></p>
+<p><a href="#k13">13. Modulární podoba aplikace představující konzumenta zpráv</a></p>
+<p><a href="#k14">14. Využití nového rozhraní i jeho implementace</a></p>
+<p><a href="#k15">15. <strong>Sarama/mocks</strong> a jednotkové testy</a></p>
+<p><a href="#k16">16. Mock objekty dostupné v&nbsp;knihovně <strong>Sarama/mocks</strong></a></p>
+<p><a href="#k17">17. Ukázka konstrukce jednotkového testu</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na relevantní články na Rootu</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Tvorba služeb postavených na systému Apache Kafka v&nbsp;jazyku Go</h2>
+
+<p>S&nbsp;užitečným, populárním a dnes velmi často nasazovaným nástrojem
+<i>Apache Kafka</i> jsme se již na stránkách Rootu několikrát setkali, a to
+například v&nbsp;článcích <a
+href="https://www.root.cz/clanky/pouziti-nastroje-apache-kafka-v-aplikacich-zalozenych-na-mikrosluzbach/">Použití
+nástroje Apache Kafka v&nbsp;aplikacích založených na mikroslužbách </a>, <a
+href="https://www.root.cz/clanky/apache-kafka-distribuovana-streamovaci-platforma/">Apache
+Kafka: distribuovaná streamovací platforma</a> a taktéž v&nbsp;trojici článků
+<a
+href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw/">Pokročilý
+streaming založený na Apache Kafce, jazyku Clojure a knihovně Jackdaw</a>, <a
+href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw-2-cast/">Pokročilý
+streaming založený na Apache Kafce, jazyku Clojure a knihovně Jackdaw (2.
+část)</a> a <a
+href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-projektu-apache-kafka-jazyku-clojure-a-knihovne-jackdaw-streamy-a-kolony/">Pokročilý
+streaming založený na projektu Apache Kafka, jazyku Clojure a knihovně Jackdaw
+(streamy a kolony)</a>. Pro tuto asi nejznámější <i>streamovací platformu</i>
+existují knihovny realizující rozhraní pro různé programovací jazyky a jejich
+ekosystémy. Tato rozhraní jsou vypsána v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Jazyk/platforma</th></tr>
+<tr><td> 1</td><td><a href="https://github.com/edenhill/librdkafka">C/C++</a></td></tr>
+<tr><td> 2</td><td><a href="https://github.com/confluentinc/confluent-kafka-python">Python</a></td></tr>
+<tr><td> 3</td><td><a href="https://github.com/Shopify/sarama">Go/Golang</a> <a href="https://github.com/confluentinc/confluent-kafka-go">Go/Golang</a></td></tr>
+<tr><td> 4</td><td><a href="https://github.com/klarna/brod">Erlang</a></td></tr>
+<tr><td> 5</td><td><a href="https://github.com/confluentinc/confluent-kafka-dotnet">.NET</a></td></tr>
+<tr><td> 6</td><td><a href="https://github.com/zendesk/ruby-kafka">Ruby</a></td></tr>
+<tr><td> 7</td><td><a href="https://github.com/Blizzard/node-rdkafka">Node.js</a></td></tr>
+<tr><td> 8</td><td><a href="https://github.com/TrackingSoft/Kafka">Perl</a></td></tr>
+<tr><td> 9</td><td><a href="https://github.com/EVODelavega/phpkafka">PHP</a></td></tr>
+<tr><td>10</td><td><a href="https://github.com/spicavigo/kafka-rust">Rust</a></td></tr>
+<tr><td>11</td><td><a href="https://github.com/wurstmeister/storm-kafka-0.8-plus">Storm</a></td></tr>
+<tr><td>12</td><td><a href="https://github.com/elodina/scala-kafka">Scala (DSL jazyk)</a></td></tr>
+<tr><td>13</td><td><a href="https://github.com/pingles/clj-kafka">Clojure</a></td></tr>
+<tr><td>14</td><td><a href="https://github.com/gerritjvv/kafka-fast">Clojure</a></td></tr>
+<tr><td>15</td><td><a href="https://github.com/kellanburket/franz">Swift</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td><a href="https://github.com/edenhill/kafkacat">CLI (stdin/stdout)</a></td></tr>
+</table>
+
+<p>Dnes si ukážeme, jak lze použít základní funkce Apache Kafky <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;programovacím
+jazyku Go</a>. Demonstrační příklady budou využívat dvě knihovny, a to
+konkrétně <strong>confluent-kafka-go</strong> a <strong>Sarama</strong>.
+Důležitým tématem je však i testování aplikací, které jsou založeny na Kafce;
+zejména se to týká jednotkových testů. Tomuto tématu je věnována druhá polovina
+článku, která tak nepřímo navazuje na dvojici článků <a
+href="https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim/">Jazyk
+Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím</a> a <a
+href="https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim-dokonceni/">Jazyk
+Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím
+(dokončení)</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: jako broker Apache Kafka, tak i
+ZooKeeper zapisují poměrně velké množství dat na disk. Pokud Kafku spouštíte
+lokálně pouze pro účely vývoje (a tedy bez reálných dat, které je zapotřebí
+zachovat), může být užitečné všechny zápisy provádět na <i>ramdisk</i> &ndash;
+výsledkem bude jak rychlejší start obou procesů (cca 2&times; urychleno), tak i
+menší &bdquo;opotřebování&ldquo; SSD. Konkrétně na mém vývojovém počítači mám
+vytvořen ramdisk o velikosti jednoho gigabajtu, který je připojen do adresáře
+<strong>/tmp/ramdisk</strong>. Konfigurace Apache Kafky i ZooKeepera je nutné
+nepatrně pozměnit, aby se pracovní data ukládala do tohoto adresáře
+(resp.&nbsp;přesněji řečeno do podadresářů). Konkrétní nastavení je ukázáno
+v&nbsp;dalším odstavci.</div></p>
+
+<p>Konfigurace ZooKeepera je uložena v&nbsp;souboru
+<strong>config/zookeeper.properties</strong>:</p>
+
+<pre>
+...
+...
+...
+# the directory where the snapshot is stored.
+<strong>dataDir=/tmp/ramdisk/zookeeper</strong>
+# the port at which the clients will connect
+clientPort=2181
+# disable the per-ip limit on the number of connections since this is a non-production config
+maxClientCnxns=0
+# Disable the adminserver by default to avoid port conflicts.
+# Set the port to something non-conflicting if choosing to enable this
+admin.enableServer=false
+# admin.serverPort=8080
+&nbsp;
+# Enable snapshot.trust.empty config if the ZK upgrade from 3.4.X to 3.5.6 is failing
+# with "java.io.IOException: No snapshot found, but there are log entries" error.
+# Check upgrade docs for more details.
+# snapshot.trust.empty=true
+...
+...
+...
+</pre>
+
+<p>Konfigurace brokera je uložena v&nbsp;souboru <strong></strong>:</p>
+
+<pre>
+...
+...
+...
+############################# Log Basics #############################
+&nbsp;
+# A comma separated list of directories under which to store log files
+<strong>log.dirs=/tmp/ramdisk/kafka-logs</strong>
+&nbsp;
+# The default number of log partitions per topic. More partitions allow greater
+# parallelism for consumption, but this will also result in more files across
+# the brokers.
+num.partitions=1
+&nbsp;
+# The number of threads per data directory to be used for log recovery at startup and flushing at shutdown.
+# This value is recommended to be increased for installations with data dirs located in RAID array.
+num.recovery.threads.per.data.dir=1
+&nbsp;
+############################# Internal Topic Settings  #############################
+# The replication factor for the group metadata internal topics "__consumer_offsets" and "__transaction_state"
+# For anything other than development testing, a value greater than 1 is recommended to ensure availability such as 3.
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Knihovna <strong>confluent-kafka-go</strong> (Confluent's Golang Client for Apache Kafka)</h2>
+
+<p>Pro komunikaci s&nbsp;Apache Kafkou z&nbsp;programovacího jazyka Go lze
+využít dvě knihovny. První z&nbsp;nich se jmenuje
+<strong>confluent-kafka-go</strong> neboli v&nbsp;lidské variantě
+<i>Confluent's Golang Client for Apache Kafka</i>. Druhá z&nbsp;těchto knihoven
+má název <strong>Sarama</strong>. Knihovna <strong>confluent-kafka-go</strong>
+nabízí programátorům spíše vysokoúrovňové operace se systémem Apache Kafka, což
+může být pro mnoho aplikací dostačující. Naproti tomu knihovna Sarama před
+programátorem odhaluje i některé nízkoúrovňové operace související se samotným
+komunikačním protokolem, takže tvorba aplikací může být nepatrně složitější,
+ale o to zajímavější (většinou si ovšem nad Saramou programátoři vytvoří
+vlastní zjednodušené rozhraní).</p>
+
+<p>Začněme popisem zcela základních operací poskytovaných knihovnou
+<strong>confluent-kafka-go</strong>. Tato knihovna je sice naprogramovaná
+v&nbsp;jazyce Go, ovšem pro svoji korektní činnost vyžaduje i nativní knihovnu
+nazvanou <strong>librdkafka</strong>, kterou lze nainstalovat buď
+z&nbsp;repositářů dané distribuce, nebo běžným postupem:</p>
+
+<pre>
+$ <strong>git clone https://github.com/edenhill/librdkafka.git</strong>
+$ <strong>cd librdkafka</strong>
+$ <strong>./configure --prefix /usr</strong>
+$ <strong>make</strong>
+$ <strong>sudo make install</strong>
+</pre>
+
+<p>Dále je ještě před instalací knihovny pro Go většinou nutné nastavit
+<strong>PKG_CONFIG_PATH</strong> (pokud již není korektně nastavena):</p>
+
+<pre>
+$ <strong>export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig/</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: předchozí krok na některých systémech
+není nutné provádět, ovšem pokud uvidíte chybovou zprávu, že nelze nalézt
+knihovnu <strong>librdkafka</strong> kvůli problémům s&nbsp;<i>pkgconfig</i>,
+mělo by nastavení proměnné <strong>PKG_CONFIG_PATH</strong> pomoci.</div></p>
+
+<p>Stažení a překlad knihovny <strong>confluent-kafka-go</strong> pro jazyk Go
+je posléze již triviální a měl by být proveden bez komplikací:</p>
+
+<pre>
+$ <strong>go get -u gopkg.in/confluentinc/confluent-kafka-go.v1/kafka</strong>
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Producent zpráv založený na knihovně <strong>confluent-kafka-go</strong></h2>
+
+<p>Nyní si ukažme, jakým způsobem je možné vytvořit producenta zpráv
+v&nbsp;programovacím jazyce Go s&nbsp;využitím knihovny
+<strong>confluent-kafka-go</strong>. Pro připojení ke Kafce a posílání zpráv
+musíme znát nejméně dva údaje &ndash; počítač a port, na kterém běží broker, a
+taktéž jméno tématu (<i>topic</i>):</p>
+
+<pre>
+const (
+        server = "localhost"
+)
+&nbsp;
+topic := "upload"
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: téma je uloženo v&nbsp;řetězci a nikoli
+v&nbsp;konstantě, protože budeme potřebovat adresu tohoto řetězce (což je,
+pravda, poněkud nešikovné řešení).</div></p>
+
+<p>Vytvoření instance datové struktury představující producenta se zajištěním
+jeho destrukce (odpojení) na konci příslušné funkce může být naprogramováno
+následovně:</p>
+
+<pre>
+producer, err := <u>kafka.NewProducer</u>(&amp;kafka.ConfigMap{
+        "bootstrap.servers": server,
+})
+&nbsp;
+<i>// kontrola chyby při připojování ke Kafce</i>
+if err != nil {
+        panic(err)
+}
+&nbsp;
+<i>// producenta zpráv je nutné na konci odpojit</i>
+defer <u>producer.Close</u>()
+</pre>
+
+<p>Samotné vytváření zpráv s&nbsp;jejich naformátováním (do řetězce), převodem
+na pole bajtů a posíláním do Kafky vypadá následovně:</p>
+
+<pre>
+for i := 0; i &lt; 100; i++ {
+        text := fmt.Sprintf("Message #%d", i)
+        <u>producer.Produce</u>(&amp;kafka.Message{
+                TopicPartition: kafka.TopicPartition{Topic: &amp;topic, Partition: kafka.PartitionAny},
+                Value:          []byte(text),
+        }, nil)
+}
+</pre>
+
+<p>Vidíme, že je zapotřebí specifikovat téma (<i>topic</i>) a popř.&nbsp;i
+sekci (<i>partition</i>). Samotná zpráva je reprezentována polem bajtů, může se
+tedy jednat o libovolná data.</p>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si toho, že musíme předávat
+odkaz (referenci) na jméno tématu, což je důvod, proč není možné použít
+konstantu (k&nbsp;té nelze v&nbsp;Go získat adresu).</div></p>
+
+<p>Navíc je ovšem někdy vhodné asynchronně reagovat na události, které mohou
+při práci se systémem Apache Kafky nastat. Asynchronní zpracování je v&nbsp;Go
+přímočaré &ndash; použijeme k&nbsp;tomu takzvanou <i>gorutinu</i> a budeme
+reagovat na případné chyby a informace o doručení zprávy:</p>
+
+<pre>
+go func() {
+        for event := range producer.Events() {
+                switch ev := event.(type) {
+                case *kafka.Message:
+                        if ev.TopicPartition.Error != nil {
+                                fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+                        } else {
+                                fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+                        }
+                }
+        }
+}()
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto jednoduchém demonstračním
+příkladu se nečeká na korektní ukončení této gorutiny &ndash; aplikace bude
+ukončena po všech blocích <strong>defer</strong> ve funkci
+<strong>main</strong>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Úplný zdrojový kód producenta zpráv</h2>
+
+<p>Úplný zdrojový kód výše popsaného producenta zpráv naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_producer.go">https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_producer.go</a>:</p>
+
+<pre>
+<i>// Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou</i>
+<i>// confluent-kafka-go: implementace producenta zpráv.</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "fmt"
+        "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+)
+&nbsp;
+const (
+        server = "localhost"
+)
+&nbsp;
+func main() {
+        topic := "upload"
+&nbsp;
+        <i>// konstrukce producenta</i>
+        producer, err := kafka.NewProducer(&amp;kafka.ConfigMap{
+                "bootstrap.servers": server,
+        })
+&nbsp;
+        <i>// kontrola chyby při připojování ke Kafce</i>
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// producenta zpráv je nutné na konci odpojit</i>
+        defer producer.Close()
+&nbsp;
+        <i>// funkce volaná pro každou událost, která při práci s Kafkou může nastat</i>
+        go func() {
+                for event := range producer.Events() {
+                        switch ev := event.(type) {
+                        case *kafka.Message:
+                                if ev.TopicPartition.Error != nil {
+                                        fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+                                } else {
+                                        fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+                                }
+                        }
+                }
+        }()
+&nbsp;
+        <i>// vytváření a produkce zpráv posílaných do zvoleného tématu</i>
+        for i := 0; i &lt; 100; i++ {
+                text := fmt.Sprintf("Message #%d", i)
+                producer.Produce(&amp;kafka.Message{
+                        TopicPartition: kafka.TopicPartition{Topic: &amp;topic, Partition: kafka.PartitionAny},
+                        Value:          []byte(text),
+                }, nil)
+        }
+        producer.Flush(15 * 1000)
+}
+</pre>
+
+<p>Překlad tohoto producenta lze provést buď s&nbsp;tím, že při spuštění bude
+vyžadována dynamicky linkovaná knihovna <strong>librdkafka</strong>:</p>
+
+<pre>
+$ <strong>go build producer1.go</strong>
+&nbsp;
+$ <strong>ldd ./producer1</strong>
+        linux-vdso.so.1 (0x00007ffc70b8e000)
+        librdkafka.so.1 =&gt; not found
+        libpthread.so.0 =&gt; /lib64/libpthread.so.0 (0x00007ffb2b6f8000)
+        libc.so.6 =&gt; /lib64/libc.so.6 (0x00007ffb2b342000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007ffb2b916000)
+</pre>
+
+<p>Alternativně lze vynutit statické slinkování, což je v&nbsp;tomto případě
+podle mého názoru lepší řešení (není zapotřebí nastavovat
+<strong>LD_LIBRARY_PATH</strong> atd. a statické linkování je ve světě Go
+používáno velmi často):</p>
+
+<pre>
+$ <strong>go build -tags static producer1.go</strong>
+&nbsp;
+$ <strong>ldd ./producer1</strong>
+        linux-vdso.so.1 (0x00007ffdd3156000)
+        libm.so.6 =&gt; /lib64/libm.so.6 (0x00007f424359c000)
+        libz.so.1 =&gt; /lib64/libz.so.1 (0x00007f4243385000)
+        libdl.so.2 =&gt; /lib64/libdl.so.2 (0x00007f4243181000)
+        libpthread.so.0 =&gt; /lib64/libpthread.so.0 (0x00007f4242f63000)
+        librt.so.1 =&gt; /lib64/librt.so.1 (0x00007f4242d5b000)
+        libc.so.6 =&gt; /lib64/libc.so.6 (0x00007f42429a5000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f42438e7000)
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Konzument zpráv založený na knihovně <strong>confluent-kafka-go</strong></h2>
+
+<p>Konzument zpráv naprogramovaný v&nbsp;jazyce Go, jenž je opět založený na
+knihovně <strong>confluent-kafka-go</strong>, je postaven na použití datové
+struktury pojmenované <strong>Consumer</strong>:</p>
+
+<pre>
+consumer, err := <u>kafka.NewConsumer</u>(&amp;kafka.ConfigMap{
+        "bootstrap.servers": server,
+        "group.id":          group_id,
+        "auto.offset.reset": "earliest",
+})
+<i>// kontrola chyby při připojování ke Kafce</i>
+if err != nil {
+        panic(err)
+}
+&nbsp;
+<i>// i konzumenta je nutné na konci uzavřít</i>
+defer <u>consumer.Close</u>()
+</pre>
+
+<p>Dále se přihlásíme k&nbsp;příjmu zpráv se zadaným tématem (nebo tématy,
+protože lze předat řez s&nbsp;větším množstvím témat):</p>
+
+<pre>
+<u>consumer.SubscribeTopics</u>([]string{topic}, nil)
+</pre>
+
+<p>Příjem zpráv (s&nbsp;případným čekáním na nové zprávy) je řešen
+v&nbsp;nekonečné smyčce, v&nbsp;níž se současně kontroluje, zda nedošlo
+k&nbsp;nějaké chybě:</p>
+
+<pre>
+for {
+        message, err := <u>consumer.ReadMessage</u>(-1)
+        if err == nil {
+                fmt.Printf("Message on %s: %s %s\n", message.TopicPartition, string(message.Key), string(message.Value))
+        } else {
+                fmt.Printf("Consumer error: %v (%v)\n", err, message)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že u zprávy můžeme
+zjistit, ze které sekce (<i>partition</i>) byla přečtena. Samotné informace,
+kterou zpráva nese, jsou rozděleny na klíč (<i>key</i>) a hodnotu
+(<i>value</i>), což jsou sekvence bajtů (a mohou tedy obsahovat
+cokoli).</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Úplný zdrojový kód konzumenta zpráv</h2>
+
+<p>Úplný zdrojový kód výše popsaného konzumenta zpráv naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_consumer.go">https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_consumer.go</a>:</p>
+
+<pre>
+<i>// Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou</i>
+<i>// confluent-kafka-go: implementace konzumenta zpráv.</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "fmt"
+        "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+)
+&nbsp;
+const (
+        server   = "localhost:9092"
+        topic    = "upload"
+        group_id = "group1"
+)
+&nbsp;
+func main() {
+        <i>// konstrukce konzumenta</i>
+        consumer, err := kafka.NewConsumer(&amp;kafka.ConfigMap{
+                "bootstrap.servers": server,
+                "group.id":          group_id,
+                "auto.offset.reset": "earliest",
+        })
+&nbsp;
+        <i>// kontrola chyby při připojování ke Kafce</i>
+        if err != nil {
+                panic(err)
+        }
+&nbsp;
+        <i>// i konzumenta je nutné na konci uzavřít</i>
+        defer consumer.Close()
+&nbsp;
+        <i>// přihlášení konzumenta do zvoleného tématu (či témat)</i>
+        consumer.SubscribeTopics([]string{topic}, nil)
+&nbsp;
+        <i>// postupné čtení zpráv, které byly do zvoleného tématu publikovány</i>
+        for {
+                message, err := consumer.ReadMessage(-1)
+                if err == nil {
+                        fmt.Printf("Message on %s: %s %s\n", message.TopicPartition, string(message.Key), string(message.Value))
+                } else {
+                        fmt.Printf("Consumer error: %v (%v)\n", err, message)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Knihovna <strong>Sarama</strong></h2>
+
+<p>Ve druhé části dnešního článku se seznámíme se základními možnostmi
+poskytovanými knihovnou nazvanou <strong>Sarama</strong>. Tato knihovna je opět
+určena pro komunikaci mezi aplikacemi vyvinutými v&nbsp;programovacím jazyku Go
+na jedné straně a Apache Kafkou na straně druhé. Sarama je <a
+href="https://github.com/Shopify/sarama/search?l=Go">kompletně naprogramována
+v&nbsp;jazyku Go</a>, takže nevyžaduje ani nativní knihovnu
+<strong>librdkafka</strong> (<a
+href="https://github.com/edenhill/librdkafka">https://github.com/edenhill/librdkafka</a>)
+ani JVM. Zajímavé je, že Sarama podporuje jak vysokoúrovňový přístup ke Kafce,
+tak i přístup na nižší úrovni, v&nbsp;němž se &bdquo;odhalují&ldquo; některé
+vlastnosti protokolu Apache Kafky. Podobně jako tomu bylo u předchozí knihovny
+si i nyní ukážeme, jak bude vypadat jednoduchý producent zpráv i jejich
+konzument. Posléze si ukážeme nepatrně složitější kód použitý v&nbsp;reálném
+projektu.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Producent zpráv založený na knihovně <strong>Sarama</strong></h2>
+
+<p>Ukažme si nyní, jak může vypadat jednoduchý producent zpráv posílaných do
+Apache Kafky. Na rozdíl od předchozích demonstračních příkladů bude producent
+založen na použití knihovny <strong>Sarama</strong>. V&nbsp;knihovně
+<strong>Sarama</strong> existují dva typy producentů zpráv &ndash; synchronní a
+asynchronní. Synchronní producent, který je představován instancí <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#SyncProducer">SyncProducer</a>,
+je blokující, tj.&nbsp;aktuálně běžící gorutina musí počkat, až je zpráva
+poslána. Naproti tomu asynchronní producent, jenž je představován instancí <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#AsyncProducer">AsyncProducer</a>,
+se z&nbsp;programátorského pohledu chová jako kanál s&nbsp;kapacitou &ndash;
+zprávy jsou tedy posílány na pozadí (asynchronně).</p>
+
+<p>Základními konfiguračními parametry jsou adresa brokera a jméno tématu
+(topicu):</p>
+
+<pre>
+const (
+        <i>// KafkaConnectionString obsahuje jméno počítače a port, na kterém běží Kafka broker</i>
+        KafkaConnectionString = "localhost:9092"
+&nbsp;
+        <i>// KafkaTopic obsahuje jméno tématu</i>
+        KafkaTopic = "test-topic"
+)
+</pre>
+
+<p>V&nbsp;demonstračním příkladu použijeme synchronního producenta zpráv,
+kterému je nutné při jeho inicializaci konstruktorem <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#NewSyncProducer">NewSyncProducer</a>
+předat adresy brokerů (minimálně jednoho brokera) a ve druhém parametru
+konfiguraci. Při výchozí konfiguraci je však možné předat <strong>nil</strong>,
+což v&nbsp;našem případě plně dostačuje:</p>
+
+<pre>
+<i>// konstrukce konzumenta</i>
+producer, err := sarama.NewSyncProducer([]string{KafkaConnectionString}, nil)
+&nbsp;
+<i>// kontrola chyby při připojování ke Kafce</i>
+if err != nil {
+        log.Fatal(err)
+}
+</pre>
+
+<p>Samozřejmě je nutné zajistit, aby se připojení taktéž uzavřelo ve chvíli,
+kdy již není zapotřebí, tedy konkrétně při ukončování hlavní gorutiny:</p>
+
+<pre>
+<i>// zajištění uzavření připojení ke Kafce</i>
+defer func() {
+        if err := producer.Close(); err != nil {
+                log.Fatal(err)
+        }
+}()
+</pre>
+
+<p>Posílaná zpráva je reprezentována datovým typem <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#ProducerMessage">ProducerMessage</a>.
+Ten obsahuje několik atributů, ovšem nejdůležitější jsou atributy
+<strong>Topic</strong>, <strong>Key</strong>, <strong>Value</strong>.
+V&nbsp;Apache Kafce jsou tyto údaje uloženy jako sekvence bajtů, ovšem nic nám
+nebrání použít řetězce, které jsou na sekvenci bajtů převedeny s&nbsp;využitím
+jedné (z&nbsp;několika) pomocných funkcí pro serializaci:</p>
+
+<pre>
+<i>// poslání (produkce) zprávy</i>
+msg := &amp;sarama.ProducerMessage{Topic: KafkaTopic, Value: sarama.StringEncoder("testing 123")}
+</pre>
+
+<p>Poslání zprávy je provedeno metodou:</p>
+
+<pre>
+func (producer SyncProducer) <strong>SendMessage</strong>(msg *ProducerMessage) (partition int32, offset int64, err error)
+</pre>
+
+<p>Jak je z&nbsp;popisu patrné, vrátí tato metoda informace o oddílu, do
+kterého byla uložena. Taktéž se vrátí offset uložené zprávy v&nbsp;rámci oddílu
+a v&nbsp;případě chyby i informace o této chybě (v&nbsp;ideálním případě
+<strong>nil</strong>):</p>
+
+<pre>
+partition, offset, err := producer.SendMessage(msg)
+if err != nil {
+        log.Printf("FAILED to send message: %s\n", err)
+} else {
+        log.Printf("&gt; message sent to partition %d at offset %d\n", partition, offset)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: existuje i varianta této metody slouží
+pro poslání většího množství zpráv.</div></p>
+
+<p>Takto naprogramovaného producenta zpráv můžeme otestovat s&nbsp;využitím
+velmi užitečného nástroje nazvaného <strong>kafkacat</strong>. Otestování bude
+probíhat tak, že <strong>kafkacat</strong> bude použit v&nbsp;režimu
+konzumenta. To znamená, že v&nbsp;jednom terminálu <strong>kafkacat</strong>
+spustíme, samozřejmě se správně nastavenými parametry &ndash; adresou a portem
+brokera a jménem tématu (<i>topicu</i>):</p>
+
+<pre>
+$ <strong>kafkacat -C -b localhost:9092 -t test-topic</strong>
+&nbsp;
+% Reached end of topic test-topic [0] at offset 0
+</pre>
+
+<p>Ve druhém terminálu spustíme producenta zpráv a budeme sledovat, zda jsou
+posílané zprávy skutečně uloženy do tématu a zkonzumovány:</p>
+
+<pre>
+$ <strong>./sarama-producer</strong>
+&nbsp;
+2021/06/13 17:48:50 Connected to localhost:9092
+2021/06/13 17:48:50 &gt; message sent to partition 0 at offset 0
+2021/06/13 17:48:50 Done
+</pre>
+
+<p>Na terminálu se spuštěným <strong>kafkacatem</strong> by se nyní měla
+objevit zpráva o přijaté zprávě:</p>
+
+<pre>
+testing 123
+% Reached end of topic test-topic [0] at offset 1
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Úplný zdrojový kód producenta zpráv</h2>
+
+<p>Úplný zdrojový kód výše popsaného producenta zpráv naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer">https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer</a>:</p>
+
+<pre>
+<i>// Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou</i>
+<i>// Sarama: implementace producenta zpráv.</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/Shopify/sarama"
+)
+&nbsp;
+const (
+        <i>// KafkaConnectionString obsahuje jméno počítače a port, na kterém běží Kafka broker</i>
+        KafkaConnectionString = "localhost:9092"
+&nbsp;
+        <i>// KafkaTopic obsahuje jméno tématu</i>
+        KafkaTopic = "test-topic"
+)
+&nbsp;
+func main() {
+        <i>// konstrukce konzumenta</i>
+        producer, err := sarama.NewSyncProducer([]string{KafkaConnectionString}, nil)
+&nbsp;
+        <i>// kontrola chyby při připojování ke Kafce</i>
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        log.Printf("Connected to %s", KafkaConnectionString)
+&nbsp;
+        <i>// zajištění uzavření připojení ke Kafce</i>
+        defer func() {
+                if err := producer.Close(); err != nil {
+                        log.Fatal(err)
+                }
+        }()
+&nbsp;
+        <i>// poslání (produkce) zprávy</i>
+        msg := &amp;sarama.ProducerMessage{Topic: KafkaTopic, Value: sarama.StringEncoder("testing 123")}
+        partition, offset, err := producer.SendMessage(msg)
+        if err != nil {
+                log.Printf("FAILED to send message: %s\n", err)
+        } else {
+                log.Printf("&gt; message sent to partition %d at offset %d\n", partition, offset)
+        }
+&nbsp;
+        log.Print("Done")
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Konzument zpráv založený na knihovně <strong>Sarama</strong></h2>
+
+<p>V&nbsp;této kapitole si ukážeme způsob vytvoření jednoduchého konzumenta
+zpráv. Ten je představován instancí <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#Consumer">Consumer</a>,
+která se vytváří konstruktorem <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#NewConsumer">NewConsumer</a>.
+Tomuto konstruktoru je nutné předat adresy brokerů (minimálně jednoho brokera)
+a ve druhém parametru konfiguraci. Při výchozí konfiguraci je však možné předat
+<strong>nil</strong>, což v&nbsp;našem případě plně dostačuje, podobně jako
+v&nbsp;případě producenta zpráv:</p>
+
+<pre>
+const (
+        <i>// KafkaConnectionString obsahuje jméno počítače a port, na kterém běží Kafka broker</i>
+        KafkaConnectionString = "localhost:9092"
+&nbsp;
+)
+&nbsp;
+<i>// konstrukce konzumenta</i>
+consumer, err := <strong>sarama.NewConsumer</strong>([]string{KafkaConnectionString}, nil)
+<i>// kontrola chyby při připojování ke Kafce</i>
+if err != nil {
+        log.Fatal(err)
+}
+</pre>
+
+<p>Samozřejmě je (opět) nutné zajistit, aby se připojení taktéž uzavřelo ve
+chvíli, kdy již není zapotřebí, tedy konkrétně při ukončování hlavní
+gorutiny:</p>
+
+<pre>
+<i>// zajištění uzavření připojení ke Kafce</i>
+defer func() {
+        if err := consumer.Close(); err != nil {
+                log.Fatal(err)
+        }
+}()
+</pre>
+
+<p>Čtení (tedy konzumaci) zpráv zajišťuje objekt <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#PartitionConsumer">PartitionConsumer</a>,
+jenž je vytvořen konstruktorem <strong>ConsumePartition</strong>. Tomuto
+konstruktoru je nutné předat téma, z&nbsp;něhož se mají zprávy číst, index
+oddílu a taktéž <i>offset</i> první zprávy, která se má přečíst. Kromě
+skutečného offsetu (tedy kladného celého čísla) lze použít i symbolické
+konstanty <strong>OffsetNewest</strong> a <strong>OffsetOldest</strong> a tím
+určit, od jakého offsetu se mají zprávy zpracovat &ndash; zda všechny od
+nejstarší, či naopak zda se mají zpracovat až nově příchozí zprávy:</p>
+
+<pre>
+func (consumer Consumer) <strong>ConsumePartition</strong>(topic string, partition int32, offset int64) (PartitionConsumer, error)
+</pre>
+
+<p>Konkrétně:</p>
+
+<pre>
+<i>// přihlášení ke zvolenému tématu</i>
+partitionConsumer, err := consumer.ConsumePartition(KafkaTopic, 0, sarama.OffsetNewest)
+if err != nil {
+        log.Fatal(err)
+}
+</pre>
+
+<p>Samotné čtení zpráv je v&nbsp;knihovně Sarama provedeno velmi elegantně
+&ndash; s&nbsp;využitím kanálu, který zajistí i blokující čekání na nové
+zprávy:</p>
+
+<pre>
+for {
+        msg := &lt;-partitionConsumer.Messages()
+        <i>// vypíšeme pouze offset zprávy, její klíč a tělo (value, payload)</i>
+        log.Printf("Consumed message offset %d: %s:%s", msg.Offset, msg.Key, msg.Value)
+        consumed++
+}
+</pre>
+
+<p>Úplný zdrojový kód konzumenta vypadá následovně:</p>
+
+<pre>
+<i>// Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou</i>
+<i>// Sarama: implementace konzumenta zpráv.</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/Shopify/sarama"
+)
+&nbsp;
+const (
+        <i>// KafkaConnectionString obsahuje jméno počítače a port, na kterém běží Kafka broker</i>
+        KafkaConnectionString = "localhost:9092"
+&nbsp;
+        <i>// KafkaTopic obsahuje jméno tématu</i>
+        KafkaTopic = "test-topic"
+)
+&nbsp;
+func main() {
+        <i>// konstrukce konzumenta</i>
+        consumer, err := sarama.NewConsumer([]string{KafkaConnectionString}, nil)
+&nbsp;
+        <i>// kontrola chyby při připojování ke Kafce</i>
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        log.Printf("Connected to %s", KafkaConnectionString)
+&nbsp;
+        <i>// zajištění uzavření připojení ke Kafce</i>
+        defer func() {
+                if err := consumer.Close(); err != nil {
+                        log.Fatal(err)
+                }
+        }()
+&nbsp;
+        <i>// přihlášení ke zvolenému tématu</i>
+        partitionConsumer, err := consumer.ConsumePartition(KafkaTopic, 0, sarama.OffsetNewest)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// zajištění ukončení přihlášení ke zvolenému tématu</i>
+        defer func() {
+                if err := partitionConsumer.Close(); err != nil {
+                        log.Fatal(err)
+                }
+        }()
+&nbsp;
+        <i>// postupné čtení zpráv, které byly do zvoleného tématu publikovány</i>
+        consumed := 0
+        for {
+                msg := &lt;-partitionConsumer.Messages()
+                <i>// vypíšeme pouze offset zprávy, její klíč a tělo (value, payload)</i>
+                log.Printf("Consumed message offset %d: %s:%s", msg.Offset, msg.Key, msg.Value)
+                consumed++
+        }
+&nbsp;
+        <i>// výpis počtu zpracovaných zpráv (ovšem sem se stejně nedostaneme :-)</i>
+        log.Printf("Consumed: %d", consumed)
+        log.Print("Done")
+}
+</pre>
+
+<p>Existují i mnohé další možnosti poskytované knihovnou Sarama, například
+výpis informací o tématech atd.:</p>
+
+<pre>
+<i>// Ukázka použití rozhraní pro systém Apache Kafka představovaného knihovnou</i>
+<i>// Sarama: výpis informací o tématech.</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/Shopify/sarama"
+)
+&nbsp;
+const (
+        <i>// KafkaConnectionString obsahuje jméno počítače a port, na kterém běží Kafka broker</i>
+        KafkaConnectionString = "localhost:9092"
+&nbsp;
+        <i>// KafkaTopic obsahuje jméno tématu</i>
+        KafkaTopic = "test-topic"
+)
+&nbsp;
+func main() {
+        <i>// konstrukce rozhraní k brokerovi</i>
+        broker := sarama.NewBroker(KafkaConnectionString)
+&nbsp;
+        <i>// kontrola chyby při připojování k brokerovi</i>
+        err := broker.Open(nil)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        log.Printf("Connected to %s", KafkaConnectionString)
+&nbsp;
+        request := sarama.MetadataRequest{Topics: []string{KafkaTopic}}
+        response, err := broker.GetMetadata(&amp;request)
+        if err != nil {
+                _ = broker.Close()
+                log.Fatal(err)
+        }
+&nbsp;
+        if len(response.Topics) == 1 {
+                log.Print("There is one topic active in the cluster.")
+        } else {
+                log.Print("There are", len(response.Topics), "topics active in the cluster.")
+        }
+&nbsp;
+        if err = broker.Close(); err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        log.Print("Done")
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Modulární podoba aplikace představující producenta zpráv</h2>
+
+<p>U reálných aplikací je možné knihovnu Sarama &bdquo;obalit&ldquo; vlastním
+rozhraním, které bude předepisovat pouze ty metody, které jsou skutečně
+v&nbsp;dané aplikaci zapotřebí. Následující demonstrační příklad je do určité
+míry založen na reálné aplikaci. Začneme definicí datového typu představujícího
+minimální užitečnou konfiguraci brokera:</p>
+
+<pre>
+package main
+&nbsp;
+<i>// BrokerConfiguration represents configuration of Kafka brokers and topics</i>
+type <strong>BrokerConfiguration</strong> struct {
+        Address string `mapstructure:"address" toml:"address"`
+        Topic   string `mapstructure:"topic"   toml:"topic"`
+}
+</pre>
+
+<p>Dále je deklarováno rozhraní pro všechny implementace brokera. Jsou
+předepsány pouze ty metody, které jsou upotřebitelné v&nbsp;aplikaci:</p>
+
+<pre>
+<i>// Producer represents any producer</i>
+type Producer interface {
+        ProduceMessage(message Message) (int32, int64, error)
+        Close() error
+}
+</pre>
+
+<p>Následuje konkrétní implementace tohoto rozhraní, včetně konstruktoru
+<strong>NewKafkaProducer</strong>:</p>
+
+<pre>
+import (
+        "encoding/json"
+&nbsp;
+        "github.com/Shopify/sarama"
+        "github.com/rs/zerolog/log"
+)
+
+<i>// KafkaProducer is an implementation of Producer interface</i>
+type <strong>KafkaProducer</strong> struct {
+        Configuration BrokerConfiguration
+        Producer      sarama.SyncProducer
+}
+
+<i>// NewKafkaProducer constructs new implementation of Producer interface</i>
+func <strong>NewKafkaProducer</strong>(brokerConfiguration BrokerConfiguration) (*KafkaProducer, error) {
+        producer, err := sarama.NewSyncProducer([]string{brokerConfiguration.Address}, nil)
+        if err != nil {
+                log.Error().Err(err).Msg("unable to create a new Kafka producer")
+                return nil, err
+        }
+&nbsp;
+        return &amp;KafkaProducer{
+                Configuration: brokerConfiguration,
+                Producer:      producer,
+        }, nil
+}
+&nbsp;
+<i>// ProduceMessage produces message to selected topic. That function returns</i>
+<i>// partition ID and offset of new message or an error value in case of any</i>
+<i>// problem on broker side.</i>
+func (producer *KafkaProducer) <strong>ProduceMessage</strong>(message Message) (partitionID int32, offset int64, err error) {
+        jsonBytes, err := json.Marshal(message)
+&nbsp;
+        if err != nil {
+                log.Error().Err(err).Msg("Couldn't turn notification message into valid JSON")
+                return -1, -1, err
+        }
+&nbsp;
+        <i>// construct message to be produced using the provided payload (message body)</i>
+        producerMsg := &amp;sarama.ProducerMessage{
+                Topic: producer.Configuration.Topic,
+                Value: sarama.ByteEncoder(jsonBytes),
+        }
+&nbsp;
+        <i>// try to produce message</i>
+        partitionID, offset, err = producer.Producer.SendMessage(producerMsg)
+        if err != nil {
+                log.Error().Err(err).Msg("failed to produce message to Kafka")
+        } else {
+                log.Info().Msgf("message sent to partition %d at offset %d\n", partitionID, offset)
+        }
+        return
+}
+&nbsp;
+<i>// Close allow the Sarama producer to be gracefully closed</i>
+func (producer *KafkaProducer) <strong>Close</strong>() error {
+        if err := producer.Producer.Close(); err != nil {
+                log.Error().Err(err).Msg("unable to close Kafka producer")
+                return err
+        }
+&nbsp;
+        return nil
+}
+</pre>
+
+<p>Výsledná struktura typů:</p>
+
+<img src="https://i.iinfo.cz/images/630/kafka-go-2.png" class="image-450708" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/licenses/by/4.0/legalcode.cs&quot;&gt;CC-BY&lt;/a&gt;" width="733" height="307" />
+<p><i>Obrázek 1: Datové struktury a rozhraní deklarované v&nbsp;předchozím
+kódu.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Využití nového rozhraní i jeho implementace</h2>
+
+<p>Rozhraní <strong>Producer</strong> a jeho implementaci
+<strong>KafkaProducer</strong> můžeme velmi snadno použít v&nbsp;aplikaci,
+která do brokera pošle zprávu se třemi atributy uloženými ve formátu JSON.
+Samotný kód je přímočarý (i když, jak je v&nbsp;jazyce Go zvykem,
+&bdquo;prošpikovaný&ldquo; kontrolami chyb):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "os"
+&nbsp;
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+type Message struct {
+        ID      int    `json:"id"`
+        Name    string `json:"name"`
+        Surname string `json:"surname"`
+}
+&nbsp;
+func main() {
+        log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+        log.Info().Msg("Started")
+&nbsp;
+        brokerConfiguration := BrokerConfiguration{
+                Address: "localhost:9092",
+                Topic:   "test-topic2",
+        }
+&nbsp;
+        producer, err := NewKafkaProducer(brokerConfiguration)
+        if err != nil {
+                log.Error().Err(err).Msg("Can not connect to Kafka")
+                return
+        }
+&nbsp;
+        log.Info().Str("address", brokerConfiguration.Address).Msg("Connected to Kafka")
+&nbsp;
+        defer producer.Close()
+&nbsp;
+        message := Message{
+                ID:      42,
+                Name:    "Václav",
+                Surname: "Trachta",
+        }
+&nbsp;
+        _, _, err = producer.ProduceMessage(message)
+        if err != nil {
+                log.Error().Err(err).Msg("Unable to produce message")
+                return
+        }
+&nbsp;
+        log.Info().Msg("Finished")
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Modulární podoba aplikace představující konzumenta zpráv</h2>
+
+<p>Stejným způsobem, jako producenta zpráv, můžeme vytvořit
+&bdquo;obalující&ldquo; rozhraní i pro konzumenta. Ovšem zde se ukazují některá
+úskalí nízkoúrovňového přístupu knihovny Sarama. Opět začneme definicí typu
+brokera, nyní s&nbsp;přidanou informací o skupině:</p>
+
+<pre>
+<i>// BrokerConfiguration represents configuration of Kafka brokers and topics</i>
+type BrokerConfiguration struct {
+        Address string `mapstructure:"address" toml:"address"`
+        Topic   string `mapstructure:"topic"   toml:"topic"`
+        Group   string `mapstructure:"group"   toml:"group"`
+}
+</pre>
+
+<p>Dále definujeme rozhraní představující konzumenta zpráv:</p>
+
+<pre>
+<i>// Consumer represents any consumer</i>
+type Consumer interface {
+        Serve()
+        ProcessMessage(msg *sarama.ConsumerMessage) error
+        Close() error
+}
+</pre>
+
+<p>Implementace konzumenta je relativně složitá, a to z&nbsp;toho důvodu, že
+reálný kód musí být schopen se znovu připojit ke Kafce i po rebalancingu (které
+může nastat v&nbsp;závislosti na nastavené konfiguraci). Následující kód byl
+vytvořen po několika neblahých zkušenostech s&nbsp;reálným nasazením
+aplikací:</p>
+
+<pre>
+import (
+        "context"
+        "encoding/json"
+
+        "github.com/Shopify/sarama"
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+<i>// KafkaConsumer in an implementation of Consumer interface</i>
+type KafkaConsumer struct {
+        Configuration                        BrokerConfiguration
+        ConsumerGroup                        sarama.ConsumerGroup
+        numberOfSuccessfullyConsumedMessages uint64
+        numberOfErrorsConsumingMessages      uint64
+        ready                                chan bool
+        cancel                               context.CancelFunc
+}
+&nbsp;
+<i>// DefaultSaramaConfig is a config which will be used by default</i>
+<i>// here you can use specific version of a protocol for example</i>
+<i>// useful for testing</i>
+var DefaultSaramaConfig *sarama.Config
+&nbsp;
+<i>// NewConsumer constructs new implementation of Consumer interface</i>
+func NewKafkaConsumer(brokerCfg BrokerConfiguration) (*KafkaConsumer, error) {
+        return NewWithSaramaConfig(brokerCfg, DefaultSaramaConfig)
+}
+&nbsp;
+<i>// NewWithSaramaConfig constructs new implementation of Consumer interface with custom sarama config</i>
+func NewWithSaramaConfig(
+        brokerConfiguration BrokerConfiguration,
+        saramaConfig *sarama.Config,
+) (*KafkaConsumer, error) {
+        if saramaConfig == nil {
+                saramaConfig = sarama.NewConfig()
+                saramaConfig.Version = sarama.V0_10_2_0
+&nbsp;
+                <i>/* TODO: we need to do it in production code</i>
+                if brokerCfg.Timeout &gt; 0 {
+                        saramaConfig.Net.DialTimeout = brokerCfg.Timeout
+                        saramaConfig.Net.ReadTimeout = brokerCfg.Timeout
+                        saramaConfig.Net.WriteTimeout = brokerCfg.Timeout
+                }
+                <i>*/</i>
+        }
+&nbsp;
+        consumerGroup, err := sarama.NewConsumerGroup([]string{brokerConfiguration.Address}, brokerConfiguration.Group, saramaConfig)
+        if err != nil {
+                return nil, err
+        }
+&nbsp;
+        consumer := &amp;KafkaConsumer{
+                Configuration:                        brokerConfiguration,
+                ConsumerGroup:                        consumerGroup,
+                numberOfSuccessfullyConsumedMessages: 0,
+                numberOfErrorsConsumingMessages:      0,
+                ready:                                make(chan bool),
+        }
+&nbsp;
+        return consumer, nil
+}
+&nbsp;
+<i>// Serve starts listening for messages and processing them. It blocks current thread.</i>
+func (consumer *KafkaConsumer) Serve() {
+        ctx, cancel := context.WithCancel(context.Background())
+        consumer.cancel = cancel
+&nbsp;
+        go func() {
+                for {
+                        <i>// `Consume` should be called inside an infinite loop, when a</i>
+                        <i>// server-side rebalance happens, the consumer session will need to be</i>
+                        <i>// recreated to get the new claims</i>
+                        if err := consumer.ConsumerGroup.Consume(ctx, []string{consumer.Configuration.Topic}, consumer); err != nil {
+                                log.Fatal().Err(err).Msg("Unable to recreate Kafka session")
+                        }
+&nbsp;
+                        <i>// check if context was cancelled, signaling that the consumer should stop</i>
+                        if ctx.Err() != nil {
+                                log.Info().Err(ctx.Err()).Msg("Stopping consumer")
+                                return
+                        }
+&nbsp;
+                        log.Info().Msg("Created new kafka session")
+&nbsp;
+                        consumer.ready = make(chan bool)
+                }
+        }()
+&nbsp;
+        <i>// Await till the consumer has been set up</i>
+        log.Info().Msg("Waiting for consumer to become ready")
+        &lt;-consumer.ready
+        log.Info().Msg("Finished waiting for consumer to become ready")
+&nbsp;
+        <i>// Actual processing is done in goroutine created by sarama (see ConsumeClaim below)</i>
+        log.Info().Msg("Started serving consumer")
+        &lt;-ctx.Done()
+        log.Info().Msg("Context cancelled, exiting")
+&nbsp;
+        cancel()
+}
+&nbsp;
+<i>// Setup is run at the beginning of a new session, before ConsumeClaim</i>
+func (consumer *KafkaConsumer) Setup(sarama.ConsumerGroupSession) error {
+        log.Info().Msg("New session has been setup")
+        <i>// Mark the consumer as ready</i>
+        close(consumer.ready)
+        return nil
+}
+&nbsp;
+<i>// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited</i>
+func (consumer *KafkaConsumer) Cleanup(sarama.ConsumerGroupSession) error {
+        log.Info().Msg("New session has been finished")
+        return nil
+}
+&nbsp;
+<i>// ConsumeClaim starts a consumer loop of ConsumerGroupClaim's Messages().</i>
+func (consumer *KafkaConsumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+        log.Info().
+                Int64("offset", claim.InitialOffset()).
+                Msg("Starting messages loop")
+&nbsp;
+        for message := range claim.Messages() {
+                consumer.HandleMessage(message)
+&nbsp;
+                session.MarkMessage(message, "")
+        }
+&nbsp;
+        return nil
+}
+&nbsp;
+<i>// Close method closes all resources used by consumer</i>
+func (consumer *KafkaConsumer) Close() error {
+        if consumer.cancel != nil {
+                consumer.cancel()
+        }
+&nbsp;
+        if consumer.ConsumerGroup != nil {
+                if err := consumer.ConsumerGroup.Close(); err != nil {
+                        log.Error().
+                                Err(err).
+                                Msg("Unable to close consumer group")
+                }
+        }
+&nbsp;
+        return nil
+}
+&nbsp;
+<i>// GetNumberOfSuccessfullyConsumedMessages returns number of consumed messages</i>
+<i>// since creating KafkaConsumer obj</i>
+func (consumer *KafkaConsumer) GetNumberOfSuccessfullyConsumedMessages() uint64 {
+        return consumer.numberOfSuccessfullyConsumedMessages
+}
+&nbsp;
+<i>// GetNumberOfErrorsConsumingMessages returns number of errors during consuming messages</i>
+<i>// since creating KafkaConsumer obj</i>
+func (consumer *KafkaConsumer) GetNumberOfErrorsConsumingMessages() uint64 {
+        return consumer.numberOfErrorsConsumingMessages
+}
+&nbsp;
+<i>// HandleMessage handles the message and does all logging, metrics, etc</i>
+func (consumer *KafkaConsumer) HandleMessage(msg *sarama.ConsumerMessage) {
+        log.Info().
+                Int64("offset", msg.Offset).
+                Int32("partition", msg.Partition).
+                Str("topic", msg.Topic).
+                Msg("Started processing message")
+&nbsp;
+        err := consumer.ProcessMessage(msg)
+&nbsp;
+        log.Info().
+                Int64("offset", msg.Offset).
+                Int32("partition", msg.Partition).
+                Str("topic", msg.Topic).
+                Msg("Finished processing message")
+&nbsp;
+        <i>// Something went wrong while processing the message.</i>
+        if err != nil {
+                log.Error().
+                        Err(err).
+                        Msg("Error processing message consumed from Kafka")
+                consumer.numberOfErrorsConsumingMessages++
+        } else {
+                <i>// The message was processed successfully.</i>
+                consumer.numberOfSuccessfullyConsumedMessages++
+        }
+}
+&nbsp;
+<i>// ProcessMessage processes an incoming message</i>
+func (consumer *KafkaConsumer) ProcessMessage(msg *sarama.ConsumerMessage) error {
+        log.Info().
+                Str("key", string(msg.Key)).
+                Str("value", string(msg.Value)).
+                Msg("Consumed")
+&nbsp;
+        var deserialized Message
+&nbsp;
+        err := json.Unmarshal(msg.Value, &amp;deserialized)
+        if err != nil {
+                return err
+        }
+&nbsp;
+        log.Info().Int("ID", deserialized.ID).
+                Str("Name", deserialized.Name).
+                Str("Surname", deserialized.Surname).
+                Msg("Deserialized message")
+
+        return nil
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak je z&nbsp;kódu patrné, akceptují se
+zprávy ve formátu produkovaného předchozím demonstračním příkladem
+s&nbsp;implementací producenta zpráv.</div></p>
+
+<p>Výsledná struktura typů:</p>
+
+<img src="https://i.iinfo.cz/images/630/kafka-go-1.png" class="image-450707" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/licenses/by/4.0/legalcode.cs&quot;&gt;CC-BY&lt;/a&gt;" width="735" height="461" />
+<p><i>Obrázek 2: Datové struktury a rozhraní deklarované v&nbsp;předchozím
+kódu.</i></p>
+
+
+
+<p><a &nbsp;name="k14"></a></p>
+<h2 id="k14">14. Využití nového rozhraní i jeho implementace</h2>
+
+<p>I když byla realizace rozhraní <strong>KafkaConsumer</strong> relativně
+složitá, samotné jeho použití je snadné a přímočaré, jak je ostatně patrné
+z&nbsp;následující ukázky zdrojového kódu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "os"
+
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+type Message struct {
+        ID      int    `json:"id"`
+        Name    string `json:"name"`
+        Surname string `json:"surname"`
+}
+&nbsp;
+func main() {
+        log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+        log.Info().Msg("Started")
+&nbsp;
+        brokerConfiguration := BrokerConfiguration{
+                Address: "localhost:9092",
+                Topic:   "test-topic2",
+                Group:   "grpX",
+        }
+&nbsp;
+        consumer, err := NewKafkaConsumer(brokerConfiguration)
+        if err != nil {
+                log.Error().Err(err).Msg("Can not connect to Kafka")
+                return
+        }
+&nbsp;
+        log.Info().Str("address", brokerConfiguration.Address).Msg("Connected to Kafka")
+&nbsp;
+        defer consumer.Close()
+&nbsp;
+        consumer.Serve()
+&nbsp;
+        log.Info().Msg("Finished")
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. <strong>Sarama/mocks</strong> a jednotkové testy</h2>
+
+<p>Knihovna <strong>Sarama</strong> poskytuje aplikacím poměrně snadno
+použitelné rozhraní k&nbsp;volání funkcí systému Apache Kafka přes komunikační
+protokol Kafky. Ovšem v&nbsp;případě, že se mají vytvořit jednotkové testy pro
+ty funkce a metody, které volají funkce z&nbsp;knihovny Sarama, je nutné
+skutečné volání Apache Kafky nahradit vhodnými &bdquo;mocky&ldquo;. Samozřejmě
+nám nic nebrání v&nbsp;použití nějaké obecné knihovny pro tvorbu <i>mocků</i>
+v&nbsp;programovacím jazyce Go, ale knihovna Sarama nabízí vývojářům již
+připravené mocky, které lze v&nbsp;jednotkových testech inicializovat a přímo
+použít. Tyto mocky jsou dostupné v&nbsp;balíčku <a
+href="https://pkg.go.dev/github.com/Shopify/sarama/mocks">sarama/mocks</a>.
+Nabízeny jsou tyto datové typy, jejichž konstrukcí vzniknout objekty:</p>
+
+<table>
+<tr><th>#</th><th>Datový typ</th><th>Konstruktor</th></tr>
+<tr><td>1</td><td>Consumer</td><td>func <strong>NewConsumer</strong>(t ErrorReporter, config *sarama.Config) *Consumer</td></tr>
+<tr><td>2</td><td>PartitionConsumer</td><td>func (c *Consumer) <strong>ConsumePartition</strong>(topic string, partition int32, offset int64) (sarama.PartitionConsumer, error)</td></tr>
+<tr><td>3</td><td>AsyncProducer</td><td>func <strong>NewAsyncProducer</strong>(t ErrorReporter, config *sarama.Config) *AsyncProducer</td></tr>
+<tr><td>4</td><td>SyncProducer</td><td>func <strong>NewSyncProducer</strong>(t ErrorReporter, config *sarama.Config) *SyncProducer</td></tr>
+</table>
+
+<p>V&nbsp;navazující kapitole jsou vypsány všechny metody implementované těmito
+užitečnými datovými typy.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Mock objekty dostupné v&nbsp;knihovně <strong>Sarama/mocks</strong></h2>
+
+<h3>Metody implementované v&nbsp;typu <strong>Consumer</strong></h3>
+
+<table>
+<tr><th>#</th><th>Metoda</th></tr>
+<tr><td>1</td><td>func (c *Consumer) <strong>Close</strong>() error</td></tr>
+<tr><td>2</td><td>func (c *Consumer) <strong>ConsumePartition</strong>(topic string, partition int32, offset int64) (sarama.PartitionConsumer, error)</td></tr>
+<tr><td>3</td><td>func (c *Consumer) <strong>ExpectConsumePartition</strong>(topic string, partition int32, offset int64) *PartitionConsumer</td></tr>
+<tr><td>4</td><td>func (c *Consumer) <strong>HighWaterMarks</strong>() map[string]map[int32]int64</td></tr>
+<tr><td>5</td><td>func (c *Consumer) <strong>Partitions</strong>(topic string) ([]int32, error)</td></tr>
+<tr><td>6</td><td>func (c *Consumer) <strong>SetTopicMetadata</strong>(metadata map[string][]int32)</td></tr>
+<tr><td>7</td><td>func (c *Consumer) <strong>Topics</strong>() ([]string, error)</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se jedná o rozšíření
+původního datového typu se stejným jménem <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#Consumer">Consumer</a> o
+metodu <strong>ExpectConsumePartition</strong> sloužící pro registraci tématu a
+oddílu společně se specifikací, jaké operace jsou očekávány (tudíž se jedná o
+typickou metodu používanou jednotkovými testy).</div></p>
+
+
+
+<h3>Metody implementované v&nbsp;typu <strong>PartitionConsumer</strong></h3>
+
+<table>
+<tr><th>#</th><th>Metoda</th></tr>
+<tr><td>1</td><td>func (pc *PartitionConsumer) <strong>AsyncClose</strong>()</td></tr>
+<tr><td>2</td><td>func (pc *PartitionConsumer) <strong>Close</strong>() error</td></tr>
+<tr><td>3</td><td>func (pc *PartitionConsumer) <strong>Errors</strong>() &lt;-chan *sarama.ConsumerError</td></tr>
+<tr><td>4</td><td>func (pc *PartitionConsumer) <strong>ExpectErrorsDrainedOnClose</strong>()</td></tr>
+<tr><td>5</td><td>func (pc *PartitionConsumer) <strong>ExpectMessagesDrainedOnClose</strong>()</td></tr>
+<tr><td>6</td><td>func (pc *PartitionConsumer) <strong>HighWaterMarkOffset</strong>() int64</td></tr>
+<tr><td>7</td><td>func (pc *PartitionConsumer) <strong>Messages</strong>() &lt;-chan *sarama.ConsumerMessage</td></tr>
+<tr><td>8</td><td>func (pc *PartitionConsumer) <strong>YieldError</strong>(err error)</td></tr>
+<tr><td>9</td><td>func (pc *PartitionConsumer) <strong>YieldMessage</strong>(msg *sarama.ConsumerMessage)</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: tento typ, resp.&nbsp;přesněji řečeno
+objekt tohoto typu, je získán výše zmíněnou metodou
+<strong>ExpectConsumePartition</strong> datového typu
+<strong>Consumer</strong>.</div></p>
+
+
+
+<h3>Metody implementované v&nbsp;typu <strong>AsyncProducer</strong></h3>
+
+<table>
+<tr><th>#</th><th>Metoda</th></tr>
+<tr><td>1</td><td>func (mp *AsyncProducer) <strong>AsyncClose</strong>()</td></tr>
+<tr><td>2</td><td>func (mp *AsyncProducer) <strong>Close</strong>() error</td></tr>
+<tr><td>3</td><td>func (mp *AsyncProducer) <strong>Errors</strong>() &lt;-chan *sarama.ProducerError</td></tr>
+<tr><td>4</td><td>func (mp *AsyncProducer) <strong>ExpectInputAndFail</strong>(err error)</td></tr>
+<tr><td>5</td><td>func (mp *AsyncProducer) <strong>ExpectInputAndSucceed</strong>()</td></tr>
+<tr><td>6</td><td>func (mp *AsyncProducer) <strong>ExpectInputWithCheckerFunctionAndFail</strong>(cf ValueChecker, err error)</td></tr>
+<tr><td>7</td><td>func (mp *AsyncProducer) <strong>ExpectInputWithCheckerFunctionAndSucceed</strong>(cf ValueChecker)</td></tr>
+<tr><td>8</td><td>func (mp *AsyncProducer) <strong>Input</strong>() chan&lt;- *sarama.ProducerMessage</td></tr>
+<tr><td>9</td><td>func (mp *AsyncProducer) <strong>Successes</strong>() &lt;-chan *sarama.ProducerMessage</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: jedná se o rozšíření původního datového
+typu <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#AsyncProducer">AsyncProducer</a>
+doplněného o metody <strong>Expect*</strong> používané v&nbsp;jednotkových
+testech.</div></p>
+
+
+
+<h3>Metody implementované v&nbsp;typu <strong>SyncProducer</strong></h3>
+
+<table>
+<tr><th>#</th><th>Metoda</th></tr>
+<tr><td>1</td><td>func (sp *SyncProducer) <strong>Close</strong>() error</td></tr>
+<tr><td>2</td><td>func (sp *SyncProducer) <strong>ExpectSendMessageAndFail</strong>(err error)</td></tr>
+<tr><td>3</td><td>func (sp *SyncProducer) <strong>ExpectSendMessageAndSucceed</strong>()</td></tr>
+<tr><td>4</td><td>func (sp *SyncProducer) <strong>ExpectSendMessageWithCheckerFunctionAndFail</strong>(cf ValueChecker, err error)</td></tr>
+<tr><td>5</td><td>func (sp *SyncProducer) <strong>ExpectSendMessageWithCheckerFunctionAndSucceed</strong>(cf ValueChecker)</td></tr>
+<tr><td>6</td><td>func (sp *SyncProducer) <strong>SendMessage</strong>(msg *sarama.ProducerMessage) (partition int32, offset int64, err error)</td></tr>
+<tr><td>7</td><td>func (sp *SyncProducer) <strong>SendMessages</strong>(msgs []*sarama.ProducerMessage) error</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: i zde se jedná o rozšíření původního
+datového typu <a
+href="https://pkg.go.dev/github.com/Shopify/sarama#SyncProducer">SyncProducer</a>
+doplněného o metody <strong>Expect*</strong> používané v&nbsp;jednotkových
+testech.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Ukázka konstrukce jednotkového testu</h2>
+
+<p>Podívejme se nyní, jak lze mock objekty využít při tvorbě jednotkových
+testů. Zaměříme se na objekt typu <strong>SyncProducer</strong>, jehož
+&bdquo;nemockovanou&ldquo; variantu jsme použili v&nbsp;předchozích
+demonstračních příkladech. Vzhledem k&nbsp;tomu, že tento objekt použijeme
+v&nbsp;jednotkových testech, deklarujme novou funkci začínající jménem
+<strong>Test</strong> a akceptující jediný parametr
+typu<strong>*testing.T</strong>:</p>
+
+<pre>
+func <strong>TestSyncProducer</strong>(t *testing.T) {
+</pre>
+
+<p>V&nbsp;testu nejdříve vytvoříme instanci mockované varianty objektu typu
+<strong>SyncProducer</strong> a zajistíme jeho uzavření na konci funkce
+s&nbsp;definicí jednotkového testu:</p>
+
+<pre>
+syncProducer := <strong>NewSyncProducer</strong>(t, nil)
+&nbsp;
+defer func() {
+        err := <strong>syncProducer.Close</strong>()
+        if err != nil {
+                t.Error(err)
+        }
+}()
+</pre>
+
+<p>Nyní nastává nejzajímavější část jednotkového testu &ndash; určíme totiž,
+jak přesně se má mockovaný objekt typu <strong>SyncProducer</strong> chovat a
+jaké chování kódu má naopak očekávat. Budeme specifikovat, že mockovaný objekt
+očekává, že mu bude poslána jedna zpráva (metodou <strong>SendMessage</strong>
+a že tato operace bude úspěšná &ndash; mockovaný objekt se tedy bude chovat
+tak, jakoby k&nbsp;poslání zprávy skutečně došlo:</p>
+
+<pre>
+<strong>syncProducer.ExpectSendMessageAndSucceed</strong>()
+</pre>
+
+<p>Dále vytvoříme zprávu, která se má poslat:</p>
+
+<pre>
+message := &amp;sarama.ProducerMessage{Topic: "test-topic", Value: string("test")}
+</pre>
+
+<p>Zprávu pošleme s&nbsp;kontrolou výsledku provedené operace:</p>
+
+<pre>
+_, offset, err := <strong>syncProducer.SendMessage</strong>(msg)
+if err != nil {
+        t.Errorf("Message produce error %s", err)
+}
+if offset != 1 || offset != message.Offset {
+        t.Errorf("Wrong offset %d", msg.Offset)
+}
+</pre>
+
+<p>Taktéž můžeme specifikovat, že mockovaný objekt bude očekávat poslání zprávy
+a posléze nasimuluje chybu při odesílání, resp.&nbsp;přesněji při komunikaci
+s&nbsp;Kafkou (o jakou chybu se jedná můžeme sami vybrat):</p>
+
+<pre>
+<strong>syncProducer.ExpectSendMessageAndFail</strong>(sarama.ErrOutOfBrokers)
+</pre>
+
+<p>Nyní budeme kontrolovat, <i>jaká</i> chyba byla vrácena:</p>
+
+<pre>
+_, _, err = <strong>syncProducer.SendMessage</strong>(msg)
+if err != sarama.ErrOutOfBrokers {
+        t.Errorf("Message produce error %s is different than expected error", err)
+}
+&nbsp;
+err := <strong>syncProducer.Close</strong>()
+if err != nil {
+        t.Error(err)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: otestování, zda opravdu došlo
+k&nbsp;odeslání zprávy (tedy zda testovaný kód provádí to, co se od něj
+očekává) se provede automaticky při zavolání metody
+<strong>syncProducer.Close()</strong>.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>confluent_kafka_producer.go</td><td>jednoduchý producent zpráv založený na knihovně <strong>confluent-kafka-go</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_producer.go">https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_producer.go</a></td></tr>
+<tr><td>2</td><td>confluent_kafka_consumer.go</td><td>jednoduchý konzument zpráv založený na knihovně <strong>confluent-kafka-go</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_consumer.go">https://github.com/tisnik/go-root/blob/master/article_75/confluent_kafka_consumer.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>3</td><td>sarama-consumer</td><td>jednoduchý konzument zpráv založený na knihovně <strong>Sarama</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-consumer">https://github.com/tisnik/go-root/blob/master/article_75/sarama-consumer</a></td></tr>
+<tr><td>4</td><td>sarama-producer</td><td>jednoduchý producent zpráv založený na knihovně <strong>Sarama</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer">https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer</a></td></tr>
+<tr><td>5</td><td>sarama-list-topics</td><td>výpis informací o zvoleném tématu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-list-topics">https://github.com/tisnik/go-root/blob/master/article_75/sarama-list-topics</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>6</td><td>sarama-consumer-2</td><td>vylepšený konzument zpráv založený na knihovně <strong>Sarama</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-consumer-2">https://github.com/tisnik/go-root/blob/master/article_75/sarama-consumer-2</a></td></tr>
+<tr><td>7</td><td>sarama-producer-2</td><td>vylepšený producent zpráv založený na knihovně <strong>Sarama</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer-2">https://github.com/tisnik/go-root/blob/master/article_75/sarama-producer-2</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na relevantní články na Rootu</h2>
+
+<p>V&nbsp;dnešním článku jsme se zabývali dvojicí témat &ndash; využitím
+systému Apache Kafka v&nbsp;programovacím jazyku Go pro tvorbu producentů a
+konzumentů zpráv (prozatím bez <i>Kafka Streams</i>) a taktéž tvorbou
+jednotkových testů pro ty jednotky aplikace, které přímo s&nbsp;Apache Kafkou
+komunikují, tedy většinou s&nbsp;producenty a konzumenty zpráv. Jak Apache
+Kafkou, tak i problematikou tvorby jednotkových testů pro
+&bdquo;okrajové&ldquo; části aplikací, jsme se již na stránkách Roota zabývali
+v&nbsp;těchto článcích:</p>
+
+<ol>
+
+<li>Použití nástroje Apache Kafka v&nbsp;aplikacích založených na mikroslužbách<br />
+<a href="https://www.root.cz/clanky/pouziti-nastroje-apache-kafka-v-aplikacich-zalozenych-na-mikrosluzbach/">https://www.root.cz/clanky/pouziti-nastroje-apache-kafka-v-aplikacich-zalozenych-na-mikrosluzbach/</a>
+</li>
+
+<li>Apache Kafka: distribuovaná streamovací platforma<br />
+<a href="https://www.root.cz/clanky/apache-kafka-distribuovana-streamovaci-platforma/">https://www.root.cz/clanky/apache-kafka-distribuovana-streamovaci-platforma/</a>
+</li>
+
+<li>Pokročilý streaming založený na Apache Kafce, jazyku Clojure a knihovně Jackdaw<br />
+<a href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw/">https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw/</a>
+</li>
+
+<li>Pokročilý streaming založený na Apache Kafce, jazyku Clojure a knihovně Jackdaw (2. část)<br />
+<a href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw-2-cast/">https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-apache-kafce-jazyku-clojure-a-knihovne-jackdaw-2-cast/</a>
+</li>
+
+<li>Pokročilý streaming založený na projektu Apache Kafka, jazyku Clojure a knihovně Jackdaw (streamy a kolony)<br />
+<a href="https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-projektu-apache-kafka-jazyku-clojure-a-knihovne-jackdaw-streamy-a-kolony/">https://www.root.cz/clanky/pokrocily-streaming-zalozeny-na-projektu-apache-kafka-jazyku-clojure-a-knihovne-jackdaw-streamy-a-kolony/</a>
+</li>
+
+<li>Knihovny určené pro tvorbu testů v&nbsp;programovacím jazyce Go<br />
+<a href="https://www.root.cz/clanky/knihovny-urcene-pro-tvorbu-testu-v-programovacim-jazyce-go/">https://www.root.cz/clanky/knihovny-urcene-pro-tvorbu-testu-v-programovacim-jazyce-go/</a>
+</li>
+
+<li>Testování aplikací naprogramovaných v&nbsp;jazyce Go<br />
+<a href="https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/">https://www.root.cz/clanky/testovani-aplikaci-naprogramovanych-v-jazyce-go/</a>
+</li>
+
+<li>Pomůcky při tvorbě jednotkových testů v&nbsp;jazyce Go<br />
+<a href="https://www.root.cz/clanky/pomucky-pri-tvorbe-jednotkovych-testu-v-jazyce-go/">https://www.root.cz/clanky/pomucky-pri-tvorbe-jednotkovych-testu-v-jazyce-go/</a>
+</li>
+
+<li>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím<br />
+<a href="https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim/">https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim/</a>
+</li>
+
+<li>Jazyk Go prakticky: jednotkové testy kódu, který přistupuje k SQL databázím (dokončení)<br />
+<a href="https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim-dokonceni/">https://www.root.cz/clanky/jazyk-go-prakticky-jednotkove-testy-kodu-ktery-pristupuje-k-sql-databazim-dokonceni/</a>
+</li>
+
+</ol>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Confluent's Golang Client for Apache Kafka<br />
+<a href="https://github.com/confluentinc/confluent-kafka-go">https://github.com/confluentinc/confluent-kafka-go</a>
+</li>
+
+<li>Confluent: Kafka Go Client<br />
+<a href="https://docs.confluent.io/clients-confluent-kafka-go/current/overview.html">https://docs.confluent.io/clients-confluent-kafka-go/current/overview.html</a>
+</li>
+
+<li>sarama: an MIT-licensed Go client library for Apache Kafka version 0.8 (and later)<br />
+<a href="https://github.com/Shopify/sarama">https://github.com/Shopify/sarama</a>
+</li>
+
+<li>Sarama FAQ<br />
+<a href="https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions">https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions</a>
+</li>
+
+<li>Awesome Go<br />
+<a href="https://github.com/avelino/awesome-go">https://github.com/avelino/awesome-go</a>
+</li>
+
+<li>Real-Time Payments with Clojure and Apache Kafka (podcast)<br />
+<a href="https://www.evidentsystems.com/news/confluent-podcast-about-apache-kafka/">https://www.evidentsystems.com/news/confluent-podcast-about-apache-kafka/</a>
+</li>
+
+<li>Kafka.clj<br />
+<a href="https://github.com/helins-io/kafka.clj">https://github.com/helins-io/kafka.clj</a>
+</li>
+
+<li>Microservices: The Rise Of Kafka<br />
+<a href="https://movio.co/blog/microservices-rise-kafka/">https://movio.co/blog/microservices-rise-kafka/</a>
+</li>
+
+<li>Building a Microservices Ecosystem with Kafka Streams and KSQL<br />
+<a href="https://www.confluent.io/blog/building-a-microservices-ecosystem-with-kafka-streams-and-ksql/">https://www.confluent.io/blog/building-a-microservices-ecosystem-with-kafka-streams-and-ksql/</a>
+</li>
+
+<li>An introduction to Apache Kafka and microservices communication<br />
+<a href="https://medium.com/@ulymarins/an-introduction-to-apache-kafka-and-microservices-communication-bf0a0966d63">https://medium.com/@ulymarins/an-introduction-to-apache-kafka-and-microservices-communication-bf0a0966d63</a>
+</li>
+
+<li>kappa-architecture.com<br />
+<a href="http://milinda.pathirage.org/kappa-architecture.com/">http://milinda.pathirage.org/kappa-architecture.com/</a>
+</li>
+
+<li>Questioning the Lambda Architecture<br />
+<a href="https://www.oreilly.com/ideas/questioning-the-lambda-architecture">https://www.oreilly.com/ideas/questioning-the-lambda-architecture</a>
+</li>
+
+<li>Lambda architecture<br />
+<a href="https://en.wikipedia.org/wiki/Lambda_architecture">https://en.wikipedia.org/wiki/Lambda_architecture</a>
+</li>
+
+<li>Kafka &ndash; ecosystem (Wiki)<br />
+<a href="https://cwiki.apache.org/confluence/display/KAFKA/Ecosystem">https://cwiki.apache.org/confluence/display/KAFKA/Ecosystem</a>
+</li>
+
+<li>The Kafka Ecosystem - Kafka Core, Kafka Streams, Kafka Connect, Kafka REST Proxy, and the Schema Registry<br />
+<a href="http://cloudurable.com/blog/kafka-ecosystem/index.html">http://cloudurable.com/blog/kafka-ecosystem/index.html</a>
+</li>
+
+<li>A Kafka Operator for Kubernetes<br />
+<a href="https://github.com/krallistic/kafka-operator">https://github.com/krallistic/kafka-operator</a>
+</li>
+
+<li>Kafka Streams<br />
+<a href="https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams">https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams</a>
+</li>
+
+<li>Kafka Streams<br />
+<a href="http://kafka.apache.org/documentation/streams/">http://kafka.apache.org/documentation/streams/</a>
+</li>
+
+<li>Kafka Streams (FAQ)<br />
+<a href="https://cwiki.apache.org/confluence/display/KAFKA/FAQ#FAQ-Streams">https://cwiki.apache.org/confluence/display/KAFKA/FAQ#FAQ-Streams</a>
+</li>
+
+<li>Event stream processing<br />
+<a href="https://en.wikipedia.org/wiki/Event_stream_processing">https://en.wikipedia.org/wiki/Event_stream_processing</a>
+</li>
+
+<li>Part 1: Apache Kafka for beginners - What is Apache Kafka?<br />
+<a href="https://www.cloudkarafka.com/blog/2016-11-30-part1-kafka-for-beginners-what-is-apache-kafka.html">https://www.cloudkarafka.com/blog/2016-11-30-part1-kafka-for-beginners-what-is-apache-kafka.html</a>
+</li>
+
+<li>What are some alternatives to Apache Kafka?<br />
+<a href="https://www.quora.com/What-are-some-alternatives-to-Apache-Kafka">https://www.quora.com/What-are-some-alternatives-to-Apache-Kafka</a>
+</li>
+
+<li>What is the best alternative to Kafka?<br />
+<a href="https://www.slant.co/options/961/alternatives/~kafka-alternatives">https://www.slant.co/options/961/alternatives/~kafka-alternatives</a>
+</li>
+
+<li>A super quick comparison between Kafka and Message Queues<br />
+<a href="https://hackernoon.com/a-super-quick-comparison-between-kafka-and-message-queues-e69742d855a8?gi=e965191e72d0">https://hackernoon.com/a-super-quick-comparison-between-kafka-and-message-queues-e69742d855a8?gi=e965191e72d0</a>
+</li>
+
+<li>Kafka Queuing: Kafka as a Messaging System<br />
+<a href="https://dzone.com/articles/kafka-queuing-kafka-as-a-messaging-system">https://dzone.com/articles/kafka-queuing-kafka-as-a-messaging-system</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2021</small></p>
+</body>
+</html>
+
