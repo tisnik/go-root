@@ -1,0 +1,1271 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Migrace databázového schématu v ekosystému programovacího jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Migrace databázového schématu v ekosystému programovacího jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V prakticky každé aplikaci, komplexní službě nebo mikroslužbě, jež ukládá data do relační databáze, je nutné řešit problematiku migrací databáze na nové schéma nebo naopak migrací zpět na starší schéma. Dnes si ukážeme řešení postavené na nástroji Goose (pro jazyk Go).</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Migrace databázového schématu v&nbsp;ekosystému programovacího jazyka Go</a></p>
+<p><a href="#k02">2. Balíček <strong>github.com/pressly/goose</strong></a></p>
+<p><a href="#k03">3. Instalace balíčku Goose</a></p>
+<p><a href="#k04">4. Kontrola instalace nástroje Goose</a></p>
+<p><a href="#k05">5. Vytvoření migračního skriptu s&nbsp;příkazem pro vytvoření tabulky</a></p>
+<p><a href="#k06">6. Výchozí stav databáze</a></p>
+<p><a href="#k07">7. Provedení migrace nástrojem <i>Goose</i></a></p>
+<p><a href="#k08">8. Návrat zpět</a></p>
+<p><a href="#k09">9. Vícekroková migrace</a></p>
+<p><a href="#k10">10. Povýšení nebo naopak snížení schématu databáze na zvolenou verzi</a></p>
+<p><a href="#k11">11. Zavolání funkcí nástroje <i>Goose</i> přímo z&nbsp;jazyka Go</a></p>
+<p><a href="#k12">12. Výpis aktuální verze databáze a stavu migrací</a></p>
+<p><a href="#k13">13. Provedení migrace přímo z&nbsp;jazyka Go</a></p>
+<p><a href="#k14">14. Zavolání libovolného příkazu nástroje <i>Goose</i> z&nbsp;jazyka Go</a></p>
+<p><a href="#k15">15. Zápis migračních skriptů přímo v&nbsp;jazyce Go</a></p>
+<p><a href="#k16">16. Rozšíření příkazu <strong>goose</strong> o realizaci migrací zapsaných v&nbsp;jazyce Go</a></p>
+<p><a href="#k17">17. Provedení migrace z&nbsp;nativní aplikace napsané v&nbsp;jazyce Go</a></p>
+<p><a href="#k18">18. Krátké doplnění: migrace nad databází uloženou v&nbsp;PostgreSQL</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Migrace databázového schématu v&nbsp;ekosystému programovacího jazyka Go</h2>
+
+<p>V&nbsp;prakticky každé aplikaci, komplexní službě nebo naopak mikroslužbě,
+která ukládá data do relační databáze, je nutné nějakým způsobem řešit
+problematiku <i>migrací</i> této databáze na nové schéma popř.&nbsp;naopak
+migrací zpět na starší schéma (a to v&nbsp;naprosté většině případů zahrnuje i
+migraci dat, která jsou již v&nbsp;databázi uložena). Pro tyto účely již bylo
+vytvořeno poměrně velké množství nástrojů. Příkladem takového nástroje
+aplikovaného především v&nbsp;ekosystému programovacího jazyka Python je
+nástroj nazvaný <a
+href="https://alembic.sqlalchemy.org/en/latest/">Alembic</a>, jenž byl vytvořen
+autory známého a dosti často používaného databázového toolkitu <a
+href="https://www.sqlalchemy.org/">SQLAlchemy</a>.</p>
+
+<p>V&nbsp;dnešním článku se ovšem zaměříme na ekosystém <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacího jazyka
+Go</a>. I pro Go pochopitelně existují nástroje zajišťující migraci databáze.
+S&nbsp;jedním z&nbsp;těchto nástrojů, který se jmenuje <i>Goose</i>, se
+seznámíme v&nbsp;dnešním článku. A v&nbsp;článku navazujícím se pak podíváme na
+nástroj s&nbsp;všeříkajícím názvem <i>Migrate</i> (ten je opět určený pro Go a
+v&nbsp;mnohém se podobá nástroji Goose).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Balíček <strong>github.com/pressly/goose</strong></h2>
+
+<p>Jak již bylo napsáno <a href="#k01">v&nbsp;úvodní kapitole</a>, slouží
+nástroj Goose k&nbsp;podpoře migrace databázového schématu a dat. Určen je
+primárně pro použití s&nbsp;relačními databázemi, mezi nimiž nechybí
+PostgreSQL, MySQL či SQLite. Jednotlivé kroky migrace &ndash; ty jsou
+pochopitelně verzovány &ndash; přitom mohou obsahovat jak krok nutný pro
+povýšení schématu o jeden krok, tak i o jeho snížení o jeden krok. Tím pádem
+může být zajištěna situace, kdy je nutné migraci vrátit o krok či o více kroků
+zpět (což se v&nbsp;našem konkrétním případě stalo několikrát).  Jednotlivé
+kroky migrace přitom mohou být zapsány přímo v&nbsp;programovacím jazyku Go,
+což na jednu stranu může vypadat poněkud zvláštně, ovšem umožňuje nám to
+například import číselníků z&nbsp;různých souborových formátů atd.</p>
+
+<p>Goose podporuje migraci většího množství databází (pokud má k&nbsp;dispozici
+příslušné ovladače), například:</p>
+
+<ul>
+<li>postgres</li>
+<li>mysql</li>
+<li>sqlite3</li>
+<li>mssql</li>
+<li>redshift</li>
+<li>tidb</li>
+<li>clickhouse</li>
+<li>vertica</li>
+</ul>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Instalace balíčku Goose</h2>
+
+<p>Samotná instalace balíčku Goose je snadná. Předpokladem pochopitelně je, že
+máte nainstalovány a nakonfigurovány základní nástroje programovacího jazyka
+Go:</p>
+
+<pre>
+$ <strong>go install github.com/pressly/goose/v3/cmd/goose@latest</strong>
+</pre>
+
+<p>Goose má poměrně velké množství závislostí, což je patrné
+z&nbsp;následujícího výpisu:</p>
+
+<pre>
+go: downloading github.com/pressly/goose v2.7.0+incompatible
+go: downloading github.com/pressly/goose/v3 v3.10.0
+go: downloading github.com/go-sql-driver/mysql v1.7.0
+go: downloading github.com/denisenkom/go-mssqldb v0.12.3
+go: downloading github.com/ClickHouse/clickhouse-go/v2 v2.7.0
+go: downloading github.com/jackc/pgx/v4 v4.18.1
+go: downloading github.com/vertica/vertica-sql-go v1.3.1
+go: downloading github.com/ziutek/mymysql v1.5.4
+go: downloading modernc.org/sqlite v1.21.0
+go: downloading github.com/jackc/pgconn v1.14.0
+go: downloading github.com/jackc/pgtype v1.14.0
+go: downloading github.com/jackc/pgio v1.0.0
+go: downloading github.com/jackc/pgproto3/v2 v2.3.2
+go: downloading github.com/ClickHouse/ch-go v0.53.0
+go: downloading github.com/andybalholm/brotli v1.0.5
+go: downloading github.com/pkg/errors v0.9.1
+go: downloading go.opentelemetry.io/otel/trace v1.14.0
+go: downloading github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9
+go: downloading github.com/golang-sql/sqlexp v0.1.0
+go: downloading golang.org/x/crypto v0.7.0
+go: downloading github.com/jackc/chunkreader/v2 v2.0.1
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a
+go: downloading go.opentelemetry.io/otel v1.14.0
+go: downloading golang.org/x/text v0.8.0
+go: downloading github.com/google/uuid v1.3.0
+go: downloading github.com/paulmach/orb v0.9.0
+go: downloading github.com/shopspring/decimal v1.3.1
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading github.com/go-faster/city v1.0.1
+go: downloading github.com/go-faster/errors v0.6.1
+go: downloading github.com/klauspost/compress v1.16.0
+go: downloading github.com/pierrec/lz4/v4 v4.1.17
+go: downloading github.com/segmentio/asm v1.2.0
+go: downloading github.com/elastic/go-sysinfo v1.9.0
+go: downloading golang.org/x/sys v0.6.0
+go: downloading github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
+go: downloading howett.net/plist v1.0.0
+go: downloading github.com/prometheus/procfs v0.9.0
+go: downloading modernc.org/libc v1.22.3
+go: downloading github.com/mattn/go-isatty v0.0.17
+go: downloading github.com/dustin/go-humanize v1.0.1
+go: downloading modernc.org/mathutil v1.5.0
+go: downloading modernc.org/memory v1.5.0
+go: downloading github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Kontrola instalace nástroje Goose</h2>
+
+<p>Po instalaci se přesvědčíme, do jakého adresáře byl nástroj Goose
+nainstalován (tento adresář by měl být uložen na <strong>$PATH</strong>, jak je
+to obvyklé):</p>
+
+<pre>
+$ <strong>whereis goose</strong>
+&nbsp;
+goose: /home/ptisnovs/go/bin/goose
+</pre>
+
+<p>A nakonec se přesvědčíme, zda je možné Goose spustit:</p>
+
+<pre>
+$ <strong>goose</strong>
+&nbsp;
+Usage: goose [OPTIONS] DRIVER DBSTRING COMMAND
+&nbsp;
+or
+&nbsp;
+Set environment key
+GOOSE_DRIVER=DRIVER
+GOOSE_DBSTRING=DBSTRING
+&nbsp;
+Usage: goose [OPTIONS] COMMAND
+&nbsp;
+Drivers:
+    postgres
+    mysql
+    sqlite3
+    mssql
+    redshift
+    tidb
+    clickhouse
+    vertica
+&nbsp;
+Examples:
+    goose sqlite3 ./foo.db status
+    goose sqlite3 ./foo.db create init sql
+    goose sqlite3 ./foo.db create add_some_column sql
+    goose sqlite3 ./foo.db create fetch_user_data go
+    goose sqlite3 ./foo.db up
+&nbsp;
+    goose postgres "user=postgres dbname=postgres sslmode=disable" status
+    goose mysql "user:password@/dbname?parseTime=true" status
+    goose redshift "postgres://user:password@qwerty.us-east-1.redshift.amazonaws.com:5439/db" status
+    goose tidb "user:password@/dbname?parseTime=true" status
+    goose mssql "sqlserver://user:password@dbname:1433?database=master" status
+    goose clickhouse "tcp://127.0.0.1:9000" status
+    goose vertica "vertica://user:password@localhost:5433/dbname?connection_load_balance=1" status
+&nbsp;
+    GOOSE_DRIVER=sqlite3 GOOSE_DBSTRING=./foo.db goose status
+    GOOSE_DRIVER=sqlite3 GOOSE_DBSTRING=./foo.db goose create init sql
+    GOOSE_DRIVER=postgres GOOSE_DBSTRING="user=postgres dbname=postgres sslmode=disable" goose status
+    GOOSE_DRIVER=mysql GOOSE_DBSTRING="user:password@/dbname" goose status
+    GOOSE_DRIVER=redshift GOOSE_DBSTRING="postgres://user:password@qwerty.us-east-1.redshift.amazonaws.com:5439/db" goose status
+&nbsp;
+Options:
+&nbsp;
+  -allow-missing
+        applies missing (out-of-order) migrations
+  -certfile string
+        file path to root CA's certificates in pem format (only support on mysql)
+  -dir string
+        directory with migration files (default ".")
+  -h    print help
+  -no-color
+        disable color output (NO_COLOR env variable supported)
+  -no-versioning
+        apply migration commands with no versioning, in file order, from directory pointed to
+  -s    use sequential numbering for new migrations
+  -ssl-cert string
+        file path to SSL certificates in pem format (only support on mysql)
+  -ssl-key string
+        file path to SSL key in pem format (only support on mysql)
+  -table string
+        migrations table name (default "goose_db_version")
+  -v    enable verbose mode
+  -version
+        print version
+&nbsp;
+Commands:
+    up                   Migrate the DB to the most recent version available
+    up-by-one            Migrate the DB up by 1
+    up-to VERSION        Migrate the DB to a specific VERSION
+    down                 Roll back the version by 1
+    down-to VERSION      Roll back to a specific VERSION
+    redo                 Re-run the latest migration
+    reset                Roll back all migrations
+    status               Dump the migration status for the current DB
+    version              Print the current version of the database
+    create NAME [sql|go] Creates new migration file with the current timestamp
+    fix                  Apply sequential ordering to migrations
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Vytvoření migračního skriptu s&nbsp;příkazem pro vytvoření tabulky</h2>
+
+<p>Kostra migračního skriptu (napsaného přímo v&nbsp;jazyce SQL) se vytvoří
+následujícím příkazem:</p>
+
+<pre>
+$ <strong>goose create users sql</strong>
+&nbsp;
+2023/07/08 11:39:41 Created new file: 20230708113941_users.sql
+</pre>
+
+<p>Povšimněte si, že jméno souboru se skriptem obsahuje časové razítko, čímž je
+stanoveno jeho pořadí.</p>
+
+<p>Podívejme se nyní na strukturu tohoto skriptu. Obsahuje několik
+&bdquo;strukturovaných poznámek&ldquo;, které určují, který blok SQL příkazů se
+použije pro migraci databáze na vyšší verzi (<i>goose Up</i>) a který blok
+naopak na verzi nižší (<i>goose Down</i>):</p>
+
+<pre>
+-- +goose Up
+-- +goose StatementBegin
+<strong>SELECT 'up SQL query';</strong>
+-- +goose StatementEnd
+&nbsp;
+-- +goose Down
+-- +goose StatementBegin
+<strong>SELECT 'down SQL query';</strong>
+-- +goose StatementEnd
+</pre>
+
+<p>Nyní je nutné skript upravit, tj.&nbsp;přidat do něj příkaz/příkazy pro
+migraci na vyšší verzi a pokud je to možné, tak i příkaz/příkazy pro migraci na
+verzi nižší. Náš první migrační skript vytvoří tabulku a při přechodu na nižší
+verzi ji zase odstraní (což znamená, že se můžeme pohybovat vpřed i zpět na
+časové ose s&nbsp;verzemi databáze):</p>
+
+<pre>
+-- +goose Up
+-- +goose StatementBegin
+<strong>CREATE TABLE users (</strong>
+    <strong>id      INTEGER NOT NULL,</strong>
+    <strong>name    VARCHAR NOT NULL,</strong>
+    <strong>surname VARCHAR NOT NULL,</strong>
+    <strong>PRIMARY KEY (id)</strong>
+-- +goose StatementEnd
+&nbsp;
+-- +goose Down
+-- +goose StatementBegin
+<strong>DROP TABLE users;</strong>
+-- +goose StatementEnd
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Výchozí stav databáze a migrace</h2>
+
+<p>Výchozí stav databáze a migrace zjistíme snadno &ndash; příkazý
+<strong>status</strong> a <strong>version</strong>. Povšimněte si, že nástroji
+<i>Goose</i> musíme předat jak informaci o typu databáze (v&nbsp;našem případě
+se bude jednat o databázi SQLite), tak i řetězec zajišťující připojení
+k&nbsp;databázi. Ten se liší podle typu databáze, ovšem v&nbsp;SQLite je to
+snadné &ndash; jedná se o cestu k&nbsp;souboru s&nbsp;databází. Pokud soubor
+neexistuje (což je i náš případ) je při prvním přístupu k&nbsp;němu
+vytvořen:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db status</strong>
+&nbsp;
+2023/07/08 11:45:45     Applied At                  Migration
+2023/07/08 11:45:45     =======================================
+2023/07/08 11:45:45     Pending                  -- 20230708113941_users.sql
+</pre>
+
+<p>a:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db version</strong>
+&nbsp;
+2023/07/09 09:10:21 goose: version 0
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Provedení migrace nástrojem <i>Goose</i></h2>
+
+<p>Nyní by v&nbsp;aktuálním adresáři měla existovat dvojice souborů:</p>
+
+<pre>
+test.db
+20230708113941_users.sql
+</pre>
+
+<p>První soubor obsahuje vlastní databázi (SQLite) a druhý migrační skript.</p>
+
+<p>Migraci na nejnovější verzi databáze provedeme následujícím příkazem:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db up</strong>
+&nbsp;
+2023/07/08 11:46:59 OK   20230708113941_users.sql (3.61ms)
+2023/07/08 11:46:59 goose: no migrations to run. current version: 20230708113941
+</pre>
+
+<p>Podívejme se nyní, zda migrace skutečně proběhla. Otevřeme si konzoli
+databáze SQLite s&nbsp;námi používanou databází:</p>
+
+<pre>
+$ <strong>sqlite3 test.db</strong>
+&nbsp;
+SQLite version 3.31.1 2020-01-27 19:55:54
+Enter ".help" for usage hints.
+sqlite&gt;
+</pre>
+
+<p>Dále si vypíšeme tabulky, které se v&nbsp;databázi nachází. Měla by se
+vypsat tabulka <strong>users</strong> vytvořená v&nbsp;rámci migrace a taktéž
+tabulka <strong>goose_db_version</strong> obsahující informaci o verzi
+databáze:</p>
+
+<pre>
+sqlite&gt; <strong>.tables</strong>
+&nbsp;
+goose_db_version  users           
+</pre>
+
+<p>Samozřejmě nás budou zajímat i schémata obou tabulek:</p>
+
+<pre>
+sqlite&gt; <strong>.schema goose_db_version</strong>
+&nbsp;
+CREATE TABLE goose_db_version (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                version_id INTEGER NOT NULL,
+                is_applied INTEGER NOT NULL,
+                tstamp TIMESTAMP DEFAULT (datetime('now'))
+            );
+&nbsp;
+&nbsp;
+&nbsp;
+sqlite&gt; <strong>.schema users</strong>
+&nbsp;
+CREATE TABLE users (
+    id      INTEGER NOT NULL,
+    name    VARCHAR NOT NULL,
+    surname VARCHAR NOT NULL,
+    PRIMARY KEY (id)
+);
+</pre>
+
+<p>Tabulka <strong>users</strong> by měla být prázdná (v&nbsp;rámci migrace
+jsme do ní nepřidali žádné záznamy), ovšem tabulka
+<strong>goose_db_version</strong> by měla obsahovat verzi/verze databáze:</p>
+
+<pre>
+sqlite&gt; <strong>select * from goose_db_version ;</strong>
+&nbsp;
+1|0|1|2023-07-08 09:46:57
+2|20230708113941|1|2023-07-08 09:46:59
+</pre>
+
+<p>Nyní je tedy databáze povýšena na verzi <strong>20230708113941</strong>.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Návrat zpět</h2>
+
+<p>Velkou předností použití migračních nástrojů oproti ah-hoc změnám
+v&nbsp;databázi (například přes její SQL konzoli) je fakt, že pokud je migrační
+skript napsán korektně, umožňuje nám návrat zpět do stavu před migrací. A
+v&nbsp;případě, že jsou takto napsány všechny migrační skripty, můžeme databázi
+připravit do libovolného stavu &ndash; verze (je to sice zpočátku pracnější,
+ovšem většinou se nám tato časová investice vyplatí).</p>
+
+<p>Návrat databáze do prvotní verze zajišťuje příkaz <strong>down</strong>,
+který si můžeme ihned otestovat:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db down</strong>
+&nbsp;
+2023/07/08 11:50:43 OK   20230708113941_users.sql (1.7ms)
+</pre>
+
+<p>Opět se přesvědčíme o stavu databáze. Otevřeme si její konzoli:</p>
+
+<pre>
+$ <strong>sqlite3 test.db</strong>
+&nbsp;
+SQLite version 3.31.1 2020-01-27 19:55:54
+Enter ".help" for usage hints.
+</pre>
+
+<p>Následně si necháme vypsat všechny tabulky. Měla by se vypsat jediná tabulka
+&ndash; <strong>goose_db_version</strong>:</p>
+
+<pre>
+sqlite&gt; <strong>.tables</strong>
+&nbsp;
+goose_db_version
+&nbsp;
+sqlite&gt; select * from goose_db_version ;
+1|0|1|2023-07-08 09:46:57
+</pre>
+
+<p>Databáze se tedy nyní nachází v&nbsp;počátečním stavu (až na existenci výše
+zmíněné tabulky spravované přímo nástrojem <i>Goose</i>).</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vícekroková migrace</h2>
+
+<p>Typicky se v&nbsp;průběhu vývoje aplikace migrační skripty rozrostou, mnohdy
+i na několik desítek (možná i stovek). Zkusme si nyní vytvořit druhý migrační
+skript, v&nbsp;němž do existující tabulky přidáme nový sloupec:</p>
+
+<pre>
+$ <strong>goose create role-column sql</strong>
+&nbsp;
+2023/07/08 11:55:39 Created new file: 20230708115539_role_column.sql
+</pre>
+
+<p>Původní obsah tohoto skriptu je stále stejný, ovšem upravíme ho do takové
+podoby, aby se do tabulky přidal nový sloupec popř.&nbsp;při návratu zpět na
+nižší verzi aby se tento sloupec naopak odstranil:</p>
+
+<pre>
+-- +goose Up
+-- +goose StatementBegin
+<strong>ALTER TABLE users ADD COLUMN role VARCHAR;</strong>
+-- +goose StatementEnd
+&nbsp;
+-- +goose Down
+-- +goose StatementBegin
+<strong>ALTER TABLE users DROP COLUMN role;</strong>
+-- +goose StatementEnd
+</pre>
+
+<p>Aktuální stav migrací zjistíme příkazem <strong>status</strong>:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db status</strong>
+&nbsp;
+2023/07/08 11:58:30     Applied At                  Migration
+2023/07/08 11:58:30     =======================================
+2023/07/08 11:58:30     Pending                  -- 20230708113941_users.sql
+2023/07/08 11:58:30     Pending                  -- 20230708115539_role_column.sql
+</pre>
+
+<p>Nyní provedeme migraci na nejvyšší verzi databáze:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db up</strong>
+&nbsp;
+2023/07/08 11:58:34 OK   20230708113941_users.sql (10ms)
+2023/07/08 11:58:34 OK   20230708115539_role_column.sql (477.42µs)
+2023/07/08 11:58:34 goose: no migrations to run. current version: 20230708115539
+</pre>
+
+<p>A při pohledu na schéma tabulky <strong>users</strong> bychom měli vidět, že
+do tabulky byl skutečně přidán nový sloupec nazvaný <strong>role</strong>:</p>
+
+<pre>
+sqlite&gt; <strong>.schema users</strong>
+&nbsp;
+CREATE TABLE users (
+    id      INTEGER NOT NULL,
+    name    VARCHAR NOT NULL,
+    surname VARCHAR NOT NULL,
+    role    VARCHAR,
+    PRIMARY KEY (id)
+);
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Povýšení nebo naopak snížení schématu databáze na zvolenou verzi</h2>
+
+<p>S&nbsp;využitím příkazů <strong>up-to</strong> nebo <strong>down-to</strong>
+je možné provést migraci databáze na zvolenou verzi, protože za tímto příkazem
+se zadává ta verze databáze, na kterou se má provést její povýšení či naopak
+snížení. V&nbsp;našem konkrétním případě si můžeme zvolit tři verze
+databáze:</p>
+
+<ul>
+<li>1</li>
+<li>20230708113941</li>
+<li>20230708115539</li>
+</ul>
+
+<p>Pokud například budeme chtít snížit verzi databáze na 20230708113941,
+provedeme to následujícím způsobem:</p>
+
+<pre>
+$ <strong>goose sqlite3 ./test.db down-to 20230708113941</strong>
+&nbsp;
+2023/07/08 12:02:58 OK   20230708115539_role_column.sql (7.95ms)
+2023/07/08 12:02:58 goose: no migrations to run. current version: 20230708113941
+</pre>
+
+<p>A pochopitelně je opět vhodné se podívat na aktuální stav databáze a ověřit
+si, zda a jak migrace proběhla:</p>
+
+<pre>
+$ <strong>sqlite3 test.db</strong>
+&nbsp;
+SQLite version 3.31.1 2020-01-27 19:55:54
+Enter ".help" for usage hints.
+&nbsp;
+sqlite&gt; <strong>.schema users</strong>
+&nbsp;
+CREATE TABLE users (
+    id      INTEGER NOT NULL,
+    name    VARCHAR NOT NULL,
+    surname VARCHAR NOT NULL,
+    PRIMARY KEY (id)
+);
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;výše uvedeného výsledku je
+patrné, že jsme skutečně migrovali zpět na druhou dostupnou verzi.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Zavolání funkcí nástroje <i>Goose</i> přímo z&nbsp;jazyka Go</h2>
+
+<p>Samotný nástroj <i>Goose</i> je naprogramovaný v&nbsp;jazyce Go. To by pro
+koncového uživatele nebyla nijak zásadní a vlastně ani potřebná informace,
+ovšem pro programátora to může mít poměrně velký význam, protože prakticky
+všechny funkce nabízené nástrojem <i>Goose</i> je možné volat přímo
+z&nbsp;jazyka Go. To například znamená, že je možné relativně snadno realizovat
+migrace přímo z&nbsp;vyvíjené aplikace, pochopitelně za předpokladu, že je
+aplikace vyvíjena právě v&nbsp;jazyce Go. A navíc je možné i samotné migrace
+zapisovat přímo v&nbsp;jazyce Go, tj.&nbsp;nejsme omezeni na použití SQL
+skriptů. Tato druhá vlastnost se může zdát neužitečná, ale můžeme ji ocenit při
+importech dat prováděných v&nbsp;rámci migrace (takovou migrací může být
+například naplnění tabulky s&nbsp;číselníkem nebo číselníky apod.). Obě výše
+zmíněné možnosti si ukážeme v&nbsp;navazujících kapitolách.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Výpis aktuální verze databáze a stavu migrací</h2>
+
+<p>První demonstrační příklad naprogramovaný v&nbsp;jazyce Go zavolá příkaz
+<strong>status</strong> nástroje Goose. Povšimněte si, že je nejprve nutné
+zajistit připojení k&nbsp;databázi volbou typu databáze a řetězce s&nbsp;vhodně
+naformátovanými informacemi potřebnými k&nbsp;připojení k&nbsp;databázi
+(<i>connection string</i>). Tento řetězec se pochopitelně liší podle typu
+databáze a v&nbsp;případě SQLite má podobu řetězce s&nbsp;názvem souboru
+s&nbsp;databází. Po připojení je možné zavolat funkci
+<strong>goose.Run</strong> a předat jí libovolný příkaz nástroje <i>Goose</i>
+(a samozřejmě případné další parametry vyžadované zvoleným příkazem). My
+v&nbsp;tomto příkladu použijeme příkaz <strong>status</strong> bez dalších
+parametrů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/pressly/goose/v3"
+        _ "modernc.org/sqlite"
+)
+&nbsp;
+const databaseType = "sqlite"
+&nbsp;
+const databaseFile = "./test.db"
+&nbsp;
+const command = "status"
+&nbsp;
+const migrationScriptsDirectory = "./"
+&nbsp;
+func <strong>main</strong>() {
+        db, err := goose.OpenDBWithDriver(databaseType, databaseFile)
+        if err != nil {
+                log.Fatalf("goose: failed to open DB: %v\n", err)
+        }
+&nbsp;
+        defer func() {
+                if err := db.Close(); err != nil {
+                        log.Fatalf("goose: failed to close DB: %v\n", err)
+                }
+        }()
+&nbsp;
+        arguments := []string{}
+&nbsp;
+        err = goose.Run(command, db, migrationScriptsDirectory, arguments...)
+        if err != nil {
+                log.Fatalf("goose %v: %v", command, err)
+        }
+}
+</pre>
+
+<p>Výsledek by měl vypadat následovně (pochopitelně s&nbsp;rozdílnými časovými
+razítky):</p>
+
+<pre>
+2023/07/08 19:02:45     Applied At                  Migration
+2023/07/08 19:02:45     =======================================
+2023/07/08 19:02:45     Sat Jul  8 10:00:59 2023 -- 20230708113941_users.sql
+2023/07/08 19:02:45     Pending                  -- 20230708115539_role_column.sql
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Provedení migrace přímo z&nbsp;jazyka Go</h2>
+
+<p>Naprosto stejným způsobem, pouze modifikací příkazu posílaného do funkce
+<strong>goose.Run</strong>, můžeme přímo z&nbsp;programovacího jazyka Go
+provést migraci. Opět se podívejme na demonstrační příklad, který tuto činnost
+provádí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/pressly/goose/v3"
+        _ "modernc.org/sqlite"
+)
+&nbsp;
+const databaseType = "sqlite"
+&nbsp;
+const databaseFile = "./test.db"
+&nbsp;
+const command = "up"
+&nbsp;
+const migrationScriptsDirectory = "./"
+&nbsp;
+func <strong>main</strong>() {
+        db, err := goose.OpenDBWithDriver(databaseType, databaseFile)
+        if err != nil {
+                log.Fatalf("goose: failed to open DB: %v\n", err)
+        }
+&nbsp;
+        defer func() {
+                if err := db.Close(); err != nil {
+                        log.Fatalf("goose: failed to close DB: %v\n", err)
+                }
+        }()
+&nbsp;
+        arguments := []string{}
+&nbsp;
+        err = goose.Run(command, db, migrationScriptsDirectory, arguments...)
+        if err != nil {
+                log.Fatalf("goose %v: %v", command, err)
+        }
+}
+</pre>
+
+<p>Po prvním spuštění této (přeložené) aplikace by se na terminálu měly objevit
+informace o provedených migracích:</p>
+
+<pre>
+2023/07/08 19:03:11     Applied At                  Migration
+2023/07/08 19:03:11     =======================================
+2023/07/08 19:03:11     Sat Jul  8 10:00:59 2023 -- 20230708113941_users.sql
+2023/07/08 19:03:11     Sat Jul  8 17:03:06 2023 -- 20230708115539_role_column.sql
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Zavolání libovolného příkazu nástroje <i>Goose</i> z&nbsp;jazyka Go</h2>
+
+<p>Nic nám pochopitelně nebrání ve spuštění libovolného příkazu nabízeného
+nástrojem <i>Goose</i>. Pouze budeme potřebovat zajistit, aby se zvolenému
+příkazu předaly i všechny jeho parametry. To se provede například následujícím
+způsobem. Nejprve se přesvědčíme, že je příkaz zadán na příkazové řádce:</p>
+
+<pre>
+        args := os.Args
+&nbsp;
+        if len(args) &lt;= 1 {
+                log.Fatalf("command is expected")
+                return
+        }
+&nbsp;
+        command := args[1]
+</pre>
+
+<p>Dále si vytvoříme řez s&nbsp;případnými argumenty (řez může být prázdný):</p>
+
+<pre>
+        arguments := []string{}
+&nbsp;
+        if len(args) &gt; 1 {
+                arguments = append(arguments, args[1:]...)
+        }
+</pre>
+
+<p>A nyní nám již jen zbývá zavolat nám již známou funkci
+<strong>goose.Run</strong> a příkaz i parametry jí předat:</p>
+
+<pre>
+        err = goose.Run(command, db, migrationScriptsDirectory, arguments...)
+</pre>
+
+<p>Úplný kód prakticky plnohodnotné náhrady příkazu <strong>goose</strong>,
+pouze s&nbsp;předvyplněnou konfigurací databáze, může vypadat například
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/pressly/goose/v3"
+        _ "modernc.org/sqlite"
+)
+&nbsp;
+const databaseType = "sqlite"
+&nbsp;
+const databaseFile = "./test.db"
+&nbsp;
+const migrationScriptsDirectory = "./"
+&nbsp;
+func <strong>main</strong>() {
+        args := os.Args
+&nbsp;
+        if len(args) &lt;= 1 {
+                log.Fatalf("command is expected")
+                return
+        }
+&nbsp;
+        command := args[1]
+&nbsp;
+        db, err := goose.OpenDBWithDriver(databaseType, databaseFile)
+        if err != nil {
+                log.Fatalf("goose: failed to open DB: %v\n", err)
+        }
+&nbsp;
+        defer func() {
+                if err := db.Close(); err != nil {
+                        log.Fatalf("goose: failed to close DB: %v\n", err)
+                }
+        }()
+&nbsp;
+        arguments := []string{}
+&nbsp;
+        if len(args) &gt; 1 {
+                arguments = append(arguments, args[1:]...)
+        }
+&nbsp;
+        err = goose.Run(command, db, migrationScriptsDirectory, arguments...)
+        if err != nil {
+                log.Fatalf("goose %v: %v", command, err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Zápis migračních skriptů přímo v&nbsp;jazyce Go</h2>
+
+<p>Migrační skripty nemusí být zapisovány jen formou výše zmíněného SQL skriptu
+s&nbsp;bloky &bdquo;up&ldquo; a &bdquo;down&ldquo;. Jednotlivé migrace je totiž
+možné v&nbsp;případě potřeby i zapsat přímo v&nbsp;jazyce Go. Většinou se pro
+každý krok migrace vytváří nový zdrojový soubor, který obsahuje sadu funkcí
+nazvaných <strong>UpXXX</strong> a <strong>DownXXX</strong> (jména ovšem mohou
+být odlišná), kde <strong>XXX</strong> obsahuje číslo kroku
+(popř.&nbsp;sémantickou verzi atd.).  Tyto funkce jsou volány nástrojem
+<i>Goose</i> a předává se jim již zahájená databázová transakce,
+tj.&nbsp;konkrétně struktura splňující rozhraní <strong>sql.Tx</strong>. A toto
+rozhraní nabízí všechny potřebné příkazy související s&nbsp;řízením relační
+databáze. Pokud dojde k&nbsp;chybě, měla by být z&nbsp;takové funkce vrácena
+(jedná se o jedinou návratovou hodnotu). O uzavření transakce se postará
+nástroj <i>Goose</i>.</p>
+
+<p>Příkladem může být funkce <strong>Up00001</strong>, která v&nbsp;rámci
+transakce vytvoří novou tabulku:</p>
+
+<pre>
+func <strong>Up00001</strong>(tx *sql.Tx) error {
+        _, err := tx.Exec(`
+CREATE TABLE users (
+    id      INTEGER NOT NULL,
+    name    VARCHAR NOT NULL,
+    surname VARCHAR NOT NULL,
+    PRIMARY KEY (id)
+);
+        `)
+        if err != nil {
+                <i>// zde by bylo vhodné přidat logování atd. atd.</i>
+                return err
+        }
+        return nil
+}
+</pre>
+
+<p>Navíc je ještě nutné funkce provádějící migraci zaregistrovat, protože názvy
+funkcí provádějících kroky migrace mohou být zvoleny uživatelem. Registraci
+můžeme provést v&nbsp;rámci speciální funkce <strong>init</strong>, která je
+volána automaticky runtime systémem jazyka Go:</p>
+
+<pre>
+func <strong>init</strong>() {
+        goose.AddMigration(Up00001, Down00001)
+}
+</pre>
+
+<p>Podívejme se nyní na to, jak by mohl vypadat celý zdrojový kód
+s&nbsp;definicí jedné migrace (směrem vzhůru k&nbsp;vyšší verzi i směrem dolů
+k&nbsp;verzi nižší):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+&nbsp;
+        "github.com/pressly/goose/v3"
+)
+&nbsp;
+func <strong>init</strong>() {
+        goose.AddMigration(Up00001, Down00001)
+}
+&nbsp;
+func <strong>Up00001</strong>(tx *sql.Tx) error {
+        _, err := tx.Exec(`
+CREATE TABLE users (
+    id      INTEGER NOT NULL,
+    name    VARCHAR NOT NULL,
+    surname VARCHAR NOT NULL,
+    PRIMARY KEY (id)
+);
+        `)
+        if err != nil {
+                <i>// zde by bylo vhodné přidat logování atd. atd.</i>
+                return err
+        }
+        return nil
+}
+&nbsp;
+func <strong>Down00001</strong>(tx *sql.Tx) error {
+        _, err := tx.Exec("DROP TABLE users;")
+        if err != nil {
+                <i>// zde by bylo vhodné přidat logování atd. atd.</i>
+                return err
+        }
+        return nil
+}
+</pre>
+
+<p>Do projektu přidáme i druhý soubor s&nbsp;druhou migrací &ndash;
+přidáním/ubráním sloupce do existující tabulky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "database/sql"
+&nbsp;
+        "github.com/pressly/goose/v3"
+)
+&nbsp;
+func <strong>init</strong>() {
+        goose.AddMigration(Up00002, Down00002)
+}
+&nbsp;
+func <strong>Up00002</strong>(tx *sql.Tx) error {
+        _, err := tx.Exec("ALTER TABLE users ADD COLUMN role VARCHAR;")
+        if err != nil {
+                <i>// zde by bylo vhodné přidat logování atd. atd.</i>
+                return err
+        }
+        return nil
+}
+&nbsp;
+func <strong>Down00002</strong>(tx *sql.Tx) error {
+        _, err := tx.Exec("ALTER TABLE users DROP COLUMN role;")
+        if err != nil {
+                <i>// zde by bylo vhodné přidat logování atd. atd.</i>
+                return err
+        }
+        return nil
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Rozšíření příkazu <strong>goose</strong> o realizaci migrací zapsaných v&nbsp;jazyce Go</h2>
+
+<p>Celý projekt, který obsahuje migrace psané v&nbsp;jazyku Go, má následující
+plochou strukturu:</p>
+
+<pre>
+01_table_users.go
+02_role_column.go
+migrations.go
+go.mod
+go.sum
+</pre>
+
+<p>První dva soubory jsme si ukázali v&nbsp;rámci <a href="#k15">předchozí
+kapitoly</a>. Zajímavé je, že soubor <strong>migrations.go</strong> se vlastně
+nemusel nijak změnit a vypadá stejně jako zdrojový kód <a href="#k14">ze
+čtrnácté kapitoly</a>. Migrace jsou totiž zaregistrovány přes funkce
+<strong>init</strong> a o zbytek se postará nám již dobře známá funkce
+<strong>goose.Run</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/pressly/goose/v3"
+        _ "modernc.org/sqlite"
+)
+&nbsp;
+const databaseType = "sqlite"
+&nbsp;
+const databaseFile = "./test.db"
+&nbsp;
+const migrationScriptsDirectory = "./"
+&nbsp;
+func <strong>main</strong>() {
+        args := os.Args
+&nbsp;
+        if len(args) &lt;= 1 {
+                log.Fatalf("command is expected")
+                return
+        }
+&nbsp;
+        command := args[1]
+&nbsp;
+        db, err := goose.OpenDBWithDriver(databaseType, databaseFile)
+        if err != nil {
+                log.Fatalf("goose: failed to open DB: %v\n", err)
+        }
+&nbsp;
+        defer func() {
+                if err := db.Close(); err != nil {
+                        log.Fatalf("goose: failed to close DB: %v\n", err)
+                }
+        }()
+&nbsp;
+        arguments := []string{}
+&nbsp;
+        if len(args) &gt; 1 {
+                arguments = append(arguments, args[1:]...)
+        }
+&nbsp;
+        err = goose.Run(command, db, migrationScriptsDirectory, arguments...)
+        if err != nil {
+                log.Fatalf("goose %v: %v", command, err)
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Provedení migrace z&nbsp;nativní aplikace napsané v&nbsp;jazyce Go</h2>
+
+<p>Jak jsme se již dozvěděli v&nbsp;předchozím textu, lze migraci provést
+z&nbsp;námi vytvořené nativní aplikace naprogramované v&nbsp;jazyce Go. Tuto
+aplikaci si nejdříve přeložíme ze zdrojových kódů:</p>
+
+<pre>
+$ <strong>go build</strong>
+</pre>
+
+<p>Díky tomu, že tato aplikace akceptuje všechny příkazy a parametry nástroje
+<i>Goose</i>, můžeme se dotázat na stav databáze:</p>
+
+<pre>
+$ <strong>./migrations status</strong>
+&nbsp;
+2023/07/09 10:10:04     Applied At                  Migration
+2023/07/09 10:10:04     =======================================
+2023/07/09 10:10:04     Pending                  -- 01_table_users.go
+2023/07/09 10:10:04     Pending                  -- 02_role_columnt.go
+</pre>
+
+<p>Následně můžeme provést vlastní migraci &ndash; zapsanou v&nbsp;migračních
+skriptech v&nbsp;Go:</p>
+
+<pre>
+$ <strong>./migrations up</strong>
+&nbsp;
+2023/07/09 10:10:07 OK   01_table_users.go (323.1µs)
+2023/07/09 10:10:07 OK   02_role_columnt.go (368.08µs)
+2023/07/09 10:10:07 goose: no migrations to run. current version: 2
+</pre>
+
+<p>A opět se můžeme pro jistotu přesvědčit, zda migrace proběhla či nikoli:</p>
+
+<pre>
+$ <strong>./migrations status</strong>
+&nbsp;
+2023/07/09 10:10:11     Applied At                  Migration
+2023/07/09 10:10:11     =======================================
+2023/07/09 10:10:11     Sun Jul  9 08:10:07 2023 -- 01_table_users.go
+2023/07/09 10:10:11     Sun Jul  9 08:10:07 2023 -- 02_role_columnt.go
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Krátké doplnění: migrace nad databází uloženou v&nbsp;PostgreSQL</h2>
+
+<p>Podívejme se nyní, jak se provádí migrace v&nbsp;případě, že se namísto
+databáze SQLite používá PostgreSQL. V&nbsp;mém konkrétním případě se jedná o
+databázi, která běží na počítači se jménem/IP adresou 192.168.1.34, a to
+konkrétně na standardním portu 5432. Jméno databáze je <strong>testdb</strong>
+a uživatel mající přístup do této databáze se jmenuje <strong>dbuser</strong>.
+Stav migrací se zjistí následovně (oproti SQLite se vlastně změnil jen
+<i>connection string</i>):</p>
+
+<pre>
+$ <strong>goose postgres "user=dbuser password=topsecret dbname=testdb sslmode=disable host=192.168.1.34 port=5432" status</strong>
+&nbsp;
+2023/07/10 17:23:29     Applied At                  Migration
+2023/07/10 17:23:29     =======================================
+2023/07/10 17:23:29     Pending                  -- 20230708113941_users.sql
+2023/07/10 17:23:29     Pending                  -- 20230708115539_role_column.sql
+</pre>
+
+<p>Ani provedení samotné migrace se nijak zásadně neliší od SQLite:</p>
+
+<pre>
+$ <strong>goose postgres "user=dbuser password=topsecret dbname=testdb sslmode=disable host=192.168.1.34 port=5432" up</strong>
+&nbsp;
+2023/07/10 17:24:25 OK   20230708113941_users.sql (28.71ms)
+2023/07/10 17:24:25 OK   20230708115539_role_column.sql (10.68ms)
+2023/07/10 17:24:25 goose: no migrations to run. current version: 20230708115539
+</pre>
+
+<p>Po přihlášení do konzole <strong>psql</strong> se můžeme přesvědčit, jak
+databáze vypadá. Nejdříve si vypíšeme všechny dostupné tabulky:</p>
+
+<pre>
+postgres=# <strong>\dt</strong>
+&nbsp;
+              List of relations
+ Schema |       Name       | Type  |  Owner   
+--------+------------------+-------+----------
+ public | goose_db_version | table | dbuser
+ public | users            | table | dbuser
+(2 rows)
+</pre>
+
+<p>Podívejme se ještě na strukturu tabulek, které byly vytvořeny nástrojem
+<i>Goose</i>. První z&nbsp;těchto tabulek bude obsahovat informace o verzi:</p>
+
+<pre>
+postgres=# <strong>\d goose_db_version</strong>
+&nbsp;
+                                     Table "public.goose_db_version"
+   Column   |            Type             |                           Modifiers                           
+------------+-----------------------------+---------------------------------------------------------------
+ id         | integer                     | not null default nextval('goose_db_version_id_seq'::regclass)
+ version_id | bigint                      | not null
+ is_applied | boolean                     | not null
+ tstamp     | timestamp without time zone | default now()
+Indexes:
+    "goose_db_version_pkey" PRIMARY KEY, btree (id)
+</pre>
+
+<p>A tabulka <strong>users</strong> byla korektně vytvořena oběma migracemi
+&ndash; první migrace vytvořila tabulku, druhá migrace do tabulky přidala další
+sloupec <strong>role</strong>:</p>
+
+<pre>
+postgres=# <strong>\d users</strong>
+&nbsp;
+          Table "public.users"
+ Column  |       Type        | Modifiers 
+---------+-------------------+-----------
+ id      | integer           | not null
+ name    | character varying | not null
+ surname | character varying | not null
+ role    | character varying | 
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů naprogramovaných
+v&nbsp;jazyku Go byly uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Projekt</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>status</td><td>zjištění aktuálního stavu migrací</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A2/status/">https://github.com/tisnik/go-root/blob/master/article_A2/status/</a></td></tr>
+<tr><td>2</td><td>up</td><td>migrace databáze na nejvyšší verzi</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A2/up/">https://github.com/tisnik/go-root/blob/master/article_A2/up/</a></td></tr>
+<tr><td>3</td><td>command</td><td>spuštění libovolného příkazu nástroje <i>Go</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A2/command/">https://github.com/tisnik/go-root/blob/master/article_A2/command/</a></td></tr>
+<tr><td>4</td><td>migrations</td><td>migrace prováděné přímo z&nbsp;jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A2/migrations/">https://github.com/tisnik/go-root/blob/master/article_A2/migrations/</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>goose: a database migration tool<br />
+<a href="https://github.com/pressly/goose">https://github.com/pressly/goose</a>
+</li>
+
+<li>Alembic na PyPi<br />
+<a href="https://pypi.org/project/alembic/">https://pypi.org/project/alembic/</a>
+</li>
+
+<li>Welcome to Alembic’s documentation!<br />
+<a href="https://alembic.sqlalchemy.org/en/latest/">https://alembic.sqlalchemy.org/en/latest/</a>
+</li>
+
+<li>The Python SQL Toolkit and Object Relational Mapper<br />
+<a href="https://www.sqlalchemy.org/">https://www.sqlalchemy.org/</a>
+</li>
+
+<li>Library (documentation for SQLAlchemy)<br />
+<a href="https://www.sqlalchemy.org/library.html">https://www.sqlalchemy.org/library.html</a>
+</li>
+
+<li>SQLAlchemy na Wikipedii<br />
+<a href="https://en.wikipedia.org/wiki/SQLAlchemy">https://en.wikipedia.org/wiki/SQLAlchemy</a>
+</li>
+
+<li>Schema migration<br />
+<a href="https://en.wikipedia.org/wiki/Schema_migration">https://en.wikipedia.org/wiki/Schema_migration</a>
+</li>
+
+<li>Intro to SqlAlchemy<br />
+<a href="https://overiq.com/sqlalchemy-101/intro-to-sqlalchemy/">https://overiq.com/sqlalchemy-101/intro-to-sqlalchemy/</a>
+</li>
+
+<li>6 Database Migration Tools For Complete Data Integrity &amp; More<br />
+<a href="https://hackernoon.com/6-database-migration-tools-for-complete-data-integrity-more">https://hackernoon.com/6-database-migration-tools-for-complete-data-integrity-more</a>
+</li>
+
+<li>DB Migration In Go Lang<br />
+<a href="https://medium.com/geekculture/db-migration-in-go-lang-d325effc55de">https://medium.com/geekculture/db-migration-in-go-lang-d325effc55de</a>
+</li>
+
+<li>Golang Database Migration Tutorial<br />
+<a href="https://golang.ch/golang-database-migration-tutorial/">https://golang.ch/golang-database-migration-tutorial/</a>
+</li>
+
+<li>Database migrations written in Go<br />
+<a href="https://github.com/golang-migrate/migrate">https://github.com/golang-migrate/migrate</a>
+</li>
+
+<li>How to do Migration using golang-migrate<br />
+<a href="https://stackoverflow.com/questions/69054061/how-to-do-migration-using-golang-migrate">https://stackoverflow.com/questions/69054061/how-to-do-migration-using-golang-migrate</a>
+</li>
+
+<li>Accessing relational databases<br />
+<a href="https://go.dev/doc/database/">https://go.dev/doc/database/</a>
+</li>
+
+<li>Evolutionary Database Design<br />
+<a href="https://martinfowler.com/articles/evodb.html">https://martinfowler.com/articles/evodb.html</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
+
