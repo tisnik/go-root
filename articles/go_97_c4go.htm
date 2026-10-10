@@ -1,0 +1,2732 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Převody zdrojových kódů z jazyka C do jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Převody zdrojových kódů z jazyka C do jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku se seznámíme s poněkud neobvyklým, ovšem potenciálně velmi užitečným projektem. Tento projekt se jmenuje c4go a jak již jeho název může napovědět, jedná se o nástroj, který je určený k převodům (transpřekladu) zdrojových kódů napsaných původně v jazyku C do jazyka Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Převody zdrojových kódů z&nbsp;jazyka C do jazyka Go</a></p>
+<p><a href="#k02">2. Instalace transpřekladače c4go, příprava projektového souboru</a></p>
+<p><a href="#k03">3. Program typu &bdquo;Hello world&ldquo; v&nbsp;C s&nbsp;jeho překladem do jazyka Go</a></p>
+<p><a href="#k04">4. Program psaný v&nbsp;C, jenž pracuje s&nbsp;řetězci</a></p>
+<p><a href="#k05">5. Transpilace zdrojového kódu do Go</a></p>
+<p><a href="#k06">6. Program psaný v&nbsp;C, jenž modifikuje řetězce</a></p>
+<p><a href="#k07">7. Transpilace zdrojového kódu do Go</a></p>
+<p><a href="#k08">8. Algoritmus CORDIC implementovaný v&nbsp;jazyku C</a></p>
+<p><a href="#k09">9. Automatická transpilace programu do Go</a></p>
+<p><a href="#k10">10. Ruční oprava některých chyb vzniklých při transpilaci</a></p>
+<p><a href="#k11">11. Porovnání výsledků: originální C program a opravený program napsaný v&nbsp;Go</a></p>
+<p><a href="#k12">12. Složitější program v&nbsp;C: výpočty algoritmu CORDIC ve fixed point aritmetice</a></p>
+<p><a href="#k13">13. Automatická transpilace programu do jazyka Go</a></p>
+<p><a href="#k14">14. Ruční oprava některých chyb vzniklých při transpilaci</a></p>
+<p><a href="#k15">15. Porovnání výsledků výpočtů</a></p>
+<p><a href="#k16">16. Program psaný v&nbsp;C, který vytváří a manipuluje se stromovou datovou strukturou</a></p>
+<p><a href="#k17">17. Výsledek transpilace programu do jazyka Go</a></p>
+<p><a href="#k18">18. Závěrečné zhodnocení</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Převody zdrojových kódů z&nbsp;jazyka C do jazyka Go</h2>
+
+<p>V&nbsp;dnešním článku se seznámíme s&nbsp;poněkud neobvyklým, ovšem
+potenciálně velmi užitečným projektem. Tento projekt se jmenuje
+<strong>c4go</strong> a jak již jeho název může napovědět, jedná se o nástroj,
+který je určený k&nbsp;převodům (transpřekladu) zdrojových kódů napsaných
+původně v&nbsp;jazyku C do jazyka Go. V&nbsp;úvodní větě jsem napsal, že se
+jedná o poněkud neobvyklý projekt. Je tomu tak z&nbsp;toho důvodu, že existuje
+takřka nepřeberné množství transpřekladačů provádějících převody
+<strong>do</strong> jazyka C a nikoli naopak (to je logické, protože C je
+v&nbsp;tomto kontextu chápáno jako &bdquo;přenositelný assembler&ldquo; se
+všemi z&nbsp;toho plynoucími výhodami a nevýhodami). Proč však provádět opačný
+překlad? V&nbsp;C je napsáno a především odladěno velké množství algoritmů,
+knihoven (například knihoven pro GUI) atd. A v&nbsp;některých případech může
+být výhodné mít tyto zdrojové kódy k&nbsp;dispozici i pro jazyk Go, a to
+v&nbsp;&bdquo;nativní&ldquo; podobě (tedy nikoli tak, že se jedná o nějaké
+rozhraní volající nativní céčkový kód).</p>
+
+<p><div class="rs-tip-major">Poznámka: důležité je, že <strong>c4go</strong> se
+musí vypořádat s&nbsp;odlišnostmi mezi C a Go, například v&nbsp;kontextu
+řetězců, které jsou v&nbsp;Go neměnitelné a současně se s&nbsp;nimi může
+pracovat jako se sekvencí bajtů nebo se sekvencí run. Ostatně uvidíme
+v&nbsp;dalším textu, do jaké míry je <strong>c4go</strong> úspěšný.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Instalace transpřekladače c4go, příprava projektového souboru</h2>
+
+<p>Instalace transpřekladače <strong>c4go</strong> je snadná. Nejdříve si ovšem
+připravíme adresář s&nbsp;projektovým souborem, z&nbsp;něhož posléze příkaz pro
+instalaci spustíme:</p>
+
+<pre>
+$ <strong>mkdir c4go-test</strong>
+&nbsp;
+$ <strong>cd c4go-test</strong>
+&nbsp;
+$ <strong>go mod init c4go-test</strong>
+go: creating new go.mod: module c4go-test
+</pre>
+
+<p>Dále stáhneme balíček s&nbsp;<strong>c4go</strong> stáhneme, včetně všech
+pomocných balíčků:</p>
+
+<pre>
+$ <strong>go get -u github.com/Konstantin8105/c4go</strong>
+&nbsp;
+go: downloading github.com/Konstantin8105/errors v0.0.0-20190517083224-0667bfd7a9ac
+go: downloading github.com/Konstantin8105/errors v0.1.0
+go: downloading github.com/Konstantin8105/tree v0.0.0-20190515202740-8a8e3df34a3b
+go: downloading github.com/Konstantin8105/tree v0.1.0
+go: added github.com/Konstantin8105/c4go v0.0.0-20211115111653-1c67b1543446
+go: added github.com/Konstantin8105/errors v0.1.0
+go: added github.com/Konstantin8105/tree v0.1.0
+</pre>
+
+<p>Nainstalujeme spustitelný transpřekladač, nastavíme cestu a otestuje, zda je
+překladač nalezen systémem (resp.&nbsp;shellem):</p>
+
+<pre>
+$ <strong>go install github.com/Konstantin8105/c4go</strong>
+&nbsp;
+$ <strong>export PATH=~/go/bin:$PATH</strong>
+&nbsp;
+$ <strong>whereis c4go</strong>
+c4go: /tester/go/bin/c4go
+</pre>
+
+<p>Nakonec otestujeme, jestli je možné transpřekladač skutečně spustit:</p>
+
+<pre>
+$ <strong>c4go</strong>
+</pre>
+
+<p>Měly by se zobrazit tyto řádky:</p>
+
+<pre>
+Usage: c4go [&lt;command&gt;] [&lt;flags&gt;] file1.c ...
+&nbsp;
+Commands:
+  transpile     transpile an input C source file or files to Go
+  ast           print AST before translated Go code
+  debug         add debug information in C source
+  version       print version of c4go
+  unused        show and action for unused functions
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Program typu &bdquo;Hello world&ldquo; v&nbsp;C s&nbsp;jeho překladem do jazyka Go</h2>
+
+<p>Transpřekladač si nejprve otestujeme na triviálním programu &ndash; na čem
+jiném, než na programu typu &bdquo;Hello world&ldquo;, jehož céčková podoba
+může vypadat následovně:</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+&nbsp;
+int main(void)
+{
+    puts("Hello world");
+    return 0;
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto prográmku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/hello.c">https://github.com/tisnik/go-root/blob/master/article_97/hello.c</a>.</div></p>
+
+<p>Transpřeklad se spustí příkazem:</p>
+
+<pre>
+$ <strong>c4go transpile hello.c</strong>
+</pre>
+
+<p>V&nbsp;případě, že se zobrazí následující chybové hlášení, je nutné
+doinstalovat i balíček <strong>clang</strong>:</p>
+
+<pre>
+Error: error in function Start: preprocess error : preprocess for file: [hello.c]
+failed: exec: "clang": executable file not found in $PATH
+StdErr =
+</pre>
+
+<p>Pokud se žádné chybové hlášení nezobrazí, měl by vypadat výsledek
+transpřekladu následovně:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+package main
+&nbsp;
+import "github.com/Konstantin8105/c4go/noarch"
+&nbsp;
+<i>// main - transpiled function from  /root/c4go-test/hello.c:3</i>
+func main() {
+        noarch.Puts([]byte("Hello world!\x00"))
+        return
+}
+</pre>
+
+<p>Povšimněte si volání funkce <strong>Puts</strong> z&nbsp;balíčku
+<strong>noarch</strong>, reprezentace řetězce řezem bajtů, ale i toho, že konec
+řetězce (ukončující nula) je explicitně zapsán, aby se výsledek co nejvíce
+podobal céčkovému vzoru.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/hello.go">https://github.com/tisnik/go-root/blob/master/article_97/hello.go</a>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Program psaný v&nbsp;C, jenž pracuje s&nbsp;řetězci</h2>
+
+<p>Podívejme se nyní na jednoduchý program zapsaný v&nbsp;jazyku C, jenž
+pracuje s&nbsp;řetězci. Jedná se o triviální program, který napřed alokuje
+paměť pro řetězec, následně do alokovaného bloku překopíruje první slovo a
+k&nbsp;němu připojí slovo druhé. Výsledný řetězec je posléze vypsán na
+standardní výstup:</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+&nbsp;
+int main(void) {
+        char *s = (char*)malloc(100*sizeof(char));
+&nbsp;
+        strcpy(s, "Hello ");
+        strcat(s, "world!");
+        puts(s);
+&nbsp;
+        free(s);
+
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto prográmku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/strings1.c">https://github.com/tisnik/go-root/blob/master/article_97/strings1.c</a>.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Automatická transpilace programu do Go</h2>
+
+<p>Po transpilaci zdrojového kódu <a href="#k04">z&nbsp;předchozí kapitoly</a>
+získáme tento kód reprezentovaný v&nbsp;Go:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+package main
+&nbsp;
+import "github.com/Konstantin8105/c4go/noarch"
+&nbsp;
+<i>// main - transpiled function from  /root/strings.c:5</i>
+func main() {
+        defer noarch.AtexitRun()
+        var s []byte = make([]byte, 100*uint32(1))
+        noarch.Strcpy(s, []byte("Hello \x00"))
+        noarch.Strcat(s, []byte("world!\x00"))
+        noarch.Puts(s)
+        _ = s
+}
+</pre>
+
+<p>Povšimněte si, že alokace paměti pro &bdquo;řetězec&ldquo; je realizována
+vytvořením řezu, jenž ovšem obsahuje 100 bajtů (nenechte se zmást převodem
+konstanty na <strong>uint32</strong>, skutečně se jedná o sto bajtů &ndash; a
+nikoli o sto znaků z&nbsp;pohledu jazyka Go). Následně můžeme vidět volání
+funkcí z&nbsp;balíčku <strong>noarch</strong> i to, že se explicitně pracuje
+s&nbsp;nulou na konci řetězce.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/strings1.go">https://github.com/tisnik/go-root/blob/master/article_97/strings1.go</a>.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Program psaný v&nbsp;C, jenž modifikuje řetězce</h2>
+
+<p><a href="#k04">Předchozí program</a> nyní nepatrně upravíme, a to konkrétně
+takovým způsobem, aby byl obsah řetězce programově modifikován. Modifikace
+(<i>mutation</i>) řetězce je operace, kterou lze v&nbsp;jazyce C bez problémů
+provést, ovšem v&nbsp;jazyce Go to není možné, protože řetězce zde nejsou
+modifikovatelné. To však (jak ostatně uvidíme v&nbsp;další kapitole) nevadí,
+protože <strong>c4go</strong> generuje kód pracující s&nbsp;řezy a nikoli
+s&nbsp;řetězci jazyka Go:</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+&nbsp;
+int main(void) {
+        char *s = (char*)malloc(100*sizeof(char));
+&nbsp;
+        strcpy(s, "Hello*");
+        strcat(s, "world!");
+        puts(s);
+&nbsp;
+        s[5] = ' ';
+        puts(s);
+&nbsp;
+        free(s);
+
+}
+</pre>
+
+<p>Výsledkem by po překladu a spuštění tohoto programu měla být opět zpráva
+&bdquo;Hello world!&ldquo;, protože hvězdička je nahrazena za mezeru.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto prográmku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/strings2.c">https://github.com/tisnik/go-root/blob/master/article_97/strings2.c</a>.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Transpilace zdrojového kódu do Go</h2>
+
+<p>Céčkový program popsaný v&nbsp;rámci <a href="#k06">předchozí kapitoly</a>
+se transpřeloží (pěkné slovo, že) do následující podoby:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+package main
+&nbsp;
+import "github.com/Konstantin8105/c4go/noarch"
+&nbsp;
+<i>// main - transpiled function from  /root/strings2.c:5</i>
+func main() {
+        defer noarch.AtexitRun()
+        var s []byte = make([]byte, 100*uint32(1))
+        noarch.Strcpy(s, []byte("Hello*\x00"))
+        noarch.Strcat(s, []byte("world!\x00"))
+        noarch.Puts(s)
+        s[5] = ' '
+        noarch.Puts(s)
+        _ = s
+}
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že se nepracuje přímo s&nbsp;řetězci, ale s&nbsp;řezy
+(hodnot typu <strong>uint32</strong>), bylo možné přímo zapsat příkaz:</p>
+
+<pre>
+s[5] = ' '
+</pre>
+
+<p>Zápis <strong>' '</strong> přitom v&nbsp;jazyce Go reprezentuje <i>runu</i>
+s&nbsp;kódem (hodnotou) 32. Samotná runa je přitom obecně datovým typem
+<strong>rune</strong>, který je aliasem pro typ <strong>int32</strong>. Výše
+uvedené přiřazení runy do řezu bajtů bude plně funkční pouze za předpokladu, že
+uvnitř jednoduchých uvozovek bude použit jen ASCII znak, nikoli jiný znak.
+Tento možná poněkud matoucí koncept jednoznakových literálů je popsán <a
+href="https://go.dev/ref/spec#Rune_literals">na této stránce</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/strings2.go">https://github.com/tisnik/go-root/blob/master/article_97/strings2.go</a>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Algoritmus CORDIC implementovaný v&nbsp;jazyku C</h2>
+
+<p>Další program vytvořený v&nbsp;jazyku C, který budeme převádět do jazyka Go,
+je již poněkud složitější. Jedná se konkrétně o implementaci výpočtů
+goniometrických funkcí sinus a kosinus s&nbsp;využitím známého iteračního
+algoritmu <i>CORDIC</i> (<i>Coordinate Rotation DIgital Computer</i>). Výpočty
+jsou v&nbsp;tomto konkrétním případě realizovány s&nbsp;numerickými hodnotami
+typu <i>double</i>, takže převodem do Go otestujeme, jak dobře či špatně se
+převádí numerické výpočty, operace s&nbsp;poli, programové smyčky, předávání
+parametrů odkazem (referencí) atd.:</p>
+
+<pre>
+<i>// --------------------------------------------------------</i>
+<i>// Výpočet hodnot funkcí sin() a cos() pomocí iteračního</i>
+<i>// algoritmu CORDIC.</i>
+<i>// --------------------------------------------------------</i>
+&nbsp;
+#include &lt;stdio.h&gt;
+#include &lt;math.h&gt;
+&nbsp;
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+&nbsp;
+<i>// maximální počet iterací při běhu algoritmu</i>
+#define MAX_ITER 10
+&nbsp;
+<i>// "zesílení" při rotacích</i>
+#define K 0.6073
+&nbsp;
+<i>// tabulka arkustangentu úhlů</i>
+double atans[MAX_ITER];
+&nbsp;
+<i>// tabulka záporných celočíselných mocnin hodnoty 2</i>
+double pows[MAX_ITER];
+&nbsp;
+<i>// naplnění tabulek atans[] a pows[]</i>
+void createTables(void)
+{
+    int i;
+    for (i = 0; i &lt; MAX_ITER; i++) {
+        double p = pow(2.0, -i);
+        atans[i] = atan(p);
+        pows[i] = p;
+    }
+}
+&nbsp;
+<i>// výpočet funkcí sin() a cos() pro zadaný úhel delta</i>
+void sincos(double delta, double *sinval, double *cosval)
+{
+    int i;
+    double x0 = 1.0;            <i>// nastavení počátečních podmínek</i>
+    double y0 = 0.0;
+    double xn;
+    for (i = 0; i &lt; MAX_ITER; i++) {    <i>// iterační smyčka</i>
+        if (delta &lt; 0) {        <i>// úhel je záporný =&gt; rotace doleva</i>
+            xn = x0 + y0 * pows[i];
+            y0 -= x0 * pows[i];
+            delta += atans[i];
+        } else {                <i>// úhel je kladný =&gt; rotace doprava</i>
+            xn = x0 - y0 * pows[i];
+            y0 += x0 * pows[i];
+            delta -= atans[i];
+        }
+        x0 = xn;
+    }
+    *sinval = y0 * K;           <i>// opravit "zesílení" výsledku</i>
+    *cosval = x0 * K;
+}
+&nbsp;
+int main(void)
+{
+    int i;
+    createTables();
+    for (i = 0; i &lt;= 90; i++) { <i>// výpočetní smyčka</i>
+        double delta;           <i>// úhel, ze kterého se počítá sin a cos</i>
+        double sinval;          <i>// vypočtené hodnoty</i>
+        double cosval;
+        double sinerr;          <i>// absolutní chyby</i>
+        double coserr;
+        delta = i * M_PI / 180.0;       <i>// převod úhlu na radiány</i>
+        sincos(delta, &amp;sinval, &amp;cosval);        <i>// výpočet sinu a kosinu</i>
+        sinerr = fabs(sinval - sin(delta));     <i>// výpočet absolutních chyb</i>
+        coserr = fabs(cosval - cos(delta));
+        <i>// tisk výsledků</i>
+        printf
+            ("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n",
+             i, sinval, cosval, sinerr, coserr, 100.0 * sinerr / sinval,
+             100.0 * coserr / cosval);
+    }
+    return 0;
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód realizace algoritmu CORDIC
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fp.c">https://github.com/tisnik/go-root/blob/master/article_97/fp.c</a>.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Automatická transpilace programu do Go</h2>
+
+<p>Po transpilaci programu, jehož zdrojový kód byl ukázán <a
+href="#k08">v&nbsp;předchozí kapitole</a>, vznikne kód v&nbsp;jazyce Go, který
+je možné přeložit a spustit, ale který obsahuje poznámky o interních problémech
+nalezených transpřekladačem <strong>c4go</strong>:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>
+&nbsp;
+package main
+&nbsp;
+import "github.com/Konstantin8105/c4go/noarch"
+import "unsafe"
+import "math"
+&nbsp;
+<i>// atans - transpiled function from  /root/fp.c:20</i>
+<i>// --------------------------------------------------------</i>
+<i>// Výpočet hodnot funkcí sin() a cos() pomocí iteračního</i>
+<i>// algoritmu CORDIC.</i>
+<i>// --------------------------------------------------------</i>
+<i>// maximální počet iterací při běhu algoritmu</i>
+<i>// "zesílení" při rotacích</i>
+<i>// tabulka arkustangentu úhlů</i>
+var <i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/ /* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>atans []float64 = make([]float64, 10)
+&nbsp;
+<i>// pows - transpiled function from  /root/fp.c:23</i>
+<i>// tabulka záporných celočíselných mocnin hodnoty 2</i>
+var pows []float64 = make([]float64, 10)
+&nbsp;
+<i>// createTables - transpiled function from  /root/fp.c:26</i>
+func createTables() {
+        <i>// naplnění tabulek atans[] a pows[]</i>
+        var i int32
+        for i = 0; i &lt; 10; i++ {
+                var p float64 = math.Pow(2, float64(-i))
+                atans[i] = math.Atan(p)
+                pows[i] = p
+        }
+}
+&nbsp;
+<i>// sincos - transpiled function from  /root/fp.c:37</i>
+func sincos(delta float64, sinval []float64, cosval []float64) {
+        <i>// výpočet funkcí sin() a cos() pro zadaný úhel delta</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 float64 = 1
+        var y0 float64
+        var xn float64
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 10; i++ {
+                        if delta &lt; 0 {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                xn = x0 + y0*pows[i]
+                                y0 -= x0 * pows[i]
+                                delta += atans[i]
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = x0 - y0*pows[i]
+                                y0 += x0 * pows[i]
+                                delta -= atans[i]
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        sinval[0] = y0 * 0.6073
+        cosval[0] = x0 * 0.6073
+}
+&nbsp;
+<i>// main - transpiled function from  /root/fp.c:59</i>
+func main() {
+        var i int32
+        createTables()
+        {
+                <i>// výpočetní smyčka</i>
+                for i = 0; i &lt;= 90; i++ {
+                        <i>// úhel, ze kterého se počítá sin a cos</i>
+                        var delta float64
+                        <i>// vypočtené hodnoty</i>
+                        var sinval float64
+                        var cosval float64
+                        <i>// absolutní chyby</i>
+                        var sinerr float64
+                        var coserr float64
+                        <i>// převod úhlu na radiány</i>
+                        delta = float64(i) * 3.141592653589793 / 180
+                        <i>// výpočet sinu a kosinu</i>
+                        sincos(delta, c4goUnsafeConvert_float64(&amp;sinval), c4goUnsafeConvert_float64(&amp;cosval))
+                        <i>// výpočet absolutních chyb</i>
+                        sinerr = math.Abs(sinval - math.Sin(delta))
+                        coserr = math.Abs(cosval - math.Cos(delta))
+                        <i>// tisk výsledků</i>
+                        noarch.Printf([]byte("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n\x00"), i, sinval, cosval, sinerr, coserr, 100*sinerr/sinval, 100*coserr/cosval)
+                }
+        }
+        return
+}
+&nbsp;
+<i>// c4goUnsafeConvert_float64 : created by c4go</i>
+func c4goUnsafeConvert_float64(c4go_name *float64) []float64 {
+        return (*[1000000]float64)(unsafe.Pointer(c4go_name))[:]
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p>Povšimněte si toho, že parametry do funkce <strong>sincos</strong> se
+nepředávají čistě referencí, ale přes řezy (<i>slice</i>):</p>
+
+<pre>
+func sincos(delta float64, sinval []float64, cosval []float64) {
+    ...
+    ...
+    ...
+}
+</pre>
+
+<p>Vytvoření takového řezu je vyřešeno dosti nešťastným způsobem, konkrétně
+vytvořením beztypového ukazatele (<a
+href="https://pkg.go.dev/unsafe#Pointer">unsafe.Pointer</a>:</p>
+
+<pre>
+<i>// c4goUnsafeConvert_float64 : created by c4go</i>
+func c4goUnsafeConvert_float64(c4go_name *float64) []float64 {
+        return (*[1000000]float64)(unsafe.Pointer(c4go_name))[:]
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fp_transpiled.go">https://github.com/tisnik/go-root/blob/master/article_97/fp_transpiled.go</a>.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Ruční oprava některých chyb vzniklých při transpilaci</h2>
+
+<p>Program vzniklý automatickou transpilací je ovšem možné relativně snadno
+opravit takovým způsobem, aby byl čitelnější, nepoužíval unsafe ukazatele atd.
+Nejdříve změníme hlavičku funkce <strong>sincos</strong> z&nbsp;této verze:</p>
+
+<pre>
+func sincos(delta float64, sinval []float64, cosval []float64) {
+    ...
+    ...
+    ...
+}
+</pre>
+
+<p>na následující variantu s&nbsp;typovanými ukazateli:</p>
+
+<pre>
+func sincos(delta float64, sinval *float64, cosval *float64) {
+    ...
+    ...
+    ...
+}
+</pre>
+
+<p>tuto funkci lze zavolat triviálně, tedy bez použití různých triků a
+konverzí:</p>
+
+<pre>
+var sinval float64
+var cosval float64
+&nbsp;
+sincos(delta, &amp;sinval, &amp;cosval)
+</pre>
+
+<p>Dále odstraníme volání funkcí z&nbsp;balíčku <strong>noarch</strong> a
+použijeme standardní funkci <strong>fmt.Printf</strong>. Balíček
+<strong>noarch</strong> tedy ani nemusíme importovat:</p>
+
+<pre>
+fmt.Printf("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n", i, sinval, cosval, sinerr, coserr, 100*sinerr/sinval, 100*coserr/cosval)
+</pre>
+
+<p>Výsledek (po smazání různých varovných komentářů) bude vypadat následovně
+&ndash; jedná se o dobře čitelný Go kód:</p>
+
+<pre>
+package main
+&nbsp;
+import "math"
+import "fmt"
+&nbsp;
+<i>// --------------------------------------------------------</i>
+<i>// Výpočet hodnot funkcí sin() a cos() pomocí iteračního</i>
+<i>// algoritmu CORDIC.</i>
+<i>// --------------------------------------------------------</i>
+<i>// maximální počet iterací při běhu algoritmu</i>
+<i>// "zesílení" při rotacích</i>
+<i>// tabulka arkustangentu úhlů</i>
+var atans []float64 = make([]float64, 10)
+&nbsp;
+<i>// pows - transpiled function from  /root/fp.c:23</i>
+<i>// tabulka záporných celočíselných mocnin hodnoty 2</i>
+var pows []float64 = make([]float64, 10)
+&nbsp;
+<i>// createTables - transpiled function from  /root/fp.c:26</i>
+func createTables() {
+        <i>// naplnění tabulek atans[] a pows[]</i>
+        var i int32
+        for i = 0; i &lt; 10; i++ {
+                var p float64 = math.Pow(2, float64(-i))
+                atans[i] = math.Atan(p)
+                pows[i] = p
+        }
+}
+&nbsp;
+<i>// sincos - transpiled function from  /root/fp.c:37</i>
+func sincos(delta float64, sinval *float64, cosval *float64) {
+        <i>// výpočet funkcí sin() a cos() pro zadaný úhel delta</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 float64 = 1
+        var y0 float64
+        var xn float64
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 10; i++ {
+                        if delta &lt; 0 {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                xn = x0 + y0*pows[i]
+                                y0 -= x0 * pows[i]
+                                delta += atans[i]
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = x0 - y0*pows[i]
+                                y0 += x0 * pows[i]
+                                delta -= atans[i]
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        *sinval = y0 * 0.6073
+        *cosval = x0 * 0.6073
+}
+&nbsp;
+<i>// main - transpiled function from  /root/fp.c:59</i>
+func main() {
+        var i int32
+        createTables()
+        {
+                <i>// výpočetní smyčka</i>
+                for i = 0; i &lt;= 90; i++ {
+                        <i>// úhel, ze kterého se počítá sin a cos</i>
+                        var delta float64
+                        <i>// vypočtené hodnoty</i>
+                        var sinval float64
+                        var cosval float64
+                        <i>// absolutní chyby</i>
+                        var sinerr float64
+                        var coserr float64
+                        <i>// převod úhlu na radiány</i>
+                        delta = float64(i) * 3.141592653589793 / 180
+                        <i>// výpočet sinu a kosinu</i>
+                        sincos(delta, &amp;sinval, &amp;cosval)
+                        <i>// výpočet absolutních chyb</i>
+                        sinerr = math.Abs(sinval - math.Sin(delta))
+                        coserr = math.Abs(cosval - math.Cos(delta))
+                        <i>// tisk výsledků</i>
+                        fmt.Printf("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n", i, sinval, cosval, sinerr, coserr, 100*sinerr/sinval, 100*coserr/cosval)
+                }
+        }
+        return
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód takto upraveného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fp_corrected.go">https://github.com/tisnik/go-root/blob/master/article_97/fp_corrected.go</a>.</div></p>
+
+<p>Rozdíl mezi transpilovaným kódem a ručně upraveným kódem:</p>
+
+<pre>
+--- fp_transpiled.go    2022-11-08 17:38:33.000000000 +0100
++++ fp_corrected.go     2022-11-12 14:37:22.383210131 +0100
+@@ -1,46 +1,7 @@
+-//
+-//     Package - transpiled by c4go
+-//
+-//     If you have found any issues, please raise an issue at:
+-//     https://github.com/Konstantin8105/c4go/
+-//
+-
+-/* AST Error :
+-unknown node type: `value: Int 0`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 1`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 2`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 3`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 4`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 0`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 1`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 2`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 3`
+-*/
+-/* AST Error :
+-unknown node type: `value: Int 4`
+-*/
+-
+ package main
+&nbsp; 
+-import "github.com/Konstantin8105/c4go/noarch"
+-import "unsafe"
+ import "math"
++import "fmt"
+&nbsp;
+ // atans - transpiled function from  /root/fp.c:20
+ // --------------------------------------------------------
+@@ -50,27 +11,7 @@
+ // maximální počet iterací při běhu algoritmu
+ // "zesílení" při rotacích
+ // tabulka arkustangentu úhlů
+-var /* AST Error :
+-unknown node type: `value: Int 0`
+-*/ /* AST Error :
+-unknown node type: `value: Int 1`
+-*/ /* AST Error :
+-unknown node type: `value: Int 2`
+-*/ /* AST Error :
+-unknown node type: `value: Int 3`
+-*/ /* AST Error :
+-unknown node type: `value: Int 4`
+-*/ /* AST Error :
+-unknown node type: `value: Int 0`
+-*/ /* AST Error :
+-unknown node type: `value: Int 1`
+-*/ /* AST Error :
+-unknown node type: `value: Int 2`
+-*/ /* AST Error :
+-unknown node type: `value: Int 3`
+-*/ /* AST Error :
+-unknown node type: `value: Int 4`
+-*/atans []float64 = make([]float64, 10)
++var atans []float64 = make([]float64, 10)
+&nbsp; 
+ // pows - transpiled function from  /root/fp.c:23
+ // tabulka záporných celočíselných mocnin hodnoty 2
+@@ -88,7 +29,7 @@
+ }
+&nbsp;
+ // sincos - transpiled function from  /root/fp.c:37
+-func sincos(delta float64, sinval []float64, cosval []float64) {
++func sincos(delta float64, sinval *float64, cosval *float64) {
+        // výpočet funkcí sin() a cos() pro zadaný úhel delta
+        var i int32
+        // nastavení počátečních podmínek
+@@ -113,8 +54,8 @@
+                }
+        }
+        // opravit "zesílení" výsledku
+-       sinval[0] = y0 * 0.6073
+-       cosval[0] = x0 * 0.6073
++       *sinval = y0 * 0.6073
++       *cosval = x0 * 0.6073
+ }
+&nbsp;
+ // main - transpiled function from  /root/fp.c:59
+@@ -135,20 +76,15 @@
+                        // převod úhlu na radiány
+                        delta = float64(i) * 3.141592653589793 / 180
+                        // výpočet sinu a kosinu
+-                       sincos(delta, c4goUnsafeConvert_float64(&amp;sinval), c4goUnsafeConvert_float64(&amp;cosval))
++                       sincos(delta, &amp;sinval, &amp;cosval)
+                        // výpočet absolutních chyb
+                        sinerr = math.Abs(sinval - math.Sin(delta))
+                        coserr = math.Abs(cosval - math.Cos(delta))
+                        // tisk výsledků
+-                       noarch.Printf([]byte("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n\x00"), i, sinval, cosval, sinerr, coserr, 100*sinerr/sinval, 100*coserr/cosval)
++                       fmt.Printf("%02d\t%12.10f\t%12.10f\t%12.10f\t%12.10f\t%8.3f%%\t%8.3f%%\n", i, sinval, cosval, sinerr, coserr, 100*sinerr/sinval, 100*coserr/cosval)
+                }
+        }
+        return
+ }
+&nbsp;
+-// c4goUnsafeConvert_float64 : created by c4go
+-func c4goUnsafeConvert_float64(c4go_name *float64) []float64 {
+-       return (*[1000000]float64)(unsafe.Pointer(c4go_name))[:]
+-}
+-
+ // finito
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Porovnání výsledků: originální C program a opravený program napsaný v&nbsp;Go</h2>
+
+<p>Oba programy, tj.&nbsp;jak originální program zapsaný v&nbsp;jazyku C, tak i
+program transpilovaný do jazyka Go, po svém překladu a spuštění zobrazí
+naprosto shodnou tabulku výsledky, která vypadá takto (hlavičky sloupců jsem
+pro větší přehled dopsal ručně). Výsledky jsou naprosto totožné až na poslední
+desetinné místo (což může být u některých algoritmů velmi důležité
+kritérium):</p>
+
+<pre>
+i       sin(x)          cos(x)          abs.err sin(x)  abs.err cos(x)   rel.err sin(x)  rel.err cos(x)
+00      0.0011726802    1.0000761814    0.0011726802    0.0000761814     100.000%          0.008%
+01      0.0167806202    0.9999360752    0.0006717863    0.0000883801       4.003%          0.009%
+02      0.0363058568    0.9994176447    0.0014063601    0.0000268177       3.874%          0.003%
+03      0.0519144682    0.9987285075    0.0004214880    0.0000989728       0.812%          0.010%
+04      0.0714093909    0.9975241564    0.0016529171    0.0000398938       2.315%          0.004%
+05      0.0858859660    0.9963821278    0.0012697767    0.0001874297       1.478%          0.019%
+06      0.1053286152    0.9945147694    0.0008001519    0.0000071260       0.760%          0.001%
+07      0.1208522102    0.9927479474    0.0010171332    0.0002017957       0.842%          0.020%
+08      0.1401999641    0.9902008452    0.0010268631    0.0000672235       0.732%          0.007%
+09      0.1556537948    0.9878894877    0.0007806702    0.0002011471       0.502%          0.020%
+10      0.1749154013    0.9846615389    0.0012672237    0.0001462141       0.724%          0.015%
+11      0.1902784482    0.9818084619    0.0005305471    0.0001812785       0.279%          0.018%
+12      0.2092807371    0.9779342089    0.0013690463    0.0002133919       0.654%          0.022%
+13      0.2245344811    0.9745450275    0.0004165732    0.0001749627       0.186%          0.018%
+14      0.2435223655    0.9699745364    0.0016004699    0.0003211899       0.657%          0.033%
+15      0.2586475676    0.9660513338    0.0001714775    0.0001255075       0.066%          0.013%
+16      0.2774481762    0.9608206145    0.0018108204    0.0004410814       0.653%          0.046%
+17      0.2924243921    0.9563690285    0.0000526874    0.0000642725       0.018%          0.007%
+18      0.3073310520    0.9516834391    0.0016859423    0.0006269228       0.549%          0.066%
+19      0.3251452218    0.9457453825    0.0004229326    0.0002268069       0.130%          0.024%
+20      0.3435512762    0.9392157709    0.0015311329    0.0004768498       0.446%          0.051%
+21      0.3581836921    0.9337334665    0.0001842574    0.0001530400       0.051%          0.016%
+22      0.3763350045    0.9265666237    0.0017284111    0.0006172309       0.459%          0.067%
+23      0.3907657879    0.9205736488    0.0000346594    0.0000687953       0.009%          0.007%
+24      0.4050994316    0.9143567106    0.0016372115    0.0008112530       0.404%          0.089%
+25      0.4228792420    0.9062708704    0.0002609802    0.0000369167       0.062%          0.004%
+26      0.4368623186    0.8996138385    0.0015088282    0.0008197922       0.345%          0.091%
+27      0.4543481744    0.8909104782    0.0003576747    0.0000960460       0.079%          0.011%
+28      0.4682106568    0.8837038670    0.0012609060    0.0007562742       0.269%          0.086%
+29      0.4853645826    0.8743997745    0.0005549624    0.0002199326       0.114%          0.025%
+30      0.4989670003    0.8667096840    0.0010329997    0.0006842803       0.207%          0.079%
+31      0.5157967696    0.8568006981    0.0007586947    0.0003666026       0.147%          0.043%
+32      0.5291205039    0.8486372819    0.0007987604    0.0005891857       0.151%          0.069%
+33      0.5446674419    0.8387437758    0.0000284069    0.0000732079       0.005%          0.009%
+34      0.5577055299    0.8301314870    0.0014873735    0.0010939144       0.267%          0.132%
+35      0.5738098078    0.8190824429    0.0002333714    0.0000696014       0.041%          0.008%
+36      0.5865371490    0.8100172323    0.0012481033    0.0010002379       0.213%          0.123%
+37      0.6022307543    0.7984183504    0.0004157312    0.0002171596       0.069%          0.027%
+38      0.6146302652    0.7889127841    0.0010312101    0.0009020305       0.168%          0.114%
+39      0.6299202599    0.7767587849    0.0005998689    0.0003871766       0.095%          0.050%
+40      0.6418729918    0.7669112114    0.0009146178    0.0008667682       0.142%          0.113%
+41      0.6567280845    0.7542293861    0.0006690555    0.0004801942       0.102%          0.064%
+42      0.6684306187    0.7438778473    0.0006999876    0.0007330218       0.105%          0.099%
+43      0.6828308344    0.7306817333    0.0008324743    0.0006719683       0.122%          0.092%
+44      0.6941513412    0.7199358716    0.0005070292    0.0005960713       0.073%          0.083%
+45      0.7062435465    0.7080775359    0.0008632347    0.0009707547       0.122%          0.137%
+46      0.7199358716    0.6941513412    0.0005960713    0.0005070292       0.083%          0.073%
+47      0.7306817333    0.6828308344    0.0006719683    0.0008324743       0.092%          0.122%
+48      0.7438778473    0.6684306187    0.0007330218    0.0006999876       0.099%          0.105%
+49      0.7542293861    0.6567280845    0.0004801942    0.0006690555       0.064%          0.102%
+50      0.7669112114    0.6418729918    0.0008667682    0.0009146178       0.113%          0.142%
+51      0.7767587849    0.6299202599    0.0003871766    0.0005998689       0.050%          0.095%
+52      0.7889127841    0.6146302652    0.0009020305    0.0010312101       0.114%          0.168%
+53      0.7984183504    0.6022307543    0.0002171596    0.0004157312       0.027%          0.069%
+54      0.8100172323    0.5865371490    0.0010002379    0.0012481033       0.123%          0.213%
+55      0.8190824429    0.5738098078    0.0000696014    0.0002333714       0.008%          0.041%
+56      0.8301314870    0.5577055299    0.0010939144    0.0014873735       0.132%          0.267%
+57      0.8387437758    0.5446674419    0.0000732079    0.0000284069       0.009%          0.005%
+58      0.8486372819    0.5291205039    0.0005891857    0.0007987604       0.069%          0.151%
+59      0.8568006981    0.5157967696    0.0003666026    0.0007586947       0.043%          0.147%
+60      0.8667096840    0.4989670003    0.0006842803    0.0010329997       0.079%          0.207%
+61      0.8743997745    0.4853645826    0.0002199326    0.0005549624       0.025%          0.114%
+62      0.8837038670    0.4682106568    0.0007562742    0.0012609060       0.086%          0.269%
+63      0.8909104782    0.4543481744    0.0000960460    0.0003576747       0.011%          0.079%
+64      0.8996138385    0.4368623186    0.0008197922    0.0015088282       0.091%          0.345%
+65      0.9062708704    0.4228792420    0.0000369167    0.0002609802       0.004%          0.062%
+66      0.9143567106    0.4050994316    0.0008112530    0.0016372115       0.089%          0.404%
+67      0.9205736488    0.3907657879    0.0000687953    0.0000346594       0.007%          0.009%
+68      0.9265666237    0.3763350045    0.0006172309    0.0017284111       0.067%          0.459%
+69      0.9337334665    0.3581836921    0.0001530400    0.0001842574       0.016%          0.051%
+70      0.9392157709    0.3435512762    0.0004768498    0.0015311329       0.051%          0.446%
+71      0.9457453825    0.3251452218    0.0002268069    0.0004229326       0.024%          0.130%
+72      0.9516834391    0.3073310520    0.0006269228    0.0016859423       0.066%          0.549%
+73      0.9563690285    0.2924243921    0.0000642725    0.0000526874       0.007%          0.018%
+74      0.9608206145    0.2774481762    0.0004410814    0.0018108204       0.046%          0.653%
+75      0.9660513338    0.2586475676    0.0001255075    0.0001714775       0.013%          0.066%
+76      0.9699745364    0.2435223655    0.0003211899    0.0016004699       0.033%          0.657%
+77      0.9745450275    0.2245344811    0.0001749627    0.0004165732       0.018%          0.186%
+78      0.9779342089    0.2092807371    0.0002133919    0.0013690463       0.022%          0.654%
+79      0.9818084619    0.1902784482    0.0001812785    0.0005305471       0.018%          0.279%
+80      0.9846615389    0.1749154013    0.0001462141    0.0012672237       0.015%          0.724%
+81      0.9878894877    0.1556537948    0.0002011471    0.0007806702       0.020%          0.502%
+82      0.9902008452    0.1401999641    0.0000672235    0.0010268631       0.007%          0.732%
+83      0.9927479474    0.1208522102    0.0002017957    0.0010171332       0.020%          0.842%
+84      0.9945147694    0.1053286152    0.0000071260    0.0008001519       0.001%          0.760%
+85      0.9963821278    0.0858859660    0.0001874297    0.0012697767       0.019%          1.478%
+86      0.9975241564    0.0714093909    0.0000398938    0.0016529171       0.004%          2.315%
+87      0.9987285075    0.0519144682    0.0000989728    0.0004214880       0.010%          0.812%
+88      0.9994176447    0.0363058568    0.0000268177    0.0014063601       0.003%          3.874%
+89      0.9999360752    0.0167806202    0.0000883801    0.0006717863       0.009%          4.003%
+90      1.0000761814    0.0011726802    0.0000761814    0.0011726802       0.008%        100.000%
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Složitější program v&nbsp;C: výpočty algoritmu CORDIC ve fixed point aritmetice</h2>
+
+<p>Zatímco byl původní program pro výpočet hodnot sinu a kosinu s&nbsp;využitím
+algoritmu CORDIC založen na výpočtech prováděných s&nbsp;numerickými hodnotami
+s&nbsp;plovoucí řádovou čárkou (<i>floating point</i>), ukážeme si v&nbsp;této
+kapitole stejný algoritmus, ovšem upravený tak, aby se výpočty prováděly
+s&nbsp;numerickými hodnotami s&nbsp;pevnou řádovou čárkou (<i>fixed point</i>),
+konkrétně s&nbsp;hodnotami, které mají před binární řádovou tečkou šestnáct
+bitů a za řádovou tečkou taktéž šestnáct bitů (lze ovlivnit konstantami
+<strong>A</strong> a <strong>B</strong>). Otestujeme tedy, jak jsou tyto
+v&nbsp;mnoha ohledech nízkoúrovňové operace založené na bitových operacích
+převedeny z&nbsp;jazyka C do jazyka Go (program navíc přímo tiskne tabulku
+s&nbsp;výsledky v&nbsp;HTML):</p>
+
+<pre>
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;math.h&gt;
+&nbsp;
+<i>/* počet míst před a za binární řádovou tečkou */</i>
+#define A 16
+#define B 16
+&nbsp;
+<i>/* Ludolfovo číslo */</i>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+&nbsp;
+<i>/* maximální počet iterací při běhu algoritmu */</i>
+#define MAX_ITER 16
+&nbsp;
+<i>/* "zesílení" při rotacích */</i>
+#define K_float 0.6073
+&nbsp;
+<i>/* převody mezi stupni a radiány */</i>
+#define rad2deg(rad) ((rad)*180.0/M_PI)
+#define deg2rad(deg) ((deg)/180.0*M_PI)
+&nbsp;
+<i>/* datový typ, se kterým budeme pracovat */</i>
+typedef signed int fx;
+&nbsp;
+<i>/* hlavičky použitých funkcí */</i>
+void fx_print(fx x);
+fx fp2fx(double x);
+double fx2fp(fx x);
+&nbsp;
+<i>/* tabulka arkustangentu úhlů */</i>
+fx atans[MAX_ITER];
+&nbsp;
+<i>/* tabulka záporných celočíselných mocnin hodnoty 2 */</i>
+fx pows[MAX_ITER];
+&nbsp;
+<i>/*</i>
+<i> * Tisk numerické hodnoty uložené ve formátu pevné</i>
+<i> * řádové binární čárky (FX)</i>
+<i> */</i>
+void fx_print(fx x)
+{
+    int i;
+    int val = x;                <i>/* pomocná proměnná pro převod do dvojkové soustavy */</i>
+    printf("bin: ");
+    for (i = 0; i &lt; A + B; i++) {       <i>/* převod na řetězec bitů (do dvojkové soustavy) */</i>
+        putchar(!!(val &amp; (1 &lt;&lt; (A + B - 1))) + '0');    <i>/* výpis hodnoty aktuálně nejvyššího bitu */</i>
+        if (i == B - 1)
+            putchar('.');       <i>/* po řádové binární čárce vypsat značku */</i>
+        val = val &lt;&lt; 1;         <i>/* posun na další (méně významný) bit */</i>
+    }
+&nbsp;
+    printf("   hex: %08x   fp: %+11.5f\n", x, fx2fp(x));
+}
+&nbsp;
+<i>/*</i>
+<i> * Převod z formátu plovoucí řádové binární čárky (FP)</i>
+<i> * do formátu pevné řádové binární čárky (FX)</i>
+<i> */</i>
+fx fp2fx(double x)
+{
+    return (fx) (x * (2 &lt;&lt; (B - 1)));
+}
+&nbsp;
+<i>/*</i>
+<i> * Převod z celočíselného formátu (integer)</i>
+<i> * do formátu pevné řádové binární čárky (FX)</i>
+<i> */</i>
+fx int2fx(int x)
+{
+    return (fx) (x &lt;&lt; B);
+}
+&nbsp;
+<i>/*</i>
+<i> * Převod z formátu pevné řádové binární čárky (FX)</i>
+<i> * do formátu plovoucí řádové binární čárky (FP)</i>
+<i> */</i>
+double fx2fp(fx x)
+{
+    return (double) x / (2 &lt;&lt; (B - 1));
+}
+&nbsp;
+<i>/*</i>
+<i> * Součet dvou hodnot uložených ve shodném formátu</i>
+<i> * pevné binární řádové čárky (FX)</i>
+<i> */</i>
+fx fx_add(fx x, fx y)
+{
+    return x + y;
+}
+&nbsp;
+<i>/*</i>
+<i> * Rozdíl dvou hodnot uložených ve shodném formátu</i>
+<i> * pevné binární řádové čárky (FX)</i>
+<i> */</i>
+fx fx_sub(fx x, fx y)
+{
+    return x - y;
+}
+&nbsp;
+<i>/*</i>
+<i> * Součin dvou hodnot uložených ve shodném formátu</i>
+<i> * pevné binární řádové čárky (FX)</i>
+<i> */</i>
+fx fx_mul(fx x, fx y)
+{
+    fx result = (x &gt;&gt; (B / 2)) * (y &gt;&gt; (B / 2));
+    return result;
+}
+&nbsp;
+<i>/*</i>
+<i> * Podíl dvou hodnot uložených ve shodném formátu</i>
+<i> * pevné binární řádové čárky (FX)</i>
+<i> */</i>
+fx fx_div(fx x, fx y)
+{
+    fx result = x / (y &gt;&gt; (B / 2));
+    return result &lt;&lt; (B / 2);
+}
+&nbsp;
+<i>/*</i>
+<i> * Vytvoření tabulky pro výpočet goniometrických</i>
+<i> * funkcí pomocí algoritmu CORDIC</i>
+<i> */</i>
+void fx_create_tables(void)
+{
+    int i;
+    for (i = 0; i &lt; MAX_ITER; i++) {
+        double p = pow(2.0, -i);
+        atans[i] = fp2fx(atan(p));
+        pows[i] = fp2fx(p);
+    }
+}
+&nbsp;
+<i>/* výpočet funkce tan() pro zadaný úhel delta */</i>
+<i>/* (neoptimalizovaná verze) */</i>
+fx fx_tan_cordic(fx delta)
+{
+    int i;
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = fp2fx(1.0);
+    fx y0 = fp2fx(0.0);
+    fx xn;
+    if (delta == 0)
+        return 0;               <i>/* ošetření nulového úhlu */</i>
+    for (i = 0; i &lt; MAX_ITER; i++) {    <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, fx_mul(y0, pows[i]));
+            y0 = fx_sub(y0, fx_mul(x0, pows[i]));
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, fx_mul(y0, pows[i]));
+            y0 = fx_add(y0, fx_mul(x0, pows[i]));
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+<i>/*        printf("%i\t%+f\t%+f\t%+f\n", i, fx2fp(x0), fx2fp(y0), fx2fp(delta)); */</i>
+    }
+    if (x0 == 0)                <i>/* ošetření tangenty pravého úhlu */</i>
+        if (y0 &lt; 0)
+            return 0;
+        else
+            return 0;
+    else
+        return fx_div(y0, x0);  <i>/* vrátit výsledek operace */</i>
+}
+&nbsp;
+<i>/* výpočet funkce tan() pro zadaný úhel delta */</i>
+<i>/* (optimalizovaná verze) */</i>
+fx fx_tan_cordic_optim(fx delta)
+{
+    int i;
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = int2fx(1);
+    fx y0 = 0;
+    fx xn;
+    if (delta == 0)
+        return 0;               <i>/* ošetření nulového úhlu */</i>
+    for (i = 0; i &lt; MAX_ITER; i++) {    <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, y0 &gt;&gt; i);   <i>/* místo násobení bitový posuv */</i>
+            y0 = fx_sub(y0, x0 &gt;&gt; i);
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, y0 &gt;&gt; i);
+            y0 = fx_add(y0, x0 &gt;&gt; i);
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+    }
+    if (x0 == 0)                <i>/* ošetření tangenty pravého úhlu */</i>
+        if (y0 &lt; 0)
+            return 0;
+        else
+            return 0;
+    else
+        return fx_div(y0, x0);  <i>/* vrátit výsledek operace */</i>
+}
+&nbsp;
+<i>/* výpočet funkce sin() pro zadaný úhel delta */</i>
+fx fx_sin_cordic_optim(fx delta)
+{
+    int i;
+    static fx K_fx = (fx) (K_float * (2 &lt;&lt; (B - 1)));
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = int2fx(1);
+    fx y0 = 0;
+    fx xn;
+    for (i = 0; i &lt; MAX_ITER; i++) {    <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, y0 &gt;&gt; i);   <i>/* místo násobení bitový posuv */</i>
+            y0 = fx_sub(y0, x0 &gt;&gt; i);
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, y0 &gt;&gt; i);
+            y0 = fx_add(y0, x0 &gt;&gt; i);
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+    }
+    return fx_mul(y0, K_fx);    <i>/* opravit "zesílení" výsledku */</i>
+}
+&nbsp;
+<i>/* výpočet funkce cos() pro zadaný úhel delta */</i>
+fx fx_cos_cordic_optim(fx delta)
+{
+    int i;
+    static fx K_fx = (fx) (K_float * (2 &lt;&lt; (B - 1)));
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = int2fx(1);
+    fx y0 = 0;
+    fx xn;
+    for (i = 0; i &lt; MAX_ITER; i++) {    <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, y0 &gt;&gt; i);   <i>/* místo násobení bitový posuv */</i>
+            y0 = fx_sub(y0, x0 &gt;&gt; i);
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, y0 &gt;&gt; i);
+            y0 = fx_add(y0, x0 &gt;&gt; i);
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+    }
+    return fx_mul(x0, K_fx);    <i>/* opravit "zesílení" výsledku */</i>
+}
+&nbsp;
+<i>/* výpočet funkce sin() pro zadaný úhel delta */</i>
+fx fx_sin_cordic_optim_iter(fx delta, int iter)
+{
+    int i;
+    static fx K_fx = (fx) (K_float * (2 &lt;&lt; (B - 1)));
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = int2fx(1);
+    fx y0 = 0;
+    fx xn;
+    for (i = 0; i &lt; iter; i++) {        <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, y0 &gt;&gt; i);   <i>/* místo násobení bitový posuv */</i>
+            y0 = fx_sub(y0, x0 &gt;&gt; i);
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, y0 &gt;&gt; i);
+            y0 = fx_add(y0, x0 &gt;&gt; i);
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+    }
+    return fx_mul(y0, K_fx);    <i>/* opravit "zesílení" výsledku */</i>
+}
+&nbsp;
+<i>/* výpočet funkce cos() pro zadaný úhel delta */</i>
+fx fx_cos_cordic_optim_iter(fx delta, int iter)
+{
+    int i;
+    static fx K_fx = (fx) (K_float * (2 &lt;&lt; (B - 1)));
+    <i>/* nastavení počátečních podmínek */</i>
+    fx x0 = int2fx(1);
+    fx y0 = 0;
+    fx xn;
+    for (i = 0; i &lt; iter; i++) {        <i>/* iterační smyčka */</i>
+        if (delta &lt; 0) {        <i>/* úhel je záporný =&gt; rotace doleva */</i>
+            xn = fx_add(x0, y0 &gt;&gt; i);   <i>/* místo násobení bitový posuv */</i>
+            y0 = fx_sub(y0, x0 &gt;&gt; i);
+            delta = fx_add(delta, atans[i]);
+        } else {                <i>/* úhel je kladný =&gt; rotace doprava */</i>
+            xn = fx_sub(x0, y0 &gt;&gt; i);
+            y0 = fx_add(y0, x0 &gt;&gt; i);
+            delta = fx_sub(delta, atans[i]);
+        }
+        x0 = xn;
+    }
+    return fx_mul(x0, K_fx);    <i>/* opravit "zesílení" výsledku */</i>
+}
+&nbsp;
+int main(void)
+{
+    int i;
+    fx cosfx;
+    double delta;               <i>/* úhel, ze kterého se funkce počítá */</i>
+    double value;               <i>/* vypočtené hodnoty */</i>
+    double abs_err;             <i>/* absolutní chyby */</i>
+    double rel_err;             <i>/* relativní chyby */</i>
+    char *zvyr1, *zvyr2;        <i>/* ukazatele na konstantní řetězce pro */</i>
+    <i>/* generování HTML */</i>
+&nbsp;
+    fx_create_tables();
+&nbsp;
+    puts("\n&lt;h2&gt;Výpočet funkce cos() optimalizovanou metodou CORDIC&lt;/h2&gt;\n");
+    puts("&lt;table&gt;");
+    printf
+        ("&lt;tr&gt;&lt;th&gt;Úhel&lt;/th&gt;&lt;th&gt;cos FP&lt;/th&gt;&lt;th&gt;cos FX&lt;/th&gt;&lt;th&gt;Abs.chyba&lt;/th&gt;&lt;th&gt;Rel.chyba&lt;/th&gt;&lt;/tr&gt;\n");
+    for (i = 0; i &lt;= 90; i++) { <i>/* výpočetní smyčka */</i>
+        delta = deg2rad(i);     <i>/* převod úhlu na radiány */</i>
+        cosfx = fx_cos_cordic_optim(fp2fx(delta));      <i>/* aplikace algoritmu CORDIC */</i>
+        value = fx2fp(cosfx);   <i>/* výpočet funkce cos */</i>
+        abs_err = fabs(value - cos(delta));     <i>/* výpočet absolutních chyb */</i>
+        rel_err = cos(delta) &lt;= 1e-10 ? 0 : 100.0 * abs_err / cos(delta);
+        if (rel_err &lt;= 1.0) {
+            zvyr1 = "&lt;strong&gt;";
+            zvyr2 = "&lt;/strong&gt;";
+        } else {
+            zvyr1 = "";
+            zvyr2 = "";
+        }
+        printf
+            ("&lt;tr&gt;&lt;td&gt;%02d&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%5.3f%%&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%s%5.3f%%%s&lt;/td&gt;&lt;/tr&gt;\n",
+             i, value, cos(delta), abs_err, zvyr1, rel_err, zvyr2);
+    }
+    puts("&lt;/table&gt;");
+    return 0;
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tímto způsobem
+realizovaného algoritmu CORDIC naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fx.c">https://github.com/tisnik/go-root/blob/master/article_97/fx.c</a>.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Automatická transpilace programu do jazyka Go</h2>
+
+<p>Po transpilaci zdrojového kódu <a href="#k12">z&nbsp;předchozí kapitoly</a>
+získáme tento kód reprezentovaný v&nbsp;jazyce Go. Opět si povšimněte několika
+poznámek s&nbsp;varováním o interních problémech překladače:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>
+&nbsp;
+package main
+&nbsp;
+import "math"
+import "github.com/Konstantin8105/c4go/noarch"
+import "fmt"
+&nbsp;
+<i>// fx - transpiled function from  /root/fx.c:25</i>
+<i>// počet míst před a za binární řádovou tečkou</i>
+<i>// Ludolfovo číslo</i>
+<i>// maximální počet iterací při běhu algoritmu</i>
+<i>// "zesílení" při rotacích</i>
+<i>// převody mezi stupni a radiány</i>
+<i>// datový typ, se kterým budeme pracovat</i>
+<i>/* AST Error :</i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 0`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 1`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 2`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 3`</i>
+<i>*/ <i>/* AST Error :</i></i>
+<i>unknown node type: `value: Int 4`</i>
+<i>*/</i>type fx = int32
+&nbsp;
+<i>// atans - transpiled function from  /root/fx.c:33</i>
+<i>// hlavičky použitých funkcí</i>
+<i>// tabulka arkustangentu úhlů</i>
+var atans []fx = make([]fx, 16)
+&nbsp;
+<i>// pows - transpiled function from  /root/fx.c:36</i>
+<i>// tabulka záporných celočíselných mocnin hodnoty 2</i>
+var pows []fx = make([]fx, 16)
+&nbsp;
+<i>// fx_print - transpiled function from  /root/fx.c:42</i>
+func fx_print(x fx) {
+        <i>//</i>
+        <i>// * Tisk numerické hodnoty uložené ve formátu pevné</i>
+        <i>// * řádové binární čárky (FX)</i>
+        <i>//</i>
+        var i int32
+        <i>// pomocná proměnná pro převod do dvojkové soustavy</i>
+        var val int32 = int32((x))
+        fmt.Printf("bin: ")
+        {
+                <i>// převod na řetězec bitů (do dvojkové soustavy)</i>
+                for i = 0; i &lt; 16+16; i++ {
+                        <i>// výpis hodnoty aktuálně nejvyššího bitu</i>
+                        noarch.Putchar(noarch.BoolToInt(!noarch.Not(val&amp;(1&lt;&lt;uint64(16+16-1)))) + int32('0'))
+                        if i == 16-1 {
+                                <i>// po řádové binární čárce vypsat značku</i>
+                                noarch.Putchar(int32('.'))
+                        }
+                        <i>// posun na další (méně významný) bit</i>
+                        val = val &lt;&lt; uint64(1)
+                }
+        }
+        noarch.Printf([]byte("   hex: %08x   fp: %+11.5f\n\x00"), x, fx2fp(x))
+}
+&nbsp;
+<i>// fp2fx - transpiled function from  /root/fx.c:61</i>
+func fp2fx(x float64) fx {
+        <i>//</i>
+        <i>// * Převod z formátu plovoucí řádové binární čárky (FP)</i>
+        <i>// * do formátu pevné řádové binární čárky (FX)</i>
+        <i>//</i>
+        return fx(x * float64(2&lt;&lt;uint64(16-1)))
+}
+&nbsp;
+<i>// int2fx - transpiled function from  /root/fx.c:70</i>
+func int2fx(x int32) fx {
+        <i>//</i>
+        <i>// * Převod z celočíselného formátu (integer)</i>
+        <i>// * do formátu pevné řádové binární čárky (FX)</i>
+        <i>//</i>
+        return fx(x &lt;&lt; uint64(16))
+}
+&nbsp;
+<i>// fx2fp - transpiled function from  /root/fx.c:79</i>
+func fx2fp(x fx) float64 {
+        <i>//</i>
+        <i>// * Převod z formátu pevné řádové binární čárky (FX)</i>
+        <i>// * do formátu plovoucí řádové binární čárky (FP)</i>
+        <i>//</i>
+        return float64(int32((x))) / float64(2&lt;&lt;uint64(16-1))
+}
+&nbsp;
+<i>// fx_add - transpiled function from  /root/fx.c:88</i>
+func fx_add(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Součet dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        return x + y
+}
+&nbsp;
+<i>// fx_sub - transpiled function from  /root/fx.c:97</i>
+func fx_sub(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Rozdíl dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        return x - y
+}
+&nbsp;
+<i>// fx_mul - transpiled function from  /root/fx.c:106</i>
+func fx_mul(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Součin dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        var result fx = x &gt;&gt; uint64(16/2) * (y &gt;&gt; uint64(16/2))
+        return result
+}
+&nbsp;
+<i>// fx_div - transpiled function from  /root/fx.c:116</i>
+func fx_div(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Podíl dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        var result fx = x / (y &gt;&gt; uint64(16/2))
+        return result &lt;&lt; uint64(16/2)
+}
+&nbsp;
+<i>// fx_create_tables - transpiled function from  /root/fx.c:126</i>
+func fx_create_tables() {
+        <i>//</i>
+        <i>// * Vytvoření tabulky pro výpočet goniometrických</i>
+        <i>// * funkcí pomocí algoritmu CORDIC</i>
+        <i>//</i>
+        var i int32
+        for i = 0; i &lt; 16; i++ {
+                var p float64 = math.Pow(2, float64(-i))
+                atans[i] = fp2fx(math.Atan(p))
+                pows[i] = fp2fx(p)
+        }
+}
+&nbsp;
+<i>// fx_tan_cordic - transpiled function from  /root/fx.c:138</i>
+func fx_tan_cordic(delta fx) (c4goDefaultReturn fx) {
+        <i>// výpočet funkce tan() pro zadaný úhel delta</i>
+        <i>// (neoptimalizovaná verze)</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = fp2fx(1)
+        var y0 fx
+        var xn fx
+        if delta == fx((0)) {
+                <i>// ošetření nulového úhlu</i>
+                return fx((0))
+        }
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                xn = fx_add(x0, fx_mul(y0, pows[i]))
+                                y0 = fx_sub(y0, fx_mul(x0, pows[i]))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, fx_mul(y0, pows[i]))
+                                y0 = fx_add(y0, fx_mul(x0, pows[i]))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        if x0 == fx((0)) {
+                if y0 &lt; fx((0)) {
+                        <i>//        printf("%i\t%+f\t%+f\t%+f\n", i, fx2fp(x0), fx2fp(y0), fx2fp(delta));</i>
+                        <i>// ošetření tangenty pravého úhlu</i>
+                        return fx((0))
+                } else {
+                        return fx((0))
+                }
+        } else {
+                <i>// vrátit výsledek operace</i>
+                return fx_div(y0, x0)
+        }
+        return
+}
+&nbsp;
+<i>// fx_tan_cordic_optim - transpiled function from  /root/fx.c:171</i>
+func fx_tan_cordic_optim(delta fx) (c4goDefaultReturn fx) {
+        <i>// výpočet funkce tan() pro zadaný úhel delta</i>
+        <i>// (optimalizovaná verze)</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        if delta == fx((0)) {
+                <i>// ošetření nulového úhlu</i>
+                return fx((0))
+        }
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        if x0 == fx((0)) {
+                if y0 &lt; fx((0)) {
+                        <i>// ošetření tangenty pravého úhlu</i>
+                        return fx((0))
+                } else {
+                        return fx((0))
+                }
+        } else {
+                <i>// vrátit výsledek operace</i>
+                return fx_div(y0, x0)
+        }
+        return
+}
+&nbsp;
+<i>// fx_sin_cordic_optim - transpiled function from  /root/fx.c:202</i>
+func fx_sin_cordic_optim(delta fx) fx {
+        <i>// výpočet funkce sin() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(0.6073 * float64(2&lt;&lt;uint64(16-1)))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(y0, K_fx)
+}
+&nbsp;
+<i>// fx_cos_cordic_optim - transpiled function from  /root/fx.c:226</i>
+func fx_cos_cordic_optim(delta fx) fx {
+        <i>// výpočet funkce cos() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(0.6073 * float64(2&lt;&lt;uint64(16-1)))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(x0, K_fx)
+}
+&nbsp;
+<i>// fx_sin_cordic_optim_iter - transpiled function from  /root/fx.c:250</i>
+func fx_sin_cordic_optim_iter(delta fx, iter int32) fx {
+        <i>// výpočet funkce sin() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(0.6073 * float64(2&lt;&lt;uint64(16-1)))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; iter; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(y0, K_fx)
+}
+&nbsp;
+<i>// fx_cos_cordic_optim_iter - transpiled function from  /root/fx.c:274</i>
+func fx_cos_cordic_optim_iter(delta fx, iter int32) fx {
+        <i>// výpočet funkce cos() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(0.6073 * float64(2&lt;&lt;uint64(16-1)))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; iter; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(x0, K_fx)
+}
+&nbsp;
+<i>// main - transpiled function from  /root/fx.c:297</i>
+func main() {
+        defer noarch.AtexitRun()
+        var i int32
+        var cosfx fx
+        <i>// úhel, ze kterého se funkce počítá</i>
+        var delta float64
+        <i>// vypočtené hodnoty</i>
+        var value float64
+        <i>// absolutní chyby</i>
+        var abs_err float64
+        <i>// relativní chyby</i>
+        var rel_err float64
+        <i>// ukazatele na konstantní řetězce pro</i>
+        var zvyr1 []byte
+        var zvyr2 []byte
+        <i>// generování HTML</i>
+        fx_create_tables()
+        noarch.Puts([]byte("\n&lt;h2&gt;Výpočet funkce cos() optimalizovanou metodou CORDIC&lt;/h2&gt;\n\x00"))
+        noarch.Puts([]byte("&lt;table&gt;\x00"))
+        fmt.Printf("&lt;tr&gt;&lt;th&gt;Úhel&lt;/th&gt;&lt;th&gt;cos FP&lt;/th&gt;&lt;th&gt;cos FX&lt;/th&gt;&lt;th&gt;Abs.chyba&lt;/th&gt;&lt;th&gt;Rel.chyba&lt;/th&gt;&lt;/tr&gt;\n")
+        {
+                <i>// výpočetní smyčka</i>
+                for i = 0; i &lt;= 90; i++ {
+                        <i>// převod úhlu na radiány</i>
+                        delta = float64(i) / 180 * 3.141592653589793
+                        <i>// aplikace algoritmu CORDIC</i>
+                        cosfx = fx_cos_cordic_optim(fp2fx(delta))
+                        <i>// výpočet funkce cos</i>
+                        value = fx2fp(cosfx)
+                        <i>// výpočet absolutních chyb</i>
+                        abs_err = math.Abs(value - math.Cos(delta))
+                        if math.Cos(delta) &lt;= 1e-10 {
+                                rel_err = 0
+                        } else {
+                                rel_err = 100 * abs_err / math.Cos(delta)
+                        }
+                        if rel_err &lt;= 1 {
+                                zvyr1 = []byte("&lt;strong&gt;\x00")
+                                zvyr2 = []byte("&lt;/strong&gt;\x00")
+                        } else {
+                                zvyr1 = []byte("\x00")
+                                zvyr2 = []byte("\x00")
+                        }
+                        noarch.Printf([]byte("&lt;tr&gt;&lt;td&gt;%02d&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%5.3f%%&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%s%5.3f%%%s&lt;/td&gt;&lt;/tr&gt;\n\x00"), i, value, math.Cos(delta), abs_err, zvyr1, rel_err, zvyr2)
+                }
+        }
+        noarch.Puts([]byte("&lt;/table&gt;\x00"))
+        return
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fx_transpiled.go">https://github.com/tisnik/go-root/blob/master/article_97/fx_transpiled.go</a>.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Ruční oprava některých chyb vzniklých při transpilaci</h2>
+
+<p>Překlad transpilovaného zdrojového kódu v&nbsp;jeho původní podobně není
+možný (chyba <strong>c4go</strong>):</p>
+
+<pre>
+$ <strong>go build fx_transpiled.go </strong>
+&nbsp;
+# command-line-arguments
+./fx_transpiled.go:97:52: (1 &lt;&lt; uint64(16 + 16 - 1)) (untyped int constant 2147483648) overflows int32
+./fx_transpiled.go:282:19: cannot convert 0.6073 * float64(2 &lt;&lt; uint64(16 - 1)) (constant 39800 of type float64) to type int32
+./fx_transpiled.go:313:19: cannot convert 0.6073 * float64(2 &lt;&lt; uint64(16 - 1)) (constant 39800 of type float64) to type int32
+./fx_transpiled.go:344:19: cannot convert 0.6073 * float64(2 &lt;&lt; uint64(16 - 1)) (constant 39800 of type float64) to type int32
+./fx_transpiled.go:375:19: cannot convert 0.6073 * float64(2 &lt;&lt; uint64(16 - 1)) (constant 39800 of type float64) to type int32
+</pre>
+
+<p>Z&nbsp;tohoto důvodu je nutné provést několik úprav s&nbsp;tím, že
+následující zdrojový kód je již bez problémů jak přeložitelný, tak i
+spustitelný a navíc poskytne stejné výsledky, jako originální céčkový kód:</p>
+
+<pre>
+var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+package main
+&nbsp;
+import "math"
+import "github.com/Konstantin8105/c4go/noarch"
+import "fmt"
+&nbsp;
+type fx int32
+&nbsp;
+<i>// atans - transpiled function from  /root/fx.c:33</i>
+<i>// hlavičky použitých funkcí</i>
+<i>// tabulka arkustangentu úhlů</i>
+var atans []fx = make([]fx, 16)
+&nbsp;
+<i>// pows - transpiled function from  /root/fx.c:36</i>
+<i>// tabulka záporných celočíselných mocnin hodnoty 2</i>
+var pows []fx = make([]fx, 16)
+&nbsp;
+<i>// fx_print - transpiled function from  /root/fx.c:42</i>
+func fx_print(x fx) {
+        <i>//</i>
+        <i>// * Tisk numerické hodnoty uložené ve formátu pevné</i>
+        <i>// * řádové binární čárky (FX)</i>
+        <i>//</i>
+        var i int32
+        <i>// pomocná proměnná pro převod do dvojkové soustavy</i>
+        var val uint32 = uint32((x))
+        fmt.Printf("bin: ")
+        {
+                <i>// převod na řetězec bitů (do dvojkové soustavy)</i>
+                for i = 0; i &lt; 16+16; i++ {
+                        <i>// výpis hodnoty aktuálně nejvyššího bitu</i>
+                        bit := val &amp; (1 &lt;&lt; (16 + 16 - 1))
+                        noarch.Putchar(noarch.BoolToInt(!noarch.Not(bit)) + int32('0'))
+                        if i == 16-1 {
+                                <i>// po řádové binární čárce vypsat značku</i>
+                                noarch.Putchar(int32('.'))
+                        }
+                        <i>// posun na další (méně významný) bit</i>
+                        val = val &lt;&lt; uint64(1)
+                }
+        }
+        noarch.Printf([]byte("   hex: %08x   fp: %+11.5f\n\x00"), x, fx2fp(x))
+}
+&nbsp;
+<i>// fp2fx - transpiled function from  /root/fx.c:61</i>
+func fp2fx(x float64) fx {
+        <i>//</i>
+        <i>// * Převod z formátu plovoucí řádové binární čárky (FP)</i>
+        <i>// * do formátu pevné řádové binární čárky (FX)</i>
+        <i>//</i>
+        return fx(x * float64(2&lt;&lt;uint64(16-1)))
+}
+&nbsp;
+<i>// int2fx - transpiled function from  /root/fx.c:70</i>
+func int2fx(x int32) fx {
+        <i>//</i>
+        <i>// * Převod z celočíselného formátu (integer)</i>
+        <i>// * do formátu pevné řádové binární čárky (FX)</i>
+        <i>//</i>
+        return fx(x &lt;&lt; uint64(16))
+}
+&nbsp;
+<i>// fx2fp - transpiled function from  /root/fx.c:79</i>
+func fx2fp(x fx) float64 {
+        <i>//</i>
+        <i>// * Převod z formátu pevné řádové binární čárky (FX)</i>
+        <i>// * do formátu plovoucí řádové binární čárky (FP)</i>
+        <i>//</i>
+        return float64(int32((x))) / float64(2&lt;&lt;uint64(16-1))
+}
+&nbsp;
+<i>// fx_add - transpiled function from  /root/fx.c:88</i>
+func fx_add(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Součet dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        return x + y
+}
+&nbsp;
+<i>// fx_sub - transpiled function from  /root/fx.c:97</i>
+func fx_sub(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Rozdíl dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        return x - y
+}
+&nbsp;
+<i>// fx_mul - transpiled function from  /root/fx.c:106</i>
+func fx_mul(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Součin dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        var result fx = x &gt;&gt; uint64(16/2) * (y &gt;&gt; uint64(16/2))
+        return result
+}
+&nbsp;
+<i>// fx_div - transpiled function from  /root/fx.c:116</i>
+func fx_div(x fx, y fx) fx {
+        <i>//</i>
+        <i>// * Podíl dvou hodnot uložených ve shodném formátu</i>
+        <i>// * pevné binární řádové čárky (FX)</i>
+        <i>//</i>
+        var result fx = x / (y &gt;&gt; uint64(16/2))
+        return result &lt;&lt; uint64(16/2)
+}
+&nbsp;
+<i>// fx_create_tables - transpiled function from  /root/fx.c:126</i>
+func fx_create_tables() {
+        <i>//</i>
+        <i>// * Vytvoření tabulky pro výpočet goniometrických</i>
+        <i>// * funkcí pomocí algoritmu CORDIC</i>
+        <i>//</i>
+        var i int32
+        for i = 0; i &lt; 16; i++ {
+                var p float64 = math.Pow(2, float64(-i))
+                atans[i] = fp2fx(math.Atan(p))
+                pows[i] = fp2fx(p)
+        }
+}
+&nbsp;
+<i>// fx_tan_cordic - transpiled function from  /root/fx.c:138</i>
+func fx_tan_cordic(delta fx) (c4goDefaultReturn fx) {
+        <i>// výpočet funkce tan() pro zadaný úhel delta</i>
+        <i>// (neoptimalizovaná verze)</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = fp2fx(1)
+        var y0 fx
+        var xn fx
+        if delta == fx((0)) {
+                <i>// ošetření nulového úhlu</i>
+                return fx((0))
+        }
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                xn = fx_add(x0, fx_mul(y0, pows[i]))
+                                y0 = fx_sub(y0, fx_mul(x0, pows[i]))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, fx_mul(y0, pows[i]))
+                                y0 = fx_add(y0, fx_mul(x0, pows[i]))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        if x0 == fx((0)) {
+                if y0 &lt; fx((0)) {
+                        <i>//        printf("%i\t%+f\t%+f\t%+f\n", i, fx2fp(x0), fx2fp(y0), fx2fp(delta));</i>
+                        <i>// ošetření tangenty pravého úhlu</i>
+                        return fx((0))
+                } else {
+                        return fx((0))
+                }
+        } else {
+                <i>// vrátit výsledek operace</i>
+                return fx_div(y0, x0)
+        }
+        return
+}
+&nbsp;
+<i>// fx_tan_cordic_optim - transpiled function from  /root/fx.c:171</i>
+func fx_tan_cordic_optim(delta fx) (c4goDefaultReturn fx) {
+        <i>// výpočet funkce tan() pro zadaný úhel delta</i>
+        <i>// (optimalizovaná verze)</i>
+        var i int32
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        if delta == fx((0)) {
+                <i>// ošetření nulového úhlu</i>
+                return fx((0))
+        }
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        if x0 == fx((0)) {
+                if y0 &lt; fx((0)) {
+                        <i>// ošetření tangenty pravého úhlu</i>
+                        return fx((0))
+                } else {
+                        return fx((0))
+                }
+        } else {
+                <i>// vrátit výsledek operace</i>
+                return fx_div(y0, x0)
+        }
+        return
+}
+&nbsp;
+<i>// fx_sin_cordic_optim - transpiled function from  /root/fx.c:202</i>
+func fx_sin_cordic_optim(delta fx) fx {
+        <i>// výpočet funkce sin() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(y0, K_fx)
+}
+&nbsp;
+<i>// fx_cos_cordic_optim - transpiled function from  /root/fx.c:226</i>
+func fx_cos_cordic_optim(delta fx) fx {
+        <i>// výpočet funkce cos() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; 16; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(x0, K_fx)
+}
+&nbsp;
+<i>// fx_sin_cordic_optim_iter - transpiled function from  /root/fx.c:250</i>
+func fx_sin_cordic_optim_iter(delta fx, iter int32) fx {
+        <i>// výpočet funkce sin() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; iter; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(y0, K_fx)
+}
+&nbsp;
+<i>// fx_cos_cordic_optim_iter - transpiled function from  /root/fx.c:274</i>
+func fx_cos_cordic_optim_iter(delta fx, iter int32) fx {
+        <i>// výpočet funkce cos() pro zadaný úhel delta</i>
+        var i int32
+        var K_fx fx = fx(math.Round(0.6073 * float64(2&lt;&lt;uint64(16-1))))
+        <i>// nastavení počátečních podmínek</i>
+        var x0 fx = int2fx(1)
+        var y0 fx = fx((0))
+        var xn fx
+        {
+                <i>// iterační smyčka</i>
+                for i = 0; i &lt; iter; i++ {
+                        if delta &lt; fx((0)) {
+                                <i>// úhel je záporný =&gt; rotace doleva</i>
+                                <i>// místo násobení bitový posuv</i>
+                                xn = fx_add(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_sub(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_add(delta, atans[i])
+                        } else {
+                                <i>// úhel je kladný =&gt; rotace doprava</i>
+                                xn = fx_sub(x0, y0&gt;&gt;uint64(i))
+                                y0 = fx_add(y0, x0&gt;&gt;uint64(i))
+                                delta = fx_sub(delta, atans[i])
+                        }
+                        x0 = xn
+                }
+        }
+        <i>// opravit "zesílení" výsledku</i>
+        return fx_mul(x0, K_fx)
+}
+&nbsp;
+<i>// main - transpiled function from  /root/fx.c:297</i>
+func main() {
+        defer noarch.AtexitRun()
+        var i int32
+        var cosfx fx
+        <i>// úhel, ze kterého se funkce počítá</i>
+        var delta float64
+        <i>// vypočtené hodnoty</i>
+        var value float64
+        <i>// absolutní chyby</i>
+        var abs_err float64
+        <i>// relativní chyby</i>
+        var rel_err float64
+        <i>// ukazatele na konstantní řetězce pro</i>
+        var zvyr1 []byte
+        var zvyr2 []byte
+        <i>// generování HTML</i>
+        fx_create_tables()
+        noarch.Puts([]byte("\n&lt;h2&gt;Výpočet funkce cos() optimalizovanou metodou CORDIC&lt;/h2&gt;\n\x00"))
+        noarch.Puts([]byte("&lt;table&gt;\x00"))
+        fmt.Printf("&lt;tr&gt;&lt;th&gt;Úhel&lt;/th&gt;&lt;th&gt;cos FP&lt;/th&gt;&lt;th&gt;cos FX&lt;/th&gt;&lt;th&gt;Abs.chyba&lt;/th&gt;&lt;th&gt;Rel.chyba&lt;/th&gt;&lt;/tr&gt;\n")
+        {
+                <i>// výpočetní smyčka</i>
+                for i = 0; i &lt;= 90; i++ {
+                        <i>// převod úhlu na radiány</i>
+                        delta = float64(i) / 180 * 3.141592653589793
+                        <i>// aplikace algoritmu CORDIC</i>
+                        cosfx = fx_cos_cordic_optim(fp2fx(delta))
+                        <i>// výpočet funkce cos</i>
+                        value = fx2fp(cosfx)
+                        <i>// výpočet absolutních chyb</i>
+                        abs_err = math.Abs(value - math.Cos(delta))
+                        if math.Cos(delta) &lt;= 1e-10 {
+                                rel_err = 0
+                        } else {
+                                rel_err = 100 * abs_err / math.Cos(delta)
+                        }
+                        if rel_err &lt;= 1 {
+                                zvyr1 = []byte("&lt;strong&gt;\x00")
+                                zvyr2 = []byte("&lt;/strong&gt;\x00")
+                        } else {
+                                zvyr1 = []byte("\x00")
+                                zvyr2 = []byte("\x00")
+                        }
+                        noarch.Printf([]byte("&lt;tr&gt;&lt;td&gt;%02d&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%5.3f%%&lt;/td&gt;&lt;td&gt;%5.3f&lt;/td&gt;&lt;td&gt;%s%5.3f%%%s&lt;/td&gt;&lt;/tr&gt;\n\x00"), i, value, math.Cos(delta), abs_err, zvyr1, rel_err, zvyr2)
+                }
+        }
+        noarch.Puts([]byte("&lt;/table&gt;\x00"))
+        return
+}
+&nbsp;
+<i>// finito</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód upraveného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/fx_corrected.go">https://github.com/tisnik/go-root/blob/master/article_97/fx_corrected.go</a>.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Porovnání výsledků výpočtů</h2>
+
+<p>Výsledky vypočtené originálním programem napsaným v&nbsp;céčku jsou naprosto
+shodné s&nbsp;výsledky, které lze získat transpilovaným programem
+reprezentovaným v&nbsp;jazyce Go. Zde je uvedena pouze krátká ukázka
+vygenerované tabulky s&nbsp;výsledky:</p>
+
+<table>
+<tr><th>Úhel</th><th>cos FP</th><th>cos FX</th><th>Abs.chyba</th><th>Rel.chyba</th></tr>
+<tr><td>00</td><td>0.996</td><td>1.000%</td><td>0.004</td><td><strong>0.429%</strong></td></tr>
+<tr><td>01</td><td>0.996</td><td>1.000%</td><td>0.004</td><td><strong>0.414%</strong></td></tr>
+<tr><td>02</td><td>0.996</td><td>0.999%</td><td>0.004</td><td><strong>0.368%</strong></td></tr>
+<tr><td>03</td><td>0.993</td><td>0.999%</td><td>0.005</td><td><strong>0.529%</strong></td></tr>
+<tr><td>04</td><td>0.993</td><td>0.998%</td><td>0.004</td><td><strong>0.423%</strong></td></tr>
+<tr><td>05</td><td>0.991</td><td>0.996%</td><td>0.005</td><td><strong>0.523%</strong></td></tr>
+<tr><td>06</td><td>0.991</td><td>0.995%</td><td>0.004</td><td><strong>0.356%</strong></td></tr>
+<tr><td>07</td><td>0.989</td><td>0.993%</td><td>0.004</td><td><strong>0.396%</strong></td></tr>
+<tr><td>08</td><td>0.986</td><td>0.990%</td><td>0.004</td><td><strong>0.406%</strong></td></tr>
+<tr><td>09</td><td>0.984</td><td>0.988%</td><td>0.004</td><td><strong>0.385%</strong></td></tr>
+<tr><td>10</td><td>0.982</td><td>0.985%</td><td>0.003</td><td><strong>0.334%</strong></td></tr>
+<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+<tr><td>76</td><td>0.239</td><td>0.242%</td><td>0.003</td><td>1.259%</td></tr>
+<tr><td>77</td><td>0.222</td><td>0.225%</td><td>0.003</td><td>1.169%</td></tr>
+<tr><td>78</td><td>0.206</td><td>0.208%</td><td>0.002</td><td>1.033%</td></tr>
+<tr><td>79</td><td>0.189</td><td>0.191%</td><td>0.002</td><td><strong>0.839%</strong></td></tr>
+<tr><td>80</td><td>0.173</td><td>0.174%</td><td>0.001</td><td><strong>0.573%</strong></td></tr>
+<tr><td>81</td><td>0.154</td><td>0.156%</td><td>0.003</td><td>1.727%</td></tr>
+<tr><td>82</td><td>0.137</td><td>0.139%</td><td>0.002</td><td>1.435%</td></tr>
+<tr><td>83</td><td>0.121</td><td>0.122%</td><td>0.001</td><td>1.025%</td></tr>
+<tr><td>84</td><td>0.104</td><td>0.105%</td><td>0.000</td><td><strong>0.443%</strong></td></tr>
+<tr><td>85</td><td>0.085</td><td>0.087%</td><td>0.002</td><td>2.308%</td></tr>
+<tr><td>86</td><td>0.069</td><td>0.070%</td><td>0.001</td><td>1.675%</td></tr>
+<tr><td>87</td><td>0.052</td><td>0.052%</td><td>0.000</td><td><strong>0.580%</strong></td></tr>
+<tr><td>88</td><td>0.033</td><td>0.035%</td><td>0.002</td><td>5.123%</td></tr>
+<tr><td>89</td><td>0.017</td><td>0.017%</td><td>0.001</td><td>5.138%</td></tr>
+<tr><td>90</td><td>-0.002</td><td>0.000%</td><td>0.002</td><td><strong>0.000%</strong></td></tr>
+</table>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Program psaný v&nbsp;C, který vytváří a manipuluje se stromovou datovou strukturou</h2>
+
+<p>Poslední příklad, který si dnes ukážeme, je opět psaný v&nbsp;jazyku C.
+Najdeme v&nbsp;něm triviální implementaci konstrukce binárního stromu pro
+uložení řetězců společně s&nbsp;funkcí pro průchod (traverzaci) tímto stromem.
+V&nbsp;tomto příkladu se tedy zaměřujeme na operace s&nbsp;ukazateli, využití
+struktur obsahujících ukazatele, dynamickou alokaci paměti atd. (tedy operace,
+které se v&nbsp;Go většinou provádí odlišně, než je tomu v&nbsp;jazyku C):</p>
+
+<pre>
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+&nbsp;
+typedef struct Node
+{
+    struct Node *left;
+    struct Node *right;
+    char *value;
+} Node;
+&nbsp;
+void insert_new_node(Node **root, char *value)
+{
+    int cmp;
+&nbsp;
+    if (*root == NULL)
+    {
+        *root = (Node *)malloc(sizeof(Node));
+        (*root)-&gt;value = (char*)calloc(strlen(value), sizeof(char));
+        strcpy((*root)-&gt;value, value);
+        (*root)-&gt;left = NULL;
+        (*root)-&gt;right = NULL;
+        return;
+    }
+    cmp = strcmp(value, (*root)-&gt;value);
+    if (cmp &lt; 0)
+    {
+        insert_new_node(&amp;(*root)-&gt;left, value);
+    }
+    else
+    {
+        insert_new_node(&amp;(*root)-&gt;right, value);
+    }
+}
+&nbsp;
+void traverse_tree(Node *root, void (*callback_function)(char *))
+{
+    if (root == NULL)
+    {
+        return;
+    }
+    traverse_tree(root-&gt;left, callback_function);
+    callback_function(root-&gt;value);
+    traverse_tree(root-&gt;right, callback_function);
+}
+&nbsp;
+void callback_function(char *value)
+{
+    printf("%s\n", value);
+}
+&nbsp;
+int main(void)
+{
+    static Node *root = NULL;
+&nbsp;
+    insert_new_node(&amp;root, "xxx");
+    insert_new_node(&amp;root, "aaa");
+    insert_new_node(&amp;root, "bbb");
+    insert_new_node(&amp;root, "ccc");
+    insert_new_node(&amp;root, "yyy");
+    insert_new_node(&amp;root, "yyy");
+&nbsp;
+    traverse_tree(root, callback_function);
+&nbsp;
+    return 0;
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto prográmku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/tree.c">https://github.com/tisnik/go-root/blob/master/article_97/tree.c</a>.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledek transpilace programu do jazyka Go</h2>
+
+<p>Program <a href="#k16">z&nbsp;předchozí kapitoly</a> se transpřeloží do
+tohoto zdrojového kódu reprezentovaného v&nbsp;jazyce Go:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+package main
+&nbsp;
+import "unsafe"
+import "github.com/Konstantin8105/c4go/noarch"
+&nbsp;
+<i>// Node - transpiled function from  /root/tree.c:5</i>
+type Node struct {
+        left  []Node
+        right []Node
+        value []byte
+}
+&nbsp;
+<i>// insert_new_node - transpiled function from  /root/tree.c:12</i>
+func insert_new_node(root [][]Node, value []byte) {
+        var cmp int32
+        if len(root[0]) == 0 {
+                root[0] = make([]Node, 1)
+                (root[0])[0].value = make([]byte, noarch.Strlen(value))
+                noarch.Strcpy((root[0])[0].value, value)
+                (root[0])[0].left = nil
+                (root[0])[0].right = nil
+                return
+        }
+        cmp = noarch.Strcmp(value, (root[0])[0].value)
+        if cmp &lt; 0 {
+                insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;(root[0])[0].left))[:], value)
+        } else {
+                insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;(root[0])[0].right))[:], value)
+        }
+}
+&nbsp;
+<i>// traverse_tree - transpiled function from  /root/tree.c:36</i>
+func traverse_tree(root []Node, callback_function func([]byte)) {
+        if len(root) == 0 {
+                return
+        }
+        traverse_tree(root[0].left, callback_function)
+        callback_function(root[0].value)
+        traverse_tree(root[0].right, callback_function)
+}
+&nbsp;
+<i>// callback_function - transpiled function from  /root/tree.c:47</i>
+func callback_function(value []byte) {
+        noarch.Printf([]byte("%s\n\x00"), value)
+}
+&nbsp;
+<i>// main - transpiled function from  /root/tree.c:52</i>
+func main() {
+        defer noarch.AtexitRun()
+        var root []Node
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("xxx\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("aaa\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("bbb\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("ccc\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("yyy\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("yyy\x00"))
+        traverse_tree(root, callback_function)
+        return
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód transpilovaného programu
+naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_97/tree.go">https://github.com/tisnik/go-root/blob/master/article_97/tree.go</a>.</div></p>
+
+<p>Tento program ovšem po svém spuštění zhavaruje:</p>
+
+<pre>
+panic: runtime error: index out of range [3] with length 3
+&nbsp;
+goroutine 1 [running]:
+github.com/Konstantin8105/c4go/noarch.Strcpy(...)
+        /home/ptisnovs/go/pkg/mod/github.com/!konstantin8105/c4go@v0.0.0-20211115111653-1c67b1543446/noarch/string.go:30
+main.insert_new_node({0xc0000aff50, 0xc000048738?, 0x4589fb?}, {0xc0000aff44, 0x4, 0xc0000021a0?})
+        /home/ptisnovs/src/go-root/article_97/tree.go:26 +0x28a
+main.main()
+        /home/ptisnovs/src/go-root/article_97/tree.go:58 +0x70
+exit status 2
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Oprava předchozího programu</h2>
+
+<p>Oprava spočívá v&nbsp;tom, že se upraví velikost bloku pro kopírovaný
+řetězec &ndash; viz též zvýrazněný kód. Po této úpravě bude manipulace se
+stromem probíhat korektně:</p>
+
+<pre>
+<i>//</i>
+<i>//      Package - transpiled by c4go</i>
+<i>//</i>
+<i>//      If you have found any issues, please raise an issue at:</i>
+<i>//      https://github.com/Konstantin8105/c4go/</i>
+<i>//</i>
+&nbsp;
+package main
+&nbsp;
+import "unsafe"
+import "github.com/Konstantin8105/c4go/noarch"
+&nbsp;
+<i>// Node - transpiled function from  /root/tree.c:5</i>
+type Node struct {
+        left  []Node
+        right []Node
+        value []byte
+}
+&nbsp;
+<i>// insert_new_node - transpiled function from  /root/tree.c:12</i>
+func insert_new_node(root [][]Node, value []byte) {
+        var cmp int32
+        if len(root[0]) == 0 {
+                root[0] = make([]Node, 1)
+                <strong>(root[0])[0].value = make([]byte, 1+noarch.Strlen(value))</strong>
+                noarch.Strcpy((root[0])[0].value, value)
+                (root[0])[0].left = nil
+                (root[0])[0].right = nil
+                return
+        }
+        cmp = noarch.Strcmp(value, (root[0])[0].value)
+        if cmp &lt; 0 {
+                insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;(root[0])[0].left))[:], value)
+        } else {
+                insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;(root[0])[0].right))[:], value)
+        }
+}
+&nbsp;
+<i>// traverse_tree - transpiled function from  /root/tree.c:36</i>
+func traverse_tree(root []Node, callback_function func([]byte)) {
+        if len(root) == 0 {
+                return
+        }
+        traverse_tree(root[0].left, callback_function)
+        callback_function(root[0].value)
+        traverse_tree(root[0].right, callback_function)
+}
+&nbsp;
+<i>// callback_function - transpiled function from  /root/tree.c:47</i>
+func callback_function(value []byte) {
+        noarch.Printf([]byte("%s\n\x00"), value)
+}
+&nbsp;
+<i>// main - transpiled function from  /root/tree.c:52</i>
+func main() {
+        defer noarch.AtexitRun()
+        var root []Node
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("xxx\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("aaa\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("bbb\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("ccc\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("yyy\x00"))
+        insert_new_node((*[1000000][]Node)(unsafe.Pointer(&amp;root))[:], []byte("yyy\x00"))
+        traverse_tree(root, callback_function)
+        return
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: o dealokaci jednotlivých uzlů se
+samozřejmě v&nbsp;jazyce Go nemusíme starat.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>hello.c</td><td>klasický program typu &bdquo;Hello world&ldquo; zapsaný v&nbsp;jazyku C</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/hello.c">https://github.com/tisnik/go-root/blob/master/article_97/hello.c</a></td></tr>
+<tr><td> 2</td><td>hello.go</td><td>soubor <strong>hello.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/hello.go">https://github.com/tisnik/go-root/blob/master/article_97/hello.go</a></td></tr>
+<tr><td> 3</td><td>strings1.c</td><td>základní manipulace s&nbsp;řetězci v&nbsp;C</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/strings1.c">https://github.com/tisnik/go-root/blob/master/article_97/strings1.c</a></td></tr>
+<tr><td> 4</td><td>strings1.go</td><td>soubor <strong>strings1.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/strings1.go">https://github.com/tisnik/go-root/blob/master/article_97/strings1.go</a></td></tr>
+<tr><td> 5</td><td>strings2.c</td><td>modifikace řetězců v&nbsp;C</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/strings2.c">https://github.com/tisnik/go-root/blob/master/article_97/strings2.c</a></td></tr>
+<tr><td> 6</td><td>strings2.go</td><td>soubor <strong>strings2.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/strings2.go">https://github.com/tisnik/go-root/blob/master/article_97/strings2.go</a></td></tr>
+<tr><td> 7</td><td>fp.c</td><td>algoritmus CORDIC zapsaný v&nbsp;C a založený na FP aritmetice</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fp.c">https://github.com/tisnik/go-root/blob/master/article_97/fp.c</a></td></tr>
+<tr><td> 8</td><td>fp_transpiled.go</td><td>soubor <strong>fp.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fp_transpiled.go">https://github.com/tisnik/go-root/blob/master/article_97/fp_transpiled.go</a></td></tr>
+<tr><td> 9</td><td>fp_corrected.go</td><td>úprava předchozího zdrojového kódu do korektní podoby</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fp_corrected.go">https://github.com/tisnik/go-root/blob/master/article_97/fp_corrected.go</a></td></tr>
+<tr><td>10</td><td>fx.c</td><td>algoritmus CORDIC zapsaný v&nbsp;C a založený na fixed point aritmetice</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fx.c">https://github.com/tisnik/go-root/blob/master/article_97/fx.c</a></td></tr>
+<tr><td>12</td><td>fx_transpiled.go</td><td>soubor <strong>fx.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fx_transpiled.go">https://github.com/tisnik/go-root/blob/master/article_97/fx_transpiled.go</a></td></tr>
+<tr><td>11</td><td>fx_corrected.go</td><td>úprava předchozího zdrojového kódu do korektní podoby</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/fx_corrected.go">https://github.com/tisnik/go-root/blob/master/article_97/fx_corrected.go</a></td></tr>
+<tr><td>13</td><td>tree.c</td><td>vytvoření a manipulace s&nbsp;binárním stromem v&nbsp;jazyku C</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/tree.c">https://github.com/tisnik/go-root/blob/master/article_97/tree.c</a></td></tr>
+<tr><td>14</td><td>tree.go</td><td>soubor <strong>tree.c</strong> transpilovaný do jazyka Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/tree.go">https://github.com/tisnik/go-root/blob/master/article_97/tree.go</a></td></tr>
+<tr><td>15</td><td>tree_corrected.go</td><td>úprava předchozího zdrojového kódu do korektní podoby</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_97/tree_corrected.go">https://github.com/tisnik/go-root/blob/master/article_97/tree_corrected.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>c4go na GitHubu<br />
+<a href="https://github.com/Konstantin8105/c4go">https://github.com/Konstantin8105/c4go</a>
+</li>
+
+<li>Source-to-source compiler (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Source-to-source_compiler">https://en.wikipedia.org/wiki/Source-to-source_compiler</a>
+</li>
+
+<li>Clang: a C language family frontend for LLVM<br />
+<a href="https://clang.llvm.org/">https://clang.llvm.org/</a>
+</li>
+
+<li>The LLVM Compiler Infrastructure<br />
+<a href="https://llvm.org/">https://llvm.org/</a>
+</li>
+
+<li>Abstract syntax tree<br />
+<a href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">https://en.wikipedia.org/wiki/Abstract_syntax_tree</a>
+</li>
+
+<li>List of transpilers, sorted by target language<br />
+<a href="https://github.com/jarble/list-of-transpilers">https://github.com/jarble/list-of-transpilers</a>
+</li>
+
+<li>Awesome WebAssembly Languages Awesome<br />
+<a href="https://github.com/appcypher/awesome-wasm-langs">https://github.com/appcypher/awesome-wasm-langs</a>
+</li>
+
+<li>Compilers targeting C<br />
+<a href="https://github.com/dbohdan/compilers-targeting-c">https://github.com/dbohdan/compilers-targeting-c</a>
+</li>
+
+<li>History of compiler construction<br />
+<a href="https://en.wikipedia.org/wiki/History_of_compiler_construction">https://en.wikipedia.org/wiki/History_of_compiler_construction</a>
+</li>
+
+<li>Golang AST Package<br />
+<a href="https://golangdocs.com/golang-ast-package">https://golangdocs.com/golang-ast-package</a>
+</li>
+
+<li>Rune literals<br />
+<a href="https://go.dev/ref/spec#Rune_literals">https://go.dev/ref/spec#Rune_literals</a>
+</li>
+
+<li>Výpočet goniometrických funkcí algoritmem CORDIC<br />
+<a href="https://www.root.cz/clanky/vypocet-goniometrickych-funkci-algoritmem-cordic/">https://www.root.cz/clanky/vypocet-goniometrickych-funkci-algoritmem-cordic/</a>
+</li>
+
+<li>Metoda CORDIC a výpočet funkcí tan, atan a length<br />
+<a href="https://www.root.cz/clanky/metoda-cordic-a-vypocet-funkci-tan-atan-a-length/">https://www.root.cz/clanky/metoda-cordic-a-vypocet-funkci-tan-atan-a-length/</a>
+</li>
+
+<li>Algoritmus CORDIC v&nbsp;FX formátu a goniometrické funkce<br />
+<a href="https://www.root.cz/clanky/algoritmus-cordic-v-fx-formatu-a-goniometricke-funkce/">https://www.root.cz/clanky/algoritmus-cordic-v-fx-formatu-a-goniometricke-funkce/</a>
+</li>
+
+<li>Algoritmus CORDIC s&nbsp;hodnotami uloženými ve formátu FX<br />
+<a href="https://www.root.cz/clanky/algoritmus-cordic-s-hodnotami-ulozenymi-ve-formatu-fx/">https://www.root.cz/clanky/algoritmus-cordic-s-hodnotami-ulozenymi-ve-formatu-fx/</a>
+</li>
+
+<li>unsafe.Pointer<br />
+<a href="https://pkg.go.dev/unsafe#Pointer">https://pkg.go.dev/unsafe#Pointer</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
