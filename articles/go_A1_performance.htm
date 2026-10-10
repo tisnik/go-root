@@ -1,0 +1,1373 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Základní optimalizace v Go aneb pomáháme překladači (3)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Základní optimalizace v Go aneb pomáháme překladači (3)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku o programovacím jazyku Go se opět seznámíme s některými dalšími optimalizacemi, které je v mnoha případech vhodné či nutné provádět na úrovni zdrojového kódu. Zabývat se budeme zdánlivě triviální úlohou: jak efektivně zkonstruovat řetězec skládáním jednotlivých znaků a/nebo kratších řetězců.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Základní optimalizace v&nbsp;Go aneb pomáháme překladači (3)</a></p>
+<p><a href="#k02">2. Práce s&nbsp;řetězci v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k03">3. Postupné skládání řetězce s&nbsp;využitím operátoru konkatenace</a></p>
+<p><a href="#k04">4. Skládání znaků do bufferu s&nbsp;následným převodem bufferu na řetězec</a></p>
+<p><a href="#k05">5. Využití objektu <strong>strings.Builder</strong></a></p>
+<p><a href="#k06">6. Předalokace paměti pro řetězec: varianta s&nbsp;bufferem</a></p>
+<p><a href="#k07">7. Předalokace paměti pro řetězec: varianta s&nbsp;objektem strings.Builder</a></p>
+<p><a href="#k08">8. Která varianta je nejvýhodnější?</a></p>
+<p><a href="#k09">9. Realizace benchmarků pro skládání řetězce znak po znaku</a></p>
+<p><a href="#k10">10. Výsledky benchmarků</a></p>
+<p><a href="#k11">11. Grafická vizualizace výsledků benchmarků</a></p>
+<p><a href="#k12">12. Podrobnější analýza prováděných operací</a></p>
+<p><a href="#k13">13. Postupné skládání řetězce z&nbsp;menších řetězců</a></p>
+<p><a href="#k14">14. Realizace konstrukce řetězce s&nbsp;využitím objektů <strong>bytes.Buffer</strong> a <strong>strings.Builder</strong></a></p>
+<p><a href="#k15">15. Realizace benchmarků pro skládání řetězce z&nbsp;menších řetězců</a></p>
+<p><a href="#k16">16. Výsledky benchmarků</a></p>
+<p><a href="#k17">17. Grafická vizualizace výsledků benchmarků</a></p>
+<p><a href="#k18">18. Kde funkce pro konstrukci řetězce stráví nejvíce času?</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Základní optimalizace v&nbsp;Go aneb pomáháme překladači (3)</h2>
+
+<p>V&nbsp;dnešní části <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a> se opět seznámíme s&nbsp;některými dalšími
+optimalizacemi, které je v&nbsp;mnoha případech vhodné či nutné provádět na
+úrovni zdrojového kódu. Zabývat se budeme zdánlivě triviální úlohou: jak
+efektivně zkonstruovat řetězec skládáním jednotlivých znaků a/nebo kratších
+řetězců. Podobné operace se v&nbsp;praxi skutečně provádí, i když mohou být
+poněkud skryté. Typickým příkladem je šablonovací systém, který interně
+postupně &bdquo;skládá&ldquo; výsledný řetězec (dokument); dalším příkladem
+jsou pak systémy pro generování a tisk logovacích informací &ndash; i zde je na
+konci celé činnosti nějaká forma řetězce získaná postupným skládáním
+z&nbsp;kratších statických či dynamicky počítaných částí.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Práce s&nbsp;řetězci v&nbsp;programovacím jazyku Go</h2>
+
+<p>Interně je řetězec v&nbsp;paměti uložen jako velmi jednoduchá struktura
+s&nbsp;ukazatelem na oblast paměti se sekvencí bajtů a s&nbsp;délkou řetězce.
+Samotná sekvence bajtů může být sdílená větším množstvím řetězců, protože
+řetězce jsou v&nbsp;Go neměnné (immutable):</p>
+
+<pre>
+type <strong>stringStruct</strong> struct {
+        str unsafe.Pointer
+        len int
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pro zjednodušení exportu ladicích
+informací existuje ještě jedna definice struktury pro řetězec. Liší se pouze
+typem ukazatele (nyní je typový):</div></p>
+
+<pre>
+<i>// Variant with *byte pointer type for DWARF debugging.</i>
+type <strong>stringStructDWARF</strong> struct {
+        str *byte
+        len int
+}
+</pre>
+
+<p>Pro zajímavost se podívejme na dvě funkce, které se v&nbsp;runtime při
+operacích s&nbsp;řetězci volají velmi často. Ostatně tyto funkce můžeme vidět i
+ve výsledcích činnosti profileru (viz benchmarky uvedené níže). Jedná se o
+funkci volanou pro alokaci paměti pro řetězec a o funkci pro spojení dvou či
+více řetězců (což je funkce volaná při použití operátoru +):</p>
+
+<pre>
+<i>// rawstring allocates storage for a new string. The returned</i>
+<i>// string and byte slice both refer to the same storage.</i>
+<i>// The storage is not zeroed. Callers should use</i>
+<i>// b to set the string contents and then drop b.</i>
+func <strong>rawstring</strong>(size int) (s string, b []byte) {
+        p := mallocgc(uintptr(size), nil, false)
+        return unsafe.String((*byte)(p), size), unsafe.Slice((*byte)(p), size)
+}
+&nbsp;
+<i>// concatstrings implements a Go string concatenation x+y+z+...</i>
+<i>// The operands are passed in the slice a.</i>
+<i>// If buf != nil, the compiler has determined that the result does not</i>
+<i>// escape the calling function, so the string data can be stored in buf</i>
+<i>// if small enough.</i>
+func <strong>concatstrings</strong>(buf *tmpBuf, a []string) string {
+        idx := 0
+        l := 0
+        count := 0
+        for i, x := range a {
+                n := len(x)
+                if n == 0 {
+                        continue
+                }
+                if l+n &lt; l {
+                        throw("string concatenation too long")
+                }
+                l += n
+                count++
+                idx = i
+        }
+        if count == 0 {
+                return ""
+        }
+&nbsp;
+        <i>// If there is just one string and either it is not on the stack</i>
+        <i>// or our result does not escape the calling frame (buf != nil),</i>
+        <i>// then we can return that string directly.</i>
+        if count == 1 &amp;&amp; (buf != nil || !stringDataOnStack(a[idx])) {
+                return a[idx]
+        }
+        s, b := rawstringtmp(buf, l)
+        for _, x := range a {
+                copy(b, x)
+                b = b[len(x):]
+        }
+        return s
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Postupné skládání řetězce s&nbsp;využitím operátoru konkatenace</h2>
+
+<p>Předpokládejme, že máme realizovat funkci, která zkonstruuje řetězec, a to
+takovým způsobem, že do něj bude postupně přidávat jednotlivé znaky
+(resp.&nbsp;přesněji řečeno <i>runy</i>). Pochopitelně se v&nbsp;této konkrétní
+podobě jedná o umělý příklad, jenž je ovšem postaven na reálných základech,
+protože podobně mohou pracovat i další algoritmy (dekomprimace, šablonovací
+systémy, některé logovací systémy atd.). Zde se navíc jedná o mezní případ, kdy
+se postupně přidávají jednotlivé znaky a ne celé sekvence znaků, ovšem tím líp
+bude celý problém patrný:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>BuildStringUsingConcatenation</strong>(n int) string {
+        <i>// budeme pouzivat primo retezec</i>
+        s := ""
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                s += "*"
+        }
+&nbsp;
+        <i>// vysledny retezec</i>
+        return s
+}
+</pre>
+
+<p>Toto řešení je z&nbsp;pohledu programátora velmi čisté a výsledek je snadno
+pochopitelný i testovatelný. Ovšem problém tohoto řešení spočívá v&nbsp;tom, že
+se interně bude prakticky neustále provádět realokace paměti, což ostatně bude
+velmi dobře patrné <a href="#k10">na výsledcích benchmarků</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: mohlo by se zdát, že v&nbsp;tomto
+případě je výhodnější připojit k&nbsp;řetězci jednu runu. To však typový systém
+jazyka Go přímo neumožňuje:</div></p>
+
+<pre>
+s += '*'
+&nbsp;
+./concatenation.go:9:3: invalid operation: s += '*' (mismatched types string and untyped rune)
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Skládání znaků do bufferu s&nbsp;následným převodem bufferu na řetězec</h2>
+
+<p>Existují však alternativní řešení <a href="#k03">výše uvedeného
+problému</a>? Ukazuje se, že existují a dokonce jich je několik; všechna tato
+řešení jsou přitom postavena na standardní knihovně programovacího jazyka Go.
+Jedno z&nbsp;těchto řešení používá standardní balíček <a
+href="https://pkg.go.dev/bytes@go1.20.1">bytes</a>, konkrétně datový typ <a
+href="https://pkg.go.dev/bytes@go1.20.1#Buffer">bytes.Buffer</a>. Tento datový
+typ skutečně realizuje buffer, do kterého je možné přidávat jednotlivé znaky
+metodou <strong>WriteRune</strong>, přičemž přidávání sice taktéž vyžaduje
+realokaci paměti, ale ta by měla být provedena optimálnějším :-) způsobem (tedy
+s&nbsp;menší frekvencí).  Tento buffer můžeme na konci převést na klasický
+řetězec metodou <strong>String</strong>, takže celý algoritmus můžeme přepsat
+do této podoby:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "bytes"
+&nbsp;
+func <strong>BuildStringUsingStringBuffer</strong>(n int) string {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                bb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return bb.String()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že zde nedáváme programu
+k&nbsp;dispozici očekávanou délku řetězce a necháváme tedy celý odhad, jak
+buffer alokovat a jak často, na vnitřních algoritmech standardní
+knihovny.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Využití objektu <strong>strings.Builder</strong></h2>
+
+<p>Další varianta spočívá ve využití objektu (datového typu) nazvaného
+<strong>strings.Builder</strong>. Jak již název napovídá, je tento datový typ
+součástí standardního balíčku <a
+href="https://pkg.go.dev/strings@go1.20.1">strings</a>; jeho popis nalezneme na
+adrese <a
+href="https://pkg.go.dev/strings@go1.20.1#Builder">https://pkg.go.dev/strings@go1.20.1#Builder</a>.
+Práce s&nbsp;objektem <strong>strings.Builder</strong> je prakticky totožná
+s&nbsp;předchozím příkladem založeným na objektu <strong>bytes.Buffer</strong>.
+I zde totiž nalezneme metodu <strong>WriteRune</strong> určenou pro přidání
+dalšího znaku a metodu <strong>String</strong> určenou pro převod hodnoty
+uložené v&nbsp;tomto objektu na běžný řetězec. Úprava celého algoritmu je tedy
+triviální:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "strings"
+&nbsp;
+func <strong>BuildStringUsingStringBuilder</strong>(n int) string {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                sb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return sb.String()
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Předalokace paměti pro řetězec: varianta s&nbsp;bufferem</h2>
+
+<p>Vraťme se nyní k&nbsp;využití bufferu, tedy datového typu
+<strong>bytes.Buffer</strong>. Paměť pro buffer, tedy v&nbsp;našem případě pro
+sekvenci znaků, je totiž možné předalokovat, a to konkrétně zavoláním metody
+<strong>Grow</strong>. Díky tomu můžeme &ndash; samozřejmě za předpokladu, že
+dopředu známe či alespoň dokážeme odhadnout výslednou délku řetězce &ndash;
+provést alokaci paměťového bloku jen jedenkrát, a to na začátku celého
+algoritmu. Ostatně si to můžeme velmi snadno otestovat:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "bytes"
+&nbsp;
+func <strong>BuildStringUsingPreallocatedStringBuffer</strong>(n int) string {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        bb.Grow(n)
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                bb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return bb.String()
+}
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Předalokace paměti pro řetězec: varianta s&nbsp;objektem strings.Builder</h2>
+
+<p>A konečně &ndash; metoda <strong>Grow</strong> není dostupná pouze u objektů
+typu <strong>bytes.Buffer</strong>, ale i pro objekt
+<strong>strings.Builder</strong>, což nám umožňuje snadno předalokovat paměť i
+pro tento objekt. Samotný zápis programu se změní pouze nepatrně; vlastně se
+modifikuje pouze typ proměnné <strong>sb</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "strings"
+&nbsp;
+func <strong>BuildStringUsingPreallocatedStringBuilder</strong>(n int) string {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        sb.Grow(n)
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                sb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return sb.String()
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Která varianta je nejvýhodnější?</h2>
+
+<p>V&nbsp;předchozích kapitolách jsme si ukázali tři varianty postupného
+&bdquo;lepení&ldquo; výsledného řetězce přidáváním dalších znaků
+resp.&nbsp;přesněji řečeno run. U variant postavených nad datovými strukturami
+<strong>bytes.Buffer</strong> a <strong>string.Builder</strong> jsme navíc
+mohli velmi snadno provést předalokaci bloku paměti, což vede (resp.&nbsp;by
+alespoň teoreticky mělo vést) ke zmenšení volání funkce pro kopii bloků dat při
+postupných paměťových realokacích. Ovšem která varianta konstrukce řetězce bude
+nejrychlejší a paměťově nejzajímavější v&nbsp;praxi? K&nbsp;tomuto účelu si
+vytvoříme sadu benchmarků, které budou postupně &ndash; tj.&nbsp;prozatím znak
+po znaku &ndash; konstruovat řetězec a vypisovat dosaženou rychlost. Pro
+realizaci benchmarků budou použity balíčky ze standardní knihovny jazyka Go,
+zejména balíček <a href="https://pkg.go.dev/testing">testing</a> a konkrétně
+datový typ <a href="https://pkg.go.dev/testing#B">B</a> představující realizaci
+benchmarku.</p>
+
+<p><div class="rs-tip-major">Poznámka: důležité je, že konkatenace spojená
+s&nbsp;realokací paměti nepoužívá žádný masivně paralelní kód, což je ostatně
+vidět i z&nbsp;výpisu <strong>top</strong> (ideálně bychom měli vidět hodnotu
+okolo 800 ve sloupci %CPU):</div></p>
+
+<pre>
+top - 13:07:52 up 65 days, 23:33,  3 users,  load average: 3,14, 2,97, 2,51
+Tasks: 327 total,   1 running, 325 sleeping,   0 stopped,   1 zombie
+%Cpu0  : 11,8 us,  5,9 sy,  0,0 ni, 76,5 id,  0,0 wa,  0,0 hi,  5,9 si,  0,0 st
+%Cpu1  : 18,8 us,  0,0 sy,  0,0 ni, 81,2 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+%Cpu2  : 11,8 us,  5,9 sy,  0,0 ni, 76,5 id,  0,0 wa,  0,0 hi,  5,9 si,  0,0 st
+%Cpu3  : 25,0 us,  0,0 sy,  0,0 ni, 75,0 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+%Cpu4  : 25,0 us,  0,0 sy,  0,0 ni, 75,0 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+%Cpu5  :  6,2 us,  0,0 sy,  0,0 ni, 93,8 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+%Cpu6  : 18,8 us,  0,0 sy,  0,0 ni, 81,2 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+%Cpu7  : 47,1 us, 23,5 sy,  0,0 ni, 29,4 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st
+MiB Mem :  31893,9 total,   4228,9 free,   5697,8 used,  21967,2 buff/cache
+MiB Swap:    662,2 total,    659,8 free,      2,4 used.  21328,6 avail Mem 
+&nbsp;
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+2605576 ptisnovs  20   0  982076  97100   2068 S <strong>193,3</strong>   0,3  23:10.61 string-builders
+      1 root      20   0 1300148  13312   8440 S   0,0   0,0   2366:31 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:10.90 kthreadd
+      3 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 rcu_gp
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 rcu_par_gp
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:09.69 kworker/0:0H-events_highpri
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 mm_percpu_wq
+      9 root      20   0       0      0      0 S   0,0   0,0  32:55.30 ksoftirqd/0
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Realizace benchmarků pro skládání řetězce znak po znaku</h2>
+
+<p>Samotná realizace benchmarků je vlastně velmi přímočará, protože již máme
+připraveny všechny potřebné algoritmy a známe funkce a metody, které se musí
+použít. Každý konkrétní benchmark nejdříve zkonstruuje řetězec (svým vlastním
+způsobem) a následně zavolá funkci <strong>checkBuiltString</strong>, která
+zkontroluje, jestli má řetězec očekávanou délku a taktéž zda obsahuje očekávané
+znaky, což by měla být sekvence hvězdiček o délce N (kde N se zadává při
+spouštění benchmarků). Samotná kontrola obsahu řetězce se již nezapočítává do
+času benchmarku. Podívejme se nyní na úplný zdrojový kód benchmarků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bytes"
+        "strings"
+&nbsp;
+        "testing"
+)
+&nbsp;
+func <strong>checkBuiltString</strong>(b *testing.B, s *string) {
+        <i>// kontrola delky vysledneho retezce</i>
+        if len(*s) != b.N {
+                b.Fatal("Wrong string length")
+        }
+&nbsp;
+        <i>// kontrola obsahu vysledneho retezce</i>
+        for i, r := range *s {
+                if r != '*' {
+                        b.Fatal("Wrong rune", r, "at index", i)
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingConcatenation</strong>(b *testing.B) {
+        <i>// budeme pouzivat primo retezec</i>
+        s := ""
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                s += "*"
+        }
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingStringBuffer</strong>(b *testing.B) {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                bb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := bb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingPreallocatedStringBuffer</strong>(b *testing.B) {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        bb.Grow(b.N)
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                bb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := bb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingStringBuilder</strong>(b *testing.B) {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                sb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := sb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingPreallocatedStringBuilder</strong>(b *testing.B) {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        sb.Grow(b.N)
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                sb.WriteRune('*')
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := sb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Výsledky benchmarků</h2>
+
+<p>Podívejme se nyní na výsledky benchmarků, které byly zjištěny pro N (tedy
+výslednou délku řetězce) postupně rostoucí v&nbsp;řadě 1, 10, 100, 1000, 10000
+a 100000, což znamená, že počet znaků ve výsledném řetězci je v&nbsp;každé
+další iteraci desetkrát větší oproti předchozí iteraci.</p>
+
+<p>Pro malou výslednou délku řetězce jsou rozdíly minimální a ne zcela
+vypovídající o prováděných operacích:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                       1               370.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                        1               765.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8            1               746.0 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                       1               635.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8           1               738.0 ns/op
+PASS
+</pre>
+
+<p>Na tomto benchmarku a benchmarku navazujícím se ukazuje, že inicializace a
+popř.&nbsp;převod výsledku na řetězec se postupně eliminují a začne narůstat
+význam výsledné délky řetězce:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                      10               197.60 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                       10                86.90 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8           10                95.10 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                      10               129.90 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8          10                72.70 ns/op
+PASS
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                     100                95.02 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                      100               165.60 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8          100                13.55 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                     100                14.10 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8         100                32.82 ns/op
+PASS
+</pre>
+
+<p>Už u relativně krátkého řetězce o délce 1000 znaků se začíná ukazovat
+nevýhoda prosté konkatenace a naopak přednost předalokace paměti:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                    1000               242.80 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                     1000                34.08 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8         1000                 5.595 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                    1000                22.61 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8        1000                 4.322 ns/op
+PASS
+</pre>
+
+<p>Rozdíl mezi naivní konkatenací a ostatními variantami se ještě dále
+zvětšuje:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                   10000               693.60 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                    10000                 8.015 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8        10000                 4.251 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                   10000                 4.221 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8       10000                 3.420 ns/op
+PASS
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                  100000              4318.000 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                   100000                 5.693 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8       100000                 3.219 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                  100000                 4.333 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8      100000                 2.797 ns/op
+PASS
+</pre>
+
+<p>Zajímavé je, že u dlouhých řetězců (zde milion znaků) již není předalokace
+tak významným prvkem pro výsledný čas. Stále hraje svoji roli, ale ne již tak
+zásadní, jako například u varianty s&nbsp;řetězcem o délce 1000 znaků:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                 1000000             46829.000 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                  1000000                 4.672 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8      1000000                 4.387 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                 1000000                 4.735 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8     1000000                 3.255 ns/op
+PASS
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Grafická vizualizace výsledků benchmarků</h2>
+
+<p>Výsledky benchmarků uvedené v&nbsp;číselné podobě si pochopitelně můžeme
+převést do grafické podoby, což nám umožní lepší porovnání jednotlivých
+algoritmů:</p>
+
+<a href="https://www.root.cz/obrazek/826567/"><img src="https://i.iinfo.cz/images/525/go-performance-3-1-prev.png" class="image-826567" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-1-prev.png" data-prev-width="370" data-prev-height="225" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-1-large.png" data-large-width="720" data-large-height="438" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="225" /></a>
+<p><i>Obrázek 1: Grafická vizualizace výsledků benchmarků pro N=1 až 10000,
+přepočteno na čas pro přidání jediného znaku.</i></p>
+
+<a href="https://www.root.cz/obrazek/826568/"><img src="https://i.iinfo.cz/images/525/go-performance-3-2-prev.png" class="image-826568" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-2-prev.png" data-prev-width="370" data-prev-height="227" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-2-large.png" data-large-width="720" data-large-height="442" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="227" /></a>
+<p><i>Obrázek 2: Grafická vizualizace výsledků benchmarků pro N=1 až 1000000,
+přepočteno na čas pro přidání jediného znaku.</i></p>
+
+<a href="https://www.root.cz/obrazek/826569/"><img src="https://i.iinfo.cz/images/525/go-performance-3-3-prev.png" class="image-826569" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-3-prev.png" data-prev-width="370" data-prev-height="203" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-3-large.png" data-large-width="720" data-large-height="396" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="203" /></a>
+<p><i>Obrázek 3: Kumulativní časy celkové doby trvání operace konstrukce
+řetězce pro N=1 až 10000.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;těchto výsledků je jasně patrné,
+že standardní konkatenace není v&nbsp;žádném případě optimálním
+řešením.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Podrobnější analýza prováděných operací</h2>
+
+<p>Podrobnější informace o tom, které operace (funkce) se vlastně provádí při
+konkatenaci řetězců různými algoritmy, nám podá další standardní nástroj
+programovacího jazyka Go &ndash; <i>profiler</i>. Nejdříve ale musíme spustit
+benchmarky izolovaně a specifikovat přitom, že se má vygenerovat datový soubor
+s&nbsp;informacemi o volání funkcí:</p>
+
+<pre>
+$ <strong>go test -bench=BenchmarkBuildStringUsingConcatenation             -benchtime=1000000x -cpuprofile concatenation.out</strong>
+$ <strong>go test -bench=BenchmarkBuildStringUsingStringBuffer              -benchtime=1000000x -cpuprofile string_buffer.out</strong>
+$ <strong>go test -bench=BenchmarkBuildStringUsingStringBuilder             -benchtime=1000000x -cpuprofile string_builder.out</strong>
+$ <strong>go test -bench=BenchmarkBuildStringUsingPreallocatedStringBuffer  -benchtime=1000000x -cpuprofile preallocated_string_buffer.out</strong>
+$ <strong>go test -bench=BenchmarkBuildStringUsingPreallocatedStringBuilder -benchtime=1000000x -cpuprofile preallocated_string_builder.out</strong>
+</pre>
+
+<p>Dále se každý z&nbsp;vygenerovaných souborů analyzuje profilerem:</p>
+
+<pre>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/826570/"><img src="https://i.iinfo.cz/images/525/go-performance-3-4-prev.png" class="image-826570" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-4-prev.png" data-prev-width="307" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-4-large.png" data-large-width="597" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="307" height="270" /></a>
+<p><i>Obrázek 4: Konkatenace řetězců s&nbsp;využitím operátoru +: nejvíce času
+se stráví ve funkci pro přesuny bloků paměti.</i></p>
+
+<a href="https://www.root.cz/obrazek/826571/"><img src="https://i.iinfo.cz/images/525/go-performance-3-5-prev.png" class="image-826571" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-5-prev.png" data-prev-width="283" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-5-large.png" data-large-width="551" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="283" height="270" /></a>
+<p><i>Obrázek 5: Při použití objektu <strong>bytes.Buffer</strong> se čas
+stráví z&nbsp;50% při přidávání znaků a dalších 50% času správcem
+paměti (což je ovšem spíše náhoda, že byl GC vůbec spuštěn).</i></p>
+
+<a href="https://www.root.cz/obrazek/826572/"><img src="https://i.iinfo.cz/images/525/go-performance-3-6-prev.png" class="image-826572" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-6-prev.png" data-prev-width="141" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-6-large.png" data-large-width="274" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="141" height="270" /></a>
+<p><i>Obrázek 6: Při použití objektu <strong>strings.Builder</strong> se čas
+stráví přidáváním znaků, tedy vlastním algoritmem.</i></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Postupné skládání řetězce z&nbsp;menších řetězců</h2>
+
+<p>Ve druhé části dnešního článku si předchozí způsob konstrukce řetězců
+rozšíříme a nepatrně upravíme. Tentokrát nebudeme výsledný řetězec postupně
+skládat z&nbsp;jednotlivých znaků, ale z&nbsp;menších řetězců. V&nbsp;jazyce Go
+pro tento účel opět můžeme použít operátor spojování (konkatenace) řetězců,
+který je zcela korektní jak ze syntaktického, tak i sémantického pohledu, ovšem
+výsledek bude velmi pomalý (což si ověříme v&nbsp;benchmarku):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func BuildStringUsingConcatenation(n int) string {
+        <i>// budeme pouzivat primo retezec</i>
+        s := ""
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                s += "foo "
+        }
+&nbsp;
+        <i>// vysledny retezec</i>
+        return s
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Realizace konstrukce řetězce s&nbsp;využitím objektů <strong>bytes.Buffer</strong> a <strong>strings.Builder</strong></h2>
+
+<p>Předchozí program lze upravit takovým způsobem, že namísto konkatenace
+řetězců použijeme objekty <strong>bytes.Buffer</strong> a
+<strong>strings.Builder</strong>. Ty totiž kromě výše použité metody
+<strong>WriteRune</strong> nabízí i metody <strong>WriteString</strong>, což
+umožňuje do bufferu resp.&nbsp;do builderu připojovat další řetězce. Výsledek
+pochopitelně na konci musíme převést na řetězec metodou
+<strong>String</strong>.</p>
+
+<p>Varianta příkladu <a href="#k13">ze třinácté kapitoly</a> převedená do
+podoby s&nbsp;objektem typu <strong>bytes.Buffer</strong> bude vypadat
+takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "bytes"
+&nbsp;
+func <strong>BuildStringUsingStringBuffer</strong>(n int) string {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                bb.WriteString("foo ")
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return bb.String()
+}
+</pre>
+
+<p>Malou úpravou funkci změníme tak, aby se používal objekt typu
+<strong>strings.Builder</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "strings"
+&nbsp;
+func <strong>BuildStringUsingStringBuilder</strong>(n int) string {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                sb.WriteString("foo ")
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return sb.String()
+}
+</pre>
+
+<p>A pochopitelně máme opět pro oba datové typy k&nbsp;dispozici metodu
+<strong>Grow</strong>, která nám umožní předalokaci paměťového bloku:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "bytes"
+&nbsp;
+func <strong>BuildStringUsingPreallocatedStringBuffer</strong>(n int) string {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        bb.Grow(n * len("foo "))
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                bb.WriteString("foo ")
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return bb.String()
+}
+</pre>
+
+<p>a:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "strings"
+&nbsp;
+func <strong>BuildStringUsingPreallocatedStringBuilder</strong>(n int) string {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        sb.Grow(n * len("foo "))
+&nbsp;
+        <i>// postupne pridavani prvku do vysledneho retezce</i>
+        for i := 0; i &lt; n; i++ {
+                sb.WriteString("foo ")
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        return sb.String()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: všech pět funkcí vrátí totožný
+řetězec:</div></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+)
+&nbsp;
+func <strong>main</strong>() {
+        const n = 20
+&nbsp;
+        s := BuildStringUsingConcatenation(n)
+        fmt.Println("Concatenation:                   ", s)
+&nbsp;
+        s2 := BuildStringUsingStringBuffer(n)
+        fmt.Println("StringBuffer (initially empty):  ", s2)
+&nbsp;
+        s3 := BuildStringUsingPreallocatedStringBuffer(n)
+        fmt.Println("StringBuffer (preallocated):     ", s3)
+&nbsp;
+        s4 := BuildStringUsingStringBuilder(n)
+        fmt.Println("StringBuilder (initially empty): ", s4)
+&nbsp;
+        s5 := BuildStringUsingStringBuilder(n)
+        fmt.Println("StringBuilder (preallocated):    ", s5)
+}
+</pre>
+
+<p>s&nbsp;výsledkem:</p>
+
+<pre>
+Concatenation:                    foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo 
+StringBuffer (initially empty):   foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo 
+StringBuffer (preallocated):      foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo 
+StringBuilder (initially empty):  foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo 
+StringBuilder (preallocated):     foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo 
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Realizace benchmarků pro skládání řetězce z&nbsp;menších řetězců</h2>
+
+<p>Na základě příkladů uvedených v&nbsp;předchozí kapitole můžeme sestavit
+benchmarky, které jednotlivé způsoby skládání řetězce z&nbsp;celé řady menších
+řetězců porovnají. Vstupní řetězec, který je neustále připojován ke
+konstruovanému řetězci, má délku sta znaků a vzhledem k&nbsp;tomu, že se jedná
+o znak &bdquo;*&ldquo; z&nbsp;ASCII, je délka tohoto řetězce současně rovna 100
+bajtům:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bytes"
+        "strings"
+&nbsp;
+        "testing"
+)
+&nbsp;
+const appendedString = "****************************************************************************************************"
+&nbsp;
+func <strong>checkBuiltString</strong>(b *testing.B, s *string) {
+        <i>// kontrola delky vysledneho retezce</i>
+        if len(*s) != len(appendedString)*b.N {
+                b.Fatal("Wrong string length", len(*s), b.N)
+        }
+&nbsp;
+        <i>// kontrola obsahu vysledneho retezce</i>
+        for i, r := range *s {
+                if r != '*' {
+                        b.Fatal("Wrong rune", r, "at index", i)
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingConcatenation</strong>(b *testing.B) {
+        <i>// budeme pouzivat primo retezec</i>
+        s := ""
+&nbsp;
+        <i>// postupne pridavani podretezce do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                s += appendedString
+        }
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingStringBuffer</strong>(b *testing.B) {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// postupne pridavani podretezce do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                bb.WriteString(appendedString)
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := bb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingPreallocatedStringBuffer</strong>(b *testing.B) {
+        <i>// budeme pouzivat buffer</i>
+        var bb bytes.Buffer
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        bb.Grow(b.N * len(appendedString))
+&nbsp;
+        <i>// postupne pridavani podretezce do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                bb.WriteString(appendedString)
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := bb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingStringBuilder</strong>(b *testing.B) {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// postupne pridavani podretezce do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                sb.WriteString(appendedString)
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := sb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+&nbsp;
+func <strong>BenchmarkBuildStringUsingPreallocatedStringBuilder</strong>(b *testing.B) {
+        <i>// budeme pouzivat String Builder</i>
+        var sb strings.Builder
+&nbsp;
+        <i>// alokace pameti pro pozdeji vkladane prvky</i>
+        sb.Grow(b.N * len(appendedString))
+&nbsp;
+        <i>// postupne pridavani podretezce do vysledneho retezce</i>
+        for n := 0; n &lt; b.N; n++ {
+                sb.WriteString(appendedString)
+        }
+&nbsp;
+        <i>// prevod objektu na retezec</i>
+        s := sb.String()
+&nbsp;
+        <i>// zkontrolovat obsah vytvoreneho retezce po zastaveni casovace</i>
+        b.StopTimer()
+        checkBuiltString(b, &amp;s)
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výsledky benchmarků</h2>
+
+<p>Opět se podívejme na výsledky benchmarků všech pěti způsobů konstrukce
+řetězce z&nbsp;menších řetězů pro N rostoucí od 1 do 1000000, kde výsledná
+délka řetězce je rovna N&times;100 znakům.</p>
+
+<p>Pro velmi malé počty iterací je inicializace potřebných datových struktur a
+popř.&nbsp;převod na klasický řetězec hlavním faktorem určujícím dobu trvání
+operace:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                       1               322.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                        1              2740.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8            1              3579.0 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                       1              2475.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8           1               370.0 ns/op
+PASS
+ok      string-builders 0.002s
+&nbsp;
+&nbsp;
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                      10              1890.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                       10              2016.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8           10               123.8 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                      10              1013.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8          10                92.80 ns/op
+PASS
+ok      string-builders 0.003s
+</pre>
+
+<p>Ale už pro N=100 je jasně patrné, že konkatenace je nejpomalejší operací a
+naopak se ukazuje přednost použití objektu
+<strong>strings.Builder</strong>:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                     100              1634.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                      100               344.7 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8          100               170.3 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                     100               186.3 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8         100                48.44 ns/op
+PASS
+ok      string-builders 0.003s
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                    1000              5430.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                     1000                55.94 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8         1000                44.43 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                    1000               152.4 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8        1000                28.23 ns/op
+PASS
+ok      string-builders 0.010s
+</pre>
+
+<p>Pro ještě větší hodnotu N se již stává prostá konkatenace neúnosnou operací
+(což ostatně odpovídá její teoretické časové složitosti):</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                   10000             41270.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                    10000                81.49 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8        10000                70.64 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                   10000               136.1 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8       10000                16.45 ns/op
+PASS
+ok      string-builders 0.423s
+goos: linux
+goarch: amd64
+pkg: string-builders
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                  100000            781287.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                   100000               126.2 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8       100000                42.36 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                  100000               138.0 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8      100000                20.56 ns/op
+PASS
+goos: linux
+goarch: amd64
+pkg: string-builders-2
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkBuildStringUsingConcatenation-8                 1000000           6508452.0 ns/op
+BenchmarkBuildStringUsingStringBuffer-8                  1000000                42.56 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuffer-8      1000000                24.46 ns/op
+BenchmarkBuildStringUsingStringBuilder-8                 1000000               125.4 ns/op
+BenchmarkBuildStringUsingPreallocatedStringBuilder-8     1000000                22.31 ns/op
+PASS
+ok      string-builders-2       6509.271s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poslední benchmark běžel téměř dvě
+hodiny!</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Grafická vizualizace výsledků benchmarků</h2>
+
+<p>Opět se podívejme na grafickou vizualizaci výsledků vybraných benchmarků. Na
+prvním grafu je patrné, že i pro řetězce o relativně malé délce nemá příliš
+význam uvažovat o použití operátoru +, protože se z&nbsp;časového hlediska
+jedná o velmi pomalou operaci:</p>
+
+<a href="https://www.root.cz/obrazek/826573/"><img src="https://i.iinfo.cz/images/525/go-performance-3-7-prev.png" class="image-826573" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-7-prev.png" data-prev-width="370" data-prev-height="223" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-7-large.png" data-large-width="720" data-large-height="433" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="223" /></a>
+<p><i>Obrázek 7: Grafická vizualizace výsledků benchmarků pro N=1 až 10000,
+přepočteno na čas pro přidání jediného znaku.</i></p>
+
+<p>Zajímavější a užitečnější bude porovnání ostatních čtyř přístupů pro větší
+hodnoty N. Ze zobrazených výsledků můžeme vyčíst, že použití objektu
+<strong>strings.Builder</strong> má význam především tehdy, pokud dokážeme
+dopředu odhadnout délku výsledného řetězce a tudíž můžeme provést předalokaci
+paměti. Bez této předalokace se zdá být výhodnější využít objekt
+<strong>bytes.Buffer</strong>:</p>
+
+<a href="https://www.root.cz/obrazek/826574/"><img src="https://i.iinfo.cz/images/525/go-performance-3-8-prev.png" class="image-826574" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-8-prev.png" data-prev-width="370" data-prev-height="220" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-8-large.png" data-large-width="720" data-large-height="429" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="220" /></a>
+<p><i>Obrázek 8: Průměrně časy připojení jednoho kratšího řetězce (sto znaků)
+ke konstruovanému řetězci. Klasická konkatenace není zobrazena vzhledem ke
+značně odlišným (mnohem delším) časům.</i></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Kde funkce pro konstrukci řetězce stráví nejvíce času?</h2>
+
+<p>Podrobnější pohled na operace prováděné při konstrukci dlouhého řetězce
+různými způsoby nám opět zpřístupní profiler, který dokáže vypsat kumulativní
+časy strávené v&nbsp;jednotlivých funkcích ve standardní knihovně a/nebo
+v&nbsp;samotném runtime programovacího jazyka Go:</p>
+
+<a href="https://www.root.cz/obrazek/826575/"><img src="https://i.iinfo.cz/images/525/go-performance-3-9-prev.png" class="image-826575" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-9-prev.png" data-prev-width="163" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-9-large.png" data-large-width="317" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="163" height="270" /></a>
+<p><i>Obrázek 9: Konkatenace řetězců; nejvíce času se stráví v&nbsp;přesunech
+znaků mezi různými verzemi konstruovaného řetězce. Zbytek času zabere činnosti
+správce paměti (GC).</i></p>
+
+<a href="https://www.root.cz/obrazek/826576/"><img src="https://i.iinfo.cz/images/525/go-performance-3-10-prev.png" class="image-826576" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-10-prev.png" data-prev-width="215" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-10-large.png" data-large-width="418" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="215" height="270" /></a>
+<p><i>Obrázek 10: Použití <strong>strings.Builder</strong>
+s&nbsp;předalokovanou pamětí. Nejvíce času zabere převod na řetězec, který
+vyžaduje paměťový přesun (paradoxně se více času stráví v&nbsp;kontrole
+výsledků, než samotnou konstrukcí řetězce).</i></p>
+
+<a href="https://www.root.cz/obrazek/826577/"><img src="https://i.iinfo.cz/images/525/go-performance-3-11-prev.png" class="image-826577" data-prev-filename="https://i.iinfo.cz/images/525/go-performance-3-11-prev.png" data-prev-width="261" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/525/go-performance-3-11-large.png" data-large-width="507" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="261" height="270" /></a>
+<p><i>Obrázek 11: Použití <strong>bytes.Buffer</strong> s&nbsp;předalokovanou
+pamětí. Nejvíce času zaberou převody malých řetězců na sekvenci bajtů..</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech demonstračních příkladů, na nichž byly popsány vybrané
+optimalizační techniky jazyka Go, byly uloženy do nového Git repositáře, který
+je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář, můžete namísto toho použít odkazy na jednotlivé demonstrační
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>maps/map1_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu UUID a hodnoty jsou časovými razítky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go</a></td></tr>
+<tr><td> 2</td><td>maps/map2_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu <strong>int</strong> a i hodnoty jsou stejného typu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go</a></td></tr>
+<tr><td> 3</td><td>maps/map3_test.go</td><td>benchmark pro mapy, jejichž prvky jsou prázdnými strukturami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go</a></td></tr>
+<tr><td> 4</td><td>maps/map4_test.go</td><td>benchmark pro mapy, jejichž klíče mají velikost 100 bajtů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go</a></td></tr>
+<tr><td> 5</td><td>maps/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod</a></td></tr>
+<tr><td> 6</td><td>maps/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>map_or_slice/map_or_slice_test.go</td><td>benchmark porovnávající použití řezů a map pro podobné operace vyhledání hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go</a></td></tr>
+<tr><td> 8</td><td>map_or_slice/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod</a></td></tr>
+<tr><td> 9</td><td>map_or_slice/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>sets/map_or_slice_test.go</td><td>benchmark: je lepší použít mapu nebo řez pro implementaci množiny?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go</a></td></tr>
+<tr><td>11</td><td>sets/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>parameter_value_reference/main.go</td><td>předávání rozsáhlých parametrů: hlavní program</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go</a></td></tr>
+<tr><td>13</td><td>parameter_value_reference/config.toml</td><td>konfigurační soubor, který je načítán programem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml</a></td></tr>
+<tr><td>14</td><td>parameter_value_reference/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod</a></td></tr>
+<tr><td>15</td><td>parameter_value_reference/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum</a></td></tr>
+<tr><td>16</td><td>parameter_value_reference/conf/config.go</td><td>definice datové struktury s&nbsp;načítanou konfigurací</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go</a></td></tr>
+<tr><td>17</td><td>parameter_value_reference/conf/config.toml</td><td>konfigurační soubor, který je načítán benchmarkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml</a></td></tr>
+<tr><td>18</td><td>parameter_value_reference/conf/config_benchmark_test.go</td><td>benchmark: předávání velké struktury hodnotou nebo referencí?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>config_to_asm.go</td><td>soubor, jehož překlad do assembleru se použil v&nbsp;dnešním článku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go">https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>20</td><td>pass_by_value_1.go</td><td>předání řezu hodnotou, změna řezu uvnitř funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_1.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_1.go</a></td></tr>
+<tr><td>21</td><td>pass_by_value_2.go</td><td>předání struktury obsahující řez hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_2.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_2.go</a></td></tr>
+<tr><td>22</td><td>pass_by_value_3.go</td><td>předání struktury obsahující pole hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_3.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_3.go</a></td></tr>
+<tr><td>23</td><td>parameters_benchmark_1/parameters_test.go</td><td>benchmark: předání řezu a pole do funkce, která řez/pole modifikuje</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/parameters_test.go">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/parameters_test.go</a></td></tr>
+<tr><td>24</td><td>parameters_benchmark_1/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/go.mod</a></td></tr>
+<tr><td>25</td><td>parameters_benchmark_2/parameters_test.go</td><td>benchmark: předání řezu a pole do funkce, která vrací prvek z&nbsp;pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/parameters_test.go">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/parameters_test.go</a></td></tr>
+<tr><td>26</td><td>parameters_benchmark_2/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/go.mod</a></td></tr>
+<tr><td>27</td><td>range-val-copy-1/range_val_copy_test.go</td><td>iterace přes všechny prvky pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/range_val_copy_test.go">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/range_val_copy_test.go</a></td></tr>
+<tr><td>28</td><td>range-val-copy-1/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/go.mod</a></td></tr>
+<tr><td>29</td><td>range-val-copy-2/range_val_copy_test.go</td><td>iterace přes všechny prvky mapy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/range_val_copy_test.go">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/range_val_copy_test.go</a></td></tr>
+<tr><td>30</td><td>range-val-copy-2/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/go.mod</a></td></tr>
+<tr><td>31</td><td>mutex_channel/mutex_channel_test.go</td><td>synchronizace přes mutex nebo kanál</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/mutex_channel_test.go">https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/mutex_channel_test.go</a></td></tr>
+<tr><td>32</td><td>mutex_channel/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>33</td><td>concatenation.go</td><td>postupné skládání řetězce ze znaků s&nbsp;využitím operátoru konkatenace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/concatenation.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/concatenation.go</a></td></tr>
+<tr><td>34</td><td>string_buffer.go</td><td>skládání znaků do bufferu s&nbsp;následným převodem bufferu na řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_buffer.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_buffer.go</a></td></tr>
+<tr><td>35</td><td>string_builder.go</td><td>skládání znaků, využití objektu <strong>strings.Builder</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_builder.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_builder.go</a></td></tr>
+<tr><td>36</td><td>preallocated_string_buffer.go</td><td>předalokace paměti pro řetězec: varianta s&nbsp;bufferem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/preallocated_string_buffer.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/preallocated_string_buffer.go</a></td></tr>
+<tr><td>37</td><td>preallocated_string_builder.go</td><td>předalokace paměti pro řetězec: varianta s&nbsp;objektem strings.Builder</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/preallocated_string_builder.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/preallocated_string_builder.go</a></td></tr>
+<tr><td>38</td><td>main.go</td><td>otestování jednotlivé varianty postupného vytváření řetězců ze znaků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/main.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/main.go</a></td></tr>
+<tr><td>39</td><td>string_builders_test.go</td><td>benchmarky porovnávající jednotlivé varianty postupného vytváření řetězců přidáváním znaků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_builders_test.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders/string_builders_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>40</td><td>concatenation.go</td><td>postupné skládání řetězce z&nbsp;řetězců s&nbsp;využitím operátoru konkatenace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/concatenation.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/concatenation.go</a></td></tr>
+<tr><td>41</td><td>string_buffer.go</td><td>skládání řetězců do bufferu s&nbsp;následným převodem bufferu na řetězec</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_buffer.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_buffer.go</a></td></tr>
+<tr><td>42</td><td>string_builder.go</td><td>skládání řetězců, využití objektu <strong>strings.Builder</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_builder.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_builder.go</a></td></tr>
+<tr><td>43</td><td>preallocated_string_buffer.go</td><td>předalokace paměti pro řetězec: varianta s&nbsp;bufferem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/preallocated_string_buffer.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/preallocated_string_buffer.go</a></td></tr>
+<tr><td>44</td><td>preallocated_string_builder.go</td><td>předalokace paměti pro řetězec: varianta s&nbsp;objektem strings.Builder</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/preallocated_string_builder.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/preallocated_string_builder.go</a></td></tr>
+<tr><td>45</td><td>main.go</td><td>otestování jednotlivé varianty postupného vytváření řetězců z&nbsp;kratších řetězců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/main.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/main.go</a></td></tr>
+<tr><td>46</td><td>string_builders_test.go</td><td>benchmarky porovnávající jednotlivé varianty postupného vytváření řetězců přidáváním kratších řetězců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_builders_test.go">https://github.com/tisnik/go-root/blob/master/article_A1/string-builders-2/string_builders_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>An Introduction to Benchmarking Your Go Programs<br />
+<a href="https://tutorialedge.net/golang/benchmarking-your-go-programs/">https://tutorialedge.net/golang/benchmarking-your-go-programs/</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>Highly extensible Go source code linter providing checks currently missing from other linters<br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Fast linters runner for Go<br />
+<a href="https://github.com/golangci/golangci-lint">https://github.com/golangci/golangci-lint</a>
+</li>
+
+<li>Checkers from the “performance” group<br />
+<a href="https://go-critic.com/overview#checkers-from-the-performance-group">https://go-critic.com/overview#checkers-from-the-performance-group</a>
+</li>
+
+<li>rangeValCopy<br />
+<a href="https://go-critic.com/overview#rangeValCopy-ref">https://go-critic.com/overview#rangeValCopy-ref</a>
+</li>
+
+<li>C vs Rust vs Go: performance analysis<br />
+<a href="https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c">https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c</a>
+</li>
+
+<li>Golang Performance Comparison | Why is GO Fast?<br />
+<a href="https://www.golinuxcloud.com/golang-performance/">https://www.golinuxcloud.com/golang-performance/</a>
+</li>
+
+<li>Go mutex vs channels benchmark<br />
+<a href="https://github.com/danil/go_mutex_vs_channels_benchmark">https://github.com/danil/go_mutex_vs_channels_benchmark</a>
+</li>
+
+<li>Techniques to Maximize Your Go Application’s Performance<br />
+<a href="https://golangdocs.com/techniques-to-maximize-your-go-applications-performance">https://golangdocs.com/techniques-to-maximize-your-go-applications-performance</a>
+</li>
+
+<li>Go language performance optimization<br />
+<a href="https://www.programmerall.com/article/8929467838/">https://www.programmerall.com/article/8929467838/</a>
+</li>
+
+<li>Ultimate Golang Performance Optimization Guide<br />
+<a href="https://www.bacancytechnology.com/blog/golang-performance">https://www.bacancytechnology.com/blog/golang-performance</a>
+</li>
+
+<li>Optimizing a Golang service to reduce over 40% CPU<br />
+<a href="https://medium.com/coralogix-engineering/optimizing-a-golang-service-to-reduce-over-40-cpu-366b67c67ef9">https://medium.com/coralogix-engineering/optimizing-a-golang-service-to-reduce-over-40-cpu-366b67c67ef9</a>
+</li>
+
+<li>Tutorial for optimizing golang program<br />
+<a href="https://github.com/caibirdme/hand-to-hand-optimize-go/blob/master/README.md">https://github.com/caibirdme/hand-to-hand-optimize-go/blob/master/README.md</a>
+</li>
+
+<li>How to optimise your Go code<br />
+<a href="https://codeburst.io/how-to-optimise-your-go-code-c6b27d4f1452">https://codeburst.io/how-to-optimise-your-go-code-c6b27d4f1452</a>
+</li>
+
+<li>Datový typ bytes.Buffer<br />
+<a href="https://pkg.go.dev/bytes@go1.20.1#Buffer">https://pkg.go.dev/bytes@go1.20.1#Buffer</a>
+</li>
+
+<li>Datový typ strings.Builder<br />
+<a href="https://pkg.go.dev/strings@go1.20.1#Builder">https://pkg.go.dev/strings@go1.20.1#Builder</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
