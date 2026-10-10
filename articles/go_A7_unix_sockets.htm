@@ -1,0 +1,1437 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Komunikace přes TCP, UDP i Unixové sokety v programovacím jazyce Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Komunikace přes TCP, UDP i Unixové sokety v programovacím jazyce Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Programovací jazyk Go se velmi často používá pro tvorbu síťových aplikací. Dnes si ukážeme, jak snadno lze v jazyku Go realizovat komunikaci jak přes TCP či UDP, tak i přes Unixové sokety. Přitom si ukážeme i využití dalších utility: nc, lsof a netstat.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Komunikace přes Unixové sokety v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k02">2. Základní nástroje, které využijeme: <strong>netstat</strong>, <strong>nc</strong> a <strong>lsof</strong></a></p>
+<p><a href="#k03">3. Komunikace přes TCP sokety (<i>stream</i>)</a></p>
+<p><a href="#k04">4. Komunikace přes UDP sokety (<i>datagram</i>)</a></p>
+<p><a href="#k05">5. &bdquo;Jmenné prostory&ldquo; TCP a UDP</a></p>
+<p><a href="#k06">6. Použití Unixových soketů (<i>stream</i> i <i>datagram</i>)</a></p>
+<p><a href="#k07">7. Realizace jednoduchého klienta komunikujícího přes TCP sokety v&nbsp;jazyku Go</a></p>
+<p><a href="#k08">8. Základní kostra serveru komunikujícího přes TCP sokety v&nbsp;jazyku Go</a></p>
+<p><a href="#k09">9. Vylepšení klienta i serveru &ndash; uzavírání prostředků a reakce na případné chyby</a></p>
+<p><a href="#k10">10. Simulace zpomalené reakce serveru</a></p>
+<p><a href="#k11">11. Otestování chování serveru</a></p>
+<p><a href="#k12">12. Server akceptující větší množství klientů realizovaný pomocí gorutin</a></p>
+<p><a href="#k13">13. Otestování chování nové implementace serveru</a></p>
+<p><a href="#k14">14. Klient komunikující přes Unixové sokety naprogramovaný v&nbsp;Go</a></p>
+<p><a href="#k15">15. Server komunikující přes Unixové sokety naprogramovaný v&nbsp;Go</a></p>
+<p><a href="#k17">17. Otestování komunikace mezi klientem a serverem</a></p>
+<p><a href="#k18">18. Obsah druhé části článku</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Komunikace přes Unixové sokety v&nbsp;programovacím jazyce Go</h2>
+
+<p><a href="https://www.root.cz/serialy/programovaci-jazyk-go/">Programovací
+jazyk Go</a> se velmi často používá pro tvorbu síťových aplikací.
+V&nbsp;dnešním článku si ukážeme, jak snadno je možné v&nbsp;jazyku Go
+realizovat komunikaci mezi serverem a klienty jak přes TCP či UDP (tedy
+s&nbsp;využitím síťových rozhraní, včetně lokálního síťového rozhraní), tak i
+přes Unixové sokety. Přitom si ukážeme i některé základní způsoby využití
+dalších utility: <strong>nc</strong>, <strong>lsof</strong> a
+<strong>netstat</strong>.</p>
+
+<p>Nezávisle na tom, zda je pro komunikaci použito síťové rozhraní (včetně
+localhostu) nebo Unixové sokety, se rozlišuje mezi tzv. <i>spojovou službou</i>
+a komunikací pomocí <i>datagramů</i>. Spojová služba je realizována buď
+s&nbsp;využitím protokolu TCP nebo přes Unixové sokety (které podporují i
+využití datagramů). Před zahájením komunikace je nutné navázat spojení. Toto
+spojení vždy navazuje klient, který se připojuje k&nbsp;serveru (ovšem odpojit
+se může jakákoli strana). Po navázání spojení může probíhat přenos dat
+(obousměrný) a přitom jsou všechna přenesená data potvrzována (z&nbsp;pohledu
+programátora automaticky). Pokud nastane situace, kdy nejsou data potvrzena,
+jsou poslána znovu (opět bez zásahu programátora). Zaručeno je i pořadí
+doručení dat.</p>
+
+<p>Naproti tomu existuje (rostoucí počet) aplikací, pro které je zajištění
+spojové služby zbytečně komplikované a v&nbsp;případě TCP i příliš zatěžující
+pro síť. Pokud není nutné zaručit pořadí zpráv nebo jejich potvrzování, lze
+komunikovat přes datagramy. To je případ síťové komunikace přes protokol UDP
+resp.&nbsp;(opět) přes Unixové sokety (zde je ovšem pořadí zaručeno). U UDP
+může dojít i k&nbsp;duplikaci dat, zatímco u Unixových soketů většinou
+nikoli.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Základní nástroje, které využijeme: <strong>netstat</strong>, <strong>nc</strong> a <strong>lsof</strong></h2>
+
+<p>V&nbsp;dnešním článku sice vytvoříme několik jednoduchých klientů a serverů
+naprogramovaných v&nbsp;jazyce Go, ovšem kromě toho využijeme i některé (dnes
+již prakticky) standardní systémové nástroje; konkrétně nástroje nazvané
+<strong>netstat</strong>, <strong>nc</strong> a <strong>lsof</strong>:</p>
+
+<ol>
+
+<li><strong>netstat</strong> je nástroj, který je možné využít pro zjištění
+síťových připojení popř.&nbsp;i použití Unixových soketů. Moderní varianty
+tohoto nástroje podporují velké množství přepínačů, ovšem my využijeme jen
+malou podskupinu těchto přepínačů.</li>
+
+<li><strong>nc</strong> neboli <strong>netcat</strong> je takřka univerzální
+nástroj při práci s&nbsp;TCP a UDP, ale (jak ostatně uvidíme dále) i
+s&nbsp;Unixovými sokety. Pomocí tohoto nástroje lze snadno realizovat TCP/UDP
+klienta i server, ovšem možnosti tohoto nástroje jsou ve skutečnosti mnohem
+větší.</li>
+
+<li><strong>lsof</strong> je nástroj, který dokáže vypsat seznam otevřených
+souborů a popř.&nbsp;i další vlastnosti těchto souborů. Tento nástroj využijeme
+v&nbsp;souvislosti s&nbsp;Unixovými sokety, které se z&nbsp;pohledu uživatele
+skutečně tváří jako speciální typy souborů.</li>
+
+</ol>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Komunikace přes TCP sokety (<i>stream</i>)</h2>
+
+<p>Síťové aplikace se vytváří na různých úrovních abstrakce &ndash; buď se
+pouze otevřou připojení (například s&nbsp;využitím dále využitých Unixových
+soketů) a následný komunikační protokol je naprogramován přímo vývojářem, nebo
+se naopak využije nějaký již existující protokol na vyšší vrstvě (pravděpodobně
+nejznámějším příkladem ze současnosti je protokol HTTP atd.). Nejprve si
+ukážeme komunikaci mezi jednoduchým klientem a serverem na nižší úrovni, kdy
+náš komunikační protokol (na aplikační úrovni) bude spočívat v&nbsp;přenosu
+jediného bajtu přes TCP popř.&nbsp;přes UDP. Později namísto TCP/UDP použijeme
+Unixové sokety.</p>
+
+<p><div class="rs-tip-major">Poznámka: na nižších vrstvách (pokud půjdeme stále
+níže, tak konkrétně na vrstvě TCP, IP a Ethernetu) bude samozřejmě komunikace
+složitější, od toho ovšem budeme do jisté míry odstíněni standardními
+knihovnami (balíčky) programovacího jazyka Go.</div></p>
+
+<p>Nejprve na prvním terminálu spustíme nástroj <strong>nc</strong>, který bude
+nakonfigurován jako <i>server</i> přijímající (naslouchající) na portu 1234.
+Aby nástroj <strong>nc</strong> naslouchal požadavkům, musíme použít přepínač
+<strong>-l</strong> neboli &bdquo;listen&ldquo;:</p>
+
+<pre>
+$ <strong>nc -l -v localhost 1234</strong>
+&nbsp;
+Listening on localhost 1234
+</pre>
+
+<p>Následně ve druhém terminálu navážeme spojení se serverem naslouchajícím na
+portu 1234:</p>
+
+<pre>
+$ <strong>nc -v localhost 1234</strong>
+&nbsp;
+Connection to localhost 1234 port [tcp/*] succeeded!
+</pre>
+
+<p>A na prvním terminálu se zobrazí informace o navázání spojení a navíc o
+portu otevřeném klientem:</p>
+
+<pre>
+Connection received on localhost 35636
+</pre>
+
+<p>Pokud nyní budete na tento terminál zapisovat nějaké zprávy, bude je server
+přijímat a opisovat je na svůj (první) terminál:</p>
+
+<pre>
+aaa
+bbb
+cc
+ddd
+</pre>
+
+<p>Na třetím terminálu si pak můžeme zobrazit podrobnější informace o
+komunikačním kanále mezi serverem a klientem:</p>
+
+<pre>
+$ <strong>netstat -tunp | grep :1234</strong>
+&nbsp;
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+tcp        0      0 127.0.0.1:1234          127.0.0.1:35636         ESTABLISHED 231176/nc
+tcp        0      0 127.0.0.1:35636         127.0.0.1:1234          ESTABLISHED 232495/nc
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se zobrazí oba porty,
+po kterých komunikace probíhá. Pro první proces (což je v&nbsp;tomto případě
+server) se porty vypíšou v&nbsp;opačném pořadí, než je tomu u klienta, protože
+je použito pořadí místní_port:vzdálený_port.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Komunikace přes UDP sokety (<i>datagram</i>)</h2>
+
+<p>Nyní si vyzkoušíme podobnou komunikaci, ovšem nikoli zajištěnou
+s&nbsp;využitím TCP (stream), ale použijeme namísto toho protokol UDP
+(datagram). Nástroj <strong>nc</strong> komunikaci přes UDP taktéž podporuje,
+ovšem musíme použít přepínač <strong>-u</strong>:</p>
+
+<pre>
+$ <strong>nc -l -u -v localhost 1234</strong>
+&nbsp;
+Bound on localhost 1234
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotné hlášení je odlišné &ndash;
+používá se zde slovo &bdquo;bound&ldquo; a nikoli &bdquo;listening&ldquo;, což
+souvisí s&nbsp;céčkovým API k&nbsp;soketům a odlišnou sémantikou jejich
+použití.</div></p>
+
+<p>V&nbsp;dalším terminálu se k&nbsp;serveru připojíme:</p>
+
+<pre>
+$ <strong>nc -u -v localhost 1234</strong>
+&nbsp;
+Connection to localhost 1234 port [udp/*] succeeded!
+</pre>
+
+<p>Na terminálu serveru se taktéž vypíše informace o připojení:</p>
+
+<pre>
+Connection received on localhost 45470
+</pre>
+
+<p>A propojené porty opět získáme a necháme si vypsat nástrojem
+<strong>netstat</strong>:</p>
+
+<pre>
+$ <strong>netstat -tunp | grep :1234</strong>
+&nbsp;
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+udp        0      0 127.0.0.1:45470         127.0.0.1:1234          ESTABLISHED 233385/nc
+udp        0      0 127.0.0.1:1234          127.0.0.1:45470         ESTABLISHED 233118/nc
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nyní se v&nbsp;prvním sloupci vypíše
+&bdquo;udp&ldquo; a nikoli &bdquo;tcp&ldquo;.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. &bdquo;Jmenné prostory&ldquo; TCP a UDP</h2>
+
+<p>Porty TCP a UDP jsou sice identifikovány celými čísly 0..65535, ovšem jedná
+se o odlišné &bdquo;jmenné prostory&ldquo;. Proto nelze navázat spojení se
+serverem naslouchajícím na UDP portu 1234 z&nbsp;klienta pokoušejícího se
+připojit na TCP port 1234:</p>
+
+<pre>
+$ <strong>nc -l -u -v localhost 1234</strong>
+&nbsp;
+Bound on localhost 1234
+&nbsp;
+&nbsp;
+&nbsp;
+$ <strong>nc -v localhost 1234</strong>
+&nbsp;
+nc: connect to localhost port 1234 (tcp) failed: Connection refused
+</pre>
+
+<p>Platí to pochopitelně i naopak:</p>
+
+<pre>
+$ <strong>nc -l -v localhost 1234</strong>
+&nbsp;
+Listening on localhost 1234
+&nbsp;
+&nbsp;
+&nbsp;
+$ <strong>nc -u -v localhost 1234</strong>
+<i>(proces je ihned ukončen)</i>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si odlišného chování při
+NEnavázání připojení.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Použití Unixových soketů (<i>stream</i> i <i>datagram</i>)</h2>
+
+<p>Namísto protokolu TCP či UDP můžeme pro komunikaci mezi procesy použít
+Unixové sokety, které taktéž existují ve variantě <i>stream</i> a
+<i>datagram</i> (tj.&nbsp;způsob komunikace do značné míry odpovídá TCP
+resp.&nbsp;UDP). Unixové sokety lze využít pro komunikaci mezi procesy běžícími
+na jednom počítači a vlastní komunikace probíhá přes strukturu spravovanou
+jádrem, která je z&nbsp;uživatelského prostoru viditelná jako speciální typ
+souboru. Podívejme se nyní na způsob spuštění serveru, který pro komunikaci
+otevře soket se jménem <strong>/tmp/test.socket</strong> (což je onen speciální
+typ souboru):</p>
+
+<pre>
+$ <strong>nc -l -U -v /tmp/test.socket</strong>
+&nbsp;
+Bound on /tmp/test.socket
+Listening on /tmp/test.socket
+</pre>
+
+<p>Samotný soket, na který se mají klienti připojit, bude vypadat
+následovně:</p>
+
+<pre>
+$ <strong>lsof /tmp/test.socket</strong>
+&nbsp;
+COMMAND    PID     USER   FD   TYPE             DEVICE SIZE/OFF       NODE NAME
+nc      235825 ptisnovs    3u  unix 0x0000000000000000      0t0 1288302629 /tmp/test.socket type=STREAM
+</pre>
+
+<p>Na druhém terminálu se k&nbsp;tomuto serveru připojíme přes unixový
+soket:</p>
+
+<pre>
+$ <strong>nc -U -v /tmp/test.socket</strong>
+</pre>
+
+<p>Připojení k&nbsp;serveru je potvrzeno na prvním terminálu zprávou:</p>
+
+<pre>
+Connection received on /tmp/test.socket
+</pre>
+
+<p>A obousměrná komunikace je nástrojem <strong>lsof</strong> nalezena
+takto:</p>
+
+<pre>
+$ <strong>lsof /tmp/test.socket</strong>
+&nbsp;
+COMMAND    PID     USER   FD   TYPE             DEVICE SIZE/OFF       NODE NAME
+nc      235825 ptisnovs    3u  unix 0x0000000000000000      0t0 1288302629 /tmp/test.socket type=STREAM
+nc      235825 ptisnovs    4u  unix 0x0000000000000000      0t0 1288302630 /tmp/test.socket type=STREAM
+</pre>
+
+<p>Podívejme se nyní na vlastnosti souboru
+<strong>/tmp/test.socket</strong>:</p>
+
+<pre>
+$ <strong>ls -la /tmp/test.socket </strong>
+&nbsp;
+srwxrwxr-x 1 ptisnovs ptisnovs 0 Apr 30 15:26 /tmp/test.socket
+</pre>
+
+<p>Z&nbsp;prvního znaku &bdquo;s&ldquo; je patrné, že se skutečně jedná o
+soket.</p>
+
+<p>Komunikace přes <i>datagram</i> soket vypadá poněkud odlišně, protože se ve
+skutečnosti použijí dva sokety, jeden explicitně pojmenovaný a druhý vytvořený
+klientem (a klientem uzavíraný):</p>
+
+<pre>
+$ <strong>nc -l -u -U -v /tmp/test.socket</strong>
+Bound on /tmp/test.socket
+&nbsp;
+$ <strong>nc -u -U -v /tmp/test.socket</strong>
+Bound on /tmp/nc.XXXXRAlNkA
+&nbsp;
+$ <strong>lsof /tmp/test.socket</strong>
+COMMAND    PID     USER   FD   TYPE             DEVICE SIZE/OFF       NODE NAME
+nc      238174 ptisnovs    3u  unix 0x0000000000000000      0t0 1288403891 /tmp/test.socket type=DGRAM
+&nbsp;
+$ <strong>lsof /tmp/nc.XXXXRAlNkA</strong>
+COMMAND    PID     USER   FD   TYPE             DEVICE SIZE/OFF       NODE NAME
+nc      238687 ptisnovs    4u  unix 0x0000000000000000      0t0 1288437146 /tmp/nc.XXXXRAlNkA type=DGRAM
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tyto informace nám budou prozatím
+postačovat k&nbsp;tomu, abychom mohli komunikaci přes unix sokety realizovat
+v&nbsp;jazyce Go.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Realizace jednoduchého klienta komunikujícího přes TCP sokety v&nbsp;jazyku Go</h2>
+
+<p>Síťové aplikace se vytváří na různých úrovních abstrakce &ndash; buď se
+pouze otevřou připojení (například s&nbsp;využitím Unix socketů) a následný
+komunikační protokol je naprogramován přímo vývojářem, nebo se naopak využije
+nějaký již existující protokol na vyšší síťové vrstvě (HTTP atd.). Nejprve si
+ukážeme komunikaci mezi jednoduchým klientem a serverem na nižší úrovni, kdy
+náš komunikační protokol (na aplikační úrovni) bude spočívat v&nbsp;přenosu
+jediného bajtu přes TCP popř.&nbsp;přes UDP.</p>
+
+<p>Samotná implementace klienta bude poměrně přímočará a bude se skládat
+z&nbsp;těchto kroků:</p>
+
+<ol>
+
+<li>Navázání připojení s&nbsp;využitím konstruktoru <strong>net.Dial(protokol,
+adresa)</strong>, který je popsán na adrese <a
+href="https://golang.org/pkg/net/#Dial">https://golang.org/pkg/net/#Dial</a>.
+Použitý protokol je specifikován řetězcem; konkrétně se může jednat o konstanty
+&bdquo;tcp&ldquo;, &bdquo;tcp4&ldquo;, &bdquo;tcp6&ldquo;, &bdquo;udp&ldquo;,
+&bdquo;udp4&ldquo;, &bdquo;udp6&ldquo;, &bdquo;ip&ldquo;, &bdquo;ip4&ldquo;,
+&bdquo;ip6&ldquo;, &bdquo;unix&ldquo;, &bdquo;unixgram&ldquo;
+popř.&nbsp;&bdquo;unixpacket&ldquo;. V&nbsp;příkladu zvolíme &bdquo;tcp&ldquo;,
+který bude funkční v&nbsp;sítích s&nbsp;IPv4 i IPv6 (nebo pochopitelně
+v&nbsp;kombinovaných sítích).</li>
+
+<li>Přečtení <i>n</i> bajtů metodou <strong>Read(b []byte) (n int, err
+error)</strong> (konkrétní příjemce se liší podle toho, jaké připojení jsme
+deklarovali v&nbsp;konstruktoru, ovšem tato metoda bude vždy podporována).
+Povšimněte si, že této metodě je nutné předat řez (<i>slice</i>) a nikoli pole
+bajtů (to je v&nbsp;tomto případě nekompatibilní datový typ). Z&nbsp;tohoto
+důvodu v&nbsp;našem příkladu použijeme trik <strong>pole[:]</strong>, kterým se
+vytvoří řez ukazující na celé pole (přesněji řez bude ukazovat na první prvek
+pole a jeho délka bude odpovídat délce pole).</li>
+
+<li>Přečtené pole bajtů se následně vytiskne, přičemž server implementovaný
+v&nbsp;rámci další kapitoly je naprogramován takovým způsobem, aby posílal jen
+jediný bajt.</li>
+
+</ol>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu bude vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := <u>net.Dial("tcp", "localhost:1234")</u>
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                var b [1]byte
+                n, err := <u>conn.Read(b[:])</u>
+                if err != nil {
+                        println("No response!")
+                } else {
+                        if n == 1 {
+                                fmt.Printf("Received %d byte: %v\n", n, b)
+                        } else {
+                                fmt.Printf("Received %d bytes: %v\n", n, b)
+                        }
+                }
+        }
+}
+</pre>
+
+<p>O realizovaném připojení si můžeme zjistit i další informace, například
+lokální i vzdálenou adresu s&nbsp;využitím metod
+<strong>Conn.LocalAddr()</strong> a <strong>Conn.RemoteAddr()</strong>. Tyto
+adresy převedeme do tisknutelného tvaru metodou <strong>String()</strong>. <a
+href="https://github.com/tisnik/go-root/blob/master/article_11/01B_simple_client_headers.go">Upravený
+klient</a> (stále však nepřipravený pro reálný provoz) může vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "net"
+)
+&nbsp;
+func <strong>main</strong>() {
+        conn, err := <u>net.Dial("tcp", "localhost:1234")</u>
+        if err != nil {
+                println("Connection refused!")
+        } else {
+                fmt.Printf("Connection established\n")
+                fmt.Printf("Remote Address: %s \n", conn.RemoteAddr().String())
+                fmt.Printf("Local Address:  %s \n", conn.LocalAddr().String())
+&nbsp;
+                var b [1]byte
+                n, err := <u>conn.Read(b[:])</u>
+                if err != nil {
+                        println("No response!")
+                } else {
+                        if n == 1 {
+                                fmt.Printf("Received %d byte: %v\n", n, b)
+                        } else {
+                                fmt.Printf("Received %d bytes: %v\n", n, b)
+                        }
+                }
+        }
+}
+</pre>
+
+<p>Příklad výsledku po připojení klienta k&nbsp;serveru popsanému <a
+href="#k07">v&nbsp;další kapitole</a>:</p>
+
+<pre>
+Connection established
+Remote Address: 127.0.0.1:1234
+Local Address:  127.0.0.1:38082
+Received 1 byte: [0]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že server má pevně zadaný
+port 1234, zatímco port otevřený na straně klienta je zvolen
+systémem.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Základní kostra serveru komunikujícího přes TCP sokety v&nbsp;jazyku Go</h2>
+
+<p>Nyní si ukažme implementaci serveru, na který se budou připojovat výše
+popsaní klienti. Implementace serveru je nepatrně složitější, než implementace
+klienta, a to z&nbsp;toho důvodu, že server musí obsloužit větší množství
+klientů. V&nbsp;tom nejjednodušším případě použijeme takzvaný
+&bdquo;neforkující&ldquo; server, který bude implementován následujícím
+způsobem a který dokáže v&nbsp;dané chvíli obsloužit jen jediného klienta:</p>
+
+<ol>
+
+<li>Použijeme konstruktor nazvaný <strong>net.Listen()</strong>, v&nbsp;němž
+opět specifikujeme protokol (viz <a href="#k07">předchozí kapitolu</a>) a
+síťové rozhraní s&nbsp;portem 1234.</li>
+
+<li>S&nbsp;využitím příkazu <strong>defer</strong> zajistíme, že se při
+ukončení funkce <strong>main</strong> automaticky uzavře i otevřený port.</li>
+
+<li>Dále v&nbsp;nekonečné smyčce budeme čekat na připojení v&nbsp;metodě
+<strong>Accept</strong>. Jakmile se nějaký klient pokusí o připojení, vrátí
+tato metoda strukturu implementující mj.&nbsp;metody <strong>Read</strong> a
+<strong>Write</strong>. A právě s&nbsp;využitím metody <strong>Write</strong>
+pošleme klientovi jediný bajt obsahující hodnotu počitadla dotazů.</li>
+
+<li>Spojení se automaticky ukončí díky použití příkazu <strong>defer
+l.Close()</strong></li>
+
+</ol>
+
+<p>Zdrojový kód takto napsaného serveru bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+)
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := <u>connection.Write(buffer)</u>
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := <u>net.Listen("tcp", "localhost:1234")</u>
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+&nbsp;
+        for {
+                connection, err := <i>l.Accept()</i>
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        processRequest(connection, &amp;cnt)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vylepšení klienta i serveru &ndash; uzavírání prostředků a reakce na případné chyby</h2>
+
+<p>Jak klient tak i server komunikující s&nbsp;využitím soketů by měly korektně
+(a navíc i co nejdříve) uzavírat všechny prostředky. Týká se to zejména
+vlastního připojení, které je v&nbsp;klientovi získáno funkcí
+<strong>net.Dial</strong> a uzavřeno by mělo být metodou
+<strong>Close</strong>. Vše lze realizovat například v&nbsp;bloku
+<strong>defer</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+)
+&nbsp;
+const BufferSize = 1024
+&nbsp;
+func <strong>main</strong>() {
+        connection, err := <u>net.Dial("tcp", "localhost:1234")</u>
+        if err != nil {
+                log.Fatal("Connection refused!")
+                return
+        }
+        log.Print("Connection established, waiting for data")
+&nbsp;
+        defer func() {
+                log.Println("Closing connection")
+                err := <u>connection.Close()</u>
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        buffer := make([]byte, BufferSize)
+        n, err := connection.Read(buffer)
+        if err != nil {
+                log.Println("No response!", err)
+        } else {
+                if n == 1 {
+                        log.Printf("Received %d byte: %v\n", n, buffer[:n])
+                } else {
+                        log.Printf("Received %d bytes: %v\n", n, buffer[:n])
+                }
+        }
+}
+</pre>
+
+<p>U serveru by se mělo uzavřít jak každé realizované připojení, tak i vlastní
+síťový server zkonstruovaný funkcí <strong>net.Listen</strong>. Opět je možné
+použít bloky <strong>defer</strong> a výsledek by mohl vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+)
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        defer func() {
+                log.Println("Closing connection")
+                err := <u>connection.Close()</u>
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := connection.Write(buffer)
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := <u>net.Listen("tcp", "localhost:1234")</u>
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+        defer func() {
+                err := <u>l.Close()</u>
+                if err != nil {
+                        log.Println("Listener close failed", err)
+                }
+        }()
+&nbsp;
+        for {
+                connection, err := l.Accept()
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        processRequest(connection, &amp;cnt)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Simulace zpomalené reakce serveru</h2>
+
+<p>Reálné implementace serverů mnohdy provádí nějakou časově náročnou činnost,
+což znamená, že nedokážou na požadavek klienta odpovědět ihned. Můžeme si tedy
+otestovat, jak se bude server i klient (popř.&nbsp;klienti) chovat ve chvíli,
+kdy bude server odpovídat se zpožděním, například se zpožděním dvou sekund. Ono
+zpoždění bude simulováno pozastavením činnosti serveru <i>po</i> akceptaci
+připojení klienta:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+        "time"
+)
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        defer func() {
+                log.Println("Closing connection")
+                err := connection.Close()
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := connection.Write(buffer)
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+        defer func() {
+                err := l.Close()
+                if err != nil {
+                        log.Println("Listener close failed", err)
+                }
+        }()
+&nbsp;
+        for {
+                connection, err := l.Accept()
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        <u>time.Sleep(2 * time.Second)</u>
+                        processRequest(connection, &amp;cnt)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Otestování chování serveru</h2>
+
+<p>Nyní server popsaný <a href="#k10">v&nbsp;předchozí kapitole</a>
+spustíme v&nbsp;jednom terminálu:</p>
+
+<pre>
+$ <strong>go run slow_tcp_server.go</strong>
+</pre>
+
+<p>A následně spustíme (částečně souběžně) několik klientů ve druhém
+terminálu:</p>
+
+<pre>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+</pre>
+
+<p>Klienti se připojí a budou očekávat odpověď od serveru:</p>
+
+<pre>
+2023/05/02 15:34:16 Connection established, waiting for data
+2023/05/02 15:34:16 Connection established, waiting for data
+2023/05/02 15:34:17 Connection established, waiting for data
+&nbsp;
+2023/05/02 <u>15:34:18</u> Received 1 byte: [1]
+2023/05/02 15:34:18 Closing connection
+&nbsp;
+2023/05/02 <u>15:34:20</u> Received 1 byte: [2]
+2023/05/02 15:34:20 Closing connection
+&nbsp;
+2023/05/02 <u>15:34:22</u> Received 1 byte: [3]
+2023/05/02 15:34:22 Closing connection
+</pre>
+
+<p>Povšimněte si, že klienti dostávali data postupně (se zpožděním dvou sekund
+mezi odpověďmi), nikoli současně. To je ostatně patrné i z&nbsp;logů serveru:</p>
+
+<pre>
+2023/05/02 <u>15:34:16</u> Connection accepted
+2023/05/02 15:34:18 Written 1 byte(s)
+2023/05/02 15:34:18 Closing connection
+2023/05/02 <u>15:34:18</u> Connection accepted
+2023/05/02 15:34:20 Written 1 byte(s)
+2023/05/02 15:34:20 Closing connection
+2023/05/02 <u>15:34:20</u> Connection accepted
+2023/05/02 15:34:22 Written 1 byte(s)
+2023/05/02 15:34:22 Closing connection
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;mnoha případech se jedná o
+chování, které by nebylo pro produkční kód akceptovatelné.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Server akceptující větší množství klientů realizovaný pomocí gorutin</h2>
+
+<p>Kostra předchozího serveru dokázala obsloužit v&nbsp;daný okamžik pouze
+jediného klienta. Je tomu tak z&nbsp;toho důvodu, že metoda
+<strong>l.Accept()</strong> skončila ve chvíli, kdy se k&nbsp;serveru připojí
+jediný klient a následně se musí ukončit celé tělo smyčky (v&nbsp;níž je
+realizováno poslání odpovědi klientovi), aby se <strong>l.Accept()</strong>
+zavolala znovu:</p>
+
+<pre>
+for {
+        connection, err := l.Accept()
+&nbsp;
+        if err != nil {
+                log.Println("Connection refused!")
+        } else {
+                log.Println("Connection accepted")
+                <strong>processRequest(connection, &amp;cnt)</strong>
+        }
+}
+</pre>
+
+<p>Nic nám ovšem nebrání, aby se vlastní obsluha klienta provedla
+v&nbsp;gorutině běžící paralelně s&nbsp;hlavní gorutinou. Na obslužnou gorutinu
+nikde nečekáme, takže se další volání <strong>l.Accept()</strong> provede velmi
+rychle:</p>
+
+<pre>
+for {
+        connection, err := l.Accept()
+&nbsp;
+        if err != nil {
+                log.Println("Connection refused!")
+        } else {
+                log.Println("Connection accepted")
+                <strong><u>go</u> processRequest(connection, &amp;cnt)</strong>
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak uvidíme v&nbsp;dalším textu, nebude
+chování serveru zcela korektní, protože zvyšování hodnoty proměnné
+<strong>cnt</strong> není atomické.</div></p>
+
+<p>Podívejme se nyní na takto upravený a úplný zdrojový kód demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+        "time"
+)
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        log.Println("Handling connection")
+        time.Sleep(5 * time.Second)
+&nbsp;
+        defer func() {
+                log.Println("Closing connection")
+                err := connection.Close()
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := connection.Write(buffer)
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := net.Listen("tcp", "localhost:1234")
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+        defer func() {
+                err := l.Close()
+                if err != nil {
+                        log.Println("Listener close failed", err)
+                }
+        }()
+&nbsp;
+        for {
+                connection, err := l.Accept()
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        go processRequest(connection, &amp;cnt)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Otestování chování nové implementace serveru</h2>
+
+<p>Opět si vyzkoušejme, jak bude server komunikovat s&nbsp;větším množstvím
+klientů. Nejdříve spustíme v&nbsp;prvním terminálu server:</p>
+
+<pre>
+$ <strong>go run multi_connection_tcp_server.go</strong>
+</pre>
+
+<p>A poté čtveřici klientů ve druhém terminálu:</p>
+
+<pre>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+$ <strong>go run simple_tcp_client.go &amp;</strong>
+</pre>
+
+<p>Klienti začnou komunikovat se serverem prakticky okamžitě:</p>
+
+<pre>
+
+</pre>
+2023/05/02 15:37:27 Connection established, waiting for data
+2023/05/02 15:37:28 Connection established, waiting for data
+2023/05/02 15:37:28 Connection established, waiting for data
+2023/05/02 15:37:28 Connection established, waiting for data
+</pre>
+
+<p>Odpovědi ovšem všichni klienti dostanou až za pět sekund (což je prodleva
+zakomponovaná do serveru). Všechny odpovědi však jsou připravovány souběžně,
+každá ve své gorutině:</p>
+
+<pre>
+2023/05/02 <u>15:37:32</u> Received 1 byte: [0]
+2023/05/02 15:37:32 Closing connection
+2023/05/02 <u>15:37:33</u> Received 1 byte: [1]
+2023/05/02 15:37:33 Closing connection
+2023/05/02 <u>15:37:33</u> Received 1 byte: [2]
+2023/05/02 15:37:33 Closing connection
+2023/05/02 <u>15:37:33</u> Received 1 byte: [3]
+2023/05/02 15:37:33 Closing connection
+</pre>
+
+<p>Souběžné zpracování požadavků je ostatně patrné i z&nbsp;logů serveru:</p>
+
+<pre>
+2023/05/02 15:37:27 Connection accepted
+2023/05/02 15:37:27 Handling connection
+2023/05/02 15:37:28 Connection accepted
+2023/05/02 15:37:28 Handling connection
+2023/05/02 15:37:28 Connection accepted
+2023/05/02 15:37:28 Handling connection
+2023/05/02 15:37:28 Connection accepted
+2023/05/02 15:37:28 Handling connection
+2023/05/02 <u>15:37:32</u> Written 1 byte(s)
+2023/05/02 15:37:32 Closing connection
+2023/05/02 <u>15:37:33</u> Written 1 byte(s)
+2023/05/02 15:37:33 Closing connection
+2023/05/02 <u>15:37:33</u> Written 1 byte(s)
+2023/05/02 15:37:33 Closing connection
+2023/05/02 <u>15:37:33</u> Written 1 byte(s)
+2023/05/02 15:37:33 Closing connection
+</pre>
+
+<p>Nástroj <strong>netstat</strong> nám vypíše všechny čtyři v&nbsp;daný
+okamžik připojené klienty:</p>
+
+<pre>
+$ <strong>netstat -tunp | grep :1234</strong>
+&nbsp;
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+tcp        0      0 127.0.0.1:1234          127.0.0.1:46558         ESTABLISHED 1422106/multi_conne 
+tcp        0      0 127.0.0.1:54550         127.0.0.1:1234          ESTABLISHED 1422685/simple_tcp_ 
+tcp        0      0 127.0.0.1:46558         127.0.0.1:1234          ESTABLISHED 1422959/simple_tcp_ 
+tcp        0      0 127.0.0.1:1234          127.0.0.1:54550         ESTABLISHED 1422106/multi_conne 
+tcp        0      0 127.0.0.1:1234          127.0.0.1:54564         ESTABLISHED 1422106/multi_conne 
+tcp        0      0 127.0.0.1:1234          127.0.0.1:46566         ESTABLISHED 1422106/multi_conne 
+tcp        0      0 127.0.0.1:46566         127.0.0.1:1234          ESTABLISHED 1423115/simple_tcp_ 
+tcp        0      0 127.0.0.1:54564         127.0.0.1:1234          ESTABLISHED 1422821/simple_tcp_ 
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Klient komunikující přes Unixové sokety naprogramovaný v&nbsp;Go</h2>
+
+<p>Nyní si ukažme, jak by mohl vypadat klient, který se serverem komunikuje
+nikoli přes TCP či UDP (tedy přes reálné nebo lokální síťové rozhraní), ale
+přes standardní Unixové sokety. Samotný kód klienta se nebude příliš odlišovat
+od TCP klienta, v&nbsp;němž bylo spojení &bdquo;vytočeno&ldquo; funkcí:</p>
+
+<pre>
+conn, err := <u>net.Dial("tcp", "localhost:1234")</u>
+</pre>
+
+<p>nyní použijeme tutéž funkci, ale s&nbsp;odlišnými parametry:</p>
+
+<pre>
+connection, err := net.Dial("unix", SocketFileName)
+</pre>
+
+<p>kde <strong>SocktFileName</strong> je jméno speciálního souboru
+představujícího soket:</p>
+
+<pre>
+const SocketFileName = "/tmp/xyzzy"
+</pre>
+
+<p>Úplný kód klienta by mohl vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+)
+&nbsp;
+const BufferSize = 1024
+const SocketFileName = "/tmp/xyzzy"
+&nbsp;
+func <strong>main</strong>() {
+        connection, err := <u>net.Dial("unix", SocketFileName)</u>
+        if err != nil {
+                log.Fatal("Connection refused!")
+                return
+        }
+        log.Print("Connection established, waiting for data")
+&nbsp;
+        defer func() {
+                log.Println("Closing connection")
+                err := <u>connection.Close()</u>
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        buffer := make([]byte, BufferSize)
+        n, err := <u>connection.Read(buffer)</u>
+        if err != nil {
+                log.Println("No response!", err)
+        } else {
+                if n == 1 {
+                        log.Printf("Received %d byte: %v\n", n, buffer[:n])
+                } else {
+                        log.Printf("Received %d bytes: %v\n", n, buffer[:n])
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Server komunikující přes Unixové sokety naprogramovaný v&nbsp;Go</h2>
+
+<p>Ani zdrojový kód serveru určeného pro komunikaci přes Unixové sokety se
+nebude příliš odlišovat od serveru, jenž komunikoval přes TCP či UDP. Ostatně
+podívejme se na následující zdrojový kód, z&nbsp;něhož je patrné, že se liší
+pouze parametry předávané do funkce <strong>net.Listen</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+)
+&nbsp;
+const SocketFileName = "/tmp/xyzzy"
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        defer func() {
+                log.Println("Closing connection")
+                err := <u>connection.Close()</u>
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := <u>connection.Write(buffer)</u>
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := <u>net.Listen("unix", SocketFileName)</u>
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+        defer func() {
+                err := <u>l.Close()</u>
+                if err != nil {
+                        log.Println("Listener close failed", err)
+                }
+        }()
+&nbsp;
+        for {
+                connection, err := <u>l.Accept()</u>
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        processRequest(connection, &amp;cnt)
+                }
+        }
+}
+</pre>
+
+<p>Praktičtější je však server, jenž může v&nbsp;daný okamžik komunikovat
+s&nbsp;větším množstvím klientů. Opět zde s&nbsp;výhodou využijeme
+gorutiny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "net"
+        "time"
+)
+&nbsp;
+const SocketFileName = "/tmp/xyzzy"
+&nbsp;
+func <strong>processRequest</strong>(connection net.Conn, cnt *byte) {
+        log.Println("Handling connection")
+        time.Sleep(10 * time.Second)
+&nbsp;
+        defer func() {
+                log.Println("Closing connection")
+                err := <u>connection.Close()</u>
+                if err != nil {
+                        log.Println("Closing connection failed", err)
+                }
+        }()
+&nbsp;
+        var buffer = []byte{*cnt}
+        *cnt++
+        n, err := <u>connection.Write(buffer)</u>
+        if err != nil {
+                log.Println("Writing error", err)
+        } else {
+                log.Printf("Written %d byte(s)", n)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        cnt := byte(0)
+&nbsp;
+        l, err := <u>net.Listen("unix", SocketFileName)</u>
+        if err != nil {
+                log.Fatal("Can't open the port!")
+        }
+        defer func() {
+                err := <u>l.Close()</u>
+                if err != nil {
+                        log.Println("Listener close failed", err)
+                }
+        }()
+&nbsp;
+        for {
+                connection, err := <u>l.Accept()</u>
+&nbsp;
+                if err != nil {
+                        log.Println("Connection refused!")
+                } else {
+                        log.Println("Connection accepted")
+                        <u>go processRequest(connection, &amp;cnt)</u>
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Otestování komunikace mezi klientem a serverem</h2>
+
+<p>Opět si otestujme, jak bude se serverem současně komunikovat větší množství
+klientů. Nejprve spustíme server, který by měl nabídnout komunikaci přes
+Unixové sokety:</p>
+
+<pre>
+$ <strong>go run multi_connection_unix_socket_server.go</strong>
+</pre>
+
+<p>Dále ve druhém terminálu spustíme (prakticky v&nbsp;totožný okamžik) větší
+množství klientů:</p>
+
+<pre>
+$ <strong>go run simple_unix_socket_client.go &amp;</strong>
+$ <strong>go run simple_unix_socket_client.go &amp;</strong>
+$ <strong>go run simple_unix_socket_client.go &amp;</strong>
+$ <strong>go run simple_unix_socket_client.go &amp;</strong>
+$ <strong>go run simple_unix_socket_client.go &amp;</strong>
+</pre>
+
+<p>Celá pětice klientů by měla ihned vypsat, že bylo navázáno spojení se
+serverem:</p>
+
+<pre>
+2023/05/02 16:09:21 Connection established, waiting for data
+2023/05/02 16:09:21 Connection established, waiting for data
+2023/05/02 16:09:22 Connection established, waiting for data
+2023/05/02 16:09:22 Connection established, waiting for data
+2023/05/02 16:09:22 Connection established, waiting for data
+</pre>
+
+<p>I server by měl na terminál vypsat, že se vytvořila pětice připojení:</p>
+
+<pre>
+2023/05/02 16:09:21 Connection accepted
+2023/05/02 16:09:21 Handling connection
+2023/05/02 16:09:21 Connection accepted
+2023/05/02 16:09:21 Handling connection
+2023/05/02 16:09:22 Connection accepted
+2023/05/02 16:09:22 Handling connection
+2023/05/02 16:09:22 Connection accepted
+2023/05/02 16:09:22 Handling connection
+2023/05/02 16:09:22 Connection accepted
+2023/05/02 16:09:22 Handling connection
+</pre>
+
+<p>Po deseti sekundách server začne odpovídat:</p>
+
+<pre>
+2023/05/02 16:09:31 Written 1 byte(s)
+2023/05/02 16:09:31 Closing connection
+2023/05/02 16:09:31 Written 1 byte(s)
+2023/05/02 16:09:31 Closing connection
+2023/05/02 16:09:32 Written 1 byte(s)
+2023/05/02 16:09:32 Closing connection
+2023/05/02 16:09:32 Written 1 byte(s)
+2023/05/02 16:09:32 Closing connection
+2023/05/02 16:09:32 Written 1 byte(s)
+2023/05/02 16:09:32 Closing connection
+</pre>
+
+<p>A právě po oněch po cca deseti sekundách by skutečně měla být (a to
+pochopitelně každým klientem zvlášť) přijata odpověď:</p>
+
+<pre>
+2023/05/02 16:09:31 Received 1 byte: [0]
+2023/05/02 16:09:31 Closing connection
+2023/05/02 16:09:31 Received 1 byte: [1]
+2023/05/02 16:09:31 Closing connection
+2023/05/02 16:09:32 Received 1 byte: [2]
+2023/05/02 16:09:32 Closing connection
+2023/05/02 16:09:32 Received 1 byte: [3]
+2023/05/02 16:09:32 Closing connection
+2023/05/02 16:09:32 Received 1 byte: [4]
+2023/05/02 16:09:32 Closing connection
+</pre>
+
+<p>V&nbsp;průběhu komunikace (ještě předtím, než jsou jednotlivá spojení
+uzavřena) by měl nástroj <strong>lsof</strong> vypsat informace o celé pětici
+navázaných spojení:</p>
+
+<pre>
+$ <strong>lsof /tmp/xyzzy</strong>
+&nbsp;
+COMMAND       PID     USER   FD   TYPE             DEVICE SIZE/OFF       NODE NAME
+multi_con 1452207 ptisnovs    3u  unix 0x0000000000000000      0t0 2944390322 /tmp/xyzzy type=STREAM
+multi_con 1452207 ptisnovs    4u  unix 0x0000000000000000      0t0 2944390332 /tmp/xyzzy type=STREAM
+multi_con 1452207 ptisnovs   11u  unix 0x0000000000000000      0t0 2944381541 /tmp/xyzzy type=STREAM
+multi_con 1452207 ptisnovs   12u  unix 0x0000000000000000      0t0 2944381558 /tmp/xyzzy type=STREAM
+multi_con 1452207 ptisnovs   13u  unix 0x0000000000000000      0t0 2944393280 /tmp/xyzzy type=STREAM
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Obsah druhé části článku</h2>
+
+<p>V&nbsp;navazujícím článku si ukážeme, jak lze využít komunikaci přes Unixové
+sokety prakticky. Konkrétně bude představen způsob konfigurace oblíbeného
+nástroje <i>HAProxy</i> právě přes Unixové sokety. Povšimněte si, o jak vhodnou
+volbu se v&nbsp;tomto případě ze strany autorů <i>HAProxy</i> jedná &ndash; u
+Unixových soketů je zaručeno, že komunikace bude navázána pouze lokálně; není
+tudíž nutné konfigurovat firewall. Navíc při přístupu k&nbsp;souboru
+představujícího soket můžeme využít klasická přístupová práva Unixu (Linuxu);
+opět bez nutnosti použití nějakého dalšího nástroje.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů naprogramovaných
+v&nbsp;jazyku Go byly uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>#</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>simple_tcp_client</td><td>jednoduchý klient komunikující se serverem s&nbsp;využitím protokolu TCP</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/simple_tcp_client/">https://github.com/tisnik/go-root/blob/master/article_A7/simple_tcp_client/</a></td></tr>
+<tr><td>2</td><td>simple_tcp_server</td><td>jednoduchý server naslouchající na TCP portu a komunikující přes protokol TCP</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/simple_tcp_server/">https://github.com/tisnik/go-root/blob/master/article_A7/simple_tcp_server/</a></td></tr>
+<tr><td>3</td><td>slow_tcp_server</td><td>TCP server naprogramovaný v&nbsp;Go, který odpovídá se zpožděním</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/slow_tcp_server/">https://github.com/tisnik/go-root/blob/master/article_A7/slow_tcp_server/</a></td></tr>
+<tr><td>4</td><td>multi_connection_tcp_server</td><td>TCP server pro větší množství klientů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/multi_connection_tcp_server/">https://github.com/tisnik/go-root/blob/master/article_A7/multi_connection_tcp_server/</a></td></tr>
+<tr><td>5</td><td>simple_unix_socket_client</td><td>klient používající Unixové sokety</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/simple_unix_socket_client/">https://github.com/tisnik/go-root/blob/master/article_A7/simple_unix_socket_client/</a></td></tr>
+<tr><td>6</td><td>simple_unix_socket_server</td><td>server používající Unixové sokety</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/simple_unix_socket_server/">https://github.com/tisnik/go-root/blob/master/article_A7/simple_unix_socket_server/</a></td></tr>
+<tr><td>7</td><td>haproxy_controller</td><td>ukázka ovládání HAProxy přes sokety</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A7/haproxy_controller/">https://github.com/tisnik/go-root/blob/master/article_A7/haproxy_controller/</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>What Are Unix Sockets and How Do They Work?<br />
+<a href="https://www.howtogeek.com/devops/what-are-unix-sockets-and-how-do-they-work/">https://www.howtogeek.com/devops/what-are-unix-sockets-and-how-do-they-work/</a>
+</li>
+
+<li>Unix domain socket<br />
+<a href="https://en.wikipedia.org/wiki/Unix_domain_socket">https://en.wikipedia.org/wiki/Unix_domain_socket</a>
+</li>
+
+<li>Interprocess Communication With Unix Sockets<br />
+<a href="https://www.baeldung.com/linux/communicate-with-unix-sockets">https://www.baeldung.com/linux/communicate-with-unix-sockets</a>
+</li>
+
+<li>Creating A Simple Web Server With Golang<br />
+<a href="https://tutorialedge.net/golang/creating-simple-web-server-with-golang/">https://tutorialedge.net/golang/creating-simple-web-server-with-golang/</a>
+</li>
+
+<li>Building a Web Server in Go<br />
+<a href="https://thenewstack.io/building-a-web-server-in-go/">https://thenewstack.io/building-a-web-server-in-go/</a>
+</li>
+
+<li>How big is the pipe buffer?<br />
+<a href="https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer">https://unix.stackexchange.com/questions/11946/how-big-is-the-pipe-buffer</a>
+</li>
+
+<li>How to turn off buffering of stdout in C<br />
+<a href="https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c">https://stackoverflow.com/questions/7876660/how-to-turn-off-buffering-of-stdout-in-c</a>
+</li>
+
+<li>OSI model<br />
+<a href="https://en.wikipedia.org/wiki/OSI_model">https://en.wikipedia.org/wiki/OSI_model</a>
+</li>
+
+<li>Datagram<br />
+<a href="https://cs.wikipedia.org/wiki/Datagram">https://cs.wikipedia.org/wiki/Datagram</a>
+</li>
+
+<li>Softwarová rozhraní systémů UNIX pro přístup k síťovým službám<br />
+<a href="https://www.cs.vsb.cz/grygarek/PS/sockets.html">https://www.cs.vsb.cz/grygarek/PS/sockets.html</a>
+</li>
+
+<li>HAProxy: Management Guide version 2.4.22-1<br />
+<a href="https://docs.haproxy.org/2.4/management.html#9.3">https://docs.haproxy.org/2.4/management.html#9.3</a>
+</li>
+
+<li>Síťový socket<br />
+<a href="https://cs.wikipedia.org/wiki/S%C3%AD%C5%A5ov%C3%BD_socket">https://cs.wikipedia.org/wiki/S%C3%AD%C5%A5ov%C3%BD_socket</a>
+</li>
+
+<li>Unix domain socket<br />
+<a href="https://cs.wikipedia.org/wiki/Unix_domain_socket">https://cs.wikipedia.org/wiki/Unix_domain_socket</a>
+</li>
+
+<li>unix domain sockets vs. internet sockets<br />
+<a href="https://lists.freebsd.org/pipermail/freebsd-performance/2005-February/001143.html">https://lists.freebsd.org/pipermail/freebsd-performance/2005-February/001143.html</a>
+</li>
+
+<li>What's the difference between streams and datagrams in network programming?<br />
+<a href="https://stackoverflow.com/questions/4688855/whats-the-difference-between-streams-and-datagrams-in-network-programming">https://stackoverflow.com/questions/4688855/whats-the-difference-between-streams-and-datagrams-in-network-programming</a>
+</li>
+
+<li>Introducing TCP/IP concepts: Selecting sockets<br />
+<a href="https://www.ibm.com/docs/en/zos/2.3.0?topic=concepts-introducing-tcpip-selecting-sockets">https://www.ibm.com/docs/en/zos/2.3.0?topic=concepts-introducing-tcpip-selecting-sockets</a>
+</li>
+
+<li>Windows Sockets: Sokety datového proudu<br />
+<a href="https://learn.microsoft.com/cs-cz/cpp/mfc/windows-sockets-stream-sockets?view=msvc-170">https://learn.microsoft.com/cs-cz/cpp/mfc/windows-sockets-stream-sockets?view=msvc-170</a>
+</li>
+
+<li>Windows Sockets: Sokety datagramů<br />
+<a href="https://learn.microsoft.com/cs-cz/cpp/mfc/windows-sockets-datagram-sockets?view=msvc-170">https://learn.microsoft.com/cs-cz/cpp/mfc/windows-sockets-datagram-sockets?view=msvc-170</a>
+</li>
+
+<li>Berkeley sockets<br />
+<a href="https://cs.wikipedia.org/wiki/Berkeley_sockets">https://cs.wikipedia.org/wiki/Berkeley_sockets</a>
+</li>
+
+<li>Sokety a C/C++: datagramy a PF_UNIX<br />
+<a href="https://www.root.cz/clanky/sokety-a-c-datagramy-a-pf-unix/">https://www.root.cz/clanky/sokety-a-c-datagramy-a-pf-unix/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
+
