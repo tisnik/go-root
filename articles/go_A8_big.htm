@@ -1,0 +1,1636 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Číselné hodnoty s neomezeným rozsahem a přesností v programovacím jazyku Go (1)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Číselné hodnoty s neomezeným rozsahem a přesností v programovacím jazyku Go (1)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V některých oblastech se vývojáři setkávají s takovými číselnými hodnotami, které nelze reprezentovat základními datovými typy (int, float, atd.). Z tohoto důvodu se v mnoha jazycích setkáme s podporou hodnot s neomezeným rozsahem či volitelnou přesností. Výjimkou není ani programovací jazyk Go.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Datový typ <strong>big.Int</strong> &ndash; celá čísla s&nbsp;neomezeným rozsahem</a></p>
+<p><a href="#k03">3. Aritmetické operace prováděné s&nbsp;hodnotami typu <strong>big.Int</strong></a></p>
+<p><a href="#k04">4. Výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></a></p>
+<p><a href="#k05">5. Zjednodušený faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></a></p>
+<p><a href="#k06">6. Převod hodnoty typu <strong>big.Int</strong> na text s&nbsp;volitelnou bází</a></p>
+<p><a href="#k07">7. Konstrukce hodnoty typu <strong>big.Int</strong> z&nbsp;řetězce</a></p>
+<p><a href="#k08">8. Interní struktura hodnot typu <strong>big.Int</strong></a></p>
+<p><a href="#k09">9. Přímý přístup k&nbsp;internímu datovému bloku hodnoty typu <strong>big.Int</strong></a></p>
+<p><a href="#k10">10. Konstrukce hodnoty <strong>big.Int</strong> na základě specifikace obsahu bajtů interní datové struktury</a></p>
+<p><a href="#k11">11. Datový typ <strong>big.Rat</strong> &ndash; zlomky s&nbsp;libovolným rozsahem a přesností</a></p>
+<p><a href="#k12">12. Konstrukce zlomků s&nbsp;jejich automatickým zjednodušením</a></p>
+<p><a href="#k13">13. Zlomky s&nbsp;nulovou hodnotou jmenovatele</a></p>
+<p><a href="#k14">14. Výsledek operace, která vede ke zlomku s&nbsp;nulovým jmenovatelem</a></p>
+<p><a href="#k15">15. Operace se zlomky</a></p>
+<p><a href="#k16">16. Výpočet hodnoty &pi;</a></p>
+<p><a href="#k17">17. Převod zlomků na hodnoty jiných typů</a></p>
+<p><a href="#k18">18. Obsah navazujícího článku</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go</h2>
+
+<p>Jak již bylo napsáno v&nbsp;perexu tohoto článku, existují oblasti
+(příkladem je šifrování), v&nbsp;nichž se využívají takové numerické hodnoty,
+které není vhodné či dokonce vůbec možné reprezentovat s&nbsp;využitím
+základních (primitivních) datových typů, mezi něž typicky patří celočíselný typ
+či typy (různé varianty <strong>int</strong>) a typy numerických hodnot
+s&nbsp;plovoucí řádovou čárkou (různé varianty <strong>float</strong>).
+Z&nbsp;tohoto důvodu se v&nbsp;některých vyšších programovacích jazycích
+setkáme s&nbsp;podporou takových datových typů, které umožňují reprezentovat
+celočíselné hodnoty s&nbsp;libovolným rozsahem (to je případ Pythonu a jeho
+typu <strong>int</strong>) popř.&nbsp;hodnoty s&nbsp;desetinnou tečkou, které
+budou mít jak neomezený rozsah, tak i neomezenou (či volitelnou) přesnost
+(podporováno v&nbsp;Clojure i mnoha implementacích Scheme a LISPu). To ovšem
+není vše, protože se mnohdy setkáme i s&nbsp;datovým typem <i>zlomek</i>, kde
+jak čitatel, tak i jmenovatel mají neomezený rozsah (opět podporováno
+v&nbsp;Clojure, Scheme, LISPu a dalších vysokoúrovňových programovacích
+jazycích).</p>
+
+<p><div class="rs-tip-major">Poznámka: pojmem &bdquo;neomezená&ldquo; je
+myšleno spíše &bdquo;prakticky neomezená&ldquo;, protože je zřejmé, že pro
+uložení hodnoty se skutečně neomezeným rozsahem by bylo nutné použít paměť o
+neomezené kapacitě. K&nbsp;tomuto závěru postačuje aplikovat <a
+href="https://cs.wikipedia.org/wiki/Dirichlet%C5%AFv_princip">Dirichletův
+princip</a> &ndash; paměť o omezeném počtu bitů <i>n</i> (ať je <i>n</i>
+jakkoli velké, ale konečné) může být použita pouze pro uložení
+<i>2<sup>n</sup></i> různých hodnot, a to nezávisle na způsobu jejich
+reprezentace.</div></p>
+
+<p>V&nbsp;dnešním článku se zaměříme na &bdquo;neomezené&ldquo; numerické
+hodnoty a operaci pro práci s&nbsp;nimi, které jsou součástí ekosystému jazyka
+Go. Ovšem již na tomto místě je pravděpodobně dobré upozornit na to, že podpora
+dále popsaných numerických typů je v&nbsp;jazyku Go striktně omezena na
+definici několika struktur a taktéž funkcí a metod určených pro práci
+s&nbsp;těmito strukturami. Jinými slovy to znamená &ndash; v&nbsp;žádném
+případě se nejedná o integrální součást jazyka a tudíž například není možné
+sčítat dva zlomky s&nbsp;využitím standardního operátoru + nebo je porovnávat
+operátorem &lt;. V&nbsp;tomto ohledu jsme narazili na omezení sémantiky
+programovacího jazyka Go (tento jazyk neumožňuje přetěžovat operátory, nelze
+definovat nové typy literálů/konstant a neexistuje zde podpora maker &ndash;
+tedy alespoň prozatím).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Datový typ <strong>big.Int</strong> &ndash; celá čísla s&nbsp;neomezeným rozsahem</h2>
+
+<p>Připomeňme si, že v&nbsp;programovacím jazyku Go mají vývojáři
+k&nbsp;dispozici několik základních datových typů určených pro práci
+s&nbsp;celými čísly, ať již se znaménkem, nebo bez znaménka. Jedná se o tyto
+typy, přičemž <strong>int</strong> a <strong>uint</strong> jsou systémově
+závislé aliasy:</p>
+
+<table>
+<tr><th>Identifikátor</th><th>Typ</th><th>Stručný popis</th></tr>
+<tr><td>int</td><td>datový typ</td><td>odpovídá buď typu int32 nebo int64</td></tr> 
+<tr><td>int8</td><td>datový typ</td><td>osmibitové celé číslo se znaménkem</td></tr> 
+<tr><td>int16</td><td>datový typ</td><td>šestnáctibitové celé číslo se znaménkem</td></tr> 
+<tr><td>int32</td><td>datový typ</td><td>32bitové celé číslo se znaménkem</td></tr> 
+<tr><td>int64</td><td>datový typ</td><td>64bitové celé číslo se znaménkem</td></tr> 
+<tr><td>uint</td><td>datový typ</td><td>odpovídá buď typu uint32 nebo uint64</td></tr> 
+<tr><td>uint8</td><td>datový typ</td><td>osmibitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint16</td><td>datový typ</td><td>16bitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint32</td><td>datový typ</td><td>32bitové celé číslo bez znaménka</td></tr> 
+<tr><td>uint64</td><td>datový typ</td><td>64bitové celé číslo bez znaménka</td></tr> 
+</table>
+
+<p>Práce s&nbsp;hodnotami těchto typů je většinou velmi rychlá, a to
+z&nbsp;toho důvodu, že současné mikroprocesory operaci s&nbsp;celými čísly
+typicky provedou přímo v&nbsp;aritmeticko-logické jednotce v&nbsp;několika
+strojových cyklech (které se navíc překrývají s&nbsp;dalšími instrukcemi díky
+instrukční pipeline). Ovšem mohou nastat situace, kdy nám ani rozsah typu
+<strong>int64</strong> nebo <strong>uint64</strong> nebude dostačovat (a typ
+<strong>long long</strong> není k&nbsp;dispozici).  V&nbsp;tomto případě je
+možné využít možnosti poskytované standardním balíčkem
+<strong>math/big</strong>, v&nbsp;němž se mj.&nbsp;nachází i specifikace nového
+typu <strong>Int</strong>. Podívejme se nyní na způsob konstrukce hodnoty
+<strong>big.Int</strong> z&nbsp;celých čísel a z&nbsp;převodu hodnoty
+<strong>big.Int</strong> na textovou reprezentaci. Hodnota 10 ve volání metody
+<strong>big.Int.Text</strong> určuje bázi, tj.&nbsp;o jakou číselnou soustavu
+se jedná (k&nbsp;této problematice se ještě později vrátíme):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        var y big.Int
+        x.SetInt64(1)
+        y.SetInt64(2)
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(y.Text(10))
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu by se na standardním
+výstupu měly objevit tyto dva řádky:</p>
+
+<pre>
+1
+2
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Aritmetické operace prováděné s&nbsp;hodnotami typu <strong>big.Int</strong></h2>
+
+<p>Pro datový typ <strong>big.Int</strong> jsou realizovány metody, které
+nahrazují základní aritmetické a bitové operace, a dokonce i vybrané algoritmy
+(výpočet GCD apod.). Pokud se zaměříme pouze na aritmetické operace, jedná se o
+tyto metody:</p>
+
+<table>
+<tr><th>Metoda</th><th>Nahrazuje operátor</th></tr>
+<tr><td>func (z *Int) Add(x, y *Int) *Int</td><td>součet hodnot <strong>x</strong> a <strong>y</strong></td></tr>
+<tr><td>func (z *Int) Sub(x, y *Int) *Int</td><td>rozdíl hodnot <strong>x</strong> a <strong>y</strong></td></tr>
+<tr><td>func (z *Int) Mul(x, y *Int) *Int</td><td>součin hodnot <strong>x</strong> a <strong>y</strong></td></tr>
+<tr><td>func (z *Int) Div(x, y *Int) *Int</td><td>podíl hodnot <strong>x</strong> a <strong>y</strong></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>func (z *Int) MulRange(a, b int64) *Int</td><td>součin všech hodnot od <strong>a</strong> do <strong>b</strong> (včetně)</td></tr>
+<tr><td>func (z *Int) DivMod(x, y, m *Int) (*Int, *Int)</td><td>realizace euklidovského dělení a výpočtu zbytku po dělení</td></tr>
+<tr><td>func (z *Int) Mod(x, y *Int) *Int</td><td>realizace operace modulo (pro modulární aritmetiku)</td></tr>
+<tr><td>func (z *Int) ModSqrt(x, p *Int) *Int</td><td>druhá odmocnina modulo <strong>p</strong></td></tr>
+<tr><td>func (z *Int) Rem(x, y *Int) *Int</td><td>výpočet zbytku po dělení</td></tr>
+<tr><td>func (z *Int) Quo(x, y *Int) *Int</td><td>dělení se zaokrouhlením k&nbsp;nule</td></tr>
+<tr><td>func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int)</td><td>výpočet q = x/y a r = x - y*q</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>func (z *Int) Abs(x *Int) *Int</td><td>výpočet absolutní hodnoty <strong>x</strong></td></tr>
+<tr><td>func (z *Int) Sqrt(x *Int) *Int</td><td>výpočet druhé odmocniny; pád (<i>panic</i>) pro záporný vstup</td></tr>
+</table>
+
+<p>Vyzkoušejme si nyní tu nejjednodušší operaci, tedy součet dvou hodnot typu
+<strong>big.Int</strong>. Povšimněte si, že je tato operace realizována
+metodou, která akceptuje dva ukazatele na <strong>big.Int</strong>, což jsou
+oba sčítance a výsledek operace je jak vrácen (pro zřetězení), tak i dosazen do
+příjemce:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        var y big.Int
+        x.SetInt64(1)
+        y.SetInt64(2)
+&nbsp;
+        var z big.Int
+        <strong>z.Add(&amp;x, &amp;y)</strong>
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(y.Text(10))
+        fmt.Println(z.Text(10))
+}
+</pre>
+
+<p>Zkusme si tento demonstrační příklad přeložit a spustit:</p>
+
+<pre>
+1
+2
+3
+</pre>
+
+<p>V&nbsp;dalším demonstračním příkladu použijeme operaci součinu; budeme
+konkrétně počítat mocniny dvojky, a to bez omezeného rozsahu výsledků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        x.SetInt64(2)
+&nbsp;
+        var z big.Int
+        z.SetInt64(1)
+&nbsp;
+        for i := 0; i &lt; 100; i++ {
+                <strong>z.Mul(&amp;z, &amp;x)</strong>
+                fmt.Println(z.Text(10))
+        }
+}
+</pre>
+
+<p>Opět se podívejme na výsledek (celý výpis je zkrácený):</p>
+
+<pre>
+2
+4
+8
+16
+32
+64
+128
+256
+512
+1024
+2048
+4096
+8192
+16384
+32768
+65536
+131072
+262144
+...
+...
+...
+1152921504606846976
+2305843009213693952
+4611686018427387904
+9223372036854775808
+18446744073709551616
+36893488147419103232
+73786976294838206464
+147573952589676412928
+295147905179352825856
+590295810358705651712
+1180591620717411303424
+2361183241434822606848
+4722366482869645213696
+9444732965739290427392
+18889465931478580854784
+37778931862957161709568
+75557863725914323419136
+151115727451828646838272
+302231454903657293676544
+604462909807314587353088
+1208925819614629174706176
+2417851639229258349412352
+4835703278458516698824704
+9671406556917033397649408
+19342813113834066795298816
+38685626227668133590597632
+77371252455336267181195264
+154742504910672534362390528
+309485009821345068724781056
+618970019642690137449562112
+1237940039285380274899124224
+2475880078570760549798248448
+4951760157141521099596496896
+9903520314283042199192993792
+19807040628566084398385987584
+39614081257132168796771975168
+79228162514264337593543950336
+158456325028528675187087900672
+316912650057057350374175801344
+633825300114114700748351602688
+1267650600228229401496703205376
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></h2>
+
+<p>S&nbsp;celými čísly o prakticky neomezeném rozsahu můžeme provádět všechny
+základní aritmetické operace; pouze nesmíme zapomenout na to, že se nezapisují
+s&nbsp;využitím operátorů +, -, *, / a %, ale příslušnými metodami popsanými na
+stránce <a
+href="https://golang.org/pkg/math/big/#Int">https://golang.org/pkg/math/big/#Int</a>.
+Taktéž porovnání dvou hodnot se neprovádí standardní šesticí relačních
+operátorů, ale metodou <strong>Int.Cmp</strong>. Pro zajímavost si ukažme,
+jakým způsobem je možné implementovat funkci pro výpočet faktoriálu pro
+libovolné kladné <i>n</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>factorial</strong>(n *big.Int) *big.Int {
+        one := big.NewInt(1)
+        if n.Cmp(big.NewInt(0)) &lt;= 0 {
+                return one
+        }
+        return one.Mul(n, factorial(one.Sub(n, one)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for n := int64(1); n &lt; 80; n++ {
+                f := factorial(big.NewInt(n))
+                fmt.Printf("%3d! = %s\n", n, f.Text(10))
+        }
+}
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, že skutečně nejsme omezení klasickými datovými
+typy <strong>uint64</strong> atd.:</p>
+
+<pre>
+  1! = 1
+  2! = 2
+  3! = 6
+  4! = 24
+  5! = 120
+  6! = 720
+  7! = 5040
+  8! = 40320
+  9! = 362880
+ 10! = 3628800
+ 11! = 39916800
+ 12! = 479001600
+ 13! = 6227020800
+ 14! = 87178291200
+ 15! = 1307674368000
+ 16! = 20922789888000
+ 17! = 355687428096000
+ 18! = 6402373705728000
+ 19! = 121645100408832000
+ 20! = 2432902008176640000
+ 21! = 51090942171709440000
+ 22! = 1124000727777607680000
+ 23! = 25852016738884976640000
+ 24! = 620448401733239439360000
+ 25! = 15511210043330985984000000
+ 26! = 403291461126605635584000000
+ 27! = 10888869450418352160768000000
+ 28! = 304888344611713860501504000000
+ 29! = 8841761993739701954543616000000
+ 30! = 265252859812191058636308480000000
+ 31! = 8222838654177922817725562880000000
+ 32! = 263130836933693530167218012160000000
+ 33! = 8683317618811886495518194401280000000
+ 34! = 295232799039604140847618609643520000000
+ 35! = 10333147966386144929666651337523200000000
+ 36! = 371993326789901217467999448150835200000000
+ 37! = 13763753091226345046315979581580902400000000
+ 38! = 523022617466601111760007224100074291200000000
+ 39! = 20397882081197443358640281739902897356800000000
+ 40! = 815915283247897734345611269596115894272000000000
+ 41! = 33452526613163807108170062053440751665152000000000
+ 42! = 1405006117752879898543142606244511569936384000000000
+ 43! = 60415263063373835637355132068513997507264512000000000
+ 44! = 2658271574788448768043625811014615890319638528000000000
+ 45! = 119622220865480194561963161495657715064383733760000000000
+ 46! = 5502622159812088949850305428800254892961651752960000000000
+ 47! = 258623241511168180642964355153611979969197632389120000000000
+ 48! = 12413915592536072670862289047373375038521486354677760000000000
+ 49! = 608281864034267560872252163321295376887552831379210240000000000
+ 50! = 30414093201713378043612608166064768844377641568960512000000000000
+ 51! = 1551118753287382280224243016469303211063259720016986112000000000000
+ 52! = 80658175170943878571660636856403766975289505440883277824000000000000
+ 53! = 4274883284060025564298013753389399649690343788366813724672000000000000
+ 54! = 230843697339241380472092742683027581083278564571807941132288000000000000
+ 55! = 12696403353658275925965100847566516959580321051449436762275840000000000000
+ 56! = 710998587804863451854045647463724949736497978881168458687447040000000000000
+ 57! = 40526919504877216755680601905432322134980384796226602145184481280000000000000
+ 58! = 2350561331282878571829474910515074683828862318181142924420699914240000000000000
+ 59! = 138683118545689835737939019720389406345902876772687432540821294940160000000000000
+ 60! = 8320987112741390144276341183223364380754172606361245952449277696409600000000000000
+ 61! = 507580213877224798800856812176625227226004528988036003099405939480985600000000000000
+ 62! = 31469973260387937525653122354950764088012280797258232192163168247821107200000000000000
+ 63! = 1982608315404440064116146708361898137544773690227268628106279599612729753600000000000000
+ 64! = 126886932185884164103433389335161480802865516174545192198801894375214704230400000000000000
+ 65! = 8247650592082470666723170306785496252186258551345437492922123134388955774976000000000000000
+ 66! = 544344939077443064003729240247842752644293064388798874532860126869671081148416000000000000000
+ 67! = 36471110918188685288249859096605464427167635314049524593701628500267962436943872000000000000000
+ 68! = 2480035542436830599600990418569171581047399201355367672371710738018221445712183296000000000000000
+ 69! = 171122452428141311372468338881272839092270544893520369393648040923257279754140647424000000000000000
+ 70! = 11978571669969891796072783721689098736458938142546425857555362864628009582789845319680000000000000000
+ 71! = 850478588567862317521167644239926010288584608120796235886430763388588680378079017697280000000000000000
+ 72! = 61234458376886086861524070385274672740778091784697328983823014963978384987221689274204160000000000000000
+ 73! = 4470115461512684340891257138125051110076800700282905015819080092370422104067183317016903680000000000000000
+ 74! = 330788544151938641225953028221253782145683251820934971170611926835411235700971565459250872320000000000000000
+ 75! = 24809140811395398091946477116594033660926243886570122837795894512655842677572867409443815424000000000000000000
+ 76! = 1885494701666050254987932260861146558230394535379329335672487982961844043495537923117729972224000000000000000000
+ 77! = 145183092028285869634070784086308284983740379224208358846781574688061991349156420080065207861248000000000000000000
+ 78! = 11324281178206297831457521158732046228731749579488251990048962825668835325234200766245086213177344000000000000000000
+ 79! = 894618213078297528685144171539831652069808216779571907213868063227837990693501860533361810841010176000000000000000000
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. <strong>big.Int</strong> na text s&nbsp;volitelnou bází</h2>
+
+<p>Ve skutečnosti ovšem nemusíme explicitně psát celou programovou smyčku pro
+výpočet faktoriálu, protože lze využít metodu <strong>MulRange</strong>, o níž
+jsme se zmínili <a href="#k03">ve třetí kapitole</a>. Následující příklad
+ukazuje rozdíly (hint: nejsou žádné) ve vypočtených výsledcích:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "math/big"
+)
+&nbsp;
+func <strong>factorial</strong>(n *big.Int) *big.Int {
+        one := big.NewInt(1)
+        if n.Cmp(big.NewInt(0)) &lt;= 0 {
+                return one
+        }
+        return one.Mul(n, factorial(one.Sub(n, one)))
+}
+&nbsp;
+func <strong>main</strong>() {
+        for n := int64(1); n &lt; 31; n++ {
+                f1 := factorial(big.NewInt(n))
+&nbsp;
+                var f2 big.Int
+                f2.MulRange(1, n)
+&nbsp;
+                fmt.Printf("%3d! = %s = %s\n", n, f1.Text(10), f2.Text(10))
+&nbsp;
+                if f1.Cmp(&amp;f2) != 0 {
+                        log.Panic("Different results detected!")
+                }
+        }
+}
+</pre>
+
+<p>Vypočtené a zobrazené výsledky ukazují, že oba algoritmy produkují shodné
+hodnoty pro shodné vstupy:</p>
+
+<pre>
+  1! = 1 = 1
+  2! = 2 = 2
+  3! = 6 = 6
+  4! = 24 = 24
+  5! = 120 = 120
+  6! = 720 = 720
+  7! = 5040 = 5040
+  8! = 40320 = 40320
+  9! = 362880 = 362880
+ 10! = 3628800 = 3628800
+ 11! = 39916800 = 39916800
+ 12! = 479001600 = 479001600
+ 13! = 6227020800 = 6227020800
+ 14! = 87178291200 = 87178291200
+ 15! = 1307674368000 = 1307674368000
+ 16! = 20922789888000 = 20922789888000
+ 17! = 355687428096000 = 355687428096000
+ 18! = 6402373705728000 = 6402373705728000
+ 19! = 121645100408832000 = 121645100408832000
+ 20! = 2432902008176640000 = 2432902008176640000
+ 21! = 51090942171709440000 = 51090942171709440000
+ 22! = 1124000727777607680000 = 1124000727777607680000
+ 23! = 25852016738884976640000 = 25852016738884976640000
+ 24! = 620448401733239439360000 = 620448401733239439360000
+ 25! = 15511210043330985984000000 = 15511210043330985984000000
+ 26! = 403291461126605635584000000 = 403291461126605635584000000
+ 27! = 10888869450418352160768000000 = 10888869450418352160768000000
+ 28! = 304888344611713860501504000000 = 304888344611713860501504000000
+ 29! = 8841761993739701954543616000000 = 8841761993739701954543616000000
+ 30! = 265252859812191058636308480000000 = 265252859812191058636308480000000
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Převod hodnoty typu <strong>big.Int</strong> na text s&nbsp;volitelnou bází</h2>
+
+<p>V&nbsp;demonstračních příkladech jsme se již setkali s&nbsp;použitím metody
+<strong>big.Int.Text</strong> určené pro převod numerické hodnoty na řetězec,
+tj.&nbsp;na tisknutelný text. Této metodě se předává <i>báze</i>, což je základ
+číselné soustavy, která se má pro tisk hodnoty použít. Podporovány jsou
+soustavy se základy 2 až 62. Je tedy podporována dvojková, osmičková, desítková
+i šestnáctková soustava (pokud máme jmenovat ty nejpoužívanější báze). Soustavy
+se základem vyšším než 10 používají jak numerické cifry, tak i znaky malé
+abecedy a poté i abecedy velké. Jednotlivé cifry jsou tedy reprezentovány
+těmito znaky:</p>
+
+<pre>
+0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+</pre>
+
+<p>Můžeme si to snadno otestovat &ndash; necháme i vytisknout jednu hodnotu
+100000000000 (desítkově), ovšem postupně s&nbsp;použitím všech podporovaných
+bází:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        x.SetInt64(10000000000)
+&nbsp;
+        for base := 2; base &lt;= 62; base++ {
+                fmt.Println(base, x.Text(base))
+        }
+}
+</pre>
+
+<p>Výsledek by měl vypadat následovně:</p>
+
+<pre>
+2 1001010100000010111110010000000000
+3 221210220202122010101
+4 21110002332100000
+5 130440000000000
+6 4332142412144
+7 502544411644
+8 112402762000
+9 27726678111
+10 10000000000
+11 4271815011
+12 1b30b91054
+13 c349ba483
+14 6ac162c24
+15 3d7dace6a
+16 2540be400
+17 1764g6422
+18 g603fb9a
+19 b3abb909
+20 7g500000
+21 5bcaikk4
+22 40487b0c
+23 2lcfd6fg
+24 247kjf2g
+25 1fo00000
+26 169gphag
+27 plokh3a
+28 kl17a14
+29 gnfiqc6
+30 dlfkb3a
+31 b893q85
+32 9a0np00
+33 7oh8of1
+34 6g35112
+35 5fdv5ap
+36 4ldqpds
+37 3x7qoxa
+38 3c7wbss
+39 2wwm1Bg
+40 2hqa000
+41 24czqE1
+42 1ylsqa4
+43 1p103zn
+44 1gs0Fbc
+45 198tgra
+46 12piFGg
+47 HseAcl
+48 DbClBg
+49 zjwtdw
+50 w00000
+51 sO7E6j
+52 qfzAIg
+53 nMisEf
+54 lG2vfa
+55 jLJa6J
+56 i8Knsw
+57 gziF6s
+58 fdCzz6
+59 dWfrGp
+60 cPAhKE
+61 bPexBe
+62 aUKYOA
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Konstrukce hodnoty typu <strong>big.Int</strong> z&nbsp;řetězce</h2>
+
+<p>Hodnoty přesahující rozsah <strong>int64</strong> a <strong>uint64</strong>
+z&nbsp;pochopitelných důvodů není možné použít při konstrukci hodnoty typu
+<strong>big.Int</strong>. Pokud ovšem takto velké hodnoty existují například
+v&nbsp;textových souborech atd., můžeme namísto konstruktoru
+<strong>big.Int.NewInt</strong> použít metodu
+<strong>big.Int.SetString</strong>. Této metodě se předává řetězec obsahující
+celočíselnou hodnotu a ve druhém parametru bázi, v&nbsp;níž je hodnota
+reprezentována (dvojková, osmičková, desítková, šestnáctková atd. soustava).
+V&nbsp;případě, že je báze nastavena na nulu, je informace o soustavě získána
+přímo ze vstupního řetězce, který tak může obsahovat klasické &bdquo;bázové
+prefixy&ldquo; typu &bdquo;0&ldquo; (osmičková) &bdquo;0x&ldquo; (šestnáctková)
+atd.</p>
+
+<p>Metodu <strong>big.Int.SetString</strong> si můžeme otestovat velmi
+snadno:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+&nbsp;
+        x.SetString("42", 10)
+        fmt.Println(x.Text(10))
+&nbsp;
+        x.SetString("1000000000000000000000000000", 10)
+        fmt.Println(x.Text(10))
+&nbsp;
+        x.SetString("1000000000000000000000000000", 2)
+        fmt.Println(x.Text(10))
+&nbsp;
+        x.SetString("0xcafebabe", 0)
+        fmt.Println(x.Text(10))
+}
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, jak se například liší chápání hodnoty
+&bdquo;1000000000000000000000000000&ldquo; ve chvíli, kdy je použita desítková
+soustava a kdy soustava dvojková:</p>
+
+<pre>
+42
+1000000000000000000000000000
+134217728
+3405691582
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Interní struktura hodnot typu <strong>big.Int</strong></h2>
+
+<p>Interní struktura typu <strong>big.Int</strong> v&nbsp;jazyce Go je sice
+odlišná od typu <strong>long</strong> v&nbsp;Pythonu, ale z&nbsp;pohledu
+programátora jsou si oba typy nápadně podobné &ndash; nulová hodnota je uložena
+velmi efektivním způsobem a kapacita obsazené paměti roste společně
+s&nbsp;velikostí uložené numerické hodnoty. Zajímavé a především poučné je, že
+v&nbsp;Go můžeme zjistit, jaká je interní struktura celočíselné hodnoty
+s&nbsp;neomezeným rozsahem a současně můžeme tuto interní strukturu
+modifikovat. Jedná se o nízkoúrovňovou operaci, kterou se sice nedoporučuje
+používat mimo vlastní knihovnu/balíček <strong>big.Int</strong>, ovšem žádná
+reálná omezení zde ve skutečnosti neexistují.</p>
+
+<p>Nejdříve si ukažme, jakým způsobem můžeme získat obsah paměťového bloku,
+v&nbsp;němž je uložena nějaká hodnota typu <strong>big.Int</strong>. Pro tento
+účel lze použít metodu nazvanou <strong>Bytes</strong>, jejíž hlavička je
+následující a která vrátí strukturu hodnoty bez znaménka:</p>
+
+<pre>
+func (x *Int) <strong>Bytes</strong>() []byte
+</pre>
+
+<p>Podívejme se nyní na způsob zjištění, jak jsou uloženy hodnoty typu
+<strong>big.Int</strong>. Pokusíme se přitom zjistit informaci o několika
+hodnotách s&nbsp;různým rozsahem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+&nbsp;
+        x.SetInt64(0)
+        fmt.Println(x.Bytes())
+&nbsp;
+        x.SetInt64(1)
+        fmt.Println(x.Bytes())
+&nbsp;
+        x.SetInt64(100)
+        fmt.Println(x.Bytes())
+&nbsp;
+        x.SetInt64(1000)
+        fmt.Println(x.Bytes())
+&nbsp;
+        x.SetInt64(100000000)
+        fmt.Println(x.Bytes())
+&nbsp;
+        x.SetInt64(100000000)
+        x.Mul(&amp;x, &amp;x)
+        fmt.Println(x.Bytes())
+}
+</pre>
+
+<p>Zobrazené výsledky:</p>
+
+<pre>
+[]
+[1]
+[100]
+[3 232]
+[5 245 225 0]
+[35 134 242 111 193 0 0]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že nula je reprezentována
+prázdnou sekvencí bajtů &ndash; podobně jako v&nbsp;Pythonu.</div></p>
+
+<p>Původní hodnotu přitom můžeme velmi snadno zrekonstruovat:</p>
+
+<pre>
+[]: 0 (z definice)
+[1]: 1
+[100]: 100
+[3 232]: 3*256 + 232 = 768 + 232 = 1000
+[5 245 225 0]: 5*256*256*256 + 245*256*256 + 225*256 + 0 = 83886080 + 16056320 + 57600 = 100000000
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Přímý přístup k&nbsp;internímu datovému bloku hodnoty typu <strong>big.Int</strong></h2>
+
+<p>Datový typ <strong>big.Int</strong> obsahuje i metodu <strong>Bits</strong>
+s&nbsp;následující hlavičkou:</p>
+
+<pre>
+func (x *Int) <strong>Bits</strong>() []Word
+</pre>
+
+<p>Užitečné (a potenciálně i nebezpečné) je, že řez (<i>slice</i>) vrácený
+metodou <strong>bit.Int.Bits()</strong> nevznikl kopií paměťového bloku
+s&nbsp;hodnotou typu <strong>big.Int</strong>, ale jedná se skutečně o totožný
+blok, v&nbsp;němž je tato hodnota uložena. Co to znamená? Modifikací obsahu
+pole, které jsme získali, můžeme měnit i hodnotu typu <strong>big.Int</strong>,
+což je užitečné při implementaci dalších matematických operací. Ostatně můžeme
+si to velmi snadno vyzkoušet na tomto demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        x.SetInt64(100000000000)
+        x.Mul(&amp;x, &amp;x)
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(x.Bits())
+        fmt.Println()
+&nbsp;
+        words := x.Bits()
+        words[0] = 1
+        words[1] = 0
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(x.Bits())
+        fmt.Println()
+&nbsp;
+        words[0] = 0
+        words[1] = 1
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(x.Bits())
+        fmt.Println()
+&nbsp;
+        words[0] = 1000
+        words[1] = 1000
+&nbsp;
+        fmt.Println(x.Text(10))
+        fmt.Println(x.Bits())
+}
+</pre>
+
+<p>A takto vypadají &bdquo;velká celá čísla&ldquo; vypočtená a vypsaná tímto
+demonstračním příkladem:</p>
+
+<pre>
+10000000000000000000000
+[1864712049423024128 542]
+&nbsp;
+1
+[1 0]
+&nbsp;
+18446744073709551616
+[0 1]
+&nbsp;
+18446744073709551617000
+[1000 1000]
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Konstrukce hodnoty <strong>big.Int</strong> na základě specifikace obsahu bajtů interní datové struktury</h2>
+
+<p>Knihovna <strong>big</strong> navíc programátorům umožňuje konstrukci
+celočíselné hodnoty typu <strong>big.Int</strong> specifikací hodnot
+jednotlivých <i>bajtů</i> (tedy nikoli <i>slov</i>). K&nbsp;tomuto účelu se
+používá metoda nazvaná <strong>big.Int.SetBytes</strong>, která má následující
+hlavičku:</p>
+
+<pre>
+func (z *Int) <strong>SetBytes</strong>(buf []byte) *Int
+</pre>
+
+<p>Díky této metodě můžeme opět sledovat, jakým způsobem jsou vlastně hodnoty
+typu <strong>big.Int</strong> interně reprezentovány. Vyzkoušíme si to na
+následujícím příkladu, v&nbsp;němž postupně do předávaného řezu přidáváme další
+a další bajty, z&nbsp;nichž ovšem pouze ten nejvyšší je nenulový. Postupně by
+tedy měly vznikat hodnoty 0, 256, 65536, tedy celočíselné mocniny základu 256
+atd.:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        x.SetInt64(0)
+&nbsp;
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0, 0, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+&nbsp;
+        x.SetBytes([]byte{1, 0, 0, 0, 0, 0, 0, 0, 0})
+        fmt.Println(x.Bytes())
+        fmt.Println(x.Text(10))
+        fmt.Println()
+}
+</pre>
+
+<p>A takto vypadají zobrazené výsledky:</p>
+
+<pre>
+[]
+0
+&nbsp;
+[]
+0
+&nbsp;
+[1 0]
+256
+&nbsp;
+[1 0 0]
+65536
+&nbsp;
+[1 0 0 0]
+16777216
+&nbsp;
+[1 0 0 0 0]
+4294967296
+&nbsp;
+[1 0 0 0 0 0]
+1099511627776
+&nbsp;
+[1 0 0 0 0 0 0]
+281474976710656
+&nbsp;
+[1 0 0 0 0 0 0 0]
+72057594037927936
+&nbsp;
+[1 0 0 0 0 0 0 0 0]
+18446744073709551616
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Datový typ <strong>big.Rat</strong> &ndash; zlomky s&nbsp;libovolným rozsahem a přesností</h2>
+
+<p>Druhým datovým typem, který programátorům umožňuje pracovat s&nbsp;číselnými
+hodnotami, s&nbsp;neomezeným rozsahem a přesností, jsou <i>zlomky</i>
+(<i>ratio</i>). Zlomek je v&nbsp;operační paměti uložen ve formě dvojice
+celočíselných hodnot s&nbsp;neomezeným rozsahem, pro které platí všechny
+vlastnosti, s&nbsp;nimiž jsme se seznámili v&nbsp;předchozím textu. A i pro
+zlomky má programátor k&nbsp;dispozici funkce a metody realizující základní
+aritmetické a relační operace, které je možné při práci s&nbsp;nimi použít.
+Navíc se zlomky automaticky zjednodušují a na konci výpočtu je možné výsledky
+převést na hodnotu typu <strong>float32</strong> nebo <strong>float64</strong>
+(samozřejmě jen v&nbsp;situaci, kdy je to možné a obecně se ztrátou přesnosti),
+popř.&nbsp;je možné kdykoli přečíst hodnotu čitatele a/nebo jmenovatele a
+pracovat s&nbsp;nimi samostatně.</p>
+
+<p>Zlomky jsou v&nbsp;základní knihovně jazyka Go představovány datovým typem
+<strong>big.Rat</strong> neboli &bdquo;velká krysa&ldquo; ;-)</p>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že zlomky sice mohou
+obsahovat libovolnou kombinaci celočíselného čitatele a jmenovatele, ovšem
+tímto způsobem je možné reprezentovat pouze racionální čísla, nikoli čísla
+reálná (totéž ostatně platí i pro typy s&nbsp;plovoucí řádovou čárkou, kde se
+ovšem tento fakt &bdquo;schovává&ldquo;).</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Konstrukce zlomků s&nbsp;jejich automatickým zjednodušením</h2>
+
+<p>Zlomky, tedy přesněji hodnoty typu <strong>big.Rat</strong> lze zkonstruovat
+funkcí <strong>NewRat</strong>, které se předají hodnoty čitatele a jmenovatele
+reprezentované jako <strong>int64</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := big.NewRat(1, 2)
+        y := big.NewRat(1, 3)
+        z := big.NewRat(2, 1)
+        w := big.NewRat(4, 2)
+&nbsp;
+        fmt.Println(x.String())
+        fmt.Println(y.String())
+        fmt.Println(z.String())
+        fmt.Println(w.String())
+}
+</pre>
+
+<p>Alternativně je možné použít metodu nazvanou <strong>SetFrac</strong>, které
+se opět předají hodnoty čitatele a jmenovatele:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+        var y big.Rat
+        var z big.Rat
+        var w big.Rat
+&nbsp;
+        x.SetFrac64(1, 2)
+        y.SetFrac64(1, 3)
+        z.SetFrac64(2, 1)
+        w.SetFrac64(4, 2)
+&nbsp;
+        fmt.Println(x.String())
+        fmt.Println(y.String())
+        fmt.Println(z.String())
+        fmt.Println(w.String())
+}
+</pre>
+
+<p>Povšimněte si, že zlomky jsou při konstrukci zjednodušeny, což je patrné na
+zlomku 4/2 (poslední zobrazený výsledek):</p>
+
+<pre>
+1/2
+1/3
+2/1
+2/1
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Zlomky s&nbsp;nulovou hodnotou jmenovatele</h2>
+
+<p>Zajímavé bude zjistit, jakým způsobem se vlastně pracuje se zlomky,
+v&nbsp;jejichž jmenovateli je nulová hodnota (což může být výsledek nějaké
+operace). Nejprve si vyzkoušejme, jak Go (resp.&nbsp;přesněji řečeno
+<i>runtime</i> kód realizovaný v&nbsp;balíčku <strong>big</strong>) reaguje na
+pokus o konstrukci zlomku s&nbsp;nulovým jmenovatelem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+&nbsp;
+        <strong>x.SetFrac64(1, 0)</strong>
+&nbsp;
+        fmt.Println(x.String())
+}
+</pre>
+
+<p>Překlad výše uvedeného programu sice proběhne bez problémů, ovšem při jeho
+spuštění dojde k&nbsp;běhové (<i>runtime</i>) chybě:</p>
+
+<pre>
+panic: division by zero
+&nbsp;
+goroutine 1 [running]:
+math/big.(*Rat).SetFrac64(0x100c000006228?, 0x7fe041ec2428?, 0x7fe041eb9108?)
+        /opt/go/src/math/big/rat.go:321 +0xc7
+main.main()
+        /home/ptisnovs/src/go-root/article_A8/18_rationals_div_zero.go:11 +0x45
+exit status 2
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tuto chybu je možné zachytit následovně
+&ndash; ovšem nejedná se o příliš idiomatický způsob řešení běhových chyb,
+alespoň nikoli v&nbsp;jazyku Go:</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výsledek operace, která vede ke zlomku s&nbsp;nulovým jmenovatelem</h2>
+
+<p>Taktéž si vyzkoušejme, co se stane ve chvíli, kdy se pokusíme o výpočet
+zlomku, v&nbsp;jehož jmenovateli bude uložena nula. Takovou operací je výpočet
+převrácené hodnoty realizovaný metodou <strong>Inv</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+&nbsp;
+        x.SetFrac64(0, 1)
+&nbsp;
+        fmt.Println(x.String())
+&nbsp;
+        <strong>x.Inv(&amp;x)</strong>
+        fmt.Println(x.String())
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu se nejdříve korektně
+zobrazí zlomek 0/1, ovšem operace výpočtu převrácené hodnoty zhavaruje:</p>
+
+<pre>
+0/1
+panic: division by zero
+&nbsp;
+goroutine 1 [running]:
+math/big.(*Rat).Inv(0x4cac28?, 0xc000012018?)
+        /opt/go/src/math/big/rat.go:383 +0xb9
+main.main()
+        /home/ptisnovs/src/go-root/article_A8/19_rationals_div_zero.go:15 +0xb2
+exit status 2
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Operace se zlomky</h2>
+
+<p>Se zlomky je možné provádět podobné operace (kupodivu však ne všechny), jako
+s&nbsp;hodnotami typu <strong>big.Int</strong>. Příkladem může být jednoduchý
+součet zlomků. Po této operaci pochopitelně opět následuje zjednodušení zlomku,
+pokud je ho možné provést:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+        var y big.Rat
+        var z big.Rat
+&nbsp;
+        x.SetFrac64(1, 2)
+        y.SetFrac64(1, 3)
+        <strong>z.Add(&amp;x, &amp;y)</strong>
+&nbsp;
+        fmt.Println(x.String())
+        fmt.Println(y.String())
+        fmt.Println(z.String())
+}
+</pre>
+
+<p>Výsledek pravděpodobně nikoho nepřekvapí:</p>
+
+<pre>
+1/2
+1/3
+5/6
+</pre>
+
+<p>Samozřejmě je možné provádět i další operace, například kombinovat součin se
+součtem (což je v&nbsp;této konkrétní variantě operace typu MAC &ndash;
+<i>multiply-accumulate</i>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+        var y big.Rat
+        var z big.Rat
+&nbsp;
+        x.SetFrac64(1, 2)
+        y.SetFrac64(1, 1)
+        z.SetFrac64(1, 1)
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+                z.Mul(&amp;z, &amp;x)
+                z.Add(&amp;z, &amp;y)
+&nbsp;
+                fmt.Println(z.String())
+        }
+&nbsp;
+}
+</pre>
+
+<p>Vypočtené a zobrazené výsledky:</p>
+
+<pre>
+3/2
+7/4
+15/8
+31/16
+63/32
+127/64
+255/128
+511/256
+1023/512
+2047/1024
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výpočet hodnoty &pi;</h2>
+
+<p>Zkusme si nyní provést nějaký výpočet, v&nbsp;němž by se zlomky skutečně
+používaly. Pro jednoduchost jsem vybral jeden z&nbsp;dnes již nepoužívaných
+výpočtů hodnoty &pi; z&nbsp;nekonečné řady. Jedná se o takzvaný <i>Wallis
+product</i>, což je forma řady, která vypadá následovně:</p>
+
+<p><img src="https://i.iinfo.cz/images/52/wallis-product-2.png" class="image-1088080" alt="&#160;" title="Autor: NA, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="577" height="99" /></p>
+
+<p>Tento výpočet je možné realizovat různými způsoby (ani se nemusí použít
+zlomky), ovšem jeho nejprimitivnější podoba může být následující:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var result big.Rat
+&nbsp;
+        result.SetFrac64(2, 1)
+&nbsp;
+        for n := int64(1); n &lt; 40; n++ {
+                m := 4 * n * n
+&nbsp;
+                var item big.Rat
+                item.SetFrac64(m, m-1)
+                result.Mul(&amp;result, &amp;item)
+&nbsp;
+                f, _ := result.Float64()
+                absError := math.Pi - f
+                relError := 100.0 * absError / math.Pi
+                fmt.Println(f, "\t", absError, "\t", relError, "\t", result.String())
+        }
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu se bude vypisovat jak postupně
+vznikající zlomek (výsledek postupně počítané nekonečně řady), tak i hodnota
+tohoto zlomku přepočtená na typ <strong>float64</strong> a navíc i absolutní a
+relativní chyba vypočtená vůči konstantě <strong></strong>:</p>
+
+<pre>
+2.6666666666666665       0.4749259869231266      15.11736368432249       8/3
+2.8444444444444446       0.29714820914534856     9.458521263277312       128/45
+2.9257142857142857       0.2158783678755074      6.871621870799526       512/175
+2.972154195011338        0.1694384585784552      5.3933936465264996      32768/11025
+3.002175954556907        0.139416699032886       4.437771360127774       131072/43659
+3.023170192001361        0.11842246158843217     3.7695040269818167      2097152/693693
+3.0386736288834193       0.10291902470637382     3.276014304043259       8388608/2760615
+3.050589996055511        0.09100265753428216     2.8967045562159837      2147483648/703956825
+3.0600345471268904       0.08155810646290274     2.5960751585572055      8589934592/2807136475
+3.067703806643499        0.07388884694629416     2.3519550461726424      137438953472/44801898141
+...
+...
+...
+3.119547206305518        0.022045447284275266    0.7017283815928417      43556142965880123323311949751266331066368/13962328532115305028016447297397521123911
+3.12014908691642         0.021443566673373216    0.6825699267175955      2787593149816327892691964784081045188247552/893416651629057110619867238795201876360873
+3.120718977160606        0.02087367642918725     0.6644297568411868      11150372599265311570767859136324180752990208/3573014001219202104195597613151008234533075
+3.121259361399075        0.020333292190718222    0.6472287922969278      178405961588244985132285746181186892047843328/57158326473797485184846471512318760538583125
+3.1217724732454335       0.019820180344359617    0.6308959349555315      713623846352979940529142984724747568191373312/228595726456351152123222278901666680050099375
+</pre>
+
+<p>Z&nbsp;předchozího zdrojového kódu je pravděpodobně zřejmé, že ve výpočtu
+nemůžeme pokračovat donekonečna. Je tomu tak proto, že i když se akumulace
+hodnot provádí se zlomky (což je v&nbsp;pořádku), tak počitadlo smyčky není
+reprezentováno typem, který může nabývat libovolně velké hodnoty a tak i
+výpočty s&nbsp;počitadlem trpí stejným problémem. Ostatně si můžeme relativně
+snadno otestovat, kdy dojde k&nbsp;situaci, v&nbsp;níž již vypočtené výsledky
+přestanou být platné:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var result big.Rat
+&nbsp;
+        result.SetFrac64(2, 1)
+&nbsp;
+        for n := int64(1); n &lt; math.MaxInt64; n++ {
+                m := 4 * n * n
+&nbsp;
+                var item big.Rat
+                item.SetFrac64(m, m-1)
+                result.Mul(&amp;result, &amp;item)
+&nbsp;
+                f, _ := result.Float64()
+                absError := math.Pi - f
+                relError := 100.0 * absError / math.Pi
+                fmt.Println(f, "\t", absError, "\t", relError)
+        }
+}
+</pre>
+
+<p>Jedno z&nbsp;možných řešení výše zmíněného problému by mohlo vypadat
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var result big.Rat
+&nbsp;
+        result.SetFrac64(2, 1)
+&nbsp;
+        one := big.NewInt(1)
+        limit := big.NewInt(1000)
+&nbsp;
+        for n := big.NewInt(1); n.Cmp(limit) &lt;= 0; n.Add(n, one) {
+                m := big.NewInt(4)
+                m.Mul(m, n)
+                m.Mul(m, n)
+                mn := big.NewInt(0)
+                mn.Sub(m, one)
+&nbsp;
+                var item big.Rat
+                item.SetFrac(m, mn)
+                result.Mul(&amp;result, &amp;item)
+&nbsp;
+                f, _ := result.Float64()
+                absError := math.Pi - f
+                relError := 100.0 * absError / math.Pi
+                fmt.Println(f, "\t", absError, "\t", relError, "\t", result.String())
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, jak se kód zbytečně
+znepřehledňuje tím, že standardní aritmetické operátory musíme nahrazovat
+voláním metod. Tento problém nemá v&nbsp;současné verzi jazyka Go žádné rozumné
+řešení.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Převod zlomků na hodnoty jiných typů</h2>
+
+<p>Metodami <strong>Num</strong> a <strong>Denom</strong> lze získat čitatel i
+jmenovatel zlomku. Vrací se přitom hodnoty s&nbsp;neomezenou přesností, tedy
+hodnoty typu <strong>big.Int</strong>, s&nbsp;nimiž jsme se seznámili výše:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+        var y big.Rat
+        var z big.Rat
+&nbsp;
+        x.SetFrac64(1, 2)
+        y.SetFrac64(1, 1)
+        z.SetFrac64(1, 1)
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+                z.Mul(&amp;z, &amp;x)
+                z.Add(&amp;z, &amp;y)
+&nbsp;
+                numerator := z.Num()
+                denominator := z.Denom()
+                fmt.Println(numerator, denominator)
+        }
+&nbsp;
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+3 2
+7 4
+15 8
+31 16
+63 32
+127 64
+255 128
+511 256
+1023 512
+2047 1024
+</pre>
+
+<p>A konečně metodou <strong>Float64</strong> se vrátí hodnota typu
+<i>float64</i> (primitivní datový typ Go), která je vypočtena podílem čitatele
+a jmenovatele (může se tedy vrátit i nekonečná hodnota):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Rat
+        var y big.Rat
+        var z big.Rat
+&nbsp;
+        x.SetFrac64(1, 2)
+        y.SetFrac64(1, 1)
+        z.SetFrac64(1, 1)
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+                z.Mul(&amp;z, &amp;x)
+                z.Add(&amp;z, &amp;y)
+&nbsp;
+                fmt.Println(z.Float64())
+        }
+&nbsp;
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Obsah navazujícího článku</h2>
+
+<p>Prozatím jsme si popsali pouze dva datové typy realizované ve standardní
+knihovně <strong>big</strong>: <strong>big.Int</strong> a
+<strong>big.Rat</strong>. Zbývá nám popis posledního typu, který je
+programátorům ve standardní knihovně nabízený. Jedná se o typ pojmenovaný
+<strong>big.Float</strong>, jenž programátorům umožňuje pracovat
+s&nbsp;&bdquo;neomezenými&ldquo; hodnotami s&nbsp;plovoucí řádovou čárkou. To
+ovšem není vše, protože i pro programovací jazyk Go (podobně jako pro mnoho
+dalších programovacích jazyků) vznikla i implementace numerického typu
+s&nbsp;poněkud záhadným jménem <strong>Posit</strong>. S&nbsp;těmito dvěma
+koncepty se seznámíme v&nbsp;navazující části <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyku Go</a>.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů naprogramovaných
+v&nbsp;jazyku Go byly uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_bigint_construction.go</td><td>konstrukce instance datového typu <strong>big.Int</strong> a tisk uložené hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/01_bigint_construction.go">https://github.com/tisnik/go-root/blob/master/article_A8/01_bigint_construction.go</a></td></tr>
+<tr><td> 2</td><td>02_bigint_add.go</td><td>aritmetická operace součtu a datový typ <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/02_bigint_add.go">https://github.com/tisnik/go-root/blob/master/article_A8/02_bigint_add.go</a></td></tr>
+<tr><td> 3</td><td>03_bigint_large_numbers.go</td><td>aritmetická operace součinu a datový typ <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/03_bigint_large_numbers.go">https://github.com/tisnik/go-root/blob/master/article_A8/03_bigint_large_numbers.go</a></td></tr>
+<tr><td> 4</td><td>04_factorial.go</td><td>výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial.go">https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial.go</a></td></tr>
+<tr><td> 5</td><td>04_factorial_B.go</td><td>zjednodušený výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial_B.go">https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial_B.go</a></td></tr>
+<tr><td> 6</td><td>05_bigint_print_base.go</td><td>převod hodnoty typu <strong>big.Int</strong> na text s&nbsp;volitelnou bází</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/05_bigint_print_base.go">https://github.com/tisnik/go-root/blob/master/article_A8/05_bigint_print_base.go</a></td></tr>
+<tr><td> 7</td><td>06_bigint_as_bytes.go</td><td>zobrazení interní struktury hodnot typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/06_bigint_as_bytes.go">https://github.com/tisnik/go-root/blob/master/article_A8/06_bigint_as_bytes.go</a></td></tr>
+<tr><td> 8</td><td>07_bigint_change_raw.go</td><td>modifikace interní struktury hodnot typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/07_bigint_change_raw.go">https://github.com/tisnik/go-root/blob/master/article_A8/07_bigint_change_raw.go</a></td></tr>
+<tr><td> 9</td><td>08_bigint_change_raw.go</td><td>nastavení jednotlivých bajtů hodnoty typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/08_bigint_change_raw.go">https://github.com/tisnik/go-root/blob/master/article_A8/08_bigint_change_raw.go</a></td></tr>
+<tr><td>10</td><td>09_bigint_from_string.go</td><td>konstrukce hodnoty <strong>big.Int</strong> z&nbsp;řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/09_bigint_from_string.go">https://github.com/tisnik/go-root/blob/master/article_A8/09_bigint_from_string.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>10_rationals_construction.go</td><td>konstrukce zlomku &ndash; hodnoty <strong>big.Rat</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/10_rationals_construction.go">https://github.com/tisnik/go-root/blob/master/article_A8/10_rationals_construction.go</a></td></tr>
+<tr><td>12</td><td>11_rationals_add.go</td><td>součet dvou zlomků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/11_rationals_add.go">https://github.com/tisnik/go-root/blob/master/article_A8/11_rationals_add.go</a></td></tr>
+<tr><td>13</td><td>12_rationals_mul.go</td><td>operace součinu zlomků a vliv na přesnost a rozsah hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/12_rationals_mul.go">https://github.com/tisnik/go-root/blob/master/article_A8/12_rationals_mul.go</a></td></tr>
+<tr><td>14</td><td>13_rational_to_int.go</td><td>převod zlomku na celočíselného čitatele a jmenovatele</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/13_rational_to_int.go">https://github.com/tisnik/go-root/blob/master/article_A8/13_rational_to_int.go</a></td></tr>
+<tr><td>15</td><td>14_rationals_to_float.go</td><td>převod zlomku na hodnotu s&nbsp;plovoucí řádovou čárkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/14_rationals_to_float.go">https://github.com/tisnik/go-root/blob/master/article_A8/14_rationals_to_float.go</a></td></tr>
+<tr><td>16</td><td>15_pi_wallis_product.go</td><td>výpočet hodnoty &pi; (naivní varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/15_pi_wallis_product.go">https://github.com/tisnik/go-root/blob/master/article_A8/15_pi_wallis_product.go</a></td></tr>
+<tr><td>17</td><td>16_pi_wallis_product_limits.go</td><td>limity naivní varianty výpočtu hodnoty &pi;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/16_pi_wallis_product_limits.go">https://github.com/tisnik/go-root/blob/master/article_A8/16_pi_wallis_product_limits.go</a></td></tr>
+<tr><td>18</td><td>17_pi_better_wallis_product.go</td><td>vylepšená varianta výpočtu hodnoty &pi;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/17_pi_better_wallis_product.go">https://github.com/tisnik/go-root/blob/master/article_A8/17_pi_better_wallis_product.go</a></td></tr>
+<tr><td>19</td><td>18_rationals_div_zero.go</td><td>konstrukce zlomku s&nbsp;nulovým jmenovatelem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/18_rationals_div_zero.go">https://github.com/tisnik/go-root/blob/master/article_A8/18_rationals_div_zero.go</a></td></tr>
+<tr><td>20</td><td>19_rationals_div_zero.go</td><td>operce, která vytvoří zlomek s&nbsp;nulovým jmenovatelem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/19_rationals_div_zero.go">https://github.com/tisnik/go-root/blob/master/article_A8/19_rationals_div_zero.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Balíček <strong>big</strong> pro jazyk Go<br />
+<a href="https://pkg.go.dev/math/big">https://pkg.go.dev/math/big</a>
+</li>
+
+<li>Zdrojové kódu pro balíček <strong>big</strong><br />
+<a href="https://cs.opensource.google/go/go/+/master:src/math/big/">https://cs.opensource.google/go/go/+/master:src/math/big/</a>
+</li>
+
+<li>Arbitrary-precision arithmetic<br />
+<a href="https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic">https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic</a>
+</li>
+
+<li>Floating-point error mitigation<br />
+<a href="https://en.wikipedia.org/wiki/Floating-point_error_mitigation">https://en.wikipedia.org/wiki/Floating-point_error_mitigation</a>
+</li>
+
+<li>Beating Floating Point at its Own Game: Posit Arithmetic<br />
+<a href="http://www.johngustafson.net/pdfs/BeatingFloatingPoint.pdf">http://www.johngustafson.net/pdfs/BeatingFloatingPoint.pdf</a>
+</li>
+
+<li>Unum (number format)<br />
+<a href="https://en.wikipedia.org/wiki/Unum_(number_format)">https://en.wikipedia.org/wiki/Unum_(number_format)</a>
+</li>
+
+<li>The GNU MPFR Library<br />
+<a href="https://www.mpfr.org/">https://www.mpfr.org/</a>
+</li>
+
+<li>GMP: Arithmetic without limitations<br />
+<a href="https://gmplib.org/">https://gmplib.org/</a>
+</li>
+
+<li>GNU MP 6.2.1 manual<br />
+<a href="https://gmplib.org/manual/index">https://gmplib.org/manual/index</a>
+</li>
+
+<li>Anatomy of a posit number<br />
+<a href="https://www.johndcook.com/blog/2018/04/11/anatomy-of-a-posit-number/">https://www.johndcook.com/blog/2018/04/11/anatomy-of-a-posit-number/</a>
+</li>
+
+<li>Better floating point: posits in plain language<br />
+<a href="http://loyc.net/2019/unum-posits.html">http://loyc.net/2019/unum-posits.html</a>
+</li>
+
+<li>Posits, a New Kind of Number, Improves the Math of AI: The first posit-based processor core gave a ten-thousandfold accuracy boost<br />
+<a href="https://spectrum.ieee.org/floating-point-numbers-posits-processor">https://spectrum.ieee.org/floating-point-numbers-posits-processor</a>
+</li>
+
+<li>Posit Standard Document (2022)<br />
+<a href="https://posithub.org/khub_widget">https://posithub.org/khub_widget</a>
+</li>
+
+<li>Standard for Posit™ Arithmetic (2022)<br />
+<a href="https://posithub.org/docs/posit_standard-2.pdf">https://posithub.org/docs/posit_standard-2.pdf</a>
+</li>
+
+<li>Posit Calculator<br />
+<a href="https://posithub.org/widget/calculator/">https://posithub.org/widget/calculator/</a>
+</li>
+
+<li>SoftPosit<br />
+<a href="https://gitlab.com/cerlane/SoftPosit">https://gitlab.com/cerlane/SoftPosit</a>
+</li>
+
+<li>PySigmoid<br />
+<a href="https://github.com/mightymercado/PySigmoid">https://github.com/mightymercado/PySigmoid</a>
+</li>
+
+<li>sgpositpy<br />
+<a href="https://github.com/xman/sgpositpy">https://github.com/xman/sgpositpy</a>
+</li>
+
+<li>SoftPosit.jl<br />
+<a href="https://github.com/milankl/SoftPosit.jl">https://github.com/milankl/SoftPosit.jl</a>
+</li>
+
+<li>SigmoidNumbers.jl<br />
+<a href="https://github.com/MohHizzani/SigmoidNumbers.jl">https://github.com/MohHizzani/SigmoidNumbers.jl</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
