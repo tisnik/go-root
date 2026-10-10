@@ -1,0 +1,1671 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Načítání a ukládání dat uložených v N-rozměrných polích v programovacím jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Načítání a ukládání dat uložených v N-rozměrných polích v programovacím jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku o programovacím jazyku Go si popíšeme knihovnu nazvanou npyio. Tato knihovna slouží pro načítání a ukládání n-rozměrných polí (typicky vektorů a matic) do souborů ve formátu NPY, který byl primárně vytvořen pro potřeby Numpy.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Načítání a ukládání dat uložených v&nbsp;N-rozměrných polích v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Formát FITS (<i>Flexible Image Transport System</i>)</a></p>
+<p><a href="#k03">3. Formát GRIB (<i>GRIdded Binary</i>)</a></p>
+<p><a href="#k04">4. Formát NetCDF (<i>Network Common Data Form</i>)</a></p>
+<p><a href="#k05">5. Formát HDF (<i>Hierarchical Data Format</i>)</a></p>
+<p><a href="#k06">6. Standardní binární soubor knihovny Numpy</a></p>
+<p><a href="#k07">7. Interní struktura souboru ve formátu NPY</a></p>
+<p><a href="#k08">8. Uložení vektoru (jednorozměrného pole) do binárního souboru s&nbsp;využitím knihovny Numpy</a></p>
+<p><a href="#k09">9. Uložení a načtení matice do/ze standardního binárního souboru, opět s&nbsp;využitím knihovny Numpy</a></p>
+<p><a href="#k10">10. Knihovna <strong>npyio</strong> pro práci s&nbsp;NPY soubory v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k11">11. Uložení vektoru s&nbsp;prvky typu <strong>int8</strong> do souboru typu NPY</a></p>
+<p><a href="#k12">12. Uložení vektoru s&nbsp;deseti prvky typu <strong>int32</strong></a></p>
+<p><a href="#k13">13. Uložení dvojrozměrné matice do souboru typu NPY</a></p>
+<p><a href="#k14">14. Načtení vektoru ze souboru typu NPY</a></p>
+<p><a href="#k15">15. Kontrola typů prvků při načítání</a></p>
+<p><a href="#k16">16. Načítání matic</a></p>
+<p><a href="#k17">17. Uložení a zpětné načtení rozsáhlejších souborů s&nbsp;velikostí přesahujících gigabyte</a></p>
+<p><a href="#k18">18. Závěrečné zhodnocení</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Načítání a ukládání dat uložených v&nbsp;N-rozměrných polích v&nbsp;programovacím jazyku Go</h2>
+
+<p>V&nbsp;mnoha oblastech souvisejících s&nbsp;IT se setkáme s&nbsp;daty, která
+jsou uložena v&nbsp;N-rozměrných polích (<i>ND array</i>). Nejčastěji se
+s&nbsp;velkou pravděpodobností setkáme s&nbsp;jednorozměrnými poli (neboli
+<i>vektory</i>), protože například zvukové záznamy jsou vlastně tvořeny
+sekvencí hodnot zvukových vzorků (<i>samplů</i>). A pochopitelně prakticky
+každý IT systém pracuje s&nbsp;obrazovými daty (ty si můžeme představit buď
+jako matice nebo jako trojrozměrná pole, v&nbsp;případě, že barvové roviny
+tvoří třetí dimenzi). Relativně často se setkáme i s&nbsp;vícerozměrnými poli,
+například v&nbsp;oblasti statistiky, lineární algebry, datové analýzy,
+strojového učení, zpracování medicínských či astronomických dat apod. Současně
+se jedná o datové struktury a operace, u nichž má velký smysl využít SIMD
+instrukce, které jsou dostupné na všech moderních mikroprocesorových
+architekturách. A právě z&nbsp;tohoto důvodu jsme se na stránkách <a
+href="https://www.root.cz">Roota</a> již mnohokrát setkali
+s&nbsp;programovacími jazyky popř.&nbsp;s&nbsp;knihovnami, které jsou určeny
+právě pro zpracování n-rozměrných polí.</p>
+
+<p>Víme již, že práce s&nbsp;N-rozměrnými poli je poměrně dobře podporována jak
+ve specializovaných programovacích jazycích (<a
+href="https://www.root.cz/clanky/jazyk-apl-kombinatory-vlacky-a-point-free-style/">APL</a>,
+<a
+href="https://www.root.cz/clanky/programovaci-jazyk-j-ndash-od-hieroglyfu-k-nbsp-ascii-znakum/">J</a>,
+<a
+href="https://www.root.cz/clanky/programovaci-jazyk-k-dukaz-ze-mezi-nami-ziji-mimozemstane/">K</a>,
+...), tak i například v&nbsp;Pythonu, pro nějž byla vytvořena populární <a
+href="https://www.root.cz/vyhledavani/?qs=numpy">knihovna Numpy</a>. Taktéž
+jsme se setkali s&nbsp;balíčky pro práci s&nbsp;N-rozměrnými poli určenými pro
+<a href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovací jazyk
+Go</a>. Připomeňme si, že se jednalo především o balíčky <i>Gonum Numerical
+Packages</i> a taktéž o balíček <i>narray</i>. Kvůli tomu, že se v&nbsp;oblasti
+statistiky, datové analýzy či strojového učení stále více používá programovací
+jazyk Python, je mnohdy nutné zajistit předávání dat (reprezentovaných ve formě
+N-rozměrných polí) právě mezi Pythonem a nástroji vytvořenými v&nbsp;jazyku Go.
+Této problematice se budeme věnovat v&nbsp;dnešním článku.</p>
+
+<p>Data mezi Pythonem a Go lze pochopitelně předávat v&nbsp;různých formátech.
+Může se jednat o některé standardizované (či de facto standardizované) formáty
+typu XML, JSON či CSV, ovšem vzhledem k&nbsp;tomu, že N-rozměrná pole mnohdy
+obsahují miliony prvků, se většinou nebude jednat o to nejlepší řešení, nehledě
+na to, že všechny tři zmíněné formáty nepodporují všechny vyžadované formáty
+prvků N-rozměrných polí (což mohou být bity, bajty, víceslovní hodnoty se
+znaménkem i bez znaménka, hodnoty s&nbsp;plovoucí řádovou čárkou se zvolenou
+přesností a v&nbsp;některých případech můžeme pracovat i s&nbsp;komplexními
+čísly).</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Formát FITS (<i>Flexible Image Transport System</i>)</h2>
+
+<p>Velmi zajímavý a potenciálně užitečný formát určený pro ukládání
+n-rozměrných polí (zejména však matic &ndash; tedy 2D struktur) je formát
+nazvaný <i>FITS</i> neboli <i>Flexible Image Transport System</i>, jenž se
+primárně používá v&nbsp;astronomii a s&nbsp;ní souvisejících odvětvích (využívá
+ho například NASA atd). V&nbsp;tomto formátu je možné do jediného souboru
+uložit několik takzvaných <i>HDU</i> neboli <i>Header/Data Unit(s)</i>. Každá
+taková &bdquo;jednotka&ldquo; se skládá z&nbsp;textové hlavičky a datového
+bloku. Hlavička je uložena jako čistý text složený z&nbsp;dvojic klíč =
+hodnota. Jednotlivé dvojice však od sebe nejsou odděleny koncem řádku, ale jsou
+zarovnány na osmdesát bajtů (mezerami). To nám dnes může připadat zvláštní, ale
+jedná se o formát vycházející ze &bdquo;starobylé&ldquo; koncepce děrných
+štítků. Za hlavičkou následují hodnoty prvků polí, přičemž pole jsou typicky 1D
+vektory, 2D matice (obrazy) nebo 3D struktury.</p>
+
+<p>Příklady dat uložených ve FITS najdeme například na adrese <a
+href="https://fits.gsfc.nasa.gov/fits_samples.html">https://fits.gsfc.nasa.gov/fits_samples.html</a>.
+Hlavička souboru <a
+href="https://fits.gsfc.nasa.gov/samples/UITfuv2582gc.fits">https://fits.gsfc.nasa.gov/samples/UITfuv2582gc.fits</a>
+začíná těmito informacemi s&nbsp;velmi specifickými metainformacemi o uloženém
+obrázku (povšimněte si, že symbol = je vždy uveden v&nbsp;devátém sloupci):</p>
+
+<pre>
+SIMPLE  =                    T  / FLIGHT22 05Apr96 RSH                           
+BITPIX  =                   16  / SIGNED 16-BIT INTEGERS                         
+NAXIS   =                    2  / 2-DIMENSIONAL IMAGES                           
+NAXIS1  =                  512  / SAMPLES PER LINE                               
+NAXIS2  =                  512  / LINES PER IMAGE                                
+EXTEND  =                    T  / FILE MAY HAVE EXTENSIONS                       
+DATATYPE= 'INTEGER*2'           / SAME INFORMATION AS BITPIX                     
+TELESCOP= 'UIT     '            / TELECOPE USED                                  
+INSTRUME= 'INTENSIFIED-FILM'    / DETECTOR USED                                  
+OBJECT  = 'NGC4151 '            / TARGET NAME                                    
+OBJECT2 = '_       '            / ALTERNATIVE TARGET NAME                        
+CATEGORY= 'FLIGHT  '            / TARGET CATEGORY                                
+JOTFID  = '8116-14 '            / ASTRO MISSION TARGET ID                        
+IMAGE   = 'FUV2582 '            / IMAGE NUMBER                                   
+ORIGIN  = 'UIT/GSFC'            / WHERE TAPE WRITTEN                             
+ASTRO   =                    2  / ASTRO MISSION NUMBER                           
+FRAMENO = 'b0582   '            / ANNOTATED FRAME NUMBER                         
+CATHODE = 'CSI     '            / IMAGE TUBE PHOTOCATHODE                        
+FILTER  = 'B1      '            / CAMERA/FILTER IDENTIFIER                       
+PDSDATIM= '06-JUL-1995  07:20'  / MICRODENSITOMETRY DATE &amp; TIME                  
+PDSID   =                   21  / MICRODENSITOMETER IDENT                        
+PDSAPERT=                   20  / MICROD. APERTURE, MICRONS                      
+PDSSTEP =                   10  / MICROD. STEP SIZE, MICRONS                     
+PIXELSIZ=        8.0000000E+01  / CURRENT PIXEL SIZE, MICRONS                    
+EQUINOX =        2.0000000E+03  / EQUINOX OF BEST COORDINATES                    
+NOMRA   =             182.0044  / 1950 I.P.S.  R.A., DEGREES                     
+NOMDEC  =              39.6839  / 1950 I.P.S.  DEC., DEGREES                     
+NOMROLL =             323.9500  / I.P.S. ROLL ANGLE                              
+NOMSCALE=        5.6832500E+01  / NOMINAL PLATE SCL (ARCSEC/MM)                  
+CALIBCON=          5.00000E-16  / PREFLIGHT LAB CALIB FOR CAMERA                 
+FEXPTIME= '8355    '            / EXPOSURE TIME, APPLICABLE FRM                  
+DATE-OBS= '13/03/95'            / DATE OF OBSERVATION (GMT)                      
+TIME-OBS=        6.2728000E+00  / TIME OF OBS (HOURS GMT)                        
+BSCALE  =        2.0587209E-16  / CALIBRATION CONST                              
+BUNIT   = 'ERGS/CM**2/S/ANGSTRM'                                                 
+BZERO   =              0.00000  / ADDITIVE CONST FOR CALIB.                      
+PATCHFIL= 'PATCH2  '            / FILE WITH PATCH INFORMATION                    
+FADJPROG= 'UITBAK  '            / FOG ADJUSTMENT PROGRAM                         
+FADJVER = '2.1     '            / FOG ADJUSTMENT PROGRAM VERSION                 
+FADJDTIM= 'Jul 22,1996 12:53:24'                                                 
+FOGLL   =        2.8988638E+02  / LOWER LEFT CORNER FOG
+</pre>
+
+<p>Za touto hlavičkou následují binární data &ndash; matice o velikosti
+512&times;512 prvků, přičemž každý prvek je reprezentován jako šestnáctibitové
+celé číslo se znaménkem. Tyto základní informace přečteme z&nbsp;prvních čtyř
+metainformací z&nbsp;hlavičky:</p>
+
+<pre>
+BITPIX  =                   16  / SIGNED 16-BIT INTEGERS                         
+NAXIS   =                    2  / 2-DIMENSIONAL IMAGES                           
+NAXIS1  =                  512  / SAMPLES PER LINE                               
+NAXIS2  =                  512  / LINES PER IMAGE                                
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tímto velmi užitečným formátem se budeme
+podrobněji zabývat v&nbsp;samostatném článku.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Formát GRIB (<i>GRIdded Binary</i>)</h2>
+
+<p>Další formát, který se používá pro uložení matic
+resp.&nbsp;dvoudimenzionálních polí s&nbsp;prvky různých (volitelných) hodnot,
+se jmenuje <i>GRIB</i> neboli <i>GRIdded Binary</i> popř.&nbsp;<i>General
+Regularly-distributed Information in Binary form</i>. Z&nbsp;praktického
+pohledu je tento formát vlastně relativně jednoduchý, protože každý soubor se
+skládá z&nbsp;kolekce na sobě nezávislých dvoudimenzionálních polí
+s&nbsp;metadaty, která jsou v&nbsp;souboru uložena za sebou. Soubory však
+neobsahují žádná metadata, která by popisovala vztahy mezi jednotlivými poli
+(například fakt, že první pole reprezentuje vypočtenou teplotu povrchu/vzduchu
+a druhé vlhkost atd. pro stejnou plochu &ndash; tyto vztahy musí odvodit až
+nějaký program). Na druhou stranu je možné do metadat pro každé pole uložit
+mnoho důležitých informací, například rozlišení původních senzorů (či
+výpočetního modelu), souřadnice měření/výpočtů i vlastní jednotky veličiny
+uložené v&nbsp;poli (teplota, rychlost větru, koncentrace ozónu atd.). Tento
+formát je podporován například v&nbsp;Mathematice nebo v&nbsp;<a
+href="https://www.qgis.org/en/site/">QGIS</a> (což je open source GIS
+systém).</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Formát NetCDF (<i>Network Common Data Form</i>)</h2>
+
+<p>Třetím formátem, o němž se v&nbsp;dnešním článku alespoň ve stručnosti
+zmíníme, je formát nazvaný <i>NetCDF</i> neboli <i>Network Common Data
+Form</i>. Opět se jedná o formát primárně určený pro ukládání polí. Jedná se o
+poměrně starý formát, protože práce na na něm začaly již v&nbsp;roce 1988.
+Původní formát se dnes nazývá &bdquo;classic NetCDF format&ldquo; a zajímavé
+je, že se stále používá (ostatně stále se používá například i <a
+href="https://www.root.cz/serialy/graficky-format-gif/">grafický formát GIF</a>
+z&nbsp;roku 1987 resp.&nbsp;jeho nová verze z&nbsp;roku 1989). Čtvrtá verze
+formátu NetCDF z&nbsp;roku 2008 již přímo zmiňuje formát HDF zmíněný <a
+href="#k04">v&nbsp;navazující kapitole</a>. NetCDF obsahuje hlavičku za níž
+následují jednotlivá pole a prakticky libovolné množství záznamů
+s&nbsp;metadaty o těchto polích ve formě dvojic klíč-hodnota.
+V&nbsp;současnosti je tento formát podporován v&nbsp;mnoha ekosystémech,
+například v&nbsp;ekosystému programovacího jazyka Python, jazyka Julia,
+v&nbsp;Mathematice, MATLABu atd. (již z&nbsp;tohoto výčtu je patrné, že tento
+formát je primárně určen pro uložení vědeckých dat).</p>
+
+<p><div class="rs-tip-major">Poznámka: tímto formátem se budeme zabývat
+v&nbsp;navazujícím článku.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Formát HDF (<i>Hierarchical Data Format</i>)</h2>
+
+<p>Posledním potenciálně užitečným formátem pro ukládání n-dimenzionálních
+polí, o němž se v&nbsp;dnešním článku zmíníme, je formát nazývaný <i>HDF</i>
+resp.&nbsp;celým jménem <i>Hierarchical Data Format</i>. Ve skutečnosti se
+nejedná o jediný formát, ale o sadu formátů se stejným jménem, za nímž je
+uvedeno číslo verze (takže například <i>HDF4</i> či <i>HDF5</i>, pokud máme
+jmenovat ty verze, s&nbsp;nimiž se lze nejčastěji setkat). V&nbsp;tomto formátu
+je možné uložit větší množství n-dimenzionálních polí včetně metadat, ale
+například <i>HDF5</i> umožňuje ukládání dalších datových struktur. Zajímavé je,
+že pole (a další struktury) jsou uloženy ve struktuře, která připomíná
+souborový systém &ndash; jedná se tedy o stromovou strukturu a tím pádem i o
+strukturu, v&nbsp;níž je možné velmi snadno určovat hierarchii jednotlivých
+objektů. To ovšem vede k&nbsp;vyšší celkové složitosti celého formátu, zejména
+v&nbsp;porovnání s&nbsp;&bdquo;primitivním&ldquo; formátem NPY, jímž se
+zabýváme dnes.</p>
+
+<p>Tento formát je v&nbsp;současnosti podporován v&nbsp;mnoha ekosystémech,
+například v&nbsp;Julii, Mathematice, MATLABu a R (tedy
+v&nbsp;&bdquo;matematických ekosystémech&ldquo;), ale i v&nbsp;Pythonu či právě
+v&nbsp;jazyce Go nebo v&nbsp;Rustu.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Standardní binární soubor knihovny Numpy</h2>
+
+<p>Z&nbsp;předchozích kapitol je patrné, že je možné n-rozměrná pole ukládat do
+binárních souborů, a to hned v&nbsp;několika standardizovaných formátech. Tyto
+formáty jsou ovšem mnohdy relativně složité a jejich použití vyžaduje instalaci
+dalších knihoven. Komplikované formáty nejsou v&nbsp;mnoha případech ideálním
+řešením (data je totiž mnohdy nutné uchovávat po dlouhou dobu, kdy původní
+systémy již nemusí být funkční) a mj.&nbsp;i proto byl vyvinut dnes již taktéž
+standardní binární formát určený pro ukládání n-rozměrných polí. Tento formát
+se nazývá NPY a jeho popis lze nalézt na stránce <a
+href="https://numpy.org/devdocs/reference/generated/numpy.lib.format.html">https://numpy.org/devdocs/reference/generated/numpy.lib.format.html</a>.
+Jedná se o přímou serializaci pole do souboru, ovšem před vlastní hodnoty prvků
+je uložena jednoduchá hlavička se všemi důležitými informacemi &ndash; včetně
+endianity, kterou jsme prozatím vůbec neřešili.</p>
+
+<p><div class="rs-tip-major">Poznámka: pokud se má uložit větší množství polí,
+lze soubory NPY zabalit do ZIP archivu a použít koncovku NPZ. Podrobnosti si
+ukážeme dále.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Interní struktura souboru ve formátu NPY</h2>
+
+<p>Interní struktura formátu NPY je relativně jednoduchá. Na začátku je uloženo
+několik bajtů s&nbsp;informacemi o typu souboru a o verzi formátu. Následuje
+hlavička v&nbsp;textovém formátu (JSON), která bývá mezerami rozšířena tak, aby
+další blok začínal na offsetu dělitelném šestnácti. A po této hlavičce již
+následují hodnoty jednotlivých prvků pole &ndash; bez oddělovačů a výplní.</p>
+
+<p>Podívejme se na jednoduchý příklad:</p>
+
+<pre>
+0000000 93 4e 55 4d 50 59 01 00 76 00 7b 27 64 65 73 63  &gt;.NUMPY..v.{'desc&lt;
+0000020 72 27 3a 20 27 3c 66 32 27 2c 20 27 66 6f 72 74  &gt;r': '&lt;f2', 'fort&lt;
+0000040 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61 6c 73  &gt;ran_order': Fals&lt;
+0000060 65 2c 20 27 73 68 61 70 65 27 3a 20 28 31 30 2c  &gt;e, 'shape': (10,&lt;
+0000100 29 2c 20 7d 20 20 20 20 20 20 20 20 20 20 20 20  &gt;), }            &lt;
+0000120 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+0000140 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+0000160 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0a  &gt;               .&lt;
+0000200 00 3c 00 40 00 42 00 44 00 45 00 46 00 47 00 48  &gt;.&lt;.@.B.D.E.F.G.H&lt;
+0000220 80 48 00 49                                      &gt;.H.I&lt;
+</pre>
+
+<p>Význam jednotlivých údajů v&nbsp;souboru je následující:</p>
+
+<ol>
+
+<li>Prvních šest bajtů obsahuje vždy stejnou sekvenci bajtů: hexadecimální
+hodnotu 0x93 následovanou pěti bajty tvořícími řetězec
+&bdquo;NUMPY&ldquo;.</li>
+
+<li>Následuje bajt obsahující hlavní (<i>major</i>) číslo verze, v&nbsp;našem
+případě 1.</li>
+
+<li>Další bajt obsahuje vedlejší (<i>minor</i>) číslo verze, konkrétně 0.</li>
+
+<li>Následuje dvojice bajtů (v&nbsp;pořadí <i>little endian</i>) s&nbsp;délkou
+metadat. V&nbsp;předchozím příkladu byla délka metadat nastavena na 0x76=118
+bajtů.</li>
+
+<li>Samotná metadata obsahují informace v&nbsp;textovém formátu:
+&bdquo;{'descr': '&lt;f2', 'fortran_order': False, 'shape': (10,), }&ldquo;.
+Tato data popisují především tvar pole, typ prvků pole (<strong>f2</strong>) i
+způsob uložení <i>little endian/big endian/jednotlivé bajty</i>.</li>
+
+<li>To ještě není vše, protože šestice magických bajtů, číslo verze, délka
+metadat a celá struktura s&nbsp;metadaty bývá zarovnána na násobky šestnácti
+bajtů (to proto, aby se celé pole dalo načíst nějakou formou rychlého blokového
+čtení. Za hlavičkou tedy většinou následuje sekvence mezer (0x20) ukončená
+znakem pro nový řádek (0x0a). V&nbsp;našem konkrétním případě je délka metadat
+menší než zmíněných 118 bajtů, ovšem na tuto hodnotu je hlavička dorovnána
+sekvencí mezer a koncem řádku (celková délka začátku souboru je tedy
+6+2+2+118=128 bajtů, což je číslo dělitelné šestnácti).</li>
+
+<li>Dále již následují surová data prvků pole ve zvoleném formátu.</li>
+
+</ol>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Uložení vektoru (jednorozměrného pole) do binárního souboru s&nbsp;využitím knihovny Numpy</h2>
+
+<p>Formát NPY byl primárně určen pro použití v&nbsp;knihovně Numpy, takže si
+nejprve ukažme způsob jeho použití právě s&nbsp;využitím programovacího jazyka
+Python a knihovny Numpy.</p>
+
+<p>Vektor s&nbsp;prvky libovolného typu se uloží do standardního binárního
+formátu funkcí <strong>save</strong>. Té je možné (a vhodné) předat parametr
+<strong>allow_pickle=False</strong> aby se zabránilo případné serializaci
+objektů v&nbsp;případě, že vektor bude nějaké objekty obsahovat (taková data by
+v&nbsp;Go postrádala smysl):</p>
+
+<pre>
+<i>"""Uložení obsahu vektoru do standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+<i># vektor obsahující hodnoty s plovoucí řádovou čárkou</i>
+<i># s poloviční přesností (half)</i>
+v = np.linspace(1, 10, 10, dtype="e")
+print(v)
+&nbsp;
+<strong>np.save("vector.npy", v, allow_pickle=False)</strong>
+</pre>
+
+<p>Výsledný binární soubor si vypíšeme jak v&nbsp;hexadecimálním tvaru, tak i
+jako sekvenci znaků. Pro tento účel použijeme standardní nástroj
+<strong>od</strong>:</p>
+
+<pre>
+$ <strong>od -t x1z -v vector.npy</strong>
+</pre>
+
+<p>Obsah tohoto souboru bude následující:</p>
+
+<pre>
+0000000 93 4e 55 4d 50 59 01 00 76 00 7b 27 64 65 73 63  &gt;.NUMPY..v.{'desc&lt;
+0000020 72 27 3a 20 27 3c 66 32 27 2c 20 27 66 6f 72 74  &gt;r': '&lt;f2', 'fort&lt;
+0000040 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61 6c 73  &gt;ran_order': Fals&lt;
+0000060 65 2c 20 27 73 68 61 70 65 27 3a 20 28 31 30 2c  &gt;e, 'shape': (10,&lt;
+0000100 29 2c 20 7d 20 20 20 20 20 20 20 20 20 20 20 20  &gt;), }            &lt;
+0000120 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+0000140 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+0000160 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0a  &gt;               .&lt;
+0000200 00 3c 00 40 00 42 00 44 00 45 00 46 00 47 00 48  &gt;.&lt;.@.B.D.E.F.G.H&lt;
+0000220 80 48 00 49                                      &gt;.H.I&lt;
+0000224
+</pre>
+
+<p>Hlavička v&nbsp;tomto případě obsahuje mj.&nbsp;i informace o typu prvků
+&bdquo;f2&ldquo; i o tvaru pole (v&nbsp;čitelném tvaru). Samotná data
+v&nbsp;tomto případě začínají na offsetu 128 (tedy 200 oktalově). Samotná délka
+dat je rovna dvaceti bajtům, protože každý prvek vektoru zabere dva bajty a
+prvků je uloženo deset.</p>
+
+<p>Tento binární soubor s&nbsp;obsahem vektoru lze načíst velmi snadno, a to
+konkrétně funkcí <strong>numpy.load()</strong>:</p>
+
+<pre>
+<i>"""Přečtení obsahu vektoru ze standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+v = <strong>np.load("vector.npy")</strong>
+print(v)
+print(v.dtype)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poněkud předbíháme, ovšem již nyní je
+vhodné si říci, že dále popsaná knihovna <i>github.com/sbinet/npyio</i> datový
+formát <strong>float16</strong> nepodporuje. Je tomu tak z&nbsp;toho důvodu, že
+tento formát není nativně podporován ani samotným programovacím jazykem
+Go.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Uložení a načtení matice do/ze standardního binárního souboru, opět s&nbsp;využitím knihovny Numpy</h2>
+
+<p>Naprosto stejným způsobem jako s&nbsp;vektory se v&nbsp;případě standardního
+binárního souboru NPY a knihovny Numpy pracuje s&nbsp;maticemi. Uložení matice
+je z&nbsp;pohledu programátora triviální operací:</p>
+
+<pre>
+<i>"""Uložení obsahu matice do standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+<i># matice obsahující celočíselné 8bitové hodnoty (byte)</i>
+m = np.linspace(1, 12, 12, dtype="b").reshape(3, 4)
+print(m)
+&nbsp;
+<strong>np.save("matrix1.npy", m, allow_pickle=False)</strong>
+</pre>
+
+<p>Zpětné načtení matice můžeme realizovat takto:</p>
+
+<pre>
+<i>"""Přečtení obsahu matice ze standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+m = <strong>np.load("matrix1.npy")</strong>
+print(m)
+print(m.dtype)
+</pre>
+
+<p>Přitom je vytvořen soubor nazvaný <strong>matrix1.npy</strong>, jehož
+vnitřní strukturu si můžeme prohlédnout nástrojem <strong>od</strong>:</p>
+
+<pre>
+$ <strong>od -Ax -t x1z -v matrix1.npy</strong>
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+000000 93 4e 55 4d 50 59 01 00 76 00 7b 27 64 65 73 63  &gt;.NUMPY..v.{'desc&lt;
+000010 72 27 3a 20 27 7c 69 31 27 2c 20 27 66 6f 72 74  &gt;r': '|i1', 'fort&lt;
+000020 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61 6c 73  &gt;ran_order': Fals&lt;
+000030 65 2c 20 27 73 68 61 70 65 27 3a 20 28 33 2c 20  &gt;e, 'shape': (3, &lt;
+000040 34 29 2c 20 7d 20 20 20 20 20 20 20 20 20 20 20  &gt;4), }           &lt;
+000050 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+000060 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+000070 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0a  &gt;               .&lt;
+000080 01 02 03 04 05 06 07 08 09 0a 0b 0c              &gt;............&lt;
+00008c
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že tvar je popsán
+řetězcem <strong>(3, 4)</strong>. Samotné hodnoty pole jsou uloženy od offsetu
+0x80, tedy ve výpisu na posledním řádku. Taktéž si povšimněte, že hodnoty typu
+&bdquo;bajt&ldquo; neboli <strong>i1</strong> nemají specifikováno pořadí bajtů
+(tedy ani <i>little endian</i> ani <i>big endian</i>).</div></p>
+
+<p>Stejný příklad, ovšem s&nbsp;maticí obsahující prvky typu
+&bdquo;float&ldquo;:</p>
+
+<pre>
+<i>"""Uložení obsahu matice do standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+m = np.linspace(1, 12, 12, dtype="f").reshape(3, 4)
+print(m)
+&nbsp;
+<strong>np.save("matrix2.npy", m, allow_pickle=False)</strong>
+</pre>
+
+<p>Zpětné načtení matice:</p>
+
+<pre>
+<i>"""Přečtení obsahu matice ze standardního binárního souboru."""</i>
+&nbsp;
+import numpy as np
+&nbsp;
+m = <strong>np.load("matrix2.npy")</strong>
+print(m)
+print(m.dtype)
+</pre>
+
+<p>Druhý binární soubor má pochopitelně odlišný obsah, neboť nyní je hodnota
+každého prvku uložena ve čtyřech bajtech:</p>
+
+<pre>
+$ <strong>od -Ax -t x1z -v matrix2.npy</strong>
+&nbsp;
+000000 93 4e 55 4d 50 59 01 00 76 00 7b 27 64 65 73 63  &gt;.NUMPY..v.{'desc&lt;
+000010 72 27 3a 20 27 3c 66 34 27 2c 20 27 66 6f 72 74  &gt;r': '&lt;f4', 'fort&lt;
+000020 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61 6c 73  &gt;ran_order': Fals&lt;
+000030 65 2c 20 27 73 68 61 70 65 27 3a 20 28 33 2c 20  &gt;e, 'shape': (3, &lt;
+000040 34 29 2c 20 7d 20 20 20 20 20 20 20 20 20 20 20  &gt;4), }           &lt;
+000050 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+000060 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20  &gt;                &lt;
+000070 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0a  &gt;               .&lt;
+000080 00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40  &gt;...?...@..@@...@&lt;
+000090 00 00 a0 40 00 00 c0 40 00 00 e0 40 00 00 00 41  &gt;...@...@...@...A&lt;
+0000a0 00 00 10 41 00 00 20 41 00 00 30 41 00 00 40 41  &gt;...A.. A..0A..@A&lt;
+0000b0
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nyní je explicitně nastaveno pořadí
+bajtů &bdquo;little endian&ldquo;, a to řetězcem
+<strong>&lt;f4</strong>.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Knihovna <strong>npyio</strong> pro práci s&nbsp;NPY soubory v&nbsp;programovacím jazyku Go</h2>
+
+<p>V&nbsp;případě programovacího jazyka Go existuje pro ukládání vektorů a
+matic do formátu NPY i pro zpětné načtení těchto datových struktur hned několik
+knihoven. První knihovnou, s&nbsp;níž se setkáme v&nbsp;dnešním článku, je
+knihovna nazvaná <strong>npyio</strong>. Její předností je fakt, že se
+s&nbsp;daty pracuje zcela idiomatickým způsobem. Mezi nevýhody lze naopak řadit
+velmi pomalé načítání (nikoli však ukládání) vektorů a matic z&nbsp;větších
+souborů (100MB a výše) a taktéž fakt, že není kompatibilní s&nbsp;balíčkem
+<strong>narray</strong>, s&nbsp;nímž jsme se ve stručnosti seznámili <a
+href="https://www.root.cz/clanky/zpracovani-n-rozmernych-poli-v-jazyce-go-s-vyuzitim-knihovny-narray/">v&nbsp;tomto
+článku</a>.</p>
+
+<p>Ve starších verzích jazyka Go je instalace balíčku <strong>npyio</strong>
+snadná, protože postačuje použít příkaz <strong>go get</strong>
+v&nbsp;následujícím tvaru:</p>
+
+<pre>
+$ <strong>go get github.com/sbinet/npyio</strong>
+</pre>
+
+<p>U novějších verzí Go je nejprve nutné vytvořit nový projekt příkazem:</p>
+
+<pre>
+$ <strong>go mod init jméno-projektu</strong>
+</pre>
+
+<p>A následně ve zdrojovém kódu naimportovat knihovnu <strong>npyio</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/sbinet/npyio"
+)
+...
+...
+...
+</pre>
+
+<p>Při pokusu o překlad takto upraveného projektu si překladač jazyka Go vyžádá
+instalaci balíčku <strong>npyio</strong>; ovšem tato instalace musí být
+spuštěna z&nbsp;adresáře, v&nbsp;němž je uložen projekt. Povšimněte si, že se
+v&nbsp;průběhu instalace kromě vlastního balíčku <strong>npyio</strong>
+mj.&nbsp;nainstaluje i celý balíček <strong>gonum</strong>, jímž jsme se na
+stránkách Roota taktéž zabývali v&nbsp;článcích <a
+href="https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/">Gophernotes:
+kombinace interaktivního prostředí Jupyteru s jazykem Go</a> a <a
+href="https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/">Popis
+vybraných balíčků nabízených projektem Gonum</a>:</p>
+
+<pre>
+go: downloading github.com/sbinet/npyio v0.7.0
+go: downloading github.com/campoy/embedmd v1.0.0
+go: downloading gonum.org/v1/gonum v0.9.3
+go: downloading github.com/pmezard/go-difflib v1.0.0
+go: added github.com/campoy/embedmd v1.0.0
+go: added github.com/pmezard/go-difflib v1.0.0
+go: added github.com/sbinet/npyio v0.7.0
+go: added gonum.org/v1/gonum v0.9.3
+</pre>
+
+<p>Projektový soubor <strong>go.mod</strong> by nyní měl vypadat následovně
+(pochopitelně se může lišit jméno projektu a taktéž verze jazyka Go, která
+projekt vytvořila):</p>
+
+<pre>
+module write-npy1
+&nbsp;
+go 1.20
+&nbsp;
+require (
+        github.com/campoy/embedmd v1.0.0 // indirect
+        github.com/pmezard/go-difflib v1.0.0 // indirect
+        github.com/sbinet/npyio v0.7.0 // indirect
+        gonum.org/v1/gonum v0.9.3 // indirect
+)
+</pre>
+
+<p>Zajímavé je zjistit, jak vypadá &bdquo;dependency hell&ldquo;, tedy obsah
+souboru <strong>go.sum</strong>. Většina tranzitivních závislostí je způsobena
+balíčkem <strong>gonum</strong> (a ukazuje se tak, že primární závislost
+<strong>npyio</strong> na <strong>gonum</strong> není zcela šťastná):</p>
+
+<pre>
+dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
+gioui.org v0.0.0-20210308172011-57750fc8a0a6/go.mod h1:RSH6KIUZ0p2xy5zHDxgAM4zumjgTw83q2ge/PI+yyw8=
+github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
+github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
+github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
+github.com/campoy/embedmd v1.0.0 h1:V4kI2qTJJLf4J29RzI/MAt2c3Bl4dQSYPuflzwFH2hY=
+github.com/campoy/embedmd v1.0.0/go.mod h1:oxyr9RCiSXg0M3VJ3ks0UGfp98BpSSGr0kpiX3MzVl8=
+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
+github.com/fogleman/gg v1.3.0/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
+github.com/go-fonts/dejavu v0.1.0/go.mod h1:4Wt4I4OU2Nq9asgDCteaAaWZOV24E+0/Pwo0gppep4g=
+github.com/go-fonts/latin-modern v0.2.0/go.mod h1:rQVLdDMK+mK1xscDwsqM5J8U2jrRa3T0ecnM9pNujks=
+github.com/go-fonts/liberation v0.1.1/go.mod h1:K6qoJYypsmfVjWg8KOVDQhLc8UDgIK2HYqyqAO9z7GY=
+github.com/go-fonts/stix v0.1.0/go.mod h1:w/c1f0ldAUlJmLBvlbkvVXLAD+tAMqobIIQpmnUIzUY=
+github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
+github.com/go-latex/latex v0.0.0-20210118124228-b3d85cf34e07/go.mod h1:CO1AlKB2CSIqUrmQPqA0gdRIlnLEY0gK5JGjh37zN5U=
+github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0/go.mod h1:E/TSTwGwJL78qG/PmXZO1EjYhfJinVAhrmmHX6Z8B9k=
+github.com/jung-kurt/gofpdf v1.0.0/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
+github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
+github.com/phpdave11/gofpdf v1.4.2/go.mod h1:zpO6xFn9yxo3YLyMvW8HcKWVdbNqgIfOOp2dXMnm1mY=
+github.com/phpdave11/gofpdi v1.0.12/go.mod h1:vBmVV0Do6hSBHC8uKUQ71JGW+ZGQq74llk/7bXwjDoI=
+github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/ruudk/golang-pdf417 v0.0.0-20181029194003-1af4ab5afa58/go.mod h1:6lfFZQK844Gfx8o5WFuvpxWRwnSoipWe/p622j1v06w=
+github.com/sbinet/npyio v0.7.0 h1:KH8n5VrI1O2FeNAHwa0WmC1f9nGNtXNzQHBkyoU8tuE=
+github.com/sbinet/npyio v0.7.0/go.mod h1:4jmxspVr/RFRPc6zSGR/8FP6nb9m7EpypUXrU/cf/nU=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+golang.org/x/exp v0.0.0-20180321215751-8460e604b9de/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
+golang.org/x/exp v0.0.0-20180807140117-3d87b88a115f/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
+golang.org/x/exp v0.0.0-20190125153040-c74c464bbbf2/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
+golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
+golang.org/x/exp v0.0.0-20191002040644-a1355ae1e2c3/go.mod h1:NOZ3BPKG0ec/BKJQgnvsSFpcKLM5xXVWnvZS97DWHgE=
+golang.org/x/image v0.0.0-20180708004352-c73c2afc3b81/go.mod h1:ux5Hcp/YLpHSI86hEcLt0YII63i6oz57MZXIpbrjZUs=
+golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
+golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20190910094157-69e4b8554b2a/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20200119044424-58c23975cae1/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20200430140353-33d19683fad8/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20200618115811-c13761719519/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20201208152932-35266b937fa6/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/image v0.0.0-20210216034530-4410531fe030/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028/go.mod h1:E/iHnbuqvinMTCcRqshq8CkpyQDoeVncDDYHnLhea+o=
+golang.org/x/mod v0.1.0/go.mod h1:0QHyrYULN0/3qlju5TqG8bIK38QM8yzMo5ekMj3DlcY=
+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/sys v0.0.0-20190312061237-fead79001313/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20210304124612-50617c2ba197/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/text v0.3.5/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
+golang.org/x/tools v0.0.0-20180525024113-a5b4c53f6e8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+golang.org/x/tools v0.0.0-20190206041539-40960b6deb8e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+golang.org/x/tools v0.0.0-20190927191325-030b2cf1153e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+gonum.org/v1/gonum v0.0.0-20180816165407-929014505bf4/go.mod h1:Y+Yx5eoAFn32cQvJDxZx5Dpnq+c3wtXuadVZAcxbbBo=
+gonum.org/v1/gonum v0.8.2/go.mod h1:oe/vMfY3deqTw+1EZJhuvEW2iwGF1bW9wwu7XCu0+v0=
+gonum.org/v1/gonum v0.9.3 h1:DnoIG+QAMaF5NvxnGe/oKsgKcAc6PcUyl8q0VetfQ8s=
+gonum.org/v1/gonum v0.9.3/go.mod h1:TZumC3NeyVQskjXqmyWt4S3bINhy7B4eYwW69EbyX+0=
+gonum.org/v1/netlib v0.0.0-20190313105609-8cb42192e0e0/go.mod h1:wa6Ws7BG/ESfp6dHfk7C6KdzKA7wR7u/rKwOGE66zvw=
+gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b/go.mod h1:Wt8AAjI+ypCyYX3nZBvf6cAIx93T+c/OS2HFAYskSZc=
+gonum.org/v1/plot v0.9.0/go.mod h1:3Pcqqmp6RHvJI72kgb8fThyUnav364FOsdDo2aGW5lY=
+rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Uložení vektoru s&nbsp;prvky typu <strong>int8</strong> do souboru typu NPY</h2>
+
+<p>Základní vlastnosti knihovny <strong>npyio</strong> si otestujeme na
+několika demonstračních příkladech. První příklad je skutečně základní &ndash;
+pokusíme se v&nbsp;něm totiž do souboru ve formátu NPY uložit vektor deseti
+hodnot typu <strong>int8</strong>, což jsou celá čísla v&nbsp;rozsahu od -128
+do 127. Povšimněte si, že celý postup je (pokud vynecháme testy úspěšnosti
+jednotlivých operací) až triviálně jednoduchý:</p>
+
+<ol>
+<li>f := os.Create</li>
+<li>npyio.Write(f, vektor)</li>
+<li>f.Close()</li>
+</ol>
+
+<p>Se všemi deklaracemi, zajištěním uzavření souboru a kontrolou chyb by mohl
+příklad vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Create("int8_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        m := []int8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+        err = npyio.Write(f, m)
+        if err != nil {
+                log.Fatalf("error writing to file: %v\n", err)
+        }
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu by měl vzniknout soubor
+<strong>vector.npy</strong>, který můžeme prozkoumat nástrojem
+<strong>od</strong>:</p>
+
+<pre>
+$ <strong>od -Ax -t x1z -v int_vector.npy</strong>
+</pre>
+
+<p>Výsledek bude vypadat následovně:</p>
+
+<pre>
+000000 93 4e 55 4d 50 59 02 00 42 00 00 00 7b 27 64 65  &gt;.NUMPY..B...{'de&lt;
+000010 73 63 72 27 3a 20 27 7c 69 31 27 2c 20 27 66 6f  &gt;scr': '|i1', 'fo&lt;
+000020 72 74 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61  &gt;rtran_order': Fa&lt;
+000030 6c 73 65 2c 20 27 73 68 61 70 65 27 3a 20 28 31  &gt;lse, 'shape': (1&lt;
+000040 30 2c 29 2c 20 7d 20 20 20 20 20 20 20 0a 00 01  &gt;0,), }       ...&lt;
+000050 02 03 04 05 06 07 08 09                          &gt;........&lt;
+000058
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že úvodní bajty společně
+s&nbsp;hlavičkou nejsou zarovnány na násobek šestnácti. Nejedná se přímo o
+chybu, ale o nedodržení doporučení o tom, jak má být formát NPY
+využit.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Uložení vektoru s&nbsp;deseti prvky typu <strong>int32</strong></h2>
+
+<p>Prakticky stejným způsobem je možné realizovat uložení vektoru s&nbsp;deseti
+prvky typu <strong>int32</strong>, tj.&nbsp;32bitových hodnot se znaménkem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Create("int_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        m := []int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+        err = npyio.Write(f, m)
+        if err != nil {
+                log.Fatalf("error writing to file: %v\n", err)
+        }
+}
+</pre>
+
+<p>Povšimněte si, že nyní je korektně uveden jak typ prvků (&bdquo;i4&ldquo;),
+tak i fakt, že bajty každého prvku jsou uloženy ve formátu <i>little endian</i>
+(znak &bdquo;&lt;&ldquo; před typem prvku). A opět není provedeno zarovnání
+hlavičky na násobky šestnácti bajtů:</p>
+
+<pre>
+$ <strong>od -Ax -t x1z -v int_vector.npy</strong>
+&nbsp;
+000000 93 4e 55 4d 50 59 02 00 42 00 00 00 7b 27 64 65  &gt;.NUMPY..B...{'de&lt;
+000010 73 63 72 27 3a 20 27 3c 69 34 27 2c 20 27 66 6f  &gt;scr': '&lt;i4', 'fo&lt;
+000020 72 74 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61  &gt;rtran_order': Fa&lt;
+000030 6c 73 65 2c 20 27 73 68 61 70 65 27 3a 20 28 31  &gt;lse, 'shape': (1&lt;
+000040 30 2c 29 2c 20 7d 20 20 20 20 20 20 20 0a 00 00  &gt;0,), }       ...&lt;
+000050 00 00 01 00 00 00 02 00 00 00 03 00 00 00 04 00  &gt;................&lt;
+000060 00 00 05 00 00 00 06 00 00 00 07 00 00 00 08 00  &gt;................&lt;
+000070 00 00 09 00 00 00                                &gt;......&lt;
+000076
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Uložení dvojrozměrné matice do souboru typu NPY</h2>
+
+<p>V&nbsp;mnoha úlohách se nepracuje s&nbsp;pouhými vektory, ale spíše
+s&nbsp;dvourozměrnými maticemi. I ty lze do souborů typu NPY pochopitelně
+uložit, ovšem při použití knihovny <strong>npyio</strong> pro jazyk Go je nutné
+pro konstrukci matice využít knihovnu <strong>gonum</strong>, kterou jsme se
+již na stránkách Roota zabývali. Příkladem může být vytvoření plné (husté)
+matice konstruktorem <strong>mat.NewDense</strong>, kterému se předají rozměry
+matice a taktéž hodnoty jednotlivých prvků matice. V&nbsp;knihovně
+<strong>gonum</strong> jsou prvky matice reprezentovány typem
+<strong>float64</strong>:</p>
+
+<pre>
+m := mat.NewDense(3, 4, []float64{
+        1, 2, 3,
+        4, 5, 6,
+        7, 8, 9,
+        10, 11, 12})
+</pre>
+
+<p>Takovou matici uložíme do NPY stejně, jako vektor:</p>
+
+<pre>
+f, err := <strong>os.Create("float_matrix.npy")</strong>
+err = <strong>npyio.Write(f, m)</strong>
+err := <strong>f.Close()</strong>
+</pre>
+
+<p>Úplný zdrojový kód obsahující všechny (nutné) kontroly možných chybových
+stavů může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+        "gonum.org/v1/gonum/mat"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Create("float_matrix.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        m := mat.NewDense(3, 4, []float64{
+                1, 2, 3,
+                4, 5, 6,
+                7, 8, 9,
+                10, 11, 12})
+&nbsp;
+        err = npyio.Write(f, m)
+        if err != nil {
+                log.Fatalf("error writing to file: %v\n", err)
+        }
+}
+</pre>
+
+<p>Opět se podíváme na to, jak vypadá vygenerovaný soubor s&nbsp;maticí:</p>
+
+<pre>
+$ <strong>od -Ax -t x1z -v float_matrix.npy</strong>
+</pre>
+
+<p>V&nbsp;souboru můžeme vidět jak definici typu prvků matice
+(&bdquo;f8&ldquo;), tak i specifikaci tvaru (<i>shape</i>) matice. Hlavička je
+nyní korektně zarovnána na hodnotu dělitelnou šestnácti; za hlavičkou a výplní
+jsou již uloženy hodnoty jednotlivých prvků:</p>
+
+<pre>
+000000 93 4e 55 4d 50 59 02 00 44 00 00 00 7b 27 64 65  &gt;.NUMPY..D...{'de&lt;
+000010 73 63 72 27 3a 20 27 3c 66 38 27 2c 20 27 66 6f  &gt;scr': '&lt;f8', 'fo&lt;
+000020 72 74 72 61 6e 5f 6f 72 64 65 72 27 3a 20 46 61  &gt;rtran_order': Fa&lt;
+000030 6c 73 65 2c 20 27 73 68 61 70 65 27 3a 20 28 33  &gt;lse, 'shape': (3&lt;
+000040 2c 20 34 29 2c 20 7d 20 20 20 20 20 20 20 20 0a  &gt;, 4), }        .&lt;
+000050 00 00 00 00 00 00 f0 3f 00 00 00 00 00 00 00 40  &gt;.......?.......@&lt;
+000060 00 00 00 00 00 00 08 40 00 00 00 00 00 00 10 40  &gt;.......@.......@&lt;
+000070 00 00 00 00 00 00 14 40 00 00 00 00 00 00 18 40  &gt;.......@.......@&lt;
+000080 00 00 00 00 00 00 1c 40 00 00 00 00 00 00 20 40  &gt;.......@...... @&lt;
+000090 00 00 00 00 00 00 22 40 00 00 00 00 00 00 24 40  &gt;......"@......$@&lt;
+0000a0 00 00 00 00 00 00 26 40 00 00 00 00 00 00 28 40  &gt;......&amp;@......(@&lt;
+0000b0
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Načtení vektoru ze souboru typu NPY</h2>
+
+<p>Víme již, že uložení vektoru či matice do souboru typu NPY se provádí
+následující sekvencí operací (zjednodušeno &ndash; bez kontroly chyb atd.):</p>
+
+<ol>
+<li>f := os.Create</li>
+<li>npyio.Write(f, vektor či matice)</li>
+<li>f.Close()</li>
+</ol>
+
+<p>Načtení vektoru ze souboru typu NPY je podobně jednoduché, pouze je nutné
+dopředu vytvořit řez (<i>slice</i>), do kterého budou prvky vektoru uloženy.
+Připomeňme si, že řez může v&nbsp;jazyce Go &bdquo;růst&ldquo;, což znamená, že
+nemusíme dopředu alokovat paměť. Navíc se řez do funkce
+<strong>npyio.Read</strong> musí předávat odkazem (protože se interně změní
+všechny tři jeho atributy &ndash; ukazatel na pole, délka řezu i jeho
+kapacita):</p>
+
+<ol>
+<li>f := os.Open("soubor.npy")</li>
+<li>var m []int8 <i>nebo jiný typ</i></li>
+<li>npyio.Read(f, &amp;m)</li>
+<li>f.Close()</li>
+</ol>
+
+<p>Takto vypadá kód demonstračního příkladu, který načte soubor obsahující
+vektor prvků typu <strong>int8</strong> neboli osmibitové hodnoty se
+znaménkem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("int8_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        var m []int8
+        err = npyio.Read(f, &amp;m)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", m)
+}
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto příkladu:</p>
+
+<pre>
+loaded vector = [0 1 2 3 4 5 6 7 8 9]
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Kontrola typů prvků při načítání</h2>
+
+<p>Pokusme se nyní o načtení souboru &bdquo;int_vector.npy&ldquo;, který
+obsahuje vektor prvků typu <strong>int32</strong> do řezu s&nbsp;prvky typu
+<strong>int8</strong>. Otestujeme si tedy, jakým způsobem balíček
+<strong>npyio</strong> kontroluje datové typy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open(<strong>"int_vector.npy"</strong>)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        <strong>var m []int8</strong>
+        err = npyio.Read(f, &amp;m)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", m)
+}
+</pre>
+
+<p>Pokus o spuštění tohoto příkladu skončí (podle očekávání) s&nbsp;chybou,
+protože se typy zkontrolují v&nbsp;době běhu aplikace (<i>runtime</i>):</p>
+
+<pre>
+2023/03/19 08:15:22 error reading from file: npy: types don't match
+</pre>
+
+<p>Oprava je v&nbsp;tomto případě jednoduchá &ndash; je nutné změnit typ řezu
+na:</p>
+
+<pre>
+var m []int32
+</pre>
+
+<p>Opravený příklad:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("int_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        var m []int32
+        err = npyio.Read(f, &amp;m)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", m)
+}
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto demonstračního příkladu je již zcela
+korektní:</p>
+
+<pre>
+loaded vector = [0 1 2 3 4 5 6 7 8 9]
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Načítání matic</h2>
+
+<p>Prozatím jsme si ukázali, jakým způsobem se do souborů s&nbsp;formátem NPY
+ukládají vektory a matice. Vektory již také umíme načíst zpět do datového typu
+&bdquo;řez&ldquo; (slice). Ovšem jakým způsobem se načítají matice?
+V&nbsp;prvním příkladu načteme obsah matice (a skutečně se jedná o matici
+&ndash; viz hlavičku souboru) do řezu, takže vlastně provedeme operaci, která
+se v&nbsp;některých jazycích nazývá <i>flatten</i> &ndash; data se sice načtou,
+ale ztratíme jejich původní strukturu, protože budou reprezentována jako
+jednorozměrný řez:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("float_matrix.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        var m []float64
+        err = npyio.Read(f, &amp;m)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", m)
+}
+</pre>
+
+<p>Získaný výsledek bude v&nbsp;tomto případě vypadat takto:</p>
+
+<pre>
+loaded vector = [1 2 3 4 5 6 7 8 9 10 11 12]
+</pre>
+
+<p>Samozřejmě nám nic nebrání v&nbsp;načtení prvků matice do řezu a jejich
+následný explicitní převod na matici (z&nbsp;balíčku <strong>gonum</strong>).
+Tento postup lze realizovat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+        "gonum.org/v1/gonum/mat"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("float_matrix.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        var v []float64
+        err = npyio.Read(f, &amp;v)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", v)
+&nbsp;
+        m := mat.NewDense(3, 4, v)
+        fmt.Printf("converted matrix =\n%v\n", mat.Formatted(m))
+}
+</pre>
+
+<p>S&nbsp;tímto výsledkem:</p>
+
+<pre>
+loaded vector = [1 2 3 4 5 6 7 8 9 10 11 12]
+&nbsp;
+converted matrix =
+⎡ 1   2   3   4⎤
+⎢ 5   6   7   8⎥
+⎣ 9  10  11  12⎦
+</pre>
+
+<p>Při konverzi lze zvolit i jiné rozměry matice, protože vlastně zcela
+ignorujeme původní hlavičku s&nbsp;metainformacemi i tvaru (<i>shape</i>)
+uloženého n-dimenzionálního pole a převod na matici provádíme v&nbsp;kódu
+explicitně. Jako pokus tedy prohodíme počet řádků a sloupců matice:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+        "gonum.org/v1/gonum/mat"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("float_matrix.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        var v []float64
+        err = npyio.Read(f, &amp;v)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", v)
+&nbsp;
+        m := mat.NewDense(4, 3, v)
+        fmt.Printf("converted matrix =\n%v\n", mat.Formatted(m))
+}
+</pre>
+
+<p>Nyní bude výsledek vypadat odlišně:</p>
+
+<pre>
+loaded vector = [1 2 3 4 5 6 7 8 9 10 11 12]
+&nbsp;
+converted matrix =
+⎡ 1   2   3⎤
+⎢ 4   5   6⎥
+⎢ 7   8   9⎥
+⎣10  11  12⎦
+</pre>
+
+<p>Nicméně ideální by bylo, aby se načetla přímo matice tak, jak byla do
+souboru s&nbsp;formátem NPY uložena. To je již nepatrně komplikovanější
+problém, který se řeší následovně &ndash; explicitním načtením hlavičky,
+alokací vektoru na základě informací získaných z&nbsp;hlavičky (což je ovšem
+poměrně ošklivé řešení) a načtením samotného bloku s&nbsp;daty:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+        "gonum.org/v1/gonum/mat"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("float_matrix.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        r, err := npyio.NewReader(f)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        fmt.Printf("npy-header: %v\n", r.Header)
+        shape := r.Header.Descr.Shape
+&nbsp;
+        v := make([]float64, shape[0]*shape[1])
+&nbsp;
+        err = r.Read(&amp;v)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector = %v\n", v)
+&nbsp;
+        m := mat.NewDense(shape[0], shape[1], v)
+        fmt.Printf("converted matrix =\n%v\n", mat.Formatted(m))
+}
+</pre>
+
+<p>Nyní ve výpisu nalezneme jak informace získané z&nbsp;hlavičky souboru NPY,
+tak i korektně vytvořenou matici:</p>
+
+<pre>
+npy-header: Header{Major:2, Minor:0, Descr:{Type:&lt;f8, Fortran:false, Shape:[3 4]}}
+&nbsp;
+loaded vector = [1 2 3 4 5 6 7 8 9 10 11 12]
+&nbsp;
+converted matrix =
+⎡ 1   2   3   4⎤
+⎢ 5   6   7   8⎥
+⎣ 9  10  11  12⎦
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: jak je patrné, není možné tímto způsobem
+načítat vícerozměrná pole, což je &ndash; vedle problému zmíněného o odstavec
+níže &ndash; největší nedostatek knihovny <strong>npyio</strong>.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Uložení a zpětné načtení rozsáhlejších souborů s&nbsp;velikostí přesahujících gigabyte</h2>
+
+<p>Ještě si vyzkoušejme, zda a jak dokáže knihovna <strong>npyio</strong>
+pracovat s&nbsp;poněkud rozsáhlejšími soubory.</p>
+
+<p>Pro vytvoření vektoru, jehož počet prvků dosahuje hodnoty 2<sup>33</sup>,
+slouží následující demonstrační příklad. Ten po svém spuštění vytvoří soubor
+s&nbsp;příslušnými daty za několik sekund až několik desítek sekund, takže
+v&nbsp;tomto případě vše pracuje zcela podle očekávání:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "math"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Create("large_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        v := make([]byte, math.MaxUint32*2)
+        fmt.Println(len(v))
+&nbsp;
+        err = npyio.Write(f, v)
+        if err != nil {
+                log.Fatalf("error writing to file: %v\n", err)
+        }
+}
+</pre>
+
+<p>Soubor získaný předchozím demonstračním příkladem se nyní pokusíme načíst
+zpět do paměti, a to konkrétně touto jednoduchou aplikací:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "os"
+&nbsp;
+        "github.com/sbinet/npyio"
+)
+&nbsp;
+func <strong>main</strong>() {
+        f, err := os.Open("large_vector.npy")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer func() {
+                err := f.Close()
+                if err != nil {
+                        log.Fatalf("error closing file: %v\n", err)
+                }
+        }()
+&nbsp;
+        r, err := npyio.NewReader(f)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        fmt.Printf("npy-header: %v\n", r.Header)
+        shape := r.Header.Descr.Shape
+&nbsp;
+        v := make([]byte, shape[0])
+&nbsp;
+        err = r.Read(&amp;v)
+        if err != nil {
+                log.Fatalf("error reading from file: %v\n", err)
+        }
+&nbsp;
+        fmt.Printf("loaded vector size = %v\n", len(v))
+}
+</pre>
+
+<p>Výše uvedený příklad je sice plně funkční, ovšem s&nbsp;jedním významným
+&bdquo;ale&ldquo; &ndash; jeho dokončení se dočkáte až po několika desítkách
+minut! Přitom bude jedno procesorové jádro neustále vytíženo na 100%. Jedná se
+o velmi významný nedostatek řešení postaveného na balíčku
+<strong>npyio</strong>, protože soubory o velikosti od 100MB do 1GB (i výše)
+jsou v&nbsp;této oblasti informatiky zcela běžné.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Závěrečné zhodnocení</h2>
+
+<p>Práce s&nbsp;knihovnou <i>npyio</i> je pro programátora znalého
+programovacího jazyka Go poměrně snadná, a to z&nbsp;toho důvodu, že použité
+operace čtení a zápisu jsou realizovány (pro Go) idiomaticky. Ukládání a
+načítání vektorů je triviální, protože se zde využívá standardní datový typ
+jazyka Go, konkrétně řez (<i>slice</i>). Pro ukládání dvojdimenzionálních polí
+jsou využity matice z&nbsp;knihovny <i>Gonum</i>, což ovšem nemusí každému
+vyhovovat (osobně bych například byl raději za podporu <i>narray</i>). Ovšem
+největší problém spočívá ve velmi pomalém načítání (nikoli však ukládání) polí,
+jejichž velikost přesahuje zhruba 100 MB. V&nbsp;praxi jsou taková pole zcela
+běžná, typicky ještě o řád či o dva řády větší, takže v&nbsp;tomto případě
+stojí za uváženou, zda tuto knihovnu vůbec použít. Většinou je lepší výpočet
+realizovat raději přímo v&nbsp;Pythonu+Numpy, zejména ve chvíli, kdy lze
+veškeré operace popsat operacemi nad n-dimenzionálními poli Numpy; v&nbsp;tomto
+případě se totiž výpočty realizují v&nbsp;nativním kódu Numpy a nikoli
+v&nbsp;pomalém Pythonu (samozřejmě lze uvažovat o použití <a
+href="https://www.root.cz/serialy/programovaci-jazyk-julia/">jazyka Julia</a>,
+což lze v&nbsp;této oblasti IT obecně jen doporučit).</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů naprogramovaných
+v&nbsp;jazyku Go byly uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>write-npy1</td><td>uložení vektoru s&nbsp;deseti prvky typu <strong>int8</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/write-npy1/">https://github.com/tisnik/go-root/blob/master/article_A6/write-npy1/</a></td></tr>
+<tr><td> 2</td><td>write-npy2</td><td>uložení vektoru s&nbsp;deseti prvky typu <strong>int32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/write-npy2/">https://github.com/tisnik/go-root/blob/master/article_A6/write-npy2/</a></td></tr>
+<tr><td> 3</td><td>write-npy3</td><td>uložení matice s&nbsp;3&times;4 prvky typu <strong>float32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/write-npy3/">https://github.com/tisnik/go-root/blob/master/article_A6/write-npy3/</a></td></tr>
+<tr><td> 4</td><td>write-npy4</td><td>uložení vektoru s&nbsp;počtem prvků přesahujícím 2<sup>32</sup></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/write-npy4/">https://github.com/tisnik/go-root/blob/master/article_A6/write-npy4/</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>read-npy1</td><td>načtení vektoru s&nbsp;deseti prvky typu <strong>int8</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy1">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy1</a></td></tr>
+<tr><td> 6</td><td>read-npy2</td><td>načtení vektoru s&nbsp;deseti prvky typu <strong>int32</strong> (špatné použití typů)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy2">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy2</a></td></tr>
+<tr><td> 7</td><td>read-npy3</td><td>načtení vektoru s&nbsp;deseti prvky typu <strong>int32</strong> (korektní použití typů)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy3">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy3</a></td></tr>
+<tr><td> 8</td><td>read-npy4</td><td>načtení matice s&nbsp;3&times;4 prvky typu <strong>float32</strong> do vektoru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy4">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy4</a></td></tr>
+<tr><td> 9</td><td>read-npy5</td><td>načtení matice s&nbsp;3&times;4 prvky typu <strong>float32</strong> do matice se specifikací jejího tvaru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy5">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy5</a></td></tr>
+<tr><td>10</td><td>read-npy6</td><td>načtení matice s&nbsp;3&times;4 prvky typu <strong>float32</strong> do matice se specifikací jejího tvaru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy6">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy6</a></td></tr>
+<tr><td>11</td><td>read-npy7</td><td>alternativní způsob načtení vektoru nebo matice ze souboru typu NPY</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy7">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy7</a></td></tr>
+<tr><td>12</td><td>read-npy8</td><td>načtení vektoru s&nbsp;počtem prvků přesahujícím 2<sup>32</sup></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A6/read-npy8">https://github.com/tisnik/go-root/blob/master/article_A6/read-npy8</a></td></tr>
+</table>
+
+<p>Pro úplnost si ještě uveďme odkazy na příklady naprogramované
+v&nbsp;Pythonu, které pracovaly s&nbsp;formátem NPY:</p>
+
+<table>
+<tr><th>#</th><th>Demonstrační příklad</th><th>Stručný popis příkladu</th><th>Cesta</th></tr>
+<tr><td>1</td><td>vector_save.py</td><td>uložení obsahu vektoru do standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/vector_save.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/vector_save.py</a></td></tr>
+<tr><td>2</td><td>vector_load.py</td><td>načtení obsahu vektoru ze standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/vector_load.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/vector_load.py</a></td></tr>
+<tr><td>3</td><td>matrix_save_1.py</td><td>uložení matice s&nbsp;prvky typu &bdquo;byte&ldquo; do standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_save_1.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_save_1.py</a></td></tr>
+<tr><td>4</td><td>matrix_save_2.py</td><td>uložení matice s&nbsp;prvky typu &bdquo;float&ldquo; do standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_save_2.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_save_2.py</a></td></tr>
+<tr><td>5</td><td>matrix_load_1.py</td><td>načtení matice s&nbsp;prvky typu &bdquo;byte&ldquo; ze standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_load_1.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_load_1.py</a></td></tr>
+<tr><td>6</td><td>matrix_load_2.py</td><td>načtení matice s&nbsp;prvky typu &bdquo;float&ldquo; ze standardního binárního souboru</td><td><a href="https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_load_2.py">https://github.com/tisnik/most-popular-python-libs/blob/master/numpy/matrix_load_2.py</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Git repositář balíčku gonpy<br />
+<a href="https://github.com/kshedden/gonpy">https://github.com/kshedden/gonpy</a>
+</li>
+
+<li>Git repositář balíčku npyio<br />
+<a href="https://github.com/sbinet/npyio">https://github.com/sbinet/npyio</a>
+</li>
+
+<li>NEP 1 &ndash; A simple file format for NumPy arrays<br />
+<a href="https://numpy.org/neps/nep-0001-npy-format.html">https://numpy.org/neps/nep-0001-npy-format.html</a>
+</li>
+
+<li>Operace s&nbsp;daty uloženými v&nbsp;binárních souborech v&nbsp;knihovnách NumPy a Pandas<br />
+<a href="https://www.root.cz/clanky/operace-s-daty-ulozenymi-v-binarnich-souborech-v-knihovnach-numpy-a-pandas/">https://www.root.cz/clanky/operace-s-daty-ulozenymi-v-binarnich-souborech-v-knihovnach-numpy-a-pandas/</a>
+</li>
+
+<li>Operace s&nbsp;daty uloženými v&nbsp;binárních souborech v&nbsp;knihovnách NumPy a Pandas (dokončení)<br />
+<a href="https://www.root.cz/clanky/operace-s-daty-ulozenymi-v-binarnich-souborech-v-knihovnach-numpy-a-pandas-dokonceni/">https://www.root.cz/clanky/operace-s-daty-ulozenymi-v-binarnich-souborech-v-knihovnach-numpy-a-pandas-dokonceni/</a>
+</li>
+
+<li>.NPY File Extension<br />
+<a href="https://fileinfo.com/extension/npy">https://fileinfo.com/extension/npy</a>
+</li>
+
+<li>What is .npy files and why you should use them…<br />
+<a href="https://towardsdatascience.com/what-is-npy-files-and-why-you-should-use-them-603373c78883">https://towardsdatascience.com/what-is-npy-files-and-why-you-should-use-them-603373c78883</a>
+</li>
+
+<li>A Simple File Format for NumPy Arrays<br />
+<a href="https://docs.scipy.org/doc/numpy-1.14.2/neps/npy-format.html">https://docs.scipy.org/doc/numpy-1.14.2/neps/npy-format.html</a>
+</li>
+
+<li>Hierarchical Data Format<br />
+<a href="https://en.wikipedia.org/wiki/Hierarchical_Data_Format">https://en.wikipedia.org/wiki/Hierarchical_Data_Format</a>
+</li>
+
+<li>HDF Group<br />
+<a href="https://www.hdfgroup.org/">https://www.hdfgroup.org/</a>
+</li>
+
+<li>GRIB (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/GRIB">https://en.wikipedia.org/wiki/GRIB</a>
+</li>
+
+<li>FITS (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/FITS">https://en.wikipedia.org/wiki/FITS</a>
+</li>
+
+<li>A Primer on the FITS Data Format<br />
+<a href="https://fits.gsfc.nasa.gov/fits_primer.html">https://fits.gsfc.nasa.gov/fits_primer.html</a>
+</li>
+
+<li>The FITS Support Office<br />
+<a href="https://fits.gsfc.nasa.gov/">https://fits.gsfc.nasa.gov/</a>
+</li>
+
+<li>FITS File Handling (astropy.io.fits)<br />
+<a href="https://docs.astropy.org/en/stable/io/fits/index.html">https://docs.astropy.org/en/stable/io/fits/index.html</a>
+</li>
+
+<li>FITS reader pro jazyk Go<br />
+<a href="https://github.com/siravan/fits">https://github.com/siravan/fits</a>
+</li>
+
+<li>FITS Standard Document<br />
+<a href="https://fits.gsfc.nasa.gov/fits_standard.html">https://fits.gsfc.nasa.gov/fits_standard.html</a>
+</li>
+
+<li>Package narray<br />
+<a href="https://github.com/akualab/narray">https://github.com/akualab/narray</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku narray/na32<br />
+<a href="https://pkg.go.dev/github.com/akualab/narray/na32">https://pkg.go.dev/github.com/akualab/narray/na32</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku narray/na64<br />
+<a href="https://pkg.go.dev/github.com/akualab/narray/na64">https://pkg.go.dev/github.com/akualab/narray/na64</a>
+</li>
+
+<li>The Gonum Numerical Computing Package<br />
+<a href="https://www.gonum.org/post/introtogonum/">https://www.gonum.org/post/introtogonum/</a>
+</li>
+
+<li>Gonum Numerical Packages<br />
+<a href="https://www.gonum.org/">https://www.gonum.org/</a>
+</li>
+
+<li>Accelerating data processing in Go with SIMD instructions<br />
+<a href="https://docs.google.com/presentation/d/1MYg8PyhEf0oIvZ9YU2panNkVXsKt5UQBl_vGEaCeB1k/htmlpresent#!">https://docs.google.com/presentation/d/1MYg8PyhEf0oIvZ9YU2panNkVXsKt5UQBl_vGEaCeB1k/htmlpresent#!</a>
+</li>
+
+<li>Array Programming<br />
+<a href="https://en.wikipedia.org/wiki/Array_programming">https://en.wikipedia.org/wiki/Array_programming</a>
+</li>
+
+<li>Discovering Array Languages<br />
+<a href="http://archive.vector.org.uk/art10008110">http://archive.vector.org.uk/art10008110</a>
+</li>
+
+<li>no stinking loops -- Kalothi<br />
+<a href="http://www.nsl.com/">http://www.nsl.com/</a>
+</li>
+
+<li>Vector (obsahuje odkazy na články, knihy a blogy o programovacích jazycích APL, J a K)<br />
+<a href="http://www.vector.org.uk/">http://www.vector.org.uk/</a>
+</li>
+
+<li>APL Wiki<br />
+<a href="https://aplwiki.com/wiki/">https://aplwiki.com/wiki/</a>
+</li>
+
+<li>The Array Cast<br />
+<a href="https://www.arraycast.com/episodes/episode-03-what-is-an-array">https://www.arraycast.com/episodes/episode-03-what-is-an-array</a>
+</li>
+
+<li>EnthusiastiCon 2019 &ndash; An Introduction to APL<br />
+<a href="https://www.youtube.com/watch?v=UltnvW83_CQ">https://www.youtube.com/watch?v=UltnvW83_CQ</a>
+</li>
+
+<li>Dyalog<br />
+<a href="https://www.dyalog.com/">https://www.dyalog.com/</a>
+</li>
+
+<li>Try APL!<br />
+<a href="https://tryapl.org/">https://tryapl.org/</a>
+</li>
+
+<li>PyNIO<br />
+<a href="https://www.pyngl.ucar.edu/Nio.shtml">https://www.pyngl.ucar.edu/Nio.shtml</a>
+</li>
+
+<li>A GUIDE TO THE CODE FORM FM 92-IX Ext. GRIB Edition 1<br />
+<a href="https://old.wmo.int/extranet/pages/prog/www/WMOCodes/Guides/GRIB/GRIB1-Contents.html">https://old.wmo.int/extranet/pages/prog/www/WMOCodes/Guides/GRIB/GRIB1-Contents.html</a>
+</li>
+
+<li>What is HDF5?<br />
+<a href="https://support.hdfgroup.org/HDF5/whatishdf5.html">https://support.hdfgroup.org/HDF5/whatishdf5.html</a>
+</li>
+
+<li>Using The Right File Format For Storing Data<br />
+<a href="https://www.analyticsvidhya.com/blog/2021/09/using-the-right-file-format-for-storing-data/">https://www.analyticsvidhya.com/blog/2021/09/using-the-right-file-format-for-storing-data/</a>
+</li>
+
+<li>Simple Data Format<br />
+<a href="https://en.wikipedia.org/wiki/Simple_Data_Format">https://en.wikipedia.org/wiki/Simple_Data_Format</a>
+</li>
+
+<li>Simple Data Format Manifesto<br />
+<a href="http://solarmuri.ssl.berkeley.edu/~fisher/public/software/SDF/SDF_MANIFESTO.txt">http://solarmuri.ssl.berkeley.edu/~fisher/public/software/SDF/SDF_MANIFESTO.txt</a>
+</li>
+
+<li>Sample FITS Files<br />
+<a href="https://fits.gsfc.nasa.gov/fits_samples.html">https://fits.gsfc.nasa.gov/fits_samples.html</a>
+</li>
+
+<li>Gophernotes: kombinace interaktivního prostředí Jupyteru s jazykem Go<br />
+<a href="https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/">https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/</a>
+</li>
+
+<li>Popis vybraných balíčků nabízených projektem Gonum<br />
+<a href="https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/">https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
+
