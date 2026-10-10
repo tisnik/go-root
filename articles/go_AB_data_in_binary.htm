@@ -1,0 +1,1002 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Vkládání dat přímo do spustitelných souborů vytvářených překladačem jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Vkládání dat přímo do spustitelných souborů vytvářených překladačem jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku o programovacím jazyku Go si ukážeme užitečný balíček, který (v kooperaci s překladačem a linkerem jazyka Go) umožňuje vkládat libovolná data do výsledného binárního spustitelného souboru. To zjednodušuje nasazení takové aplikace a zmenšuje míru potenciálních &bdquo;instalačních&ldquo; chyb.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Vkládání dat přímo do spustitelných souborů vytvářených překladačem jazyka Go</a></p>
+<p><a href="#k02">2. Vložení krátkého řetězce do výsledného spustitelného souboru</a></p>
+<p><a href="#k03">3. Korektní způsob použití balíčku <strong>embed</strong></a></p>
+<p><a href="#k04">4. Vložení delšího víceřádkového řetězce do výsledného spustitelného souboru</a></p>
+<p><a href="#k05">5. Binární data (sekvence bajtů) vložená do výsledného spustitelného souboru</a></p>
+<p><a href="#k06">6. Pokus o vložení dat jiného typu</a></p>
+<p><a href="#k07">7. Vložené soubory a virtuální souborový systém</a></p>
+<p><a href="#k08">8. Přístup ke vloženému souboru přes virtuální souborový systém</a></p>
+<p><a href="#k09">9. Vložení rastrových dat ve formátu JPEG, export obrázku v&nbsp;runtime</a></p>
+<p><a href="#k10">10. Jak lze do virtuálního souborového systému přidat větší množství souborů?</a></p>
+<p><a href="#k11">11. Získání seznamu všech souborů vložených do vybraného virtuálního adresáře</a></p>
+<p><a href="#k12">12. Větší množství adresářů ve virtuálním souborovém systému</a></p>
+<p><a href="#k13">13. Závěr</a></p>
+<p><a href="#k14">14. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k15">15. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Vkládání dat přímo do spustitelných souborů vytvářených překladačem jazyka Go</h2>
+
+<p>Programovací jazyk Go je mezi vývojáři v&nbsp;některých oblastech (například
+v&nbsp;oblasti mikroslužeb) oblíben mj.&nbsp;i proto, že pro nasazení aplikace
+vyvinuté v&nbsp;Go je mnohdy nutné pouze použít jediný spustitelný soubor a
+příliš se nestarat o to, na jakých dalších dynamicky linkovaných knihovnách
+nasazovaná aplikace závisí (protože tyto závislosti v&nbsp;mnoha případech
+vůbec neexistují). To je výhodné například tehdy, pokud se aplikace nasazuje do
+&bdquo;kontejnerizovaného&ldquo; prostředí atd. Většinou se taková aplikace
+konfiguruje nikoli s&nbsp;využitím konfiguračního souboru, ale přes proměnné
+prostředí, takže odpadá nutnost nasazení a správy konfiguračních souborů.</p>
+
+<p>Ovšem situace je poněkud odlišná tehdy, pokud aplikace ke své činnosti
+vyžaduje nějaké soubory s&nbsp;daty. Může se jednat například o statické HTML
+stránky, obrázky, šablony (<i>templates</i>) atd. Zde již výhody nasazení celé
+aplikace pouhým zkopírováním jediného souboru zdánlivě mizí. Ovšem jazyk Go od
+verze 1.16 podporuje zajímavou a užitečnou technologii &ndash; datové soubory
+je totiž umožněno přidat přímo do onoho spustitelného souboru vytvářeného
+překladačem a linkerem jazyka Go. A navíc je možné k&nbsp;obsahu těchto souborů
+přistupovat buď přímo jakoby se jednalo o inicializované proměnné (typu řetězec
+či sekvence bajtů) nebo přes &bdquo;virtuální&ldquo; souborový systém. A právě
+tuto relativně málo známou vlastnost programovacího jazyka Go si popíšeme
+v&nbsp;dnešním článku.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti lze podobný koncept
+využít například i v&nbsp;céčku, ovšem zde se již vyžaduje znalost linkeru a
+výsledné řešení nebude přenositelné na jiné překladače či jiné
+platformy.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Vložení krátkého řetězce do výsledného spustitelného souboru</h2>
+
+<p>Do výsledného spustitelného souboru můžeme vložit řetězec, jenž je
+v&nbsp;době překladu načtený z&nbsp;nějakého textového souboru. Pro tento účel
+se před definicí proměnné použije tento speciální komentář:</p>
+
+<pre>
+<i>//go:embed hello.txt</i>
+</pre>
+
+<p>Například:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+)
+&nbsp;
+<i>//go:embed hello.txt</i>
+var helloMessage string
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(helloMessage)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto příkladu je uložen
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string0.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string0.go</a>.</div></p>
+
+<p>Při pokusu o překlad tohoto zdrojového kódu však dojde k&nbsp;chybě, protože
+pro zpracování výše uvedeného speciálního komentáře je nutné načíst balíček
+<strong>embed</strong>:</p>
+
+<pre>
+./embed_string0.go:7:3: go:embed only allowed in Go files that import "embed"
+</pre>
+
+<p>Pokusme se tedy o úpravu tohoto příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+)
+&nbsp;
+<i>//go:embed hello.txt</i>
+var helloMessage string
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(helloMessage)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto příkladu je uložen
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string1.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string1.go</a>.</div></p>
+
+<p>Ani tento způsob ovšem ve skutečnosti není zcela korektní, protože sice
+importujeme balíček <strong>embed</strong>, ovšem nikde ho nepoužijeme, což
+v&nbsp;Go není dovoleno (je použit jen v&nbsp;onom komentáři):</p>
+
+<pre>
+./embed_string1.go:4:2: "embed" imported and not used
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Korektní způsob použití balíčku <strong>embed</strong></h2>
+
+<p>Jak tedy můžeme naimportovat balíček <strong>embed</strong>, i když není
+přímo v&nbsp;kódu použit? Programovací jazyk Go vyžaduje, aby každý importovaný
+balíček byl skutečně využit (což jsme ostatně viděli výše), ovšem existuje zde
+jeden trik, jak pouze provést import bez explicitního použití (používá se
+například při načítání databázových driverů). Tento trik spočívá v&nbsp;tom, že
+se před jméno importovaného balíčku zadá jeho jmenný alias, který je nastavený
+na podtržítko:</p>
+
+<pre>
+import _ "embed"
+</pre>
+
+<p>V&nbsp;praxi to může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        _ "embed"
+        "fmt"
+)
+&nbsp;
+<i>//go:embed hello.txt</i>
+var helloMessage string
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(helloMessage)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto příkladu je uložen
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string2.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string2.go</a>.</div></p>
+
+<p>Tento zdrojový kód je již bez problémů jak přeložitelný, tak i
+spustitelný:</p>
+
+<pre>
+$ <strong>go build embed_string2.go</strong>
+&nbsp;
+$ <strong>./embed_string2</strong>
+Hello world!
+</pre>
+
+<p>O tom, že řetězec &bdquo;Hello world!&ldquo; je skutečně ve spustitelném
+kódu použit, se lze snadno přesvědčit (i když dost primitivním způsobem):</p>
+
+<pre>
+$ <strong>strings embed_string2 | grep Hello</strong>
+&nbsp;
+entersyscallgcBitsArenasgcpacertraceharddecommithost is downillegal seekinvalid
+slotlfstack.pushmadvdontneedmheapSpecialmspanSpecialnot pollablens} value:
+{releasep: m=runtime: gp=runtime:
+sp=spanSetSpinesweepWaiterstimer_deletetraceStringswirep: p-&gt;m=worker mode
+}, want {r1= != sweepgen  MB globals,  MB) workers= called from  failed with
+flushedWork  idlethreads= is nil, not  nStackRoots= pluginpath=  s.spanclass=
+span.base()= syscalltick= work.nproc=  work.nwait= , gp-&gt;status=, not
+pointer-byte block (3814697265625: unknown pc GC sweep
+waitGunjala_Gondi<strong>Hello world!</strong>
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Vložení delšího víceřádkového řetězce do výsledného spustitelného souboru</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu se do výsledného spustitelného kódu
+pokusíme vložit delší řetězec, který je navíc víceřádkový. Použijeme přitom
+klasický příklad odstavce &bdquo;Lorem ipsum&ldquo;:</p>
+
+<pre>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+</pre>
+
+<p>Samotný zdrojový kód příkladu se prakticky nebude lišit od příkladu
+předchozího, pouze použijeme jiné jméno souboru &bdquo;ipsum.txt&ldquo; a jiné
+jméno proměnné, do které se obsah tohoto souboru automaticky přiřadí
+(<strong>loremIpsum</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        _ "embed"
+        "fmt"
+)
+&nbsp;
+<i>//go:embed lorem_ipsum.txt</i>
+var loremIpsum string
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(loremIpsum)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto příkladu je uložen
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string3.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string3.go</a>.</div></p>
+
+<p>Proveďme kontrolní překlad a spuštění:</p>
+
+<pre>
+$ <strong>go build embed_string3.go </strong>
+&nbsp;
+&nbsp;
+&nbsp;
+$ <strong>./embed_string3 </strong>
+&nbsp;
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Binární data (sekvence bajtů) vložená do výsledného spustitelného souboru</h2>
+
+<p>Kromě řetězců lze do výsledného spustitelného souboru vložit data
+v&nbsp;ještě jednom dostupném a podporovaném formátu. Jedná se o sekvenci
+bajtů, což je datový typ, jenž je v&nbsp;jazyce Go reprezentován buď jako pole
+bajtů (nepříliš často používáno) nebo jako řez bajtů, tj.:</p>
+
+<pre>
+[]byte
+</pre>
+
+<p>Programově je možné tuto sekvenci bajtů použít různými způsoby, například ji
+předat do funkce <strong>json.Unmarhal</strong>, <strong>xml.Unmarhal</strong>
+atd. V&nbsp;obou zmíněných případech má funkce pro dekódování dat ze sekvence
+bajtů zcela shodnou hlavičku (což samozřejmě není náhoda):</p>
+
+<pre>
+func <strong>Unmarshal</strong>(data []byte, v any) error
+</pre>
+
+<p>Vložení binárních dat (a nikoli řetězců) do výsledného spustitelného souboru
+je snadné, jak to ostatně ukazuje následující demonstrační příklad:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        _ "embed"
+        "fmt"
+)
+&nbsp;
+<i>//go:embed lorem_ipsum.txt</i>
+var loremIpsum []byte
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(loremIpsum)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu se zobrazí obsah jednotlivých bajtů
+v&nbsp;řezu:</p>
+
+<pre>
+$ <strong>go run embed_binary1.go</strong>
+&nbsp;
+[76 111 114 101 109 32 105 112 115 117 109 32 100 111 108 111 114 32 115 105
+116 32 97 109 101 116 44 32 99 111 110 115 101 99 116 101 116 117 114 32 97 100
+105 112 105 115 99 105 110 103 32 101 108 105 116 44 32 115 101 100 32 100 111
+32 101 105 117 115 109 111 100 32 116 101 109 112 111 114 10 105 110 99 105 100
+105 100 117 110 116 32 117 116 32 108 97 98 111 114 101 32 101 116 32 100 111
+108 111 114 101 32 109 97 103 110 97 32 97 108 105 113 117 97 46 32 85 116 32
+101 110 105 109 32 97 100 32 109 105 110 105 109 32 118 101 110 105 97 109 44
+32 113 117 105 115 10 110 111 115 116 114 117 100 32 101 120 101 114 99 105 116
+97 116 105 111 110 32 117 108 108 97 109 99 111 32 108 97 98 111 114 105 115 32
+110 105 115 105 32 117 116 32 97 108 105 113 117 105 112 32 101 120 32 101 97
+32 99 111 109 109 111 100 111 32 99 111 110 115 101 113 117 97 116 46 10 68 117
+105 115 32 97 117 116 101 32 105 114 117 114 101 32 100 111 108 111 114 32 105
+110 32 114 101 112 114 101 104 101 110 100 101 114 105 116 32 105 110 32 118
+111 108 117 112 116 97 116 101 32 118 101 108 105 116 32 101 115 115 101 32 99
+105 108 108 117 109 32 100 111 108 111 114 101 32 101 117 10 102 117 103 105 97
+116 32 110 117 108 108 97 32 112 97 114 105 97 116 117 114 46 32 69 120 99 101
+112 116 101 117 114 32 115 105 110 116 32 111 99 99 97 101 99 97 116 32 99 117
+112 105 100 97 116 97 116 32 110 111 110 32 112 114 111 105 100 101 110 116 44
+32 115 117 110 116 32 105 110 10 99 117 108 112 97 32 113 117 105 32 111 102
+102 105 99 105 97 32 100 101 115 101 114 117 110 116 32 109 111 108 108 105 116
+32 97 110 105 109 32 105 100 32 101 115 116 32 108 97 98 111 114 117 109 46 10]
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary1.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary1.go</a>.</p>
+
+<p>Ale převod zpět na řetězec je snadný:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        _ "embed"
+        "fmt"
+)
+&nbsp;
+<i>//go:embed lorem_ipsum.txt</i>
+var loremIpsum []byte
+&nbsp;
+func <strong>main</strong>() {
+        <i>// pouziti retezce</i>
+        fmt.Println(string(loremIpsum))
+}
+</pre>
+
+<p>S&nbsp;očekávaným výsledkem:</p>
+
+<pre>
+$ <strong>go run embed_binary2.go</strong>
+&nbsp;
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary2.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary2.go</a>.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Pokus o vložení dat jiného typu</h2>
+
+<p>Zajímavé bude zjistit, co se stane ve chvíli, kdy se do výsledného
+spustitelného souboru pokusíme vložit data jiného typu než řetězec nebo
+sekvence bajtů. Vyzkoušíme si to například na tomto demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        _ "embed"
+        "fmt"
+)
+&nbsp;
+type <strong>Foo</strong> struct {
+        x string
+        y bool
+}
+&nbsp;
+<i>//go:embed lorem_ipsum.txt</i>
+var loremIpsum Foo
+&nbsp;
+func main() {
+        <i>// pouziti struktury</i>
+        fmt.Println(loremIpsum)
+}
+</pre>
+
+<p>I když by to mohlo být užitečné, není tato funkcionalita překladačem Go
+podporována, o čemž nás překladač bude nekompromisně informovat:</p>
+
+<pre>
+$ <strong>go build embed_other_data.go </strong>
+&nbsp;
+# command-line-arguments
+./embed_other_data.go:14:5: go:embed cannot apply to var of type Foo
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_other_data.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_other_data.go</a>.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Vložené soubory a virtuální souborový systém</h2>
+
+<p>Přímé vkládání obsahu souborů do výsledného spustitelného binárního souboru
+je sice potenciálně velmi užitečná funkce, ovšem standardní balíček
+<strong>embed</strong> programátorům nabízí ještě jednu velmi zajímavou
+funkcionalitu &ndash; možnost přístupu ke vloženým souborům takovým způsobem,
+jakoby se jednalo o virtuální souborový systém. Konkrétně je tento souborový
+systém dostupný přes datový typ <strong>embed.FS</strong>, který (ovšem pouze
+při správné inicializaci) programátorům nabízí tyto metody:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis metody</th></tr>
+<tr><td>func (f FS) <strong>Open</strong>(name string) (fs.File, error)</td><td>otevření pojmenovaného souboru na virtuálním souborovém systému</td></tr>
+<tr><td>func (f FS) <strong>ReadDir</strong>(name string) ([]fs.DirEntry, error)</td><td>získání obsahu adresáře na virtuálním souborovém systému</td></tr>
+<tr><td>func (f FS) <strong>ReadFile</strong>(name string) ([]byte, error)</td><td>přečtení obsahu souboru na virtuálním souborovém systému</td></tr>
+</table>
+
+<p>Samotný virtuální souborový systém (resp.&nbsp;typ, který ho představuje) se
+deklaruje a naplní takto:</p>
+
+<pre>
+<i>//go:embed lorem_ipsum.txt</i>
+var f embed.FS
+</pre>
+
+<p>popř.:</p>
+
+<pre>
+<i>//go:embed hello.txt</i>
+<i>//go:embed lorem_ipsum.txt</i>
+var f embed.FS
+</pre>
+
+<p>nebo následovně:</p>
+
+<pre>
+<i>//go:embed *.jpg</i>
+<i>//go:embed lorem_ipsum.txt</i>
+var f embed.FS
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Přístup ke vloženému souboru přes virtuální souborový systém</h2>
+
+<p>Vyzkoušejme si nyní, jak se k&nbsp;vloženým souborům přistupuje přes
+virtuální souborový systém. Strukturovaným komentářem <i>//go:embed jméno
+souboru</i> si necháme do výsledného spustitelného binárního souboru vložit
+obsah textového souboru pojmenovaného &bdquo;ipsum.txt&ldquo;. Následně
+k&nbsp;tomuto obsahu přistoupíme přes virtuální souborový systém
+s&nbsp;využitím metody <strong>FS.ReadFile</strong>. Tato metoda vrací řez
+bajtů, takže před tiskem provedeme převod na řetězec s&nbsp;využitím
+konverzního mechanismu <strong>string([]byte)</strong>.</p>
+
+<p>Celý zdrojový kód bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed lorem_ipsum.txt</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        data, err := f.ReadFile("lorem_ipsum.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// pouziti retezce</i>
+        fmt.Println(string(data))
+}
+</pre>
+
+<p>Nyní provedeme překlad projektu:</p>
+
+<pre>
+$ <strong>go build access_string.go</strong>
+</pre>
+
+<p>A následně výsledný spustitelný soubor skutečně spustíme:</p>
+
+<pre>
+$ <strong>./access_string</strong>
+</pre>
+
+<p>Na terminálu by se mělo zobrazit následujících šest řádků:</p>
+
+<pre>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/access_string.go">https://github.com/tisnik/go-root/blob/master/article_AB/access_string.go</a>.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vložení rastrových dat ve formátu JPEG, export obrázku v&nbsp;runtime</h2>
+
+<p>Jak jsme se již dozvěděli v&nbsp;předchozím textu, je možné do výsledného
+binárního souboru vkládat i poměrně rozsáhlá data. Může se například jednat o
+rastrové obrázky. Ukažme si tedy program, který ve svém spustitelném souboru
+obsahuje rastrový obrázek uložený ve formátu JPEG. Po spuštění tohoto programu
+je obrázek exportován na disk (ovšem stejně tak by mohl být poslán jako odpověď
+na HTTP dotaz atd.):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "log"
+        "os"
+)
+&nbsp;
+<i>//go:embed npe.jpg</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        data, err := f.ReadFile("npe.jpg")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// open output file</i>
+        fout, err := os.Create("npe2.jpg")
+        if err != nil {
+                log.Fatal(err)
+        }
+        <i>// close fo on exit and check for its returned error</i>
+        defer func() {
+                err := fout.Close()
+                if err != nil {
+                        log.Fatal(err)
+                }
+        }()
+&nbsp;
+        fout.Write(data)
+}
+</pre>
+
+<p>Po spuštění tohoto programu by se měl v&nbsp;pracovním adresáři objevit nový
+soubor nazvaný &bdquo;npe2.jpg&ldquo;, který vypadá následovně:</p>
+
+<a href="https://www.root.cz/obrazek/1101162/"><img src="https://i.iinfo.cz/images/320/npe-prev.jpg" class="image-1101162" data-prev-filename="https://i.iinfo.cz/images/320/npe-prev.jpg" data-prev-width="270" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/320/npe.jpg" data-large-width="350" data-large-height="350" alt="&#160;" title="Autor: meme megerator, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="270" height="270" /></a>
+<p><i>Obrázek 1: Obsah souboru vytvořeného předchozím příkladem.</i></p>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/access_binary.go">https://github.com/tisnik/go-root/blob/master/article_AB/access_binary.go</a>.</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Jak lze do virtuálního souborového systému přidat větší množství souborů?</h2>
+
+<p>Samozřejmě nám nic nebrání ve vložení většího množství souborů, které budou
+po překladu aplikace dostupné přes virtuální souborový systém. Jedna
+z&nbsp;nabízených možností spočívá v&nbsp;explicitním uvedení všech vkládaných
+souborů, přičemž každý soubor bude specifikován jedním strukturovaným
+komentářem <i>//go:embed</i>. V&nbsp;praxi to může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed hello.txt</i>
+<i>//go:embed lorem_ipsum.txt</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        data, err := f.ReadFile("lorem_ipsum.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// pouziti retezce</i>
+        fmt.Println(string(data))
+}
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/more_strings1.go">https://github.com/tisnik/go-root/blob/master/article_AB/more_strings1.go</a>.</p>
+
+<p>Překladač programovacího jazyka Go ovšem rozpoznává i žolíkové znaky (<a
+href="https://en.wikipedia.org/wiki/Glob_(programming)">globs</a>), takže nám
+nic nebrání v&nbsp;tom, abychom do virtuálního souborového systému vložili
+například všechny soubory s&nbsp;koncovkou &bdquo;.txt&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed *.txt</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        data, err := f.ReadFile("lorem_ipsum.txt")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// pouziti retezce</i>
+        fmt.Println(string(data))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: obě předchozí možnosti je ovšem možné
+v&nbsp;případě potřeby zkombinovat.</div></p>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/more_strings2.go">https://github.com/tisnik/go-root/blob/master/article_AB/more_strings2.go</a>.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Získání seznamu všech souborů vložených do vybraného virtuálního adresáře</h2>
+
+<p>Rozhraní, přes které se přistupuje k&nbsp;virtuálnímu souborovému systému,
+obsahuje i metodu nazvanou <strong>ReadDir</strong>, která slouží
+k&nbsp;přečtení obsahu vybraného virtuálního adresáře. V&nbsp;našem konkrétním
+příkladu vložíme do virtuálního souborového systému několik textových souborů
+(s&nbsp;využitím globu &bdquo;*.txt&ldquo;) a v&nbsp;runtime přečteme jejich
+seznam právě metodou <strong>ReadDir</strong>, které předáme aktuální adresář
+reprezentovaný tečkou:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed *.txt</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        entries, err := f.ReadDir(".")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, entry := range entries {
+                fmt.Printf("%-25s  %s\n", entry.Name(), entry.Type())
+        }
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu by se na terminál měly vypsat
+následující řádky:</p>
+
+<pre>
+$ <strong>go run dir.go</strong>
+&nbsp;
+hello.txt                  ----------
+lorem_ipsum.txt            ----------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že metoda
+<strong>entry.Type</strong> pro jednu strukturu vrácenou metodou
+<strong>emded.FS.ReadDir</strong>, vrátí pouze &bdquo;----------&ldquo;. Jak
+uvidíme dále, bude typ odlišný pro podadresáře atd.</div></p>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/dir.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir.go</a>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Větší množství adresářů ve virtuálním souborovém systému</h2>
+
+<p>Ve virtuálním souborovém systému můžeme mít uloženou i adresářovou
+strukturu, což se provádí například následovně (opět zde tedy používáme
+<i>globy</i>):</p>
+
+<pre>
+<i>//go:embed adresář1/*</i>
+<i>//go:embed adresář2/*</i>
+var f embed.FS
+</pre>
+
+<p>Podívejme se nyní na konkrétní případ ve chvíli, kdy existuje dvojice
+adresářů <strong>a</strong> a <strong>b</strong> s&nbsp;vkládanými soubory:</p>
+
+<pre>
+a
+├── A1.txt
+└── A2.txt
+b
+├── B1.txt
+├── B2.txt
+└── B3.txt
+</pre>
+
+<p>Všechny textové soubory z&nbsp;obou adresářů vložíme do výsledného
+spustitelného binárního souboru (v&nbsp;době překladu &ndash; <i>compile
+time</i>) a v&nbsp;čase běhu (<i>runtime</i>) si vypíšeme obsah kořenového
+virtuálního adresáře:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed a/*</i>
+<i>//go:embed b/*</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        entries, err := f.ReadDir(".")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, entry := range entries {
+                fmt.Printf("%-25s  %s\n", entry.Name(), entry.Type())
+        }
+}
+</pre>
+
+<p>Výsledek by měl v&nbsp;tomto případě vypadat následovně:</p>
+
+<pre>
+a                          d---------
+b                          d---------
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nyní je tedy typ souborů nastaven na
+&bdquo;adresář&ldquo;.</div></p>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/dir2.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir2.go</a>.</p>
+
+<p>Samozřejmě nám nic nebrání v&nbsp;tom, abychom si vypsali obsah konkrétních
+virtuálních podadresářů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "embed"
+        "fmt"
+        "log"
+)
+&nbsp;
+<i>//go:embed a/*</i>
+<i>//go:embed b/*</i>
+var f embed.FS
+&nbsp;
+func <strong>main</strong>() {
+        entries, err := f.ReadDir("a")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, entry := range entries {
+                fmt.Printf("%-25s  %s\n", entry.Name(), entry.Type())
+        }
+&nbsp;
+        fmt.Println("*************************************")
+&nbsp;
+        entries, err = f.ReadDir("b")
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        for _, entry := range entries {
+                fmt.Printf("%-25s  %s\n", entry.Name(), entry.Type())
+        }
+}
+</pre>
+
+<p>Tentokrát budou výsledky pochopitelně odlišné:</p>
+
+<pre>
+A1.txt                     ----------
+A2.txt                     ----------
+*************************************
+B1.txt                     ----------
+B2.txt                     ----------
+B3.txt                     ----------
+</pre>
+
+<p>Zdrojový kód tohoto příkladu naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_AB/dir3.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir3.go</a>.</p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Závěr</h2>
+
+<p>Balíček <strong>embed</strong>, který byl do ekosystému programovacího
+jazyka Go přidán ve verzi 1.16, může být pro některé typy aplikací velmi
+užitečný, protože zjednodušuje instalaci (která tak mnohdy vyžaduje pouze
+zkopírování jediného souboru) a navíc zmenšuje pravděpodobnost chyb, které
+s&nbsp;instalacemi či reinstalacemi souvisí &ndash; tedy chybějící soubory,
+soubory s&nbsp;jinými než očekávanými přístupovými právy, soubory ze starší
+verze aplikace, které nebyly při reinstalaci/upgradu přepsány atd. Nasazení
+takové aplikace je jednodušší i v&nbsp;&bdquo;kontejnerizovaném IT světě&ldquo;
+atd. Přitom díky balíčku <strong>embed</strong> je vkládání dat do výsledných
+souborů nezávislé na použité architektuře ani na operačním systému.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů naprogramovaných
+v&nbsp;jazyku Go byly uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>embed_string0.go</td><td>vložení jednořádkového řetězce do výsledného spustitelného souboru (nekorektní varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string0.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string0.go</a></td></tr>
+<tr><td> 2</td><td>embed_string1.go</td><td>vložení jednořádkového řetězce do výsledného spustitelného souboru (nekorektní varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string1.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string1.go</a></td></tr>
+<tr><td> 3</td><td>embed_string2.go</td><td>vložení jednořádkového řetězce do výsledného spustitelného souboru (korektní varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string2.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string2.go</a></td></tr>
+<tr><td> 4</td><td>embed_string3.go</td><td>vložení víceřádkového řetězce do výsledného spustitelného souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_string3.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_string3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>embed_binary1.go</td><td>vložení binárních dat do výsledného spustitelného souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary1.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary1.go</a></td></tr>
+<tr><td> 6</td><td>embed_binary2.go</td><td>vložení binárních dat do výsledného spustitelného souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary2.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_binary2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>embed_other_data.go</td><td>pokus o vložení dat odlišného typu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/embed_other_data.go">https://github.com/tisnik/go-root/blob/master/article_AB/embed_other_data.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 8</td><td>access_string.go</td><td>přístup k&nbsp;původnímu řetězci přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/access_string.go">https://github.com/tisnik/go-root/blob/master/article_AB/access_string.go</a></td></tr>
+<tr><td> 9</td><td>access_binary.go</td><td>přístup k&nbsp;binárním datům přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/access_binary.go">https://github.com/tisnik/go-root/blob/master/article_AB/access_binary.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>more_strings1.go</td><td>větší množství řetězců, přístup k&nbsp;nim přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/more_strings1.go">https://github.com/tisnik/go-root/blob/master/article_AB/more_strings1.go</a></td></tr>
+<tr><td>11</td><td>more_strings2.go</td><td>větší množství řetězců, přístup k&nbsp;nim přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/more_strings2.go">https://github.com/tisnik/go-root/blob/master/article_AB/more_strings2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>dir.go</td><td>výpis všech dat, která jsou vložena do spustitelného souboru a dostupná přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/dir.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir.go</a></td></tr>
+<tr><td>13</td><td>dir2.go</td><td>výpis všech dat v&nbsp;adresáři, která jsou vložena do spustitelného souboru a dostupná přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/dir2.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir2.go</a></td></tr>
+<tr><td>14</td><td>dir3.go</td><td>výpis všech dat v&nbsp;adresářích, která jsou vložena do spustitelného souboru a dostupná přes virtuální souborový systém</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AB/dir3.go">https://github.com/tisnik/go-root/blob/master/article_AB/dir3.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Popis balíčku <i>embed</i><br />
+<a href="https://pkg.go.dev/embed">https://pkg.go.dev/embed</a>
+</li>
+
+<li>How to Use go:embed in Go<br />
+<a href="https://blog.jetbrains.com/go/2021/06/09/how-to-use-go-embed-in-go-1-16/">https://blog.jetbrains.com/go/2021/06/09/how-to-use-go-embed-in-go-1-16/</a>
+</li>
+
+<li>How to embed files into Go binaries<br />
+<a href="https://stackoverflow.com/questions/17796043/how-to-embed-files-into-go-binaries">https://stackoverflow.com/questions/17796043/how-to-embed-files-into-go-binaries</a>
+</li>
+
+<li>Include binary file with GNU ld linker script<br />
+<a href="https://stackoverflow.com/questions/327609/include-binary-file-with-gnu-ld-linker-script">https://stackoverflow.com/questions/327609/include-binary-file-with-gnu-ld-linker-script</a>
+</li>
+
+<li>Executable and Linkable Format<br />
+<a href="https://en.wikipedia.org/wiki/Executable_and_Linkable_Format">https://en.wikipedia.org/wiki/Executable_and_Linkable_Format</a>
+</li>
+
+<li>Executable and Linkable Format 101 - Part 1 Sections and Segments<br />
+<a href="https://intezer.com/blog/research/executable-linkable-format-101-part1-sections-segments/">https://intezer.com/blog/research/executable-linkable-format-101-part1-sections-segments/</a>
+</li>
+
+<li>appending data to an exe<br />
+<a href="https://stackoverflow.com/questions/5795446/appending-data-to-an-exe">https://stackoverflow.com/questions/5795446/appending-data-to-an-exe</a>
+</li>
+
+<li>Embedding resources in executable using GCC<br />
+<a href="https://stackoverflow.com/questions/4158900/embedding-resources-in-executable-using-gcc">https://stackoverflow.com/questions/4158900/embedding-resources-in-executable-using-gcc</a>
+</li>
+
+<li>Go 1.18 Release Notes<br />
+<a href="https://golang.org/doc/go1.18">https://golang.org/doc/go1.18</a>
+</li>
+
+<li>Go 1.17 Release Notes<br />
+<a href="https://golang.org/doc/go1.17">https://golang.org/doc/go1.17</a>
+</li>
+
+<li>Go 1.16 Release Notes<br />
+<a href="https://golang.org/doc/go1.16">https://golang.org/doc/go1.16</a>
+</li>
+
+<li>Go 1.15 Release Notes<br />
+<a href="https://golang.org/doc/go1.15">https://golang.org/doc/go1.15</a>
+</li>
+
+<li>Go 1.14 Release Notes<br />
+<a href="https://golang.org/doc/go1.14">https://golang.org/doc/go1.14</a>
+</li>
+
+<li>Go 1.13 Release Notes<br />
+<a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a>
+</li>
+
+<li>Go 1.12 Release Notes<br />
+<a href="https://golang.org/doc/go1.12">https://golang.org/doc/go1.12</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
+
