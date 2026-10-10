@@ -1,0 +1,1828 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Základní optimalizace v Go aneb pomáháme překladači</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Základní optimalizace v Go aneb pomáháme překladači</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku o programovacím jazyku Go se seznámíme se základními optimalizacemi, které je v některých případech vhodné či nutné provádět na úrovni zdrojového kódu. Některé dále zmíněné optimalizace jsou (zdánlivě) triviální, na druhou stranu ovšem opomíjené. A další optimalizace jsou naopak neintuitivní.</p>
+
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Základní optimalizace v&nbsp;Go aneb pomáháme překladači</a></p>
+<p><a href="#k02">2. Prázdné mapy vs. mapy s&nbsp;předběžnou alokací prvků</a></p>
+<p><a href="#k03">3. Benchmark: naplnění prázdné mapy a předalokované mapy</a></p>
+<p><a href="#k04">4. Odlišné použití map: mapy s&nbsp;prvky typu <strong>int</strong></a></p>
+<p><a href="#k05">5. Mapy, jejichž klíče mají velikost 100 bajtů</a></p>
+<p><a href="#k06">6. Výsledky benchmarků, výsledky činnosti profileru</a></p>
+<p><a href="#k07">7. Mapa použitá ve funkci množiny</a></p>
+<p><a href="#k08">8. Výsledky benchmarků a profileru</a></p>
+<p><a href="#k09">9. Předávání datových struktur do funkcí a metod hodnotou či odkazem?</a></p>
+<p><a href="#k10">10. Syntaxe pro předávání struktur do funkcí a metod hodnotou a odkazem, způsob překladu do assembleru</a></p>
+<p><a href="#k11">11. Benchmark zjišťující rozdíly v&nbsp;rychlosti volání funkcí a metod s&nbsp;využitím hodnoty a reference na předávanou strukturu</a></p>
+<p><a href="#k12">12. Výsledky benchmarku i profileru</a></p>
+<p><a href="#k13">13. Mapy vs. řezy při implementaci jednoduché paměťové cache</a></p>
+<p><a href="#k14">14. Výsledky benchmarků</a></p>
+<p><a href="#k15">15. Grafické porovnání výsledků</a></p>
+<p><a href="#k16">16. Mapy vs. řezy při implementaci množiny</a></p>
+<p><a href="#k17">17. Výsledky benchmarku</a></p>
+<p><a href="#k18">18. Závěrečné zhodnocení &ndash; triviální a přitom mnohdy důležité optimalizace</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Základní optimalizace v&nbsp;Go aneb pomáháme překladači</h2>
+
+<p><a
+href="https://www.root.cz/clanky/go-minimalisticky-a-prekvapive-vykonny-programovaci-jazyk/">Programovací
+jazyk Go</a> je v&nbsp;současnosti mezi vývojáři <a
+href="https://www.tiobe.com/tiobe-index/">poměrně oblíben</a>, a to mj.&nbsp;i
+díky jeho velmi rychlému překladači a linkeru, který dokáže v&nbsp;několika
+sekundách přeložit i velmi rozsáhlé aplikace. Rychlost překladače je do určité
+míry umožněna syntaxí samotného programovacího jazyka Go, ovšem na druhou
+stranu je nutné si přiznat, že se překladač příliš nezdržuje optimalizacemi,
+což je mnohdy patrné z&nbsp;vygenerovaného strojového kódu i výsledného výkonu
+aplikací (pokud porovnáváme s&nbsp;C, Rustem atd., nikoli například
+s&nbsp;Pythonem :-). V&nbsp;dnešním článku se seznámíme se základními
+optimalizacemi, které je v některých případech nutné provádět na úrovni
+zdrojového kódu. Některé dále zmíněné optimalizace jsou (alespoň zdánlivě)
+triviální, na druhou stranu ovšem opomíjené. A další optimalizace jsou naopak
+neintuitivní a vlastně jdou i proti &bdquo;zdravému rozumu&ldquo;. Podrobnosti
+si řekneme v&nbsp;navazujících kapitolách.</p>
+
+<p><div class="rs-tip-major">Poznámka: nosnou myšlenkou dnešního článku je, že
+v&nbsp;praktických zadáních (například viz níže zmíněný požadavek na paměťovou
+cache explicitně navrženou pro malý počet prvků) mohou být zdánlivě méně
+efektivní algoritmy lepší, než sofistikovanější řešení. A proto je vhodné
+v&nbsp;případě potřeby provádět benchmarky, ideálně s&nbsp;reálnými daty (počet
+a velikost zpracovávaných prvků) a přímo na cílové platformě.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Prázdné mapy vs. mapy s&nbsp;předběžnou alokací prvků</h2>
+
+<p>Mapy jsou jedním z&nbsp;nejčastěji používaných kontejnerů, a to i
+v&nbsp;programovacím jazyku Go. Připomeňme si, že v&nbsp;Go je možné použít
+jako klíč prakticky jakýkoli datový typ, což užitečnost map ještě zvyšuje.</p>
+
+<p>Existuje poměrně velké množství způsobů implementace map, přesněji řečeno
+způsobů ukládání dvojic klíč-hodnota do paměti s&nbsp;možností jejich
+pozdějšího přečtení. Jednotlivé implementace se od sebe odlišují svými
+základními vlastnostmi, například tím, zda jsou prvky v&nbsp;mapě setříděny na
+základě svého klíče, zda je naopak zachováno pořadí prvků podle pořadí jejich
+vkládání do mapy či zda jsou prvky obecně neuspořádány. Liší se i časové
+složitosti základních operací &ndash; tedy operace pro vložení prvku do mapy a
+operace pro získání prvku na základě jeho klíče. Navíc v&nbsp;některých
+případech vyžadujeme specifické chování mapy, například možnost mapování
+nejenom v&nbsp;jednom směru (tedy klasické klíč&rarr;hodnota), ale i ve směru
+opačném (hodnota&rarr;klíč). Toto chování realizují mapy, v&nbsp;jejichž jméně
+se objevuje zkratka &bdquo;bidi&ldquo; (neboli <i>bi-directional</i>).</p>
+
+<p>V&nbsp;rámci tohoto článku se zaměříme na základní implementaci map, která
+je nedílnou součástí samotného programovacího jazyka Go.</p>
+
+<p><div class="rs-tip-major">Poznámka: tak jako v&nbsp;jiných jazycích platí,
+že klíče použité v&nbsp;jedné mapě musí být unikátní; hodnoty však mohou být
+naprosto libovolné.</div></p>
+
+<p>Ukažme si nyní způsob deklarace proměnné pojmenované <strong>m1</strong>,
+která je typu mapa celé číslo:řetězec:</p>
+
+<pre>
+var m1 map[int]string
+</pre>
+
+<p>Samozřejmě můžeme vytvořit i jinou mapu, konkrétně mapu s&nbsp;klíči typu
+<strong>string</strong> a hodnotami typu <strong>User</strong></p>
+
+<pre>
+var m2 map[string]User
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_03/15_uninitialized_map.go">V&nbsp;dalším
+demonstračním příkladu</a> vytvoříme proměnnou typu mapa a posléze se do ní
+pokusíme zapsat novou dvojici s&nbsp;klíčem rovným nule a hodnotou
+&bdquo;nula&ldquo;:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        var m1 map[int]string
+        fmt.Println(m1)
+&nbsp;
+        m1[0] = "nula"
+}
+</pre>
+
+<p>Při pokusu o spuštění tohoto příkladu ovšem dojde k&nbsp;běhové chybě, která
+vypadá takto:</p>
+
+<pre>
+map[]
+<strong>panic: assignment to entry in nil map</strong>
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /home/tester/go-root/article_03/15_uninitialized_map.go:16 +0x76
+exit status 2
+</pre>
+
+<p>Co to znamená? Předchozí proměnná byla sice deklarována korektně, ovšem
+uplatnila se zde již dříve popsaná pravidla pro inicializaci hodnoty proměnné.
+Zde se konkrétně vytvořila mapa a byla jí přiřazena speciální hodnota
+<strong>nil</strong> &ndash; proto se nazývá <strong>nil-mapou</strong>. Pokud
+budeme skutečně chtít mapu použít (naplnit ji dvojicemi klíč-hodnota), musíme
+při inicializaci zavolat <a
+href="https://golang.org/pkg/builtin/#make">vestavěnou funkci make</a>.</p>
+
+<p>Korektní inicializace mapy je ukázána na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_03/16_initialized_map.go">dalším
+příkladu</a>:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        var m1 map[int]string = make(map[int]string)
+        fmt.Println(m1)
+&nbsp;
+        m1[0] = "nula"
+        m1[1] = "jedna"
+        m1[2] = "dva"
+        m1[3] = "tri"
+        m1[4] = "ctyri"
+        m1[5] = "pet"
+        m1[6] = "sest"
+&nbsp;
+        fmt.Println(m1)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu se nejdříve vypíše prázdná mapa a posléze mapa
+naplněná šesti dvojicemi:</p>
+
+<pre>
+map[]
+map[6:sest 0:nula 1:jedna 2:dva 3:tri 4:ctyri 5:pet]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že dvojice jsou vypsány
+v&nbsp;jiném pořadí, než jak byly vkládány do mapy. To je výchozí a očekávané
+chování této datové struktury.</div></p>
+
+<p>Z&nbsp;hlediska výkonu aplikace je důležitý taktéž fakt, že do vestavěné
+funkce <strong>make</strong> je možné ve druhém parametru předat očekávanou
+kapacitu mapy. To povede k&nbsp;prealokaci paměti pro prvky, ovšem současně se
+<i>ne</i>jedná o maximální kapacitu (mapa může mít více prvků, než je její
+prvotní kapacita):</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        var m1 map[int]string = make(map[int]string, 6)
+        fmt.Println(m1)
+&nbsp;
+        m1[0] = "nula"
+        m1[1] = "jedna"
+        m1[2] = "dva"
+        m1[3] = "tri"
+        m1[4] = "ctyri"
+        m1[5] = "pet"
+        m1[6] = "sest"
+&nbsp;
+        fmt.Println(m1)
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Benchmark: naplnění prázdné mapy a předalokované mapy</h2>
+
+<p>Na tomto místě je dobré se na chvíli zastavit a zjistit, zda má vůbec smysl
+se snažit o předalokaci mapy, tj.&nbsp;o zjištění či odhad počtu prvků, které
+budou do mapy vloženy. Pro tento účel vznikl jednoduchý benchmark, který je
+vypsán pod tímto odstavcem. V&nbsp;benchmarku se do mapy s&nbsp;klíči typu <a
+href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUID</a>
+ukládají časová razítka &ndash; pro každé UUID jedno razítko. První benchmark
+využívá předalokovanou mapu, druhý prázdnou mapu (která však není
+nil-mapou):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+        "time"
+
+        "github.com/google/uuid"
+)
+&nbsp;
+type UUID string
+&nbsp;
+func <strong>BenchmarkInsertIntoPreallocatedMapUUIDKey</strong>(b *testing.B) {
+        m := make(map[UUID]time.Time, b.N)
+        t := time.Now()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                b.StopTimer()
+                id := UUID(uuid.New().String())
+                b.StartTimer()
+                <u>m[id] = t</u>
+        }
+}
+&nbsp;
+func <strong>BenchmarkInsertIntoEmptyMapUUIDKey</strong>(b *testing.B) {
+        m := map[UUID]time.Time{}
+        t := time.Now()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                b.StopTimer()
+                id := UUID(uuid.New().String())
+                b.StartTimer()
+                <u>m[id] = t</u>
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto benchmarku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go</a>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Odlišné použití map: mapy s&nbsp;prvky typu <strong>int</strong></h2>
+
+<p>Chování map do značné míry závisí na typu klíčů i typu hodnot. Proto si
+v&nbsp;této kapitole ukažme podobný benchmark, jaký byl uveden <a
+href="#k03">v&nbsp;předchozí kapitole</a>, nyní ovšem upravený do podoby, kdy
+klíče jsou typu <strong>int</strong> a hodnoty jsou taktéž typu
+<strong>int</strong>. Výsledná mapa tedy bude i přes velký počet uložených
+hodnot, obecně menší, než mapa z&nbsp;předchozího textu. Úprava benchmarku
+vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+func <strong>BenchmarkInsertIntoPreallocatedMapIntKeyIntValue</strong>(b *testing.B) {
+        m := make(map[int]int, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                m[i] = i
+        }
+}
+&nbsp;
+func <strong>BenchmarkInsertIntoEmptyMapIntKeyIntValue</strong>(b *testing.B) {
+        m := map[int]int{}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                m[i] = i
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto benchmarku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go</a>.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Mapy, jejichž klíče mají velikost 100 bajtů</h2>
+
+<p>V&nbsp;pořadí již třetí benchmark je zaměřen na test vkládání prvků do mapy,
+jejichž prvky jsou poměrně velké &ndash; mají totiž velikost nepatrně
+přesahující 100 bajtů. Pro tento účel je klíč definován v&nbsp;datové struktuře
+nazvané jednoduše <strong>key</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+type key struct {
+        ID      int
+        payload [100]byte
+}
+&nbsp;
+type value struct{}
+&nbsp;
+func <strong>BenchmarkInsertIntoPreallocatedMapCompoundKey</strong>(b *testing.B) {
+        m := make(map[key]value, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                k := key{
+                        ID: i,
+                }
+                m[k] = value{}
+        }
+}
+&nbsp;
+func <strong>BenchmarkInsertIntoEmptyMapCompoundKey</strong>(b *testing.B) {
+        m := map[key]value{}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                k := key{
+                        ID: i,
+                }
+                m[k] = value{}
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto benchmarku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go</a>.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Výsledky benchmarků, výsledky činnosti profileru</h2>
+
+<p>Podívejme se nyní na výsledky všech tří benchmarků popsaných
+v&nbsp;předchozí trojici kapitol. Benchmarky jsou spouštěny s&nbsp;využitím
+standardních nástrojů programovacího jazyka Go:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=1000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: map-bench
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkInsertIntoPreallocatedMapUUIDKey-8              1000000               163.9 ns/op
+BenchmarkInsertIntoEmptyMapUUIDKey-8                     1000000               354.7 ns/op
+BenchmarkInsertIntoPreallocatedMapIntKeyIntValue-8       1000000                66.26 ns/op
+BenchmarkInsertIntoEmptyMapIntKeyIntValue-8              1000000               137.4 ns/op
+BenchmarkInsertIntoPreallocatedMapCompoundKey-8          1000000               177.7 ns/op
+BenchmarkInsertIntoEmptyMapCompoundKey-8                 1000000               332.2 ns/op
+PASS
+ok      map-bench       27.959s
+</pre>
+
+<p>Z&nbsp;výsledků je zřejmé, že se skutečně vyplatí, když jsou prvky mapy
+předalokovány, samozřejmě za předpokladu, že je to možné.</p>
+
+<p>Můžeme si dokonce zjistit i to, v&nbsp;jaké oblasti tráví benchmark nejvíce
+času. Testy můžeme spustit s&nbsp;povolením záznamu dat pro profiler CPU:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=1000000x -cpuprofile profile.out</strong>
+</pre>
+
+<p>Výsledkem by měl být (kromě výsledků benchmarku) i soubor
+<strong>profile.out</strong>, který můžeme snadno prozkoumat přímo
+v&nbsp;prostředí webového prohlížeče:</p>
+
+<pre>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/719971/"><img src="https://i.iinfo.cz/images/118/go-performance-1-1-prev.png" class="image-719971" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-1-prev.png" data-prev-width="303" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-1-large.png" data-large-width="589" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="303" height="270" /></a>
+<p><i>Obrázek 1: Webová stránka s&nbsp;výsledky benchmarků.</i></p>
+
+<a href="https://www.root.cz/obrazek/719972/"><img src="https://i.iinfo.cz/images/118/go-performance-1-2-prev.png" class="image-719972" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-2-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-2-large.png" data-large-width="632" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="325" height="270" /></a>
+<p><i>Obrázek 2: Časové rozdíly v&nbsp;přidávání prvků do prázdné
+vs.&nbsp;předalokované mapy.</i></p>
+
+<p>Zajímavější může být zjištění, jak se od sebe budou odlišovat paměťové
+náročnosti jednotlivých benchmarků:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=1000000x -memprofile profile.out</strong>
+</pre>
+
+<p>Výsledky paměťového profileru si opět můžeme zobrazit přímo v&nbsp;prostředí
+webového prohlížeče. Povšimněte si, jak velké jsou paměťové nároky pro původně
+prázdnou mapu:</p>
+
+<pre>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/719973/"><img src="https://i.iinfo.cz/images/118/go-performance-1-3-prev.png" class="image-719973" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-3-prev.png" data-prev-width="370" data-prev-height="163" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-3-large.png" data-large-width="720" data-large-height="317" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="163" /></a>
+<p><i>Obrázek 3: Rozdíly ve velikosti obsazené paměti v&nbsp;průběhu přidávání
+prvků do prázdné vs.&nbsp;předalokované mapy.</i></p>
+
+<a href="https://www.root.cz/obrazek/719974/"><img src="https://i.iinfo.cz/images/118/go-performance-1-4-prev.png" class="image-719974" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-4-prev.png" data-prev-width="370" data-prev-height="203" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-4-large.png" data-large-width="720" data-large-height="396" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="203" /></a>
+<p><i>Obrázek 4: Odlišný pohled na stejná data změřená profilerem.</i></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Mapa použitá ve funkci množiny</h2>
+
+<p>Programovací jazyk Go neobsahuje podporu pro práci s&nbsp;množinami.
+Z&nbsp;tohoto důvodu je nutné při požadavku existence této datové struktury
+použít odlišné techniky. Poměrně často se pro tyto účely používají mapy,
+jejichž hodnoty jsou prázdnými strukturami. Vzhledem k&nbsp;tomu, že prázdné
+struktury mají nulovou velikost, je jejich použití z&nbsp;hlediska obsazení
+paměti efektivnější, než použití (například) pravdivostních hodnot. Opět platí,
+že pokud bude takto zkonstruovaná množina obsahovat velký počet prvků, je
+výhodnější ji předalokovat v&nbsp;těch případech, kdy je počet prvků dopředu
+známý či alespoň dobře odhadnutelný. Rozdíl mezi postupným naplňováním původně
+prázdné množiny resp.&nbsp;množiny s&nbsp;předalokovanými prvky můžeme zjistit
+z&nbsp;následujícího jednoduchého benchmarku:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+<u>type emptyValue struct{}</u>
+&nbsp;
+func <strong>BenchmarkInsertIntoPreallocatedMapIntKeyEmptyValue</strong>(b *testing.B) {
+        m := make(map[int]emptyValue, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                m[i] = <u>emptyValue{}</u>
+        }
+}
+&nbsp;
+func <strong>BenchmarkInsertIntoEmptyMapEmptyValue</strong>(b *testing.B) {
+        m := map[int]emptyValue{}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                m[i] = <u>emptyValue{}</u>
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto benchmarku naleznete
+na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go</a>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Výsledky benchmarků a profileru</h2>
+
+<p>Opět se podívejme na výsledky benchmarků, z&nbsp;nichž jsou jasně patrné
+rozdílné časové náročnosti:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: map-bench
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkInsertIntoPreallocatedMapIntKeyEmptyValue-8    100000000               97.77 ns/op
+BenchmarkInsertIntoEmptyMapEmptyValue-8                 100000000              156.1 ns/op
+PASS
+ok      map-bench       25.405s
+</pre>
+
+<p>Získání CPU profilu s&nbsp;jeho zobrazením v&nbsp;prohlížeči:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=10000000x -cpuprofile profile.out</strong>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/719975/"><img src="https://i.iinfo.cz/images/118/go-performance-1-5-prev.png" class="image-719975" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-5-prev.png" data-prev-width="370" data-prev-height="133" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-5-large.png" data-large-width="720" data-large-height="260" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="133" /></a>
+<p><i>Obrázek 5: Graficky zobrazené výsledky CPU profileru.</i></p>
+
+<a href="https://www.root.cz/obrazek/719976/"><img src="https://i.iinfo.cz/images/118/go-performance-1-6-prev.png" class="image-719976" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-6-prev.png" data-prev-width="370" data-prev-height="114" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-6.png" data-large-width="699" data-large-height="215" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="114" /></a>
+<p><i>Obrázek 6: Odlišný pohled na stejná data.</i></p>
+
+<p>Paměťový profil:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=10000000x -memprofile profile.out</strong>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<p>Z&nbsp;profilu je zřejmé, že u prázdné mapy bylo nutné paměť několikrát
+realokovat:</p>
+
+<a href="https://www.root.cz/obrazek/719977/"><img src="https://i.iinfo.cz/images/118/go-performance-1-7-prev.png" class="image-719977" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-7-prev.png" data-prev-width="370" data-prev-height="121" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-7-large.png" data-large-width="720" data-large-height="236" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="121" /></a>
+<p><i>Obrázek 7: Graficky zobrazené výsledky paměťového profileru.</i></p>
+
+<a href="https://www.root.cz/obrazek/719978/"><img src="https://i.iinfo.cz/images/118/go-performance-1-8-prev.png" class="image-719978" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-8-prev.png" data-prev-width="370" data-prev-height="66" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-8-large.png" data-large-width="720" data-large-height="129" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="66" /></a>
+<p><i>Obrázek 8: Odlišný pohled na stejná data.</i></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Předávání datových struktur do funkcí a metod hodnotou či odkazem?</h2>
+
+<p>V&nbsp;prakticky všech aplikacích naprogramovaných v&nbsp;jazyku Go se do
+některých funkcí nebo metod předávají relativně rozsáhlé datové struktury.
+Častější a vlastně i méně viditelný je tento problém u metod, protože taková
+datová struktura může být použita jako příjemce (<i>receiver</i>) metody; je
+tedy využita jako objekt metody a tím pádem nemusí být problém na první pohled
+patrný.</p>
+
+<p>Podívejme se na příklad převzatý z&nbsp;praxe. Jedná se konkrétně o službu
+naprogramovanou v&nbsp;jazyce Go, která je nakonfigurována přes konfigurační
+soubor ve formátu TOML a taktéž přes proměnné prostředí. Interně se pro načtení
+konfigurace používá <a
+href="https://www.root.cz/clanky/zpracovani-konfiguracnich-souboru-v-go-s-vyuzitim-knihovny-viper/">knihovna
+Viper</a>. Celá konfigurace může vypadat následovně (pouze jsem změnil některé
+interní hodnoty):</p>
+
+<pre>
+[logging]
+debug = true
+log_level = "info"
+&nbsp;
+[kafka_broker]
+enabled = true
+address = "kafka:29092" #provide in deployment env or as secret
+security_protocol = "PLAINTEXT"
+cert_path = "not-set"
+sasl_mechanism = "PLAIN"
+sasl_username = "not-used"
+sasl_password = "not-used"
+topic = "platform.notifications.ingress" #provide in deployment env or as secret
+timeout = "60s"
+likelihood_threshold = 0
+impact_threshold = 0
+severity_threshold = 0
+total_risk_threshold = 3
+event_filter = "totalRisk &gt;= totalRiskThreshold"
+&nbsp;
+[service_log]
+client_id = "a-service-id"
+client_secret = "a-secret"
+token_url = ""
+enabled = false
+url = "https://api.foo.bar.com/api/v1/logs/"
+timeout = "15s"
+likelihood_threshold = 0
+impact_threshold = 0
+severity_threshold = 0
+total_risk_threshold = 0
+event_filter = "totalRisk &gt;= totalRiskThreshold"
+rule_details_uri = "https://ui.foo.bar.com/page/{module}|{error_key}"
+&nbsp;
+[storage]
+db_driver = "postgres"
+pg_username = "postgres" #provide in deployment env or as secret
+pg_password = "postgres" #provide in deployment env or as secret
+pg_host = "localhost" #provide in deployment env or as secret
+pg_port = 5432 #provide in deployment env or as secret
+pg_db_name = "notification" #provide in deployment env or as secret
+pg_params = "sslmode=disable"
+log_sql_queries = true
+&nbsp;
+[dependencies]
+content_server = "localhost:8082" #provide in deployment env or as secret
+content_endpoint = "/api/v1/content" #provide in deployment env or as secret
+template_renderer_server = "localhost:8083" #provide in deployment env or as secret
+template_renderer_endpoint = "/v1/rendered_reports" #provide in deployment env or as secret
+&nbsp;
+[notifications]
+insights_advisor_url = "https://console.foo.bar.com/info/{object_id}"
+cluster_details_uri = "https://console.foo.bar.com/details/{object_id}#insights"
+rule_details_uri = "https://console.foo.bar.com/details/{object_id}/modules/{module}/{error_key}"
+<i># valid units are SQL epoch time units: months days hours minutes seconds"</i>
+cooldown = "24 hours"
+&nbsp;
+[metrics]
+job_name = "notification_service"
+<i># The metrics in Prometheus will be $namespace_$subsystem_$name</i>
+namespace = "notification_service"
+subsystem = "notification_backend"
+gateway_url = "localhost:9091"
+gateway_auth_token = ""
+retries = 3
+<i># Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".</i>
+retry_after = "60s"
+&nbsp;
+[cleaner]
+<i># valid units are SQL epoch time units: months days hours minutes seconds"</i>
+max_age = "90 days"
+&nbsp;
+[processing]
+filter_allowed_clusters = false
+allowed_clusters = []
+filter_blocked_clusters = false
+blocked_clusters = []
+</pre>
+
+<p>Jen pro zajímavost se podívejme na to, jak je tato konfigurace reflektována
+datovými strukturami jazyka Go a jak je zajištěno načtení konfigurace (což
+ovšem s&nbsp;problémem souvisí jen okrajově &ndash; takže tento kód můžete
+přeskočit, hodí se jen těm, kdo chtějí prozkoumat, jak lze spojit možnosti
+souborů TOML a konfigurace přes proměnné prostředí):</p>
+
+<pre>
+package conf
+&nbsp;
+import (
+        "bytes"
+        "fmt"
+        "net/url"
+        "os"
+        "path"
+        "path/filepath"
+        "strings"
+        "time"
+&nbsp;
+        "github.com/BurntSushi/toml"
+&nbsp;
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/viper"
+)
+&nbsp;
+<i>// Common constants used for logging and error reporting</i>
+const (
+        filenameAttribute               = "filename"
+        parsingConfigurationFileMessage = "parsing configuration file"
+        noKafkaConfig                   = "no Kafka configuration available in Clowder, using default one"
+        noBrokerConfig                  = "warning: no broker configurations found in clowder config"
+        noSaslConfig                    = "warning: SASL configuration is missing"
+        noTopicMapping                  = "warning: no kafka mapping found for topic %s"
+        noStorage                       = "warning: no storage section in Clowder config"
+)
+&nbsp;
+<i>// ConfigStruct is a structure holding the whole notification service</i>
+<i>// configuration</i>
+type ConfigStruct struct {
+        Logging       LoggingConfiguration       `mapstructure:"logging" toml:"logging"`
+        Storage       StorageConfiguration       `mapstructure:"storage" toml:"storage"`
+        Kafka         KafkaConfiguration         `mapstructure:"kafka_broker" toml:"kafka_broker"`
+        ServiceLog    ServiceLogConfiguration    `mapstructure:"service_log" toml:"service_log"`
+        Dependencies  DependenciesConfiguration  `mapstructure:"dependencies" toml:"dependencies"`
+        Notifications NotificationsConfiguration `mapstructure:"notifications" toml:"notifications"`
+        Metrics       MetricsConfiguration       `mapstructure:"metrics" toml:"metrics"`
+        Cleaner       CleanerConfiguration       `mapstructure:"cleaner" toml:"cleaner"`
+        Processing    ProcessingConfiguration    `mapstructure:"processing" toml:"processing"`
+}
+&nbsp;
+<i>// LoggingConfiguration represents configuration for logging in general</i>
+type LoggingConfiguration struct {
+        <i>// Debug enables pretty colored logging</i>
+        Debug bool `mapstructure:"debug" toml:"debug"`
+&nbsp;
+        <i>// LogLevel sets logging level to show. Possible values are:</i>
+        <i>// "debug"</i>
+        <i>// "info"</i>
+        <i>// "warn", "warning"</i>
+        <i>// "error"</i>
+        <i>// "fatal"</i>
+        <i>//</i>
+        <i>// logging level won't be changed if value is not one of listed above</i>
+        LogLevel string `mapstructure:"log_level" toml:"log_level"`
+}
+&nbsp;
+<i>// StorageConfiguration represents configuration of postgresQSL data storage</i>
+type StorageConfiguration struct {
+        Driver        string `mapstructure:"db_driver"       toml:"db_driver"`
+        PGUsername    string `mapstructure:"pg_username"     toml:"pg_username"`
+        PGPassword    string `mapstructure:"pg_password"     toml:"pg_password"`
+        PGHost        string `mapstructure:"pg_host"         toml:"pg_host"`
+        PGPort        int    `mapstructure:"pg_port"         toml:"pg_port"`
+        PGDBName      string `mapstructure:"pg_db_name"      toml:"pg_db_name"`
+        PGParams      string `mapstructure:"pg_params"       toml:"pg_params"`
+        LogSQLQueries bool   `mapstructure:"log_sql_queries" toml:"log_sql_queries"`
+}
+&nbsp;
+<i>// DependenciesConfiguration represents configuration of external services and other dependencies</i>
+type DependenciesConfiguration struct {
+        ContentServiceServer     string `mapstructure:"content_server" toml:"content_server"`
+        ContentServiceEndpoint   string `mapstructure:"content_endpoint" toml:"content_endpoint"`
+        TemplateRendererServer   string `mapstructure:"template_renderer_server" toml:"template_renderer_server"`
+        TemplateRendererEndpoint string `mapstructure:"template_renderer_endpoint" toml:"template_renderer_endpoint"`
+        TemplateRendererURL      string
+}
+&nbsp;
+<i>// CleanerConfiguration represents configuration for the main cleaner</i>
+type CleanerConfiguration struct {
+        // MaxAge is specification of max age for records to be cleaned
+        MaxAge string `mapstructure:"max_age" toml:"max_age"`
+}
+&nbsp;
+<i>// KafkaConfiguration represents configuration of Kafka brokers and topics</i>
+type KafkaConfiguration struct {
+        Enabled             bool          `mapstructure:"enabled" toml:"enabled"`
+        Address             string        `mapstructure:"address" toml:"address"`
+        SecurityProtocol    string        `mapstructure:"security_protocol" toml:"security_protocol"`
+        CertPath            string        `mapstructure:"cert_path" toml:"cert_path"`
+        SaslMechanism       string        `mapstructure:"sasl_mechanism" toml:"sasl_mechanism"`
+        SaslUsername        string        `mapstructure:"sasl_username" toml:"sasl_username"`
+        SaslPassword        string        `mapstructure:"sasl_password" toml:"sasl_password"`
+        Topic               string        `mapstructure:"topic"   toml:"topic"`
+        Timeout             time.Duration `mapstructure:"timeout" toml:"timeout"`
+        LikelihoodThreshold int           `mapstructure:"likelihood_threshold" toml:"likelihood_threshold"`
+        ImpactThreshold     int           `mapstructure:"impact_threshold" toml:"impact_threshold"`
+        SeverityThreshold   int           `mapstructure:"severity_threshold" toml:"severity_threshold"`
+        TotalRiskThreshold  int           `mapstructure:"total_risk_threshold" toml:"total_risk_threshold"`
+        EventFilter         string        `mapstructure:"event_filter" toml:"event_filter"`
+}
+&nbsp;
+<i>// ServiceLogConfiguration represents configuration of ServiceLog REST API</i>
+type ServiceLogConfiguration struct {
+        Enabled             bool          `mapstructure:"enabled" toml:"enabled"`
+        ClientID            string        `mapstructure:"client_id" toml:"client_id"`
+        ClientSecret        string        `mapstructure:"client_secret" toml:"client_secret"`
+        TokenURL            string        `mapstructure:"token_url" toml:"token_url"`
+        URL                 string        `mapstructure:"url" toml:"url"`
+        Timeout             time.Duration `mapstructure:"timeout" toml:"timeout"`
+        LikelihoodThreshold int           `mapstructure:"likelihood_threshold" toml:"likelihood_threshold"`
+        ImpactThreshold     int           `mapstructure:"impact_threshold" toml:"impact_threshold"`
+        SeverityThreshold   int           `mapstructure:"severity_threshold" toml:"severity_threshold"`
+        TotalRiskThreshold  int           `mapstructure:"total_risk_threshold" toml:"total_risk_threshold"`
+        EventFilter         string        `mapstructure:"event_filter" toml:"event_filter"`
+        RuleDetailsURI      string        `mapstructure:"rule_details_uri" toml:"rule_details_uri"`
+}
+&nbsp;
+<i>// NotificationsConfiguration represents the configuration specific to the content of notifications</i>
+type NotificationsConfiguration struct {
+        InsightsAdvisorURL string `mapstructure:"insights_advisor_url" toml:"insights_advisor_url"`
+        ClusterDetailsURI  string `mapstructure:"cluster_details_uri" toml:"cluster_details_uri"`
+        RuleDetailsURI     string `mapstructure:"rule_details_uri"    toml:"rule_details_uri"`
+        Cooldown           string `mapstructure:"cooldown" toml:"cooldown"`
+}
+&nbsp;
+<i>// MetricsConfiguration holds metrics related configuration</i>
+type MetricsConfiguration struct {
+        Job              string        `mapstructure:"job_name" toml:"job_name"`
+        Namespace        string        `mapstructure:"namespace" toml:"namespace"`
+        Subsystem        string        `mapstructure:"subsystem" toml:"subsystem"`
+        GatewayURL       string        `mapstructure:"gateway_url" toml:"gateway_url"`
+        GatewayAuthToken string        `mapstructure:"gateway_auth_token" toml:"gateway_auth_token"`
+        Retries          int           `mapstructure:"retries" toml:"retries"`
+        RetryAfter       time.Duration `mapstructure:"retry_after" toml:"retry_after"`
+}
+&nbsp;
+<i>// ProcessingConfiguration represents configuration for processing subsystem</i>
+type ProcessingConfiguration struct {
+        FilterAllowedClusters bool     `mapstructure:"filter_allowed_clusters" toml:"filter_allowed_clusters"`
+        AllowedClusters       []string `mapstructure:"allowed_clusters" toml:"allowed_clusters"`
+        FilterBlockedClusters bool     `mapstructure:"filter_blocked_clusters" toml:"filter_blocked_clusters"`
+        BlockedClusters       []string `mapstructure:"blocked_clusters" toml:"blocked_clusters"`
+}
+&nbsp;
+<i>// LoadConfiguration loads configuration from defaultConfigFile, file set in</i>
+<i>// configFileEnvVariableName or from env</i>
+func <strong>LoadConfiguration</strong>(configFileEnvVariableName, defaultConfigFile string) (ConfigStruct, error) {
+        var configuration ConfigStruct
+&nbsp;
+        <i>// env. variable holding name of configuration file</i>
+        configFile, specified := os.LookupEnv(configFileEnvVariableName)
+        if specified {
+                log.Info().Str(filenameAttribute, configFile).Msg(parsingConfigurationFileMessage)
+                <i>// we need to separate the directory name and filename without</i>
+                <i>// extension</i>
+                directory, basename := filepath.Split(configFile)
+                file := strings.TrimSuffix(basename, filepath.Ext(basename))
+                <i>// parse the configuration</i>
+                viper.SetConfigName(file)
+                viper.AddConfigPath(directory)
+        } else {
+                log.Info().Str(filenameAttribute, defaultConfigFile).Msg(parsingConfigurationFileMessage)
+                <i>// parse the configuration</i>
+                viper.SetConfigName(defaultConfigFile)
+                viper.AddConfigPath(".")
+        }
+&nbsp;
+        <i>// try to read the whole configuration</i>
+        err := viper.ReadInConfig()
+        if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !specified &amp;&amp; isNotFoundError {
+                <i>// If config file is not present (which might be correct in</i>
+                <i>// some environment) we need to read configuration from</i>
+                <i>// environment variables. The problem is that Viper is not</i>
+                <i>// smart enough to understand the structure of config by</i>
+                <i>// itself, so we need to read fake config file</i>
+                fakeTomlConfigWriter := new(bytes.Buffer)
+&nbsp;
+                err := toml.NewEncoder(fakeTomlConfigWriter).Encode(configuration)
+                if err != nil {
+                        return configuration, err
+                }
+&nbsp;
+                fakeTomlConfig := fakeTomlConfigWriter.String()
+&nbsp;
+                viper.SetConfigType("toml")
+&nbsp;
+                err = viper.ReadConfig(strings.NewReader(fakeTomlConfig))
+                if err != nil {
+                        return configuration, err
+                }
+        } else if err != nil {
+                <i>// error is processed on caller side</i>
+                return configuration, fmt.Errorf("fatal error config file: %s", err)
+        }
+&nbsp;
+        <i>// override configuration from env if there's variable in env</i>
+&nbsp;
+        const envPrefix = "MY_COOL_SERVICE_"
+&nbsp;
+        viper.AutomaticEnv()
+        viper.SetEnvPrefix(envPrefix)
+        viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "__"))
+&nbsp;
+        err = viper.Unmarshal(&amp;configuration)
+        if err != nil {
+                return configuration, err
+        }
+&nbsp;
+        configuration.Dependencies.TemplateRendererURL, err = createURL(
+                configuration.Dependencies.TemplateRendererServer,
+                configuration.Dependencies.TemplateRendererEndpoint)
+        if err != nil {
+                fmt.Println("error creating content template renderer URL")
+                return configuration, err
+        }
+&nbsp;
+        <i>// everything's should be ok</i>
+        return configuration, nil
+}
+&nbsp;
+func <strong>createURL</strong>(server, endpoint string) (string, error) {
+        u, err := url.Parse(server)
+        if err != nil {
+                return "", err
+        }
+        u.Path = path.Join(u.Path, endpoint)
+        return u.String(), nil
+}
+</pre>
+
+<p>Důležité je, že struktura nazvaná <strong>ConfigStruct</strong> obsahuje
+jako své prvky další struktury (a ty obsahují řetězce, pravdivostní hodnoty
+atd.) a její celková velikost je poměrně značná, což může způsobit problémy při
+předávání takové struktury hodnotou (a tedy i kopií celé struktury):</p>
+
+<pre>
+type ConfigStruct struct {
+        Logging       LoggingConfiguration       `mapstructure:"logging" toml:"logging"`
+        Storage       StorageConfiguration       `mapstructure:"storage" toml:"storage"`
+        Kafka         KafkaConfiguration         `mapstructure:"kafka_broker" toml:"kafka_broker"`
+        ServiceLog    ServiceLogConfiguration    `mapstructure:"service_log" toml:"service_log"`
+        Dependencies  DependenciesConfiguration  `mapstructure:"dependencies" toml:"dependencies"`
+        Notifications NotificationsConfiguration `mapstructure:"notifications" toml:"notifications"`
+        Metrics       MetricsConfiguration       `mapstructure:"metrics" toml:"metrics"`
+        Cleaner       CleanerConfiguration       `mapstructure:"cleaner" toml:"cleaner"`
+        Processing    ProcessingConfiguration    `mapstructure:"processing" toml:"processing"`
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je vhodné si uvědomit, že
+v&nbsp;Go se většina hodnot reprezentuje skutečně formou hodnoty a nikoli
+reference. To platí i pro struktury, takže struktura, která jako své prvky
+obsahuje další (pod)struktury, tyto podstruktury skutečně ve svém těle obsahuje
+&ndash; nejedná se o reference (adresy), na rozdíl od Javy, kde atribut typu
+nějaká třída je uložen formou reference. Tudíž v&nbsp;jazyce Go znamená
+<i>předávání</i> struktury <i>hodnotou</i> de facto hlubokou kopii celé
+struktury (výjimkou jsou řezy a do určité míry i řetězce, ovšem u řetězců nelze
+rozdíl poznat díky jejich neměnnosti).</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Syntaxe pro předávání struktur do funkcí a metod hodnotou a odkazem, způsob překladu do assembleru</h2>
+
+<p>Zopakujme si, jak vlastně vypadají funkce a metody, do nichž se předává
+nějaká datová struktura hodnotou (tedy přes kopii) a odkazem (tedy přes
+ukazatel na původní strukturu). Syntaxe všech čtyř variant vypadá
+následovně:</p>
+
+<pre>
+<i>; funkce s&nbsp;předáním struktury hodnotou</i>
+func <strong>GetStorageConfigurationByValue</strong>(configuration ConfigStruct) StorageConfiguration {
+        return configuration.Storage
+}
+&nbsp;
+<i>; funkce s&nbsp;předáním struktury referencí</i>
+func <strong>GetStorageConfigurationByReference</strong>(configuration *ConfigStruct) StorageConfiguration {
+        return configuration.Storage
+}
+&nbsp;
+<i>; metoda s&nbsp;příjemcem předaným hodnotou</i>
+func (configuration ConfigStruct) <strong>GetStorageConfigurationByValue</strong>() StorageConfiguration {
+        return configuration.Storage
+}
+&nbsp;
+<i>; metoda s&nbsp;příjemcem předaným referencí</i>
+func (configuration *ConfigStruct) <strong>GetStorageConfigurationByReference</strong>() StorageConfiguration {
+        return configuration.Storage
+}
+</pre>
+
+<p>Při volání <i>funkcí</i> (nikoli metod) je nutné při předání struktury
+odkazem ukazatel na danou strukturu získat operátorem &amp;, který je
+v&nbsp;jazyce Go inspirován céčkem a má v&nbsp;obou jazycích podobný
+význam:</p>
+
+<pre>
+conf.GetStorageConfigurationByValue(<strong>configuration</strong>)
+conf.GetStorageConfigurationByReference(<strong>&amp;configuration</strong>)
+</pre>
+
+<p>Naproti tomu při volání metod žádný ukazatel získávat nemusíme, protože obě
+volání vypadají stejně, a to nezávisle na tom, zda je příjemce předáván
+hodnotou nebo odkazem:</p>
+
+<pre>
+configuration.GetStorageConfigurationByValue()
+configuration.GetStorageConfigurationByReference()
+</pre>
+
+<p>A jak vlastně vypadá volání těchto funkcí a metod v&nbsp;assembleru? Ukažme
+si to pro nějakou lokální proměnnou obsahující konfiguraci:</p>
+
+<pre>
+func main() {
+        configuration := ConfigStruct{}
+        GetStorageConfigurationByValue(configuration)
+        GetStorageConfigurationByReference(&amp;configuration)
+        configuration.GetStorageConfigurationByValue()
+        configuration.GetStorageConfigurationByReference()
+}
+</pre>
+
+<p>Překlad se zpětným převodem do assembleru:</p>
+
+<pre>
+$ <strong>go build -gcflags '-N -l' config.go</strong>
+$ <strong>objdump -d config &gt; config.asm</strong>
+</pre>
+
+<p>Překlad <strong>GetStorageConfigurationByValue(configuration)</strong>:</p>
+
+<pre>
+  457358:       48 8b 84 24 78 03 00    mov    0x378(%rsp),%rax
+  45735f:       00 
+  457360:       48 89 04 24             mov    %rax,(%rsp)
+  457364:       48 8d 7c 24 08          lea    0x8(%rsp),%rdi
+  457369:       48 8d b4 24 80 03 00    lea    0x380(%rsp),%rsi
+  457370:       00 
+  457371:       66 0f 1f 84 00 00 00    nopw   0x0(%rax,%rax,1)
+  457378:       00 00 
+  45737a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+  457380:       48 89 6c 24 f0          mov    %rbp,-0x10(%rsp)
+  457385:       48 8d 6c 24 f0          lea    -0x10(%rsp),%rbp
+  45738a:       e8 51 c3 ff ff          callq  4536e0 &lt;runtime.duffcopy+0xe0&gt;
+  45738f:       48 8b 6d 00             mov    0x0(%rbp),%rbp
+  457393:       e8 88 fd ff ff          callq  457120 &lt;main.GetStorageConfigurationByValue&gt;
+</pre>
+
+<p>Překlad <strong>GetStorageConfigurationByReference(&amp;configuration)</strong>:</p>
+
+<pre>
+  45739d:       48 8d 84 24 78 03 00    lea    0x378(%rsp),%rax
+  4573a4:       00 
+  4573a5:       e8 d6 fd ff ff          callq  457180 &lt;main.GetStorageConfigurationByReference&gt;
+</pre>
+
+<p>Překlad <strong>configuration.GetStorageConfigurationByValue()</strong>:</p>
+
+<pre>
+  4573af:       48 8b 84 24 78 03 00    mov    0x378(%rsp),%rax
+  4573b6:       00 
+  4573b7:       48 89 04 24             mov    %rax,(%rsp)
+  4573bb:       48 8d 7c 24 08          lea    0x8(%rsp),%rdi
+  4573c0:       48 8d b4 24 80 03 00    lea    0x380(%rsp),%rsi
+  4573c7:       00 
+  4573c8:       48 89 6c 24 f0          mov    %rbp,-0x10(%rsp)
+  4573cd:       48 8d 6c 24 f0          lea    -0x10(%rsp),%rbp
+  4573d2:       e8 09 c3 ff ff          callq  4536e0 &lt;runtime.duffcopy+0xe0&gt;
+  4573d7:       48 8b 6d 00             mov    0x0(%rbp),%rbp
+  4573db:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
+  4573e0:       e8 1b fe ff ff          callq  457200 &lt;main.ConfigStruct.GetStorageConfigurationByValue&gt;
+</pre>
+
+<p>Překlad <strong>configuration.GetStorageConfigurationByReference()</strong>:</p>
+
+<pre>
+  4573ea:       48 8d 84 24 78 03 00    lea    0x378(%rsp),%rax
+  4573f1:       00 
+  4573f2:       e8 69 fe ff ff          callq  457260 &lt;main.(*ConfigStruct).GetStorageConfigurationByReference&gt;
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: už rozdíly v&nbsp;počtu instrukcí a ve
+volání funkce <strong>duffcopy</strong> naznačují, který způsob bude trvat déle
+a který kratší dobu.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Benchmark zjišťující rozdíly v&nbsp;rychlosti volání funkcí a metod s&nbsp;využitím hodnoty a reference na předávanou strukturu</h2>
+
+<p>Pro zjištění, jak moc (či jak vůbec) se budou lišit časy volání funkcí a
+metod s&nbsp;využitím hodnoty nebo reference na předávanou datovou strukturu,
+byl vytvořen následující jednoduchý benchmark, jenž otestuje všechny čtyři
+možnosti. Povšimněte si, že tento benchmark neměří čas nutný pro načtení
+konfigurace a její deserializaci knihovnou <i>Viper</i>. Měří se pouze čas
+volání funkce nebo metody s&nbsp;předáním deserializované konfigurace, a to buď
+hodnotou nebo odkazem (v&nbsp;benchmarcích je možné pozastavit a znovu
+rozběhnout časovač používaný pro výpočet doby trvání operací):</p>
+
+<pre>
+package conf_test
+&nbsp;
+<i>// Benchmark for config module</i>
+&nbsp;
+import (
+        "os"
+        "testing"
+&nbsp;
+        "config-struct/conf"
+)
+&nbsp;
+const (
+        configFileEnvVariableName = "SERVICE_CONFIG_FILE"
+        defaultConfigFileName     = "./config"
+)
+&nbsp;
+<i>// loadConfiguration function loads configuration prepared to be used by</i>
+<i>// benchmarks</i>
+func <strong>loadConfiguration</strong>() (conf.ConfigStruct, error) {
+        os.Clearenv()
+&nbsp;
+        err := os.Setenv(configFileEnvVariableName, defaultConfigFileName)
+        if err != nil {
+                return conf.ConfigStruct{}, err
+        }
+&nbsp;
+        config, err := conf.LoadConfiguration(configFileEnvVariableName, defaultConfigFileName)
+        if err != nil {
+                return conf.ConfigStruct{}, err
+        }
+&nbsp;
+        return config, nil
+}
+&nbsp;
+func <strong>mustLoadBenchmarkConfiguration</strong>(b *testing.B) conf.ConfigStruct {
+        configuration, err := loadConfiguration()
+        if err != nil {
+                b.Fatal(err)
+        }
+        return configuration
+}
+&nbsp;
+func <strong>BenchmarkGetStorageConfigurationFunctionByValue</strong>(b *testing.B) {
+        b.StopTimer()
+        configuration := mustLoadBenchmarkConfiguration(b)
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// call benchmarked function</i>
+                conf.GetStorageConfigurationByValue(configuration)
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>BenchmarkGetStorageConfigurationFunctionByReference</strong>(b *testing.B) {
+        b.StopTimer()
+        configuration := mustLoadBenchmarkConfiguration(b)
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// call benchmarked function</i>
+                conf.GetStorageConfigurationByReference(&amp;configuration)
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>BenchmarkGetStorageConfigurationMethodByValue</strong>(b *testing.B) {
+        b.StopTimer()
+        configuration := mustLoadBenchmarkConfiguration(b)
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// call benchmarked function</i>
+                configuration.GetStorageConfigurationByValue()
+        }
+&nbsp;
+}
+&nbsp;
+func <strong>BenchmarkGetStorageConfigurationMethodByReference</strong>(b *testing.B) {
+        b.StopTimer()
+        configuration := mustLoadBenchmarkConfiguration(b)
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// call benchmarked function</i>
+                configuration.GetStorageConfigurationByReference()
+        }
+&nbsp;
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Výsledky benchmarku i profileru</h2>
+
+<p>Podívejme se nyní na výsledky všech čtyř benchmarků, jejichž zdrojové kódy
+jsme si ukázali a popsali <a href="#k11">v&nbsp;předchozí kapitole</a>. Celkem
+je provedeno 1000000000 volání všech testovaných funkcí a metod:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=1000000000x -cpuprofile profile.out -v config-struct/conf</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: config-struct/conf
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkGetStorageConfigurationFunctionByValue
+BenchmarkGetStorageConfigurationFunctionByValue-8               1000000000              13.20 ns/op
+BenchmarkGetStorageConfigurationFunctionByReference
+BenchmarkGetStorageConfigurationFunctionByReference-8           1000000000               0.2405 ns/op
+BenchmarkGetStorageConfigurationMethodByValue
+BenchmarkGetStorageConfigurationMethodByValue-8                 1000000000              13.24 ns/op
+BenchmarkGetStorageConfigurationMethodByReference
+BenchmarkGetStorageConfigurationMethodByReference-8             1000000000               0.3596 ns/op
+PASS
+ok      config-struct/conf      27.166s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;výsledků benchmarků je patrné, že
+volání funkce s&nbsp;předáním reference je přibližně 55&times; rychlejší, než
+volání obdobné funkce, které se však předá přímo hodnota struktury. Podobně pro
+volání metod je použití reference jako příjemce (<i>receiver</i>) přibližně
+36&times; rychlejší, než použití hodnoty jako příjemce. Samozřejmě se liší
+<i>sémantika</i> volání, ale obecně je použití reference mnohem rychlejší (a
+nebezpečnější kvůli nemožnosti použití modifikátoru <strong>const</strong>).
+Pro menší struktury (a naše testovaná struktura je skutečně velká) budou
+rozdíly v&nbsp;dosažených časech pochopitelně menší.</div></p>
+
+<p>Profiler, konkrétně profiler zjišťující zatížení mikroprocesoru výpočty, se
+spustí následujícím příkazem:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=1000000000x -cpuprofile profile.out -v config-struct/conf</strong>
+</pre>
+
+<p>Výsledky v&nbsp;grafické podobě vypadají takto:</p>
+
+<a href="https://www.root.cz/obrazek/719979/"><img src="https://i.iinfo.cz/images/118/go-performance-1-9-prev.png" class="image-719979" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-9-prev.png" data-prev-width="370" data-prev-height="112" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-9-large.png" data-large-width="720" data-large-height="219" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="112" /></a>
+<p><i>Obrázek 9: Z&nbsp;grafické podoby výsledků je patrné, že zdaleka nejvíce
+času se stráví v&nbsp;systémové funkci <strong>duffcopy</strong>.</i></p>
+
+<p>Mimochodem &ndash; samotná funkce <strong>duffcopy</strong> se přeloží
+s&nbsp;rozbalenou smyčkou, takže se vlastně jedná pouze o sekvenci instrukcí
+pro přesuny dat:</p>
+
+<pre>
+    ...
+    ...
+    ...
+    187        200ms      200ms           	MOVUPS	(SI), X0 
+    188        120ms      120ms           	ADDQ	$16, SI 
+    189        280ms      280ms           	MOVUPS	X0, (DI) 
+    190         90ms       90ms           	ADDQ	$16, DI 
+    191            .          .            
+    192        140ms      140ms           	MOVUPS	(SI), X0 
+    193        120ms      120ms           	ADDQ	$16, SI 
+    194        280ms      280ms           	MOVUPS	X0, (DI) 
+    195         60ms       60ms           	ADDQ	$16, DI 
+    196            .          .            
+    197        210ms      210ms           	MOVUPS	(SI), X0 
+    198         70ms       70ms           	ADDQ	$16, SI 
+    199        180ms      180ms           	MOVUPS	X0, (DI) 
+    200         50ms       50ms           	ADDQ	$16, DI 
+    201            .          .            
+    202        110ms      110ms           	MOVUPS	(SI), X0 
+    203        140ms      140ms           	ADDQ	$16, SI 
+    204        170ms      170ms           	MOVUPS	X0, (DI) 
+    205         20ms       20ms           	ADDQ	$16, DI 
+    206            .          .            
+    207         90ms       90ms           	MOVUPS	(SI), X0 
+    208        130ms      130ms           	ADDQ	$16, SI 
+    209        210ms      210ms           	MOVUPS	X0, (DI) 
+    210         30ms       30ms           	ADDQ	$16, DI 
+    ...
+    ...
+    ...
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Mapy vs. řezy při implementaci jednoduché paměťové cache</h2>
+
+<p>Následující benchmark vznikl z&nbsp;toho důvodu, že jsme pro účely jednoho
+projektu zjišťovali, jakým způsobem se má implementovat jednoduchá paměťová
+cache, konkrétně cache pro prvky, jejichž klíče jsou typu <strong>int</strong>
+a hodnoty obsahují UUID a časové razítko (v&nbsp;samotné aplikaci je situace
+složitější, neboť se používá komplikovanější datová struktura). Poněkud
+neobvyklé ovšem bylo, že počet položek umístěných do paměťové cache je
+relativně malý &ndash; většinou v&nbsp;intervalu od 1 do 10 &ndash; a počet
+čtení o několik řádů přesahuje počet zápisů.</p>
+
+<p>Vzhledem k&nbsp;tomu, že prvky v&nbsp;cache jsou určeny identifikátorem
+(typu <strong>int</strong>), mohlo by se zdát řešení triviální: použít mapu.
+Ovšem vzhledem k&nbsp;požadavku na co nejvyšší rychlost nalezení prvků byl
+vytvořen benchmark a navíc se kromě implementace cache přes mapu (což je
+řešení, které automaticky napadne každého vývojáře) vytvořilo i alternativní
+řešení založené na použití běžného řezu s&nbsp;lineárním (!!!) vyhledáváním.
+Z&nbsp;teoretického hlediska je to pochopitelně nesmysl, ovšem podívejme se na
+chování takové cache pro malý počet uložených prvků. Toto chování je otestováno
+v&nbsp;následujícím benchmarku:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+        "time"
+&nbsp;
+        "github.com/google/uuid"
+)
+&nbsp;
+type ID int
+&nbsp;
+type Payload struct {
+        uuid      string
+        timestamp time.Time
+}
+&nbsp;
+type IdWithPayload struct {
+        id        ID
+        uuid      string
+        timestamp time.Time
+}
+&nbsp;
+func <strong>genID</strong>(i int) ID {
+        return ID(3*i + 1)
+}
+&nbsp;
+func <strong>fillInMap</strong>(b *testing.B, items int) map[ID]Payload {
+        b.StopTimer()
+&nbsp;
+        m := make(map[ID]Payload, items)
+&nbsp;
+        for i := 0; i &lt; items; i++ {
+                id := genID(i)
+                payload := Payload{
+                        uuid:      uuid.New().String(),
+                        timestamp: time.Now(),
+                }
+                m[id] = payload
+        }
+&nbsp;
+        b.StartTimer()
+        return m
+}
+&nbsp;
+func <strong>fillInSlice</strong>(b *testing.B, items int) []IdWithPayload {
+        b.StopTimer()
+&nbsp;
+        s := make([]IdWithPayload, items)
+&nbsp;
+        for i := 0; i &lt; items; i++ {
+                idWithPayload := IdWithPayload{
+                        id:        genID(i),
+                        uuid:      uuid.New().String(),
+                        timestamp: time.Now(),
+                }
+                s[i] = idWithPayload
+        }
+&nbsp;
+        b.StartTimer()
+        return s
+}
+&nbsp;
+func <strong>performBenchmarkFindInMap</strong>(b *testing.B, m map[ID]Payload) {
+        items := len(m)
+        for i := 0; i &lt; b.N; i++ {
+                _, found := m[genID(i%items)]
+                if !found {
+                        b.Fatal("not found")
+                }
+        }
+}
+&nbsp;
+func <strong>performBenchmarkFindInSlice</strong>(b *testing.B, s []IdWithPayload) {
+        items := len(s)
+        for i := 0; i &lt; b.N; i++ {
+                found := false
+                id := genID(i % items)
+                for _, p := range s {
+                        if p.id == id {
+                                found = true
+                                break
+                        }
+                }
+                if !found {
+                        b.Fatal("not found")
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkFindInMap1</strong>(b *testing.B) {
+        m := fillInMap(b, 1)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice1</strong>(b *testing.B) {
+        m := fillInSlice(b, 1)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap5</strong>(b *testing.B) {
+        m := fillInMap(b, 5)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice5</strong>(b *testing.B) {
+        m := fillInSlice(b, 5)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap10</strong>(b *testing.B) {
+        m := fillInMap(b, 10)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice10</strong>(b *testing.B) {
+        m := fillInSlice(b, 10)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap20</strong>(b *testing.B) {
+        m := fillInMap(b, 20)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice20</strong>(b *testing.B) {
+        m := fillInSlice(b, 20)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap100</strong>(b *testing.B) {
+        m := fillInMap(b, 100)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice100</strong>(b *testing.B) {
+        m := fillInSlice(b, 100)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap1000</strong>(b *testing.B) {
+        m := fillInMap(b, 1000)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice1000</strong>(b *testing.B) {
+        m := fillInSlice(b, 1000)
+        performBenchmarkFindInSlice(b, m)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ze zdrojového kódu je patrné, že
+benchmark voláme pro různé velikosti cache &ndash; od minimálního počtu prvků
+do 1000 prvků.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výsledky benchmarků</h2>
+
+<p>Výsledky benchmarků budou v&nbsp;tomto případě zajímavé, protože již nebude
+zcela zřejmé, který algoritmus je výhodnější pro libovolná data. Ukazuje se
+totiž, že pro malý počet prvků je výhodnější (i když se nejedná o řádový
+rozdíl) použít řez a nikoli mapu:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: slice-or-map
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkFindInMap1-8           100000000               12.13 ns/op
+BenchmarkFindInSlice1-8         100000000                9.573 ns/op
+BenchmarkFindInMap5-8           100000000               13.19 ns/op
+BenchmarkFindInSlice5-8         100000000               10.78 ns/op
+BenchmarkFindInMap10-8          100000000               15.82 ns/op
+BenchmarkFindInSlice10-8        100000000               14.11 ns/op
+BenchmarkFindInMap20-8          100000000               15.29 ns/op
+BenchmarkFindInSlice20-8        100000000               17.80 ns/op
+BenchmarkFindInMap100-8         100000000               17.07 ns/op
+BenchmarkFindInSlice100-8       100000000               64.13 ns/op
+BenchmarkFindInMap1000-8        100000000               23.96 ns/op
+BenchmarkFindInSlice1000-8      100000000              611.9 ns/op
+PASS
+ok      slice-or-map    82.604s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;případě, že vás překvapuje, že je
+přístup do mapy (relativně) pomalý pro malý počet prvků, postačuje se podívat
+na implementaci mapy, konkrétně na funkce <strong>mapaccess1</strong> a
+<strong>mapaccess2</strong>. Počet operací, které se při vyhledání prvku
+provádí, je skutečně velký v&nbsp;porovnání s&nbsp;triviálním lineárním
+průchodem prvky řezu, takže pro počet prvků do cca 15 je (což může znít
+paradoxně) mnohdy rychlejší použití řezů.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Grafické porovnání výsledků</h2>
+
+<p>Nejprve si porovnejme časy běhu pro benchmarku s&nbsp;počtem prvků
+pohybujícím se od 1 do 100:</p>
+
+<a href="https://www.root.cz/obrazek/719980/"><img src="https://i.iinfo.cz/images/118/go-performance-1-10-prev.png" class="image-719980" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-10-prev.png" data-prev-width="370" data-prev-height="228" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-10-large.png" data-large-width="720" data-large-height="444" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="228" /></a>
+<p><i>Obrázek 10: Porovnání doby vyhledání prvku v&nbsp;mapě a v&nbsp;řezu pro
+kontejnery s&nbsp;počtem prvků do 100.</i></p>
+
+<p>Povšimněte si, že pro skutečně malý počet prvků (do cca 15) je použití řezu
+výhodnější.</p>
+
+<p>Pro větší počet prvků je však již patrné, že mapa je v&nbsp;naprosté většině
+případů lepším řešením a v&nbsp;nejhorším možném případě bude časová složitost
+stejná, jako složitost lineárního přístupu, tedy O(n). Viz též poslední
+sloupec:</p>
+
+<a href="https://www.root.cz/obrazek/719981/"><img src="https://i.iinfo.cz/images/118/go-performance-1-11-prev.png" class="image-719981" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-11-prev.png" data-prev-width="370" data-prev-height="228" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-11-large.png" data-large-width="720" data-large-height="443" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="228" /></a>
+<p><i>Obrázek 11: Porovnání doby vyhledání prvku v&nbsp;mapě a v&nbsp;řezu pro
+kontejnery s&nbsp;počtem prvků do 1000.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: samozřejmě je možné implementovat i
+sofistikovanější struktury typu strom. V&nbsp;našem konkrétním případě &ndash;
+o dva řády více vyhledání než zápisů &ndash; by se nejspíše jednalo o vyvážený
+strom. Užitečné je ovšem znovu provést benchmarky, aby se ověřilo, jak se bude
+datová struktura chovat v&nbsp;praxi, protože celý mechanismus běží na reálném
+HW s&nbsp;více jádry, lokální i globální cache atd. atd.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Mapy vs. řezy při implementaci množiny</h2>
+
+<p>Ještě naposledy se vraťme k&nbsp;problematice použití map nebo řezů, a to
+při implementaci množiny. Pokud je množina implementovaná řezem, je řešení
+zřejmé &ndash; vlastní hodnota uložená v&nbsp;řezu je hodnota prvku množiny,
+takže minimálně operace vkládání vyžaduje zjištění, zda prvek v&nbsp;množině
+již existuje či nikoli (operace s&nbsp;lineární složitostí!). V&nbsp;případě
+map se používají vlastně jen klíče prvků, protože hodnoty prvků jsou prázdnými
+strukturami (což je datový typ s&nbsp;teoreticky nulovou velikostí). Dopředu je
+nutné říci, že ani jeden z&nbsp;použitých způsobů není ani zdaleka ideální a
+pokud se má skutečně pracovat s&nbsp;rozsáhlými množinami, je lepší se
+poohlédnout po již hotových implementacích, například po <a
+href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k04">knihovně
+Go18DS</a>. Nicméně se podívejme na časovou složitost zjišťování, zda prvek
+v&nbsp;množině existuje či nikoli. Jedná se tedy o podobný problém, jaký jsme
+řešili v&nbsp;předchozích kapitolách:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+type ID int
+&nbsp;
+func <strong>genID</strong>(i int) ID {
+        return ID(3*i + 1)
+}
+&nbsp;
+func <strong>fillInMap</strong>(b *testing.B, items int) map[ID]struct{} {
+        b.StopTimer()
+&nbsp;
+        m := make(map[ID]struct{}, items)
+&nbsp;
+        for i := 0; i &lt; items; i++ {
+                id := genID(i)
+                m[id] = struct{}{}
+        }
+&nbsp;
+        b.StartTimer()
+        return m
+}
+&nbsp;
+func <strong>fillInSlice</strong>(b *testing.B, items int) []ID {
+        b.StopTimer()
+&nbsp;
+        s := make([]ID, items)
+&nbsp;
+        for i := 0; i &lt; items; i++ {
+                id := genID(i)
+                s[i] = id
+        }
+&nbsp;
+        b.StartTimer()
+        return s
+}
+&nbsp;
+func <strong>performBenchmarkFindInMap</strong>(b *testing.B, m map[ID]struct{}) {
+        items := len(m)
+        for i := 0; i &lt; b.N; i++ {
+                _, found := m[genID(i%items)]
+                if !found {
+                        b.Fatal("not found")
+                }
+        }
+}
+&nbsp;
+func <strong>performBenchmarkFindInSlice</strong>(b *testing.B, s []ID) {
+        items := len(s)
+        for i := 0; i &lt; b.N; i++ {
+                found := false
+                id := genID(i % items)
+                for _, p := range s {
+                        if p == id {
+                                found = true
+                                break
+                        }
+                }
+                if !found {
+                        b.Fatal("not found")
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkFindInMap1</strong>(b *testing.B) {
+        m := fillInMap(b, 1)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice1</strong>(b *testing.B) {
+        m := fillInSlice(b, 1)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap5</strong>(b *testing.B) {
+        m := fillInMap(b, 5)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice5</strong>(b *testing.B) {
+        m := fillInSlice(b, 5)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap10</strong>(b *testing.B) {
+        m := fillInMap(b, 10)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice10</strong>(b *testing.B) {
+        m := fillInSlice(b, 10)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap20</strong>(b *testing.B) {
+        m := fillInMap(b, 20)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice20</strong>(b *testing.B) {
+        m := fillInSlice(b, 20)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap100</strong>(b *testing.B) {
+        m := fillInMap(b, 100)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice100</strong>(b *testing.B) {
+        m := fillInSlice(b, 100)
+        performBenchmarkFindInSlice(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInMap1000</strong>(b *testing.B) {
+        m := fillInMap(b, 1000)
+        performBenchmarkFindInMap(b, m)
+}
+&nbsp;
+func <strong>BenchmarkFindInSlice1000</strong>(b *testing.B) {
+        m := fillInSlice(b, 1000)
+        performBenchmarkFindInSlice(b, m)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledky benchmarku</h2>
+
+<p>Výsledky benchmarku by již pro nás neměly být překvapivé &ndash; pro velmi
+malý počet prvků &bdquo;vyhrává&ldquo; jinak zcela nepoužitelný algoritmus
+založený na (lineárním) průchodu prvky, zatímco pro množiny mající více než
+přibližně 20 prvků je již lepší se spolehnout na interní hešovací algoritmus
+implementovaný pro mapy:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: sets-slice-or-map
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkFindInMap1-8           100000000               12.01 ns/op
+BenchmarkFindInSlice1-8         100000000                7.208 ns/op
+BenchmarkFindInMap5-8           100000000               12.61 ns/op
+BenchmarkFindInSlice5-8         100000000                8.346 ns/op
+BenchmarkFindInMap10-8          100000000               14.57 ns/op
+BenchmarkFindInSlice10-8        100000000                9.498 ns/op
+BenchmarkFindInMap20-8          100000000               14.28 ns/op
+BenchmarkFindInSlice20-8        100000000               11.61 ns/op
+BenchmarkFindInMap100-8         100000000               14.63 ns/op
+BenchmarkFindInSlice100-8       100000000               35.57 ns/op
+BenchmarkFindInMap1000-8        100000000               22.53 ns/op
+BenchmarkFindInSlice1000-8      100000000              281.4 ns/op
+PASS
+ok      sets-slice-or-map       44.437s
+</pre>
+
+<p>Grafické zobrazení výsledků:</p>
+
+<a href="https://www.root.cz/obrazek/719982/"><img src="https://i.iinfo.cz/images/118/go-performance-1-12-prev.png" class="image-719982" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-12-prev.png" data-prev-width="370" data-prev-height="227" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-12-large.png" data-large-width="720" data-large-height="441" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="227" /></a>
+<p><i>Obrázek 12: Při malém počtu prvků (což ale není typický případ) se
+vyplatí použít primitivní řezy.</i></p>
+
+<a href="https://www.root.cz/obrazek/719983/"><img src="https://i.iinfo.cz/images/118/go-performance-1-13-prev.png" class="image-719983" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-13-prev.png" data-prev-width="370" data-prev-height="225" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-13-large.png" data-large-width="720" data-large-height="438" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="225" /></a>
+<p><i>Obrázek 13: Při větším počtu prvků je samozřejmě už výhodnější se
+spolehnout na sofistikovanější algoritmy, i když je nutné dát pozor na to, že
+mapy v&nbsp;nejhorším případě zaručují lineární složitost.</i></p>
+
+<a href="https://www.root.cz/obrazek/719984/"><img src="https://i.iinfo.cz/images/118/go-performance-1-14-prev.png" class="image-719984" data-prev-filename="https://i.iinfo.cz/images/118/go-performance-1-14-prev.png" data-prev-width="370" data-prev-height="227" data-large-filename="https://i.iinfo.cz/images/118/go-performance-1-14-large.png" data-large-width="720" data-large-height="441" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://www.gnu.org/copyleft/gpl.html&quot;&gt;GNU GPL&lt;/a&gt;" width="370" height="227" /></a>
+<p><i>Obrázek 14: Praktický (ne teoretický!) rozdíl mezi použitím map a řezů
+pro implementaci množin je lépe patrný na tomto grafu, na němž je lineární
+časová složitost O(n) pro řezy jasně porovnatelná s&nbsp;obecně lepší časovou
+složitostí map pro větší počet prvků.</i></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Závěrečné zhodnocení &ndash; triviální a přitom mnohdy důležité optimalizace</h2>
+
+<p>V&nbsp;dnešním článku jsme si ukázali velmi jednoduché optimalizace, které
+je možné provádět v&nbsp;aplikacích naprogramovaných v&nbsp;jazyku Go. Jak bylo
+z&nbsp;předchozích kapitol patrné, jedná se prakticky ve všech případech o
+zcela triviální operace, které však mohou být přesto užitečné a důležité.
+Prakticky vždy je však při výběru algoritmu určeného pro řešení určité úlohy
+užitečné si napsat benchmarky, spustit je a taktéž spustit profiler. Jen tak
+lze totiž &bdquo;objevit&ldquo; některé zajímavé odchylky pro určitou velikost
+úlohy &ndash; viz například benchmark pro cache a benchmark pro implementaci
+množiny dvěma různými datovými strukturami.</p>
+
+<p>Někdy je taktéž užitečné (ale zde již skutečně záleží na citu programátora)
+vzdát se některé vlastnosti poskytované jazykem Go. Příkladem je předávání
+parametrů hodnotou, což je v&nbsp;mnoha ohledech &bdquo;čistější&ldquo; řešení,
+než předávání odkazem (volaná funkce/metoda nemůže předávanou hodnotu
+modifikovat, protože má k&nbsp;dispozici její kopii &ndash; což je ale někdy
+jen iluze). Zde platíme strojovým časem a pamětí za fakt, že Go prozatím
+nedokáže zajistit neměnnost (<i>immutability</i>) datových struktur &ndash;
+neexistuje zde ani vhodná syntaxe, ale ani sémantika.</p>
+
+<p><div class="rs-tip-major">Poznámka: existují i další poněkud neintuitivní
+optimalizace, například při průchodu řezem, polem či mapou bez kopie hodnoty
+jednotlivých prvků. O této problematice (která mimochodem opět vede ke snížení
+počtu operace <strong>duffcopy</strong>) se zmíníme příště.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>maps/map1_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu UUID a hodnoty jsou časovými razítky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go</a></td></tr>
+<tr><td> 2</td><td>maps/map2_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu <strong>int</strong> a i hodnoty jsou stejného typu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go</a></td></tr>
+<tr><td> 3</td><td>maps/map3_test.go</td><td>benchmark pro mapy, jejichž prvky jsou prázdnými strukturami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go</a></td></tr>
+<tr><td> 4</td><td>maps/map4_test.go</td><td>benchmark pro mapy, jejichž klíče mají velikost 100 bajtů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go</a></td></tr>
+<tr><td> 5</td><td>maps/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod</a></td></tr>
+<tr><td> 6</td><td>maps/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>map_or_slice/map_or_slice_test.go</td><td>benchmark porovnávající použití řezů a map pro podobné operace vyhledání hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go</a></td></tr>
+<tr><td> 8</td><td>map_or_slice/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod</a></td></tr>
+<tr><td> 9</td><td>map_or_slice/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>sets/map_or_slice_test.go</td><td>benchmark: je lepší použít mapu nebo řez pro implementaci množiny?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go</a></td></tr>
+<tr><td>11</td><td>sets/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>parameter_value_reference/main.go</td><td>předávání rozsáhlých parametrů: hlavní program</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go</a></td></tr>
+<tr><td>13</td><td>parameter_value_reference/config.toml</td><td>konfigurační soubor, který je načítán programem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml</a></td></tr>
+<tr><td>14</td><td>parameter_value_reference/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod</a></td></tr>
+<tr><td>15</td><td>parameter_value_reference/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum</a></td></tr>
+<tr><td>16</td><td>parameter_value_reference/conf/config.go</td><td>definice datové struktury s&nbsp;načítanou konfigurací</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go</a></td></tr>
+<tr><td>17</td><td>parameter_value_reference/conf/config.toml</td><td>konfigurační soubor, který je načítán benchmarkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml</a></td></tr>
+<tr><td>18</td><td>parameter_value_reference/conf/config_benchmark_test.go</td><td>benchmark: předávání velké struktury hodnotou nebo referencí?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>config_to_asm.go</td><td>soubor, jehož překlad do assembleru se použil v&nbsp;dnešním článku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go">https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>An Introduction to Benchmarking Your Go Programs<br />
+<a href="https://tutorialedge.net/golang/benchmarking-your-go-programs/">https://tutorialedge.net/golang/benchmarking-your-go-programs/</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
