@@ -1,0 +1,1650 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Číselné hodnoty s neomezeným rozsahem a přesností v programovacím jazyku Go: typ Decimal</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Číselné hodnoty s neomezeným rozsahem a přesností v programovacím jazyku Go: typ Decimal</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na dvojici článků, v nichž jsme si popsali práci s numerickými hodnotami s neomezeným rozsahem a/nebo přesností nabízených v jazyku Go standardním balíčkem math.big, dnes navážeme. Zabývat se budeme knihovnou shopspring/decimal, která programátorům nabízí hodnoty s desítkovým exponentem v rozsahu -2<sup>31</sup> až 2<sup>31</sup>-1 a libovolně rozsáhlou mantisou.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go: typ <strong>Decimal</strong></a></p>
+<p><a href="#k02">2. Interní reprezentace numerických hodnot typu <strong>Decimal</strong></a></p>
+<p><a href="#k03">3. Instalace balíčku <strong>shopspring/decimal</strong></a></p>
+<p><a href="#k04">4. Nulová hodnota typu <strong>Decimal</strong></a></p>
+<p><a href="#k05">5. Konstrukce hodnot typu <strong>Decimal</strong> s&nbsp;využitím inicializační celočíselné hodnoty</a></p>
+<p><a href="#k06">6. Konstrukce hodnot typu <strong>Decimal</strong> s&nbsp;využitím inicializační hodnoty s&nbsp;plovoucí řádovou čárkou</a></p>
+<p><a href="#k07">7. Explicitní specifikace hodnoty exponentu při konstrukci hodnot typu <strong>Decimal</strong></a></p>
+<p><a href="#k08">8. Převod obsahu řetězce na numerickou hodnotu typu <strong>Decimal</strong></a></p>
+<p><a href="#k09">9. Automatická kontrola, zda naparsování hodnoty z&nbsp;řetězce bylo úspěšné</a></p>
+<p><a href="#k10">10. Naparsování hodnoty z&nbsp;řetězce se specifikací nadbytečných znaků v&nbsp;řetězci</a></p>
+<p><a href="#k11">11. Základní aritmetické operace s&nbsp;hodnotami typu <strong>Decimal</strong></a></p>
+<p><a href="#k12">12. Podíl se specifikací způsobu zaokrouhlení výsledku</a></p>
+<p><a href="#k13">13. Výpočet faktoriálu s&nbsp;hodnotami typu <strong>Decimal</strong></a></p>
+<p><a href="#k14">14. Agregační funkce s&nbsp;hodnotami typu <strong>Decimal</strong></a></p>
+<p><a href="#k15">15. Interní struktura hodnot typu <strong>Decimal</strong></a></p>
+<p><a href="#k16">16. Výpočet hodnoty &pi; s&nbsp;typem <strong>Decimal</strong></a></p>
+<p><a href="#k17">17. Rychlost výpočtů s&nbsp;hodnotami typu <strong>Decimal</strong></a></p>
+<p><a href="#k18">18. Výsledky benchmarků</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go: typ <strong>Decimal</strong></h2>
+
+<p><a href="https://www.root.cz/serialy/programovaci-jazyk-go/">V&nbsp;seriálu
+o programovacím jazyce Go</a> jsme se již zabývali způsoby, jakými je možné
+v&nbsp;tomto programovacím jazyce pracovat s&nbsp;hodnotami, které mají
+neomezený rozsah a/nebo i přesnost [<a
+href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-1/">1</a>]
+[<a
+href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-1/">2</a>].
+Připomeňme si, že se pro tento účel používají datové struktury definované ve
+standardním balíčku <strong>math/big</strong>; konkrétně se jedná o celá čísla
+s&nbsp;neomezeným rozsahem (<strong>big.Int</strong>), zlomky, jejichž čitatele
+i jmenovatele mají neomezený rozsah (<strong>big.Rat</strong>) a konečně
+hodnoty s&nbsp;plovoucí řádovou čárkou (<strong>big.Float</strong>). Existují
+ovšem situace, které vyžadují použití odlišných způsobů reprezentace rozsáhlých
+numerických hodnot. A jedna z&nbsp;možných reprezentací je nabízena
+v&nbsp;balíčku <a
+href="https://github.com/shopspring/decimal">shopspring/decimal</a>. Jak již
+název tohoto balíčku naznačuje, nejedná se o součást standardní knihovny, takže
+je nutná jeho (triviální) instalace.</p>
+
+<p><div class="rs-tip-major">Poznámka: pro Go existuje hned několik balíčků
+s&nbsp;podobným jménem; k&nbsp;některým z&nbsp;nich se ještě vrátíme.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Interní reprezentace numerických hodnot typu <strong>Decimal</strong></h2>
+
+<p>Hodnoty typu <strong>Decimal</strong> jsou interně reprezentovány velmi
+jednoduchou datovou strukturou, která obsahuje pouze dva prvky. Prvním prvkem
+je hodnota typu <strong>big.Int</strong>, což je, jak již dobře víme,
+celočíselná hodnota s&nbsp;neomezeným rozsahem. A druhým prvkem je
+<i>desítkový</i> exponent reprezentovaný 32bitovou celočíselnou hodnotou
+<strong>int32</strong>. Důvod, proč je exponent takto &bdquo;omezený&ldquo;
+pouze na 32 bitů, je uveden v&nbsp;poznámce:</p>
+
+<pre>
+type <strong>Decimal</strong> struct {
+        value *big.Int
+&nbsp;
+        <i>// NOTE(vadim): this must be an int32, because we cast it to float64 during</i>
+        <i>// calculations. If exp is 64 bit, we might lose precision.</i>
+        <i>// If we cared about being able to represent every possible decimal, we</i>
+        <i>// could make exp a *big.Int but it would hurt performance and numbers</i>
+        <i>// like that are unrealistic.</i>
+        exp int32
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;praxi však k&nbsp;žádnému omezení
+nedochází, protože rozsah <i>desítkových</i> (nikoli dvojkových!) exponentů od
+-2&nbsp;31 do 2<sup>31-1</sup> je více než dostatečný pro všechny myslitelné
+výpočty.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Instalace balíčku <strong>shopspring/decimal</strong></h2>
+
+<p>Samotná instalace balíčku <strong>shopspring/decimal</strong> je při použití
+některé novější verze základních nástrojů programovacího jazyka Go jednoduchá.
+Nejprve si vytvořte prázdný projekt příkazem:</p>
+
+<pre>
+$ <strong>go mod init decimal-1</strong>
+</pre>
+
+<p>Dále je nutné upravit soubor <strong>go.mod</strong>, který vznikne
+předchozím příkazem, do podoby:</p>
+
+<pre>
+module decimal-1
+&nbsp;
+go 1.20
+&nbsp;
+<strong>require github.com/shopspring/decimal v1.3.1</strong>
+</pre>
+
+<p>Nyní je již možné ve zdrojových souborech projektu provést import balíčku
+<strong>shopspring/decimal</strong> a začít používat zde definovaný datový typ
+<strong>Decimal</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+...
+...
+...
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Nulová hodnota typu <strong>Decimal</strong></h2>
+
+<p>Již ve standardním balíčku <strong>math.big</strong> je zajištěno, že
+explicitně neinicializovaná struktura daného typu <strong>big.Int</strong>,
+<strong>big.Rat</strong> nebo <strong>big.Float</strong> je považována za
+nulovou hodnotu, což může zjednodušovat zápis programů. Ostatně si to můžeme
+velmi snadno ověřit tímto triviálním příkladem, v&nbsp;němž pouze definujeme
+proměnné daného typu, ovšem bez jejich explicitní inicializace:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math/big"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x big.Int
+        var y big.Rat
+        var z big.Float
+&nbsp;
+        fmt.Println("big.Int  ", x.Text(10))
+        fmt.Println("big.Rat  ", y.String())
+        fmt.Println("big.Float", z.Text('f', 10))
+}
+</pre>
+
+<p>S&nbsp;těmito výsledky:</p>
+
+<pre>
+big.Int   0
+big.Rat   0/1
+big.Float 0.0000000000
+</pre>
+
+<p>Podobně je tomu i u datového typu <strong>Decimal</strong>, jehož
+neinicializované proměnné jsou automaticky považovány za nulové hodnoty:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var d <u>decimal.Decimal</u>
+        fmt.Println(d)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu se skutečně vypíše
+nula:</p>
+
+<pre>
+0
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde se počítá s&nbsp;tím, že
+v&nbsp;jazyce Go je explicitně specifikováno, že všechny hodnoty (i hodnoty
+prvků struktur) jsou inicializovány na nulu.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Konstrukce hodnot typu <strong>Decimal</strong> s&nbsp;využitím inicializační celočíselné hodnoty</h2>
+
+<p>Hodnoty typu <strong>Decimal</strong> je pochopitelně možné vytvářet a
+současně i inicializovat (na hodnotu odlišnou od nuly). Pro inicializaci lze
+použít i celočíselné hodnoty, konkrétně hodnoty typu <strong>int32</strong> či
+<strong>int</strong> (což je v&nbsp;současnosti na většině architektur vlastně
+<strong>int64</strong>). Podívejme se nejdříve na ukázku použití konstruktoru,
+který akceptuje hodnoty typu <strong>int32</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.NewFromInt32(0)</u>
+        fmt.Println(d0)
+&nbsp;
+        d1 := <u>decimal.NewFromInt32(1234)</u>
+        fmt.Println(d1)
+&nbsp;
+        d2 := <u>decimal.NewFromInt32(12345)</u>
+        fmt.Println(d2)
+&nbsp;
+        d3 := <u>decimal.NewFromInt32(123456)</u>
+        fmt.Println(d3)
+&nbsp;
+        d4 := <u>decimal.NewFromInt32(1234567)</u>
+        fmt.Println(d4)
+&nbsp;
+        d5 := <u>decimal.NewFromInt32(12345678)</u>
+        fmt.Println(d5)
+}
+</pre>
+
+<p>Výsledky vypsané po překladu a spuštění tohoto demonstračního příkladu
+pravděpodobně nebudou nijak překvapivé:</p>
+
+<pre>
+0
+1234
+12345
+123456
+1234567
+12345678
+</pre>
+
+<p>Prakticky stejným způsobem, pouze s&nbsp;využitím odlišného konstruktoru,
+můžeme pro inicializaci datového typu <strong>Decimal</strong> použít i hodnoty
+typu <strong>int</strong> (tedy většinou <strong>int64</strong>):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.NewFromInt(0)</u>
+        fmt.Println(d0)
+&nbsp;
+        d1 := <u>decimal.NewFromInt(123456)</u>
+        fmt.Println(d1)
+&nbsp;
+        d2 := <u>decimal.NewFromInt(123456789)</u>
+        fmt.Println(d2)
+&nbsp;
+        d3 := <u>decimal.NewFromInt(12345678900000)</u>
+        fmt.Println(d3)
+&nbsp;
+        d4 := <u>decimal.NewFromInt(1234567890000000000)</u>
+        fmt.Println(d4)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+0
+123456
+123456789
+12345678900000
+1234567890000000000
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;těchto případech je převod
+pochopitelně proveden bez ztráty přesnosti a/nebo rozsahu.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Konstrukce hodnot typu <strong>Decimal</strong> s&nbsp;využitím inicializační hodnoty s&nbsp;plovoucí řádovou čárkou</h2>
+
+<p>K&nbsp;inicializaci hodnot typu <strong>Decimal</strong> můžeme pochopitelně
+použít i hodnotu s&nbsp;plovoucí řádovou čárkou, což v&nbsp;programovacím
+jazyku Go znamená typy <strong>float32</strong> a <strong>float64</strong>. Na
+tomto místě je ale dobré si uvědomit, že typ <strong>Decimal</strong> nedokáže
+vyjádřit kladné a záporné nekonečno, takže při pokusu o převod těchto hodnot
+dojde k&nbsp;pádu (<i>panic</i>) celého programu (ovšem víme již, že tento pád
+lze zachytit).</p>
+
+<p>Nejdříve si ukažme inicializaci s&nbsp;využitím vstupní hodnoty typu
+<strong>float32</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.NewFromFloat32(0)</u>
+        fmt.Println(d0)
+&nbsp;
+        d1 := <u>decimal.NewFromFloat32(1e10)</u>
+        fmt.Println(d1)
+&nbsp;
+        d2 := <u>decimal.NewFromFloat32(1e-10)</u>
+        fmt.Println(d2)
+&nbsp;
+        <i>// maximální podporovaný exponent</i>
+        d3 := <u>decimal.NewFromFloat32(1.2e38)</u>
+        fmt.Println(d3)
+&nbsp;
+        <i>// minimální podporovaný exponent</i>
+        d4 := <u>decimal.NewFromFloat32(1.2e-38)</u>
+        fmt.Println(d4)
+&nbsp;
+        <i>// de facto nula z pohledu float32</i>
+        d5 := <u>decimal.NewFromFloat32(1.1e-100)</u>
+        fmt.Println(d5)
+&nbsp;
+        <i>// kladné nekonečno</i>
+        d6 := <u>decimal.NewFromFloat32(float32(math.Inf(1)))</u>
+        fmt.Println(d6)
+&nbsp;
+        <i>// záporné nekonečno</i>
+        d7 := <u>decimal.NewFromFloat32(float32(math.Inf(-1)))</u>
+        fmt.Println(d7)
+}
+</pre>
+
+<p>Prvních pět hodnot se převede bez problémů:</p>
+
+<pre>
+0
+10000000000
+0.0000000001
+120000000000000000000000000000000000000
+0.000000000000000000000000000000000000012
+</pre>
+
+<p>Šestá hodnota je pro <strong>float32</strong> tak malá, že se jedná o
+nulu:</p>
+
+<pre>
+0
+</pre>
+
+<p>A kladné či záporné nekonečno převést nelze &ndash; právě zde dojde
+k&nbsp;pádu aplikace:</p>
+
+<pre>
+panic: Cannot create a Decimal from +Inf
+&nbsp;
+goroutine 1 [running]:
+github.com/shopspring/decimal.newFromFloat(0xc00010a270?, 0x0?, 0x0?)
+        /home/ptisnovs/go/pkg/mod/github.com/shopspring/decimal@v1.3.1/decimal.go:286 +0x3d4
+github.com/shopspring/decimal.NewFromFloat32(0x4d49f8?)
+        /home/ptisnovs/go/pkg/mod/github.com/shopspring/decimal@v1.3.1/decimal.go:281 +0x65
+main.main()
+        /home/ptisnovs/src/go-root/article_AA/04_construct_from_float_32/construct_from_float32.go:29 +0x2c5
+exit status 2
+</pre>
+
+<p>Podobně můžeme postupovat při použití numerických hodnot reprezentovaných
+typem <strong>float64</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.NewFromFloat(0)</u>
+        fmt.Println(d0)
+&nbsp;
+        d1 := <u>decimal.NewFromFloat(1e10)</u>
+        fmt.Println(d1)
+&nbsp;
+        d2 := <u>decimal.NewFromFloat(1e-10)</u>
+        fmt.Println(d2)
+&nbsp;
+        <i>// maximální exponent</i>
+        d3 := <u>decimal.NewFromFloat(1.2e308)</u>
+        fmt.Println(d3)
+&nbsp;
+        <i>// minimální exponent</i>
+        d4 := <u>decimal.NewFromFloat(1.2e-308)</u>
+        fmt.Println(d4)
+&nbsp;
+        <i>// tato hodnota je již de facto nulová</i>
+        d5 := <u>decimal.NewFromFloat(1.1e-1000)</u>
+        fmt.Println(d5)
+&nbsp;
+        <i>// kladné nekonečno</i>
+        d6 := <u>decimal.NewFromFloat(math.Inf(1))</u>
+        fmt.Println(d6)
+&nbsp;
+        <i>// záporné nekonečno</i>
+        d7 := <u>decimal.NewFromFloat(math.Inf(-1))</u>
+        fmt.Println(d7)
+}
+</pre>
+
+<p>Podívejme se nyní na zobrazené výsledky, a to včetně pádu aplikace při
+pokusu o převedení nekonečné hodnoty na typ <strong>Decimal</strong>:</p>
+
+<pre>
+0
+10000000000
+0.0000000001
+120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012
+0
+panic: Cannot create a Decimal from +Inf
+&nbsp;
+goroutine 1 [running]:
+github.com/shopspring/decimal.newFromFloat(0xc00010a270?, 0x0?, 0x0?)
+        /home/ptisnovs/go/pkg/mod/github.com/shopspring/decimal@v1.3.1/decimal.go:286 +0x3d4
+github.com/shopspring/decimal.NewFromFloat(0x4d49f8?)
+        /home/ptisnovs/go/pkg/mod/github.com/shopspring/decimal@v1.3.1/decimal.go:262 +0x56
+main.main()
+        /home/ptisnovs/src/go-root/article_AA/05_construct_from_float/construct_from_float.go:29 +0x2c5
+exit status 2
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Explicitní specifikace hodnoty exponentu při konstrukci hodnot typu <strong>Decimal</strong></h2>
+
+<p><a href="#k02">Ve druhé kapitole</a> jsme si ukázali, jakým způsobem jsou
+uloženy hodnoty typu <strong>Decimal</strong>. Víme tedy, že vlastní
+celočíselná hodnota je oddělena od exponentu. Zajímavé je, že při konstrukci
+hodnoty <strong>Decimal</strong> je možné hodnotu desítkového exponentu
+explicitně nastavit, konkrétně použitím konstruktoru
+<strong>NewFromFloatWithExponent</strong>. Podívejme se nyní na důsledky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.NewFromFloatWithExponent(123.456, 0)</u>
+        fmt.Println(d0)
+&nbsp;
+        d1 := <u>decimal.NewFromFloatWithExponent(123.456, 1)</u>
+        fmt.Println(d1)
+&nbsp;
+        d2 := <u>decimal.NewFromFloatWithExponent(123.456, 2)</u>
+        fmt.Println(d2)
+&nbsp;
+        d3 := <u>decimal.NewFromFloatWithExponent(123.456, 3)</u>
+        fmt.Println(d3)
+&nbsp;
+        d4 := <u>decimal.NewFromFloatWithExponent(123.456, -1)</u>
+        fmt.Println(d4)
+&nbsp;
+        d5 := <u>decimal.NewFromFloatWithExponent(123.456, -2)</u>
+        fmt.Println(d5)
+&nbsp;
+        d6 := <u>decimal.NewFromFloatWithExponent(123.456, -3)</u>
+        fmt.Println(d6)
+&nbsp;
+        d7 := <u>decimal.NewFromFloatWithExponent(123.456, -4)</u>
+        fmt.Println(d7)
+}
+</pre>
+
+<p>Zajímavé bude sledovat, jak ovlivní předaná hodnota exponentu hodnotu, která
+převodem na typ <strong>Decimal</strong> vznikne:</p>
+
+<pre>
+123
+120
+100
+0
+123.5
+123.46
+123.456
+123.456
+</pre>
+
+<p>Kladné hodnoty znamenají, že se obecně ztrácí informace o cifrách
+<i>před</i> desetinnou čárkou/tečkou a záporné hodnoty mohou ovlivnit přesnost
+<i>za</i> desetinnou čárkou/tečkou. Je to vlastně logické, když si uvědomíme,
+že hodnota je reprezentována jako celé_číslo&times;10<sup>exponent</sup>.
+Tj.&nbsp;když například budeme vyžadovat použití exponentu==1, bude muset být
+základ nastaven na 12 a exponent na jedničku (tj.&nbsp;poslední cifra se
+ztratí).</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Převod obsahu řetězce na numerickou hodnotu typu <strong>Decimal</strong></h2>
+
+<p>Velmi často má programátor k&nbsp;dispozici numerickou hodnotu
+v&nbsp;textové podobě, tj.&nbsp;reprezentovanou řetězcem. Takovou hodnotu lze
+převést (naparsovat) na typ <strong>Decimal</strong> přímo, tj.&nbsp;bez
+mezipřevodu na celá čísla nebo čísla s&nbsp;plovoucí řádovou čárkou. V&nbsp;tom
+nejjednodušším případě můžeme pro parsing textu na <strong>Decimal</strong>
+použít konstruktor nazvaný <strong>NewFromString</strong>, který ovšem vrací
+dvě hodnoty &ndash; převedené číslo a rozhraní reprezentující chybu při
+převodu. Pochopitelně pokud k&nbsp;chybě nenastane, bude hodnota chyby
+nastavena na <strong>nil</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0, err := <u>decimal.NewFromString("-0")</u>
+        fmt.Println(d0, err)
+        fmt.Println()
+&nbsp;
+        d1, err := <u>decimal.NewFromString("-1234567890.123456789")</u>
+        fmt.Println(d1, err)
+        fmt.Println()
+&nbsp;
+        d2, err := <u>decimal.NewFromString("1e1000")</u>
+        fmt.Println(d2, err)
+        fmt.Println()
+&nbsp;
+        d3, err := <u>decimal.NewFromString("1e-1000")</u>
+        fmt.Println(d3, err)
+        fmt.Println()
+&nbsp;
+        d4, err := <u>decimal.NewFromString("-1234567890e123456")</u>
+        fmt.Println(d4, err)
+        fmt.Println()
+}
+</pre>
+
+<p>A takto vypadají výsledky (povšimněte si, že chyba je v&nbsp;těchto
+případech vždy <strong>nil</strong>):</p>
+
+<pre>
+0 &lt;<strong>nil</strong>&gt;
+&nbsp;
+-1234567890.123456789 &lt;<strong>nil</strong>&gt;
+&nbsp;
+10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 &lt;<strong>nil</strong>&gt;
+&nbsp;
+0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001 &lt;<strong>nil</strong>&gt;
+&nbsp;
+...
+...
+...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poslední hodnota je obrovská, a proto
+ani není vypsána.</div></p>
+
+<p>Otestovat si můžeme i pokusy o převod řetězců, které číselné hodnoty
+(v&nbsp;textové podobě) ve skutečnosti neobsahují:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0, err := <u>decimal.NewFromString("-a")</u>
+        fmt.Println(d0, err)
+        fmt.Println()
+&nbsp;
+        d1, err := <u>decimal.NewFromString("-x.123456789")</u>
+        fmt.Println(d1, err)
+        fmt.Println()
+&nbsp;
+        d2, err := <u>decimal.NewFromString("1e100a")</u>
+        fmt.Println(d2, err)
+        fmt.Println()
+}
+</pre>
+
+<p>V&nbsp;těchto případech získáme chyby s&nbsp;přesnější informací o provedené
+operaci a problémech, které nastaly:</p>
+
+<pre>
+0 can't convert -a to decimal
+&nbsp;
+0 can't convert -x.123456789 to decimal
+&nbsp;
+0 can't convert 1e100a to decimal: exponent is not numeric
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Automatická kontrola, zda naparsování hodnoty z&nbsp;řetězce bylo úspěšné</h2>
+
+<p>Explicitní kontrola chyby, která může nastat při parsování řetězce, je
+v&nbsp;jazyce Go (bez podpory syntaxe pro zachytávání výjimek) problematická,
+resp.&nbsp;přesněji řečeno poněkud nečitelná. Proto se ustálil idiom, že
+konstruktory popř.&nbsp;jiné funkce existují i ve variantě typicky začínající
+prefixem <strong>Must</strong>. Taková varianta nevrací chybovou hodnotu, ale
+v&nbsp;případě chyby přímo havaruje, tj.&nbsp;vyvolá <i>panic</i>.
+V&nbsp;knihovně <strong>decimal</strong> lze při parsingu řetězců použít
+konstruktor nazvaný <strong>RequireFromString</strong> (zde není onen idiom
+dodržen), který se používá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        d0 := <u>decimal.RequireFromString("-a")</u>
+        fmt.Println(d0)
+        fmt.Println()
+&nbsp;
+        d1 := <u>decimal.RequireFromString("-x.123456789")</u>
+        fmt.Println(d1)
+        fmt.Println()
+&nbsp;
+        d2 := <u>decimal.RequireFromString("1e100a")</u>
+        fmt.Println(d2)
+        fmt.Println()
+}
+</pre>
+
+<p>Tento program po svém překladu a spuštění zhavaruje při pokusu o parsing
+prvního řetězce, takže se další konverze již nebudou provádět:</p>
+
+<pre>
+panic: can't convert -a to decimal
+&nbsp;
+goroutine 1 [running]:
+github.com/shopspring/decimal.RequireFromString(...)
+        /home/ptisnovs/go/pkg/mod/github.com/shopspring/decimal@v1.3.1/decimal.go:243
+main.main()
+        /home/ptisnovs/src/go-root/article_AA/12_require_from_string/require_from_string_err.go:10 +0x208
+exit status 2
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Naparsování hodnoty z&nbsp;řetězce se specifikací nadbytečných znaků v&nbsp;řetězci</h2>
+
+<p>Mnohdy se taktéž setkáme se situací, kdy vstupní řetězce obsahují nějaké
+nadbytečné znaky, například oddělovače milionů a tisíců (v&nbsp;tuzemsku
+mezery, v&nbsp;US pak čárky), symboly měn atd. Tyto znaky je samozřejmě možné
+explicitně odstranit ještě před konverzí (parsingem) řetězce na hodnotu typu
+<strong>Decimal</strong>. Ovšem díky existenci konstruktoru
+<strong>NewFromFormattedString</strong> je možné jak odstranění, tak i konverzi
+provést v&nbsp;jediném kroku. Tomuto konstruktoru se předává jak řetězec, který
+se má parsovat, tak i regulární výraz (a ten je mimochodem konstruován právě
+konstruktorem, jehož jméno začíná na <strong>Must</strong>).</p>
+
+<p>Nejprve si ukažme parsing řetězců obsahujících přímo textovou reprezentaci
+čísla, z&nbsp;níž se žádné znaky nemusí odstraňovat:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "regexp"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        r := regexp.MustCompile("neco")
+&nbsp;
+        d0, err := <u>decimal.NewFromFormattedString("-0", r)</u>
+        fmt.Println(d0, err)
+        fmt.Println()
+&nbsp;
+        d1, err := <u>decimal.NewFromFormattedString("-1234567890.123456789", r)</u>
+        fmt.Println(d1, err)
+        fmt.Println()
+&nbsp;
+        d2, err := <u>decimal.NewFromFormattedString("1e1000", r)</u>
+        fmt.Println(d2, err)
+        fmt.Println()
+&nbsp;
+        d3, err := <u>decimal.NewFromFormattedString("1e-1000", r)</u>
+        fmt.Println(d3, err)
+        fmt.Println()
+&nbsp;
+        d4, err := <u>decimal.NewFromFormattedString("-1234567890e123", r)</u>
+        fmt.Println(d4, err)
+        fmt.Println()
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+0 &lt;<strong>nil</strong>&gt;
+&nbsp;
+-1234567890.123456789 &lt;<strong>nil</strong>&gt;
+&nbsp;
+10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 &lt;<strong>nil</strong>&gt;
+&nbsp;
+0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001 &lt;<strong>nil</strong>&gt;
+&nbsp;
+-1234567890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 &lt;<strong>nil</strong>&gt;
+</pre>
+
+<p>V&nbsp;dalším příkladu pak parsujeme řetězce, které obsahují
+&bdquo;nechtěné&ldquo; znaky, které jsou odstraněny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "regexp"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        r := regexp.MustCompile(",")
+&nbsp;
+        d0, err := <u>decimal.NewFromFormattedString("1,000", r)</u>
+        fmt.Println(d0, err)
+        fmt.Println()
+&nbsp;
+        d1, err := <u>decimal.NewFromFormattedString("1,000,000", r)</u>
+        fmt.Println(d1, err)
+        fmt.Println()
+&nbsp;
+        d2, err := <u>decimal.NewFromFormattedString("1.000", r)</u>
+        fmt.Println(d2, err)
+        fmt.Println()
+&nbsp;
+        d3, err := <u>decimal.NewFromFormattedString("1,000.000", r)</u>
+        fmt.Println(d3, err)
+        fmt.Println()
+}
+</pre>
+
+<p>Výsledky by opět měly odpovídat očekávání:</p>
+
+<pre>
+1000 &lt;<strong>nil</strong>&gt;
+&nbsp;
+1000000 &lt;<strong>nil</strong>&gt;
+&nbsp;
+1 &lt;<strong>nil</strong>&gt;
+&nbsp;
+1000 &lt;<strong>nil</strong>&gt;
+</pre>
+
+<p>Odstranění symbolů měny:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "regexp"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        r := regexp.MustCompile("\\$")
+&nbsp;
+        d0, err := <u>decimal.NewFromFormattedString("$1000", r)</u>
+        fmt.Println(d0, err)
+        fmt.Println()
+&nbsp;
+        d1, err := <u>decimal.NewFromFormattedString("20.25$", r)</u>
+        fmt.Println(d1, err)
+        fmt.Println()
+&nbsp;
+        r = regexp.MustCompile("Kč")
+        d2, err := <u>decimal.NewFromFormattedString("1000Kč", r)</u>
+        fmt.Println(d2, err)
+        fmt.Println()
+}
+</pre>
+
+<p>Vypočtené a zobrazené numerické hodnoty:</p>
+
+<pre>
+1000 &lt;<strong>nil</strong>&gt;
+&nbsp;
+20.25 &lt;<strong>nil</strong>&gt;
+&nbsp;
+1000 &lt;<strong>nil</strong>&gt;
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Základní aritmetické operace s&nbsp;hodnotami typu <strong>Decimal</strong></h2>
+
+<p>Datový typ <strong>Decimal</strong> pochopitelně obsahuje i podporu pro
+provádění všech pěti základních aritmetických operací (součet, rozdíl, součin,
+podíl a modulo). Tyto operace se zapisují odlišným způsobem, než je tomu u typů
+ze základní knihovny <strong>big</strong>, protože příjemcem je první hodnota a
+jediným parametrem operace druhá numerická hodnota:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := decimal.NewFromInt32(2)
+&nbsp;
+        y := decimal.NewFromInt32(3)
+&nbsp;
+        r1 := <u>x.Add(y)</u>
+        r2 := <u>x.Sub(y)</u>
+        r3 := <u>x.Mul(y)</u>
+        r4 := <u>x.Div(y)</u>
+        r5 := <i>x.Mod(y)</i>
+&nbsp;
+        fmt.Println("x   ", x)
+        fmt.Println("y   ", y)
+        fmt.Println("x+y ", r1)
+        fmt.Println("x-y ", r2)
+        fmt.Println("x*y ", r3)
+        fmt.Println("x/y ", r4)
+        fmt.Println("x%y ", r5)
+}
+</pre>
+
+<p>Výsledky získané po překladu a spuštění tohoto demonstračního příkladu by
+neměly být příliš překvapující (snad až na zdánlivě omezenou přesnost hodnoty
+2/3):</p>
+
+<pre>
+x    2
+y    3
+x+y  5
+x-y  -1
+x*y  6
+x/y  0.6666666666666667
+x%y  2
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Podíl se specifikací způsobu zaokrouhlení výsledku</h2>
+
+<p>Již <a href="#k11">v&nbsp;předchozí kapitole</a> jsme mohli vidět, že u
+operace podílu nebyl (a mnohdy ani nemůže být) výsledek zcela přesný. Zajímavé
+je, že u datového typu <strong>Decimal</strong> lze přesnost této aritmetické
+operace zvolit, pokud se namísto metody <strong>Div</strong> použije metoda
+nazvaná <strong>DivRound</strong>, které se navíc předá i další hodnota (typu
+<strong>int32</strong> &ndash; viz druhou kapitolu) s&nbsp;požadovanou
+přesností:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := <u>decimal.NewFromInt32(1)</u>
+&nbsp;
+        y := <u>decimal.NewFromInt32(7)</u>
+&nbsp;
+        for precision := 30; precision &gt; 0; precision-- {
+                r := <u>x.DivRound(y, int32(precision))</u>
+                fmt.Println(r)
+        }
+}
+</pre>
+
+<p>Výsledky zobrazené tímto demonstračním příkladem ukazují výpočty podílu
+s&nbsp;přesností klesající od 30 do 1:</p>
+
+<pre>
+0.142857142857142857142857142857
+0.14285714285714285714285714286
+0.1428571428571428571428571429
+0.142857142857142857142857143
+0.14285714285714285714285714
+0.1428571428571428571428571
+0.142857142857142857142857
+0.14285714285714285714286
+0.1428571428571428571429
+0.142857142857142857143
+0.14285714285714285714
+0.1428571428571428571
+0.142857142857142857
+0.14285714285714286
+0.1428571428571429
+0.142857142857143
+0.14285714285714
+0.1428571428571
+0.142857142857
+0.14285714286
+0.1428571429
+0.142857143
+0.14285714
+0.1428571
+0.142857
+0.14286
+0.1429
+0.143
+0.14
+0.1
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Výpočet faktoriálu s&nbsp;hodnotami typu <strong>Decimal</strong></h2>
+
+<p>V&nbsp;předchozích dvou článcích s&nbsp;popisem datových typů nabízených
+standardní knihovnou jazyka Go <strong>big</strong> jsme si ukazovali některé
+základní numerické algoritmy, například výpočet konstanty &pi; či výpočet
+faktoriálu. A právě výpočet faktoriálu nad hodnotami typu
+<strong>Decimal</strong> je ukázán v&nbsp;této kapitole. I když je opět nutné
+nahradit zápis aritmetických operací (i operace relační) za volání metod, je
+výsledek nepatrně čitelnější, než je tomu v&nbsp;případě použití
+<strong>big.Int</strong>, a to kvůli odlišné sémantice volání binárních
+operací:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>factorial</strong>(n decimal.Decimal) decimal.Decimal {
+        one := <u>decimal.NewFromInt32(1)</u>
+        var zero <u>decimal.Decimal</u>
+&nbsp;
+        if <u>n.Cmp(zero)</u> &lt;= 0 {
+                return one
+        }
+        return <u>n.Mul(factorial(n.Sub(one)))</u>
+}
+&nbsp;
+func <strong>main</strong>() {
+        for n := int64(1); n &lt; 80; n++ {
+                f := factorial(<u>decimal.NewFromInt(n)</u>)
+                fmt.Printf("%3d! = %s\n", n, f)
+        }
+}
+</pre>
+
+<p>Hodnoty faktoriálu vypočtené tímto demonstračním příkladem:</p>
+
+<pre>
+  1! = 1
+  2! = 2
+  3! = 6
+  4! = 24
+  5! = 120
+  6! = 720
+  7! = 5040
+  8! = 40320
+  9! = 362880
+ 10! = 3628800
+ ...
+ ...
+ ...
+ 70! = 11978571669969891796072783721689098736458938142546425857555362864628009582789845319680000000000000000
+ 71! = 850478588567862317521167644239926010288584608120796235886430763388588680378079017697280000000000000000
+ 72! = 61234458376886086861524070385274672740778091784697328983823014963978384987221689274204160000000000000000
+ 73! = 4470115461512684340891257138125051110076800700282905015819080092370422104067183317016903680000000000000000
+ 74! = 330788544151938641225953028221253782145683251820934971170611926835411235700971565459250872320000000000000000
+ 75! = 24809140811395398091946477116594033660926243886570122837795894512655842677572867409443815424000000000000000000
+ 76! = 1885494701666050254987932260861146558230394535379329335672487982961844043495537923117729972224000000000000000000
+ 77! = 145183092028285869634070784086308284983740379224208358846781574688061991349156420080065207861248000000000000000000
+ 78! = 11324281178206297831457521158732046228731749579488251990048962825668835325234200766245086213177344000000000000000000
+ 79! = 894618213078297528685144171539831652069808216779571907213868063227837990693501860533361810841010176000000000000000000
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Agregační funkce s&nbsp;hodnotami typu <strong>Decimal</strong></h2>
+
+<p>Velmi užitečné mohou být i agregační funkce nazvané <strong>Min</strong>,
+<strong>Max</strong>, <strong>Avg</strong> a <strong>Sum</strong>, jejichž
+jména dostatečně popisují prováděný výpočet. Těmto funkcím je možné předat
+<i>libovolný</i> (nenulový) počet hodnot typu <strong>Decimal</strong> a
+výsledkem bude nová hodnota stejného typu s&nbsp;vypočteným výsledkem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := <u>decimal.NewFromInt32(2)</u>
+        y := <u>decimal.NewFromInt32(3)</u>
+        z := <u>decimal.NewFromInt32(1)</u>
+        w := <u>decimal.NewFromInt32(0)</u>
+&nbsp;
+        min := <u>decimal.Min(x, y, z, w)</u>
+        max := <u>decimal.Max(x, y, z, w)</u>
+        avg := <u>decimal.Avg(x, y, z, w)</u>
+        sum := <u>decimal.Sum(x, y, z, w)</u>
+&nbsp;
+        fmt.Println("min   ", min)
+        fmt.Println("max   ", max)
+        fmt.Println("avg   ", avg)
+        fmt.Println("sum   ", sum)
+}
+</pre>
+
+<p>Podívejme se nyní na vypočtené výsledky:</p>
+
+<pre>
+min    0
+max    3
+avg    1.5
+sum    6
+</pre>
+
+<p>Pokus o předání nulového počtu parametrů skončí chybou při překladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;  
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        min := decimal.Min()
+        max := decimal.Max()
+        avg := decimal.Avg()
+        sum := decimal.Sum()
+&nbsp;
+        fmt.Println("min   ", min)
+        fmt.Println("max   ", max)
+        fmt.Println("avg   ", avg)
+        fmt.Println("sum   ", sum)
+}
+</pre>
+
+<pre>
+./g.go:10:9: not enough arguments in call to decimal.Min
+        have ()
+        want (decimal.Decimal, ...decimal.Decimal)
+./g.go:11:9: not enough arguments in call to decimal.Max
+        have ()
+        want (decimal.Decimal, ...decimal.Decimal)
+./g.go:12:9: not enough arguments in call to decimal.Avg
+        have ()
+        want (decimal.Decimal, ...decimal.Decimal)
+./g.go:13:9: not enough arguments in call to decimal.Sum
+        have ()
+        want (decimal.Decimal, ...decimal.Decimal)
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Interní struktura hodnot typu <strong>Decimal</strong></h2>
+
+<p><a href="#k02">Ve druhé kapitole</a> jsme si ukázali datovou strukturu,
+která je použita pro uchování hodnot typu <strong>Decimal</strong>. Tento
+datový typ podporuje i serializaci hodnoty do sekvence bajtů, což nám umožní
+sledovat konkrétní způsob uložení numerických hodnot. Pro serializaci do
+sekvence bajtů se používá metoda nazvaná <strong>MarshalBinary</strong>, která
+vrací řez bajtů (<i>slice</i>) a taktéž informaci o chybě, ke které (čistě
+teoreticky) může dojít (prakticky k&nbsp;chybě nedojde, ovšem musí být
+<i>splněno</i> rozhraní <a
+href="https://pkg.go.dev/encoding#BinaryMarshaler">BinaryMarshaller</a>).</p>
+
+<p>V&nbsp;dalším demonstračním příkladu se pokusíme o serializaci několika
+hodnot a prozkoumáme výsledky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        values := []float32{0, 1, -1, 10, -10, 100, 255, 256, 257, 2550, 2560, 2570, 1000, 1e38, -1e38}
+&nbsp;
+        for _, value := range values {
+                dec := <u>decimal.NewFromFloat32(float32(value))</u>
+                bin, _ := <u>dec.MarshalBinary()</u>
+                fmt.Println(dec, "\t", bin)
+        }
+}
+</pre>
+
+<p>Velmi zajímavý je pohled na zobrazené výsledky:</p>
+
+<pre>
+0        [0 0 0 0 2]
+1        [0 0 0 0 2 1]
+-1       [0 0 0 0 3 1]
+10       [0 0 0 1 2 1]
+-10      [0 0 0 1 3 1]
+100      [0 0 0 2 2 1]
+255      [0 0 0 0 2 255]
+256      [0 0 0 0 2 1 0]
+257      [0 0 0 0 2 1 1]
+2550     [0 0 0 1 2 255]
+2560     [0 0 0 1 2 1 0]
+2570     [0 0 0 1 2 1 1]
+1000     [0 0 0 3 2 1]
+100000000000000000000000000000000000000          [0 0 0 38 2 1]
+-100000000000000000000000000000000000000         [0 0 0 38 3 1]
+</pre>
+
+<p>Nula je, jak je patrné, uložena bez mantisy.</p>
+
+<p>Musíme si uvědomit, že ve vypsané sekvenci bajtů první čtyři bajty
+odpovídají desítkovému exponentu, což vysvětluje rozdíly mezi těmito
+hodnotami:</p>
+
+<pre>
+1        [0 0 0 <strong>0</strong> 2 1]
+10       [0 0 0 <strong>1</strong> 2 1]
+100      [0 0 0 <strong>2</strong> 2 1]
+1000     [0 0 0 <strong>3</strong> 2 1]
+100000000000000000000000000000000000000          [0 0 0 <strong>38</strong> 2 1]
+</pre>
+
+<p>Povšimněte si, že poslední dva bajty (což je, když poněkud předběhneme,
+znaménko a mantisa) jsou shodné, zatímco exponent je postupně roven 0, 1, 2 a
+3, což přesně odpovídá reprezentované hodnotě.</p>
+
+<p>Dále lze snadno zjistit, který <i>bit</i> v&nbsp;pátém bajtu odpovídá
+znaménku:</p>
+
+<pre>
+1        [0 0 0 0 <strong>2</strong> 1]
+-1       [0 0 0 0 <strong>3</strong> 1]
+10       [0 0 0 1 <strong>2</strong> 1]
+-10      [0 0 0 1 <strong>3</strong> 1]
+100000000000000000000000000000000000000          [0 0 0 38 <strong>2</strong> 1]
+-100000000000000000000000000000000000000         [0 0 0 38 <strong>3</strong> 1]
+</pre>
+
+<p>A konečně hodnota mantisy je uložena binárně:</p>
+
+<pre>
+255      [0 0 0 0 2 255] <i>// 255</i>
+256      [0 0 0 0 2 1 0] <i>// 1*256+0</i>
+257      [0 0 0 0 2 1 1] <i>// i*255+1</i>
+2550     [0 0 0 1 2 255] <i>// 10*(255)</i>
+2560     [0 0 0 1 2 1 0] <i>// 10*(1*256+0)</i>
+2570     [0 0 0 1 2 1 1] <i>// 10*(1*256+0)</i>
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výpočet hodnoty &pi; s&nbsp;typem <strong>Decimal</strong></h2>
+
+<p>Opět se na chvíli vraťme k&nbsp;předchozím dvěma článkům, v&nbsp;nichž jsme
+si popisovali datové typy poskytované standardní knihovnou
+<strong>big</strong>, tj.&nbsp;typy <strong>big.Int</strong>,
+<strong>big.Rat</strong> a <strong>big.Float</strong>. V&nbsp;těchto článcích
+jsme mj.&nbsp;ukazovali i (pomalý) postupný výpočet konstanty &pi; založený na
+<i>Wallisově produktu</i> (řadě členů, které se nesčítají, ale násobí). Tento
+algoritmus je pochopitelně možné přepsat do podoby, v&nbsp;níž budou pro
+výpočty použity hodnoty typu <strong>Decimal</strong>. A opět budeme zkoumat
+absolutní a relativní chybu těchto výpočtů při porovnání výsledků
+s&nbsp;&bdquo;přesnou&ldquo; (ehm) reprezentací &pi; ve formě konstanty
+<strong>math.Pi</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>main</strong>() {
+        result := <u>decimal.NewFromInt32(2)</u>
+&nbsp;
+        one := <u>decimal.NewFromInt32(1)</u>
+        limit := <u>decimal.NewFromInt32(200)</u>
+&nbsp;
+        for n := <u>decimal.NewFromInt32(1)</u>; <u>n.Cmp(limit)</u> &lt;= 0; n = <u>n.Add(one)</u> {
+                m := <u>decimal.NewFromInt32(4)</u>
+                m = <u>m.Mul(n)</u>
+                m = <u>m.Mul(n)</u>
+                mn := <u>m.Sub(one)</u>
+&nbsp;
+                m = <u>m.Div(mn)</u>
+&nbsp;
+                result = <u>result.Mul(m)</u>
+&nbsp;
+                f, _ := <u>result.Float64()</u>
+                absError := math.Pi - f
+                relError := 100.0 * absError / math.Pi
+                fmt.Println(f, "\t", absError, "\t", relError) //, "\t", result.String())
+        }
+}
+</pre>
+
+<p>A vypočtené výsledky:</p>
+
+<pre>
+2.6666666666666665       0.4749259869231266      15.11736368432249
+2.8444444444444446       0.29714820914534856     9.458521263277312
+2.9257142857142857       0.2158783678755074      6.871621870799526
+2.972154195011338        0.1694384585784552      5.3933936465264996
+3.002175954556907        0.139416699032886       4.437771360127774
+3.023170192001361        0.11842246158843217     3.7695040269818167
+...
+...
+...
+3.1227247411658112       0.018867912423981892    0.6005843056203406
+3.1231673669264297       0.018425286663363405    0.5864950900718922
+3.1235897019320995       0.01800295165769361     0.573051749313274
+3.1239931101333047       0.017599543456488398    0.56021086745215
+...
+...
+...
+3.1376384825154533       0.003954171074339818    0.1258651744624345
+3.137658290464056        0.003934363125737139    0.12523466787590917
+3.137677900950937        0.0039147526388561005   0.12461044669119796
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: konvergence k&nbsp;&pi; je pochopitelně
+opět velmi pomalá.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Rychlost výpočtů s&nbsp;hodnotami typu <strong>Decimal</strong></h2>
+
+<p>Prozatím jsme si ukázali, jak jsou hodnoty typu <strong>Decimal</strong>
+interně uloženy a jaké operace je s&nbsp;nimi možné provádět. Ovšem důležitá je
+i rychlost prováděných výpočtů. Ta pochopitelně nemůže dosahovat rychlosti
+operací s&nbsp;hodnotami, jejichž formát odpovídá použité architektuře
+mikroprocesorů (tedy typicky <i>byte</i>, <i>int</i> s&nbsp;různou šířkou,
+<i>float32</i> a <i>float64</i>). Pro zajímavost si porovnáme rychlost výpočtu
+konstanty &pi; výše zmíněným Wallisovým produktem. Počítat přitom budeme dvěma
+způsoby &ndash; s&nbsp;využitím standardní knihovny math/big a taktéž
+s&nbsp;využitím knihovny shopspring/decimal. Povšimněte si, že u typu
+<strong>Decimal</strong> jsou výpočty zapsány mnohem jednodušším způsobem, bez
+nutnosti převodu mezi různými datovými typy atd.:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "math"
+        "math/big"
+&nbsp;
+        "testing"
+&nbsp;
+        "github.com/shopspring/decimal"
+)
+&nbsp;
+func <strong>piBig</strong>(n int) float64 {
+        var result big.Rat
+&nbsp;
+        result.SetFrac64(2, 1)
+&nbsp;
+        one := big.NewInt(1)
+        limit := big.NewInt(1000)
+&nbsp;
+        for n := big.NewInt(1); n.Cmp(limit) &lt;= 0; n.Add(n, one) {
+                m := big.NewInt(4)
+                m.Mul(m, n)
+                m.Mul(m, n)
+                mn := big.NewInt(0)
+                mn.Sub(m, one)
+&nbsp;
+                var item big.Rat
+                item.SetFrac(m, mn)
+                result.Mul(&amp;result, &amp;item)
+&nbsp;
+        }
+        f, _ := result.Float64()
+        return f
+}
+&nbsp;
+func <strong>piDecimal</strong>(n int) float64 {
+        result := decimal.NewFromInt32(2)
+&nbsp;
+        one := decimal.NewFromInt32(1)
+        limit := decimal.NewFromInt32(200)
+&nbsp;
+        for n := decimal.NewFromInt32(1); n.Cmp(limit) &lt;= 0; n = n.Add(one) {
+                m := decimal.NewFromInt32(4)
+                m = m.Mul(n)
+                m = m.Mul(n)
+                mn := m.Sub(one)
+&nbsp;
+                m = m.Div(mn)
+&nbsp;
+                result = result.Mul(m)
+        }
+        f, _ := result.Float64()
+        return f
+}
+&nbsp;
+func <strong>BenchmarkPiBig</strong>(b *testing.B) {
+        for n := 1; n &lt; b.N; n++ {
+                f := piBig(n)
+                if math.Abs(f-math.Pi) &gt;= 0.01 {
+                        b.Fatal("Incorrect result", f)
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkPiDecimal</strong>(b *testing.B) {
+        for n := 1; n &lt; b.N; n++ {
+                f := piDecimal(n)
+                if math.Abs(f-math.Pi) &gt;= 0.01 {
+                        b.Fatal("Incorrect result", f)
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: kontrola, zda je vypočtená hodnota
+korektní, je provedena dosti naivním způsobem, protože přesnost by se měla
+zvyšovat spolu s&nbsp;rostoucím počtem členů Wallisova produktu.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Výsledky benchmarků</h2>
+
+<p>Benchmark představený <a href="#k17">v&nbsp;předchozí kapitole</a> nyní
+přeložíme a následně i spustíme:</p>
+
+<pre>
+$ <strong>./run_benchmark.sh</strong>
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, že výpočet s&nbsp;hodnotami
+<strong>Decimal</strong> je v&nbsp;tomto případě mnohem rychlejší, než je tomu
+u datového typu <strong>big.Float</strong>, což se ovšem dalo předpokládat
+vzhledem ke konverzím numerických hodnot v&nbsp;prvním benchmarku a taktéž
+kvůli složitější interní struktuře datového typu <strong>big.Float</strong> (na
+druhou stranu je rozdíl v&nbsp;rozsahu dvou řádů):</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: div-round
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPiBig-8            1000          26720122 ns/op
+BenchmarkPiDecimal-8        1000            412662 ns/op
+PASS
+ok      div-round       27.136s
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-1/">předminule</a>,
+<a href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-2/">minule</a>
+i dnes použitých demonstračních příkladů naprogramovaných v&nbsp;jazyku Go byly
+uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_bigint_construction.go</td><td>konstrukce instance datového typu <strong>big.Int</strong> a tisk uložené hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/01_bigint_construction.go">https://github.com/tisnik/go-root/blob/master/article_A8/01_bigint_construction.go</a></td></tr>
+<tr><td> 2</td><td>02_bigint_add.go</td><td>aritmetická operace součtu a datový typ <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/02_bigint_add.go">https://github.com/tisnik/go-root/blob/master/article_A8/02_bigint_add.go</a></td></tr>
+<tr><td> 3</td><td>03_bigint_large_numbers.go</td><td>aritmetická operace součinu a datový typ <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/03_bigint_large_numbers.go">https://github.com/tisnik/go-root/blob/master/article_A8/03_bigint_large_numbers.go</a></td></tr>
+<tr><td> 4</td><td>04_factorial.go</td><td>výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial.go">https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial.go</a></td></tr>
+<tr><td> 5</td><td>04_factorial_B.go</td><td>zjednodušený výpočet faktoriálu s&nbsp;využitím datového typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial_B.go">https://github.com/tisnik/go-root/blob/master/article_A8/04_factorial_B.go</a></td></tr>
+<tr><td> 6</td><td>05_bigint_print_base.go</td><td>převod hodnoty typu <strong>big.Int</strong> na text s&nbsp;volitelnou bází</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/05_bigint_print_base.go">https://github.com/tisnik/go-root/blob/master/article_A8/05_bigint_print_base.go</a></td></tr>
+<tr><td> 7</td><td>06_bigint_as_bytes.go</td><td>zobrazení interní struktury hodnot typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/06_bigint_as_bytes.go">https://github.com/tisnik/go-root/blob/master/article_A8/06_bigint_as_bytes.go</a></td></tr>
+<tr><td> 8</td><td>07_bigint_change_raw.go</td><td>modifikace interní struktury hodnot typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/07_bigint_change_raw.go">https://github.com/tisnik/go-root/blob/master/article_A8/07_bigint_change_raw.go</a></td></tr>
+<tr><td> 9</td><td>08_bigint_change_raw.go</td><td>nastavení jednotlivých bajtů hodnoty typu <strong>big.Int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/08_bigint_change_raw.go">https://github.com/tisnik/go-root/blob/master/article_A8/08_bigint_change_raw.go</a></td></tr>
+<tr><td>10</td><td>09_bigint_from_string.go</td><td>konstrukce hodnoty <strong>big.Int</strong> z&nbsp;řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/09_bigint_from_string.go">https://github.com/tisnik/go-root/blob/master/article_A8/09_bigint_from_string.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>10_rationals_construction.go</td><td>konstrukce zlomku &ndash; hodnoty <strong>big.Rat</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/10_rationals_construction.go">https://github.com/tisnik/go-root/blob/master/article_A8/10_rationals_construction.go</a></td></tr>
+<tr><td>12</td><td>11_rationals_add.go</td><td>součet dvou zlomků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/11_rationals_add.go">https://github.com/tisnik/go-root/blob/master/article_A8/11_rationals_add.go</a></td></tr>
+<tr><td>13</td><td>12_rationals_mul.go</td><td>operace součinu zlomků a vliv na přesnost a rozsah hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/12_rationals_mul.go">https://github.com/tisnik/go-root/blob/master/article_A8/12_rationals_mul.go</a></td></tr>
+<tr><td>14</td><td>13_rational_to_int.go</td><td>převod zlomku na celočíselného čitatele a jmenovatele</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/13_rational_to_int.go">https://github.com/tisnik/go-root/blob/master/article_A8/13_rational_to_int.go</a></td></tr>
+<tr><td>15</td><td>14_rationals_to_float.go</td><td>převod zlomku na hodnotu s&nbsp;plovoucí řádovou čárkou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/14_rationals_to_float.go">https://github.com/tisnik/go-root/blob/master/article_A8/14_rationals_to_float.go</a></td></tr>
+<tr><td>16</td><td>15_pi_wallis_product.go</td><td>výpočet hodnoty &pi; (naivní varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/15_pi_wallis_product.go">https://github.com/tisnik/go-root/blob/master/article_A8/15_pi_wallis_product.go</a></td></tr>
+<tr><td>17</td><td>16_pi_wallis_product_limits.go</td><td>limity naivní varianty výpočtu hodnoty &pi;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/16_pi_wallis_product_limits.go">https://github.com/tisnik/go-root/blob/master/article_A8/16_pi_wallis_product_limits.go</a></td></tr>
+<tr><td>18</td><td>17_pi_better_wallis_product.go</td><td>vylepšená varianta výpočtu hodnoty &pi;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/17_pi_better_wallis_product.go">https://github.com/tisnik/go-root/blob/master/article_A8/17_pi_better_wallis_product.go</a></td></tr>
+<tr><td>19</td><td>18_rationals_div_zero.go</td><td>konstrukce zlomku s&nbsp;nulovým jmenovatelem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/18_rationals_div_zero.go">https://github.com/tisnik/go-root/blob/master/article_A8/18_rationals_div_zero.go</a></td></tr>
+<tr><td>20</td><td>19_rationals_div_zero.go</td><td>operace, která vytvoří zlomek s&nbsp;nulovým jmenovatelem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A8/19_rationals_div_zero.go">https://github.com/tisnik/go-root/blob/master/article_A8/19_rationals_div_zero.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>21</td><td>01_bigfloat_construction.go</td><td>konstrukce hodnoty typu <strong>big.Float</strong>, základní aritmetické operace a zobrazení hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/01_bigfloat_construction.go">https://github.com/tisnik/go-root/blob/master/article_A9/01_bigfloat_construction.go</a></td></tr>
+<tr><td>22</td><td>02_bigfloat_add.go</td><td>zvýšení počtu cifer zobrazených za desetinnou čárkou (tečkou)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/02_bigfloat_add.go">https://github.com/tisnik/go-root/blob/master/article_A9/02_bigfloat_add.go</a></td></tr>
+<tr><td>23</td><td>03_bigfloat_large_numbers.go</td><td>zobrazení velkých hodnot bez použití exponentu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/03_bigfloat_large_numbers.go">https://github.com/tisnik/go-root/blob/master/article_A9/03_bigfloat_large_numbers.go</a></td></tr>
+<tr><td>24</td><td>04_bigfloat_small_numbers.go</td><td>zobrazení malých hodnot bez použití exponentu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/04_bigfloat_small_numbers.go">https://github.com/tisnik/go-root/blob/master/article_A9/04_bigfloat_small_numbers.go</a></td></tr>
+<tr><td>25</td><td>05_bigfloat_exp_format.go</td><td>zobrazení numerických hodnot ve tvaru s&nbsp;exponentem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/05_bigfloat_exp_format.go">https://github.com/tisnik/go-root/blob/master/article_A9/05_bigfloat_exp_format.go</a></td></tr>
+<tr><td>26</td><td>06_bigfloat_exp_format.go</td><td>zobrazení numerických hodnot ve tvaru s&nbsp;exponentem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/06_bigfloat_exp_format.go">https://github.com/tisnik/go-root/blob/master/article_A9/06_bigfloat_exp_format.go</a></td></tr>
+<tr><td>27</td><td>07_hexa_mantissa.go</td><td>výpis hodnoty s&nbsp;využitím mantisy zapsané v&nbsp;hexadecimálním kódu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/07_hexa_mantissa.go">https://github.com/tisnik/go-root/blob/master/article_A9/07_hexa_mantissa.go</a></td></tr>
+<tr><td>28</td><td>08_pi_wallis_product.go</td><td>výpočet hodnoty &pi; podruhé</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/08_pi_wallis_product.go">https://github.com/tisnik/go-root/blob/master/article_A9/08_pi_wallis_product.go</a></td></tr>
+<tr><td>29</td><td>09_bigfloat_to_rat.go</td><td></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/09_bigfloat_to_rat.go">https://github.com/tisnik/go-root/blob/master/article_A9/09_bigfloat_to_rat.go</a></td></tr>
+<tr><td>30</td><td>10_bigfloat_to_float64.go</td><td>převody mezi typem <strong>big.Float</strong> a zlomky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/10_bigfloat_to_float64.go">https://github.com/tisnik/go-root/blob/master/article_A9/10_bigfloat_to_float64.go</a></td></tr>
+<tr><td>31</td><td>11_bigfloat_to_float32.go</td><td>převod mezi typem <strong>big.Float</strong> a typy <strong>float64</strong> a <strong>float32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/11_bigfloat_to_float32.go">https://github.com/tisnik/go-root/blob/master/article_A9/11_bigfloat_to_float32.go</a></td></tr>
+<tr><td>32</td><td>12_precision.go</td><td>přesnost hodnot typu <strong>big.Float</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/12_precision.go">https://github.com/tisnik/go-root/blob/master/article_A9/12_precision.go</a></td></tr>
+<tr><td>33</td><td>13_precision_B.go</td><td>přesnost hodnot typu <strong>big.Float</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/13_precision_B.go">https://github.com/tisnik/go-root/blob/master/article_A9/13_precision_B.go</a></td></tr>
+<tr><td>34</td><td>14_positive_infinity.go</td><td>výsledek podílu 1/0</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/14_positive_infinity.go">https://github.com/tisnik/go-root/blob/master/article_A9/14_positive_infinity.go</a></td></tr>
+<tr><td>35</td><td>15_negative_infinity.go</td><td>výsledek podílu -1/0</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/15_negative_infinity.go">https://github.com/tisnik/go-root/blob/master/article_A9/15_negative_infinity.go</a></td></tr>
+<tr><td>36</td><td>16_inf_operations.go</td><td>povolené operace s&nbsp;nekonečny</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/16_inf_operations.go">https://github.com/tisnik/go-root/blob/master/article_A9/16_inf_operations.go</a></td></tr>
+<tr><td>37</td><td>17_inf_operations.go</td><td>nepovolené operace s&nbsp;nekonečny: -&infin;+&infin;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/17_inf_operations.go">https://github.com/tisnik/go-root/blob/master/article_A9/17_inf_operations.go</a></td></tr>
+<tr><td>38</td><td>18_inf_operations.go</td><td>nepovolené operace s&nbsp;nekonečny: &infin;&times;0</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/18_inf_operations.go">https://github.com/tisnik/go-root/blob/master/article_A9/18_inf_operations.go</a></td></tr>
+<tr><td>39</td><td>19_catch_panic.go</td><td>zachycení nepovolené operace s&nbsp;nekonečny</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/19_catch_panic.go">https://github.com/tisnik/go-root/blob/master/article_A9/19_catch_panic.go</a></td></tr>
+<tr><td>40</td><td>20_div_by_zero.go</td><td>podíl 0/0</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A9/20_div_by_zero.go">https://github.com/tisnik/go-root/blob/master/article_A9/20_div_by_zero.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>41</td><td>01_zero_value</td><td>nulová hodnota datového typu <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/01_zero_value">https://github.com/tisnik/go-root/blob/master/article_AA/01_zero_value</a></td></tr>
+<tr><td>42</td><td>02_construct_from_int_32</td><td>konstrukce hodnoty typu <strong>Decimal</strong> z&nbsp;celého čísla typu <strong>int32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/02_construct_from_int_32">https://github.com/tisnik/go-root/blob/master/article_AA/02_construct_from_int_32</a></td></tr>
+<tr><td>43</td><td>03_construct_from_int</td><td>konstrukce hodnoty typu <strong>Decimal</strong> z&nbsp;celého čísla typu <strong>int</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/03_construct_from_int">https://github.com/tisnik/go-root/blob/master/article_AA/03_construct_from_int</a></td></tr>
+<tr><td>44</td><td>04_construct_from_float_32</td><td>konstrukce hodnoty typu <strong>Decimal</strong> z&nbsp;čísla typu <strong>float32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/04_construct_from_float_32">https://github.com/tisnik/go-root/blob/master/article_AA/04_construct_from_float_32</a></td></tr>
+<tr><td>45</td><td>05_construct_from_float</td><td>konstrukce hodnoty typu <strong>Decimal</strong> z&nbsp;čísla typu <strong>float64</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/05_construct_from_float">https://github.com/tisnik/go-root/blob/master/article_AA/05_construct_from_float</a></td></tr>
+<tr><td>46</td><td>06_construct_from_float_with_exponent</td><td>konstrukce hodnoty typu <strong>Decimal</strong> z&nbsp;čísla typu <strong>float64</strong> se specifikací exponentu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/06_construct_from_float_with_exponent">https://github.com/tisnik/go-root/blob/master/article_AA/06_construct_from_float_with_exponent</a></td></tr>
+<tr><td>47</td><td>07_construct_from_string</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/07_construct_from_string">https://github.com/tisnik/go-root/blob/master/article_AA/07_construct_from_string</a></td></tr>
+<tr><td>48</td><td>08_construct_from_formatted_string</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;naformátovaného řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/08_construct_from_formatted_string">https://github.com/tisnik/go-root/blob/master/article_AA/08_construct_from_formatted_string</a></td></tr>
+<tr><td>49</td><td>09_construct_from_formatted_string</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;naformátovaného řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/09_construct_from_formatted_string">https://github.com/tisnik/go-root/blob/master/article_AA/09_construct_from_formatted_string</a></td></tr>
+<tr><td>50</td><td>10_construct_from_formatted_string</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;naformátovaného řetězce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/10_construct_from_formatted_string">https://github.com/tisnik/go-root/blob/master/article_AA/10_construct_from_formatted_string</a></td></tr>
+<tr><td>51</td><td>11_construct_from_string_err</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;řetězce, který neobsahuje číselnou hodnotu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/11_construct_from_string_err">https://github.com/tisnik/go-root/blob/master/article_AA/11_construct_from_string_err</a></td></tr>
+<tr><td>52</td><td>12_require_from_string</td><td>naparsování hodnoty typu <strong>Decimal</strong> z&nbsp;řetězce, který neobsahuje číselnou hodnotu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/12_require_from_string">https://github.com/tisnik/go-root/blob/master/article_AA/12_require_from_string</a></td></tr>
+<tr><td>53</td><td>13_arithmetic</td><td>základní aritmetické operace s&nbsp;hodnotami typu <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/13_arithmetic">https://github.com/tisnik/go-root/blob/master/article_AA/13_arithmetic</a></td></tr>
+<tr><td>54</td><td>14_div_round</td><td>podíl se specifikací způsobu zaokrouhlení výsledku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/14_div_round">https://github.com/tisnik/go-root/blob/master/article_AA/14_div_round</a></td></tr>
+<tr><td>55</td><td>15_factorial</td><td>výpočet faktoriálu s&nbsp;hodnotami typu <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/15_factorial">https://github.com/tisnik/go-root/blob/master/article_AA/15_factorial</a></td></tr>
+<tr><td>56</td><td>16_aggregation</td><td>agregační funkce s&nbsp;hodnotami typu <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/16_aggregation">https://github.com/tisnik/go-root/blob/master/article_AA/16_aggregation</a></td></tr>
+<tr><td>57</td><td>17_internals</td><td>interní struktura hodnot typu <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/17_internals">https://github.com/tisnik/go-root/blob/master/article_AA/17_internals</a></td></tr>
+<tr><td>58</td><td>18_pi_wallis_product</td><td>výpočet konstanty &pi; s&nbsp;typem <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/18_pi_wallis_product">https://github.com/tisnik/go-root/blob/master/article_AA/18_pi_wallis_product</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>59</td><td>19_benchmark</td><td>benchmark: výpočet konstanty &pi; s&nbsp;typem <strong>Decimal</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AA/19_benchmark">https://github.com/tisnik/go-root/blob/master/article_AA/19_benchmark</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go (1)<br />
+<a href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-1/">https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-1/</a>
+</li>
+
+<li>Číselné hodnoty s&nbsp;neomezeným rozsahem a přesností v&nbsp;programovacím jazyku Go (2)<br />
+<a href="https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-2/">https://www.root.cz/clanky/ciselne-hodnoty-s-neomezenym-rozsahem-a-presnosti-v-programovacim-jazyku-go-2/</a>
+</li>
+
+<li>Balíček <strong>big</strong> pro jazyk Go<br />
+<a href="https://pkg.go.dev/math/big">https://pkg.go.dev/math/big</a>
+</li>
+
+<li>Zdrojové kódu pro balíček <strong>big</strong><br />
+<a href="https://cs.opensource.google/go/go/+/master:src/math/big/">https://cs.opensource.google/go/go/+/master:src/math/big/</a>
+</li>
+
+<li>Arbitrary-precision arithmetic<br />
+<a href="https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic">https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic</a>
+</li>
+
+<li>Floating-point error mitigation<br />
+<a href="https://en.wikipedia.org/wiki/Floating-point_error_mitigation">https://en.wikipedia.org/wiki/Floating-point_error_mitigation</a>
+</li>
+
+<li>Beating Floating Point at its Own Game: Posit Arithmetic<br />
+<a href="http://www.johngustafson.net/pdfs/BeatingFloatingPoint.pdf">http://www.johngustafson.net/pdfs/BeatingFloatingPoint.pdf</a>
+</li>
+
+<li>Unum (number format)<br />
+<a href="https://en.wikipedia.org/wiki/Unum_(number_format)">https://en.wikipedia.org/wiki/Unum_(number_format)</a>
+</li>
+
+<li>The GNU MPFR Library<br />
+<a href="https://www.mpfr.org/">https://www.mpfr.org/</a>
+</li>
+
+<li>GMP: Arithmetic without limitations<br />
+<a href="https://gmplib.org/">https://gmplib.org/</a>
+</li>
+
+<li>GNU MP 6.2.1 manual<br />
+<a href="https://gmplib.org/manual/index">https://gmplib.org/manual/index</a>
+</li>
+
+<li>Anatomy of a posit number<br />
+<a href="https://www.johndcook.com/blog/2018/04/11/anatomy-of-a-posit-number/">https://www.johndcook.com/blog/2018/04/11/anatomy-of-a-posit-number/</a>
+</li>
+
+<li>Better floating point: posits in plain language<br />
+<a href="http://loyc.net/2019/unum-posits.html">http://loyc.net/2019/unum-posits.html</a>
+</li>
+
+<li>Posits, a New Kind of Number, Improves the Math of AI: The first posit-based processor core gave a ten-thousandfold accuracy boost<br />
+<a href="https://spectrum.ieee.org/floating-point-numbers-posits-processor">https://spectrum.ieee.org/floating-point-numbers-posits-processor</a>
+</li>
+
+<li>Posit Standard Document (2022)<br />
+<a href="https://posithub.org/khub_widget">https://posithub.org/khub_widget</a>
+</li>
+
+<li>Standard for Posit™ Arithmetic (2022)<br />
+<a href="https://posithub.org/docs/posit_standard-2.pdf">https://posithub.org/docs/posit_standard-2.pdf</a>
+</li>
+
+<li>Posit Calculator<br />
+<a href="https://posithub.org/widget/calculator/">https://posithub.org/widget/calculator/</a>
+</li>
+
+<li>SoftPosit<br />
+<a href="https://gitlab.com/cerlane/SoftPosit">https://gitlab.com/cerlane/SoftPosit</a>
+</li>
+
+<li>PySigmoid<br />
+<a href="https://github.com/mightymercado/PySigmoid">https://github.com/mightymercado/PySigmoid</a>
+</li>
+
+<li>sgpositpy<br />
+<a href="https://github.com/xman/sgpositpy">https://github.com/xman/sgpositpy</a>
+</li>
+
+<li>SoftPosit.jl<br />
+<a href="https://github.com/milankl/SoftPosit.jl">https://github.com/milankl/SoftPosit.jl</a>
+</li>
+
+<li>SigmoidNumbers.jl<br />
+<a href="https://github.com/MohHizzani/SigmoidNumbers.jl">https://github.com/MohHizzani/SigmoidNumbers.jl</a>
+</li>
+
+<li>How many digits can float8, float16, float32, float64, and float128 contain?<br />
+<a href="https://stackoverflow.com/questions/56514892/how-many-digits-can-float8-float16-float32-float64-and-float128-contain">https://stackoverflow.com/questions/56514892/how-many-digits-can-float8-float16-float32-float64-and-float128-contain</a>
+</li>
+
+<li>15. Floating Point Arithmetic: Issues and Limitations (Python documentation)<br />
+<a href="https://docs.python.org/3/tutorial/floatingpoint.html">https://docs.python.org/3/tutorial/floatingpoint.html</a>
+</li>
+
+<li>Number limits, overflow, and roundoff<br />
+<a href="https://www.khanacademy.org/computing/computers-and-internet/xcae6f4a7ff015e7d:digital-information/xcae6f4a7ff015e7d:limitations-of-storing-numbers/a/number-limits-overflow-and-roundoff">https://www.khanacademy.org/computing/computers-and-internet/xcae6f4a7ff015e7d:digital-information/xcae6f4a7ff015e7d:limitations-of-storing-numbers/a/number-limits-overflow-and-roundoff</a>
+</li>
+
+<li>The upper and lower limits of IEEE-754 standard<br />
+<a href="https://math.stackexchange.com/questions/2607697/the-upper-and-lower-limits-of-ieee-754-standard">https://math.stackexchange.com/questions/2607697/the-upper-and-lower-limits-of-ieee-754-standard</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
