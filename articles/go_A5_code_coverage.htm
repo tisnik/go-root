@@ -1,0 +1,1322 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Nová funkcionalita v Go 1.20: detekce skutečně volaných řádků v programovém kódu</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Nová funkcionalita v Go 1.20: detekce skutečně volaných řádků v programovém kódu</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V Go verze 1.20 se objevila poměrně dlouho očekávaná funkcionalita. Jedná se o relativně snadno použitelnou technologii umožňující detekci skutečně volaných řádků v programovém kódu. Díky tomu je například možné zjistit, zda kód neobsahuje nepoužívané části atd.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Nová funkcionalita v&nbsp;Go 1.20: detekce skutečně volaných řádků v&nbsp;programovém kódu</a></p>
+<p><a href="#k02">2. Nástroj <i>cover</i> a jednotkové testy</a></p>
+<p><a href="#k03">3. Jednoduchá webová služba a její jednotkové testy</a></p>
+<p><a href="#k04">4. Zjištění pokrytí kódu jednotkovými testy</a></p>
+<p><a href="#k05">5. Výpis informací o pokrytí kódu jednotkovými testy</a></p>
+<p><a href="#k06">6. Vygenerování upraveného zdrojového kódu aplikace s&nbsp;explicitními testy pokrytí</a></p>
+<p><a href="#k07">7. Ukázka transformace kódu nástrojem <strong>cover</strong></a></p>
+<p><a href="#k08">8. Od jednotkových testů k&nbsp;detekci řádků, které jsou spuštěny při reálném běhu aplikace</a></p>
+<p><a href="#k09">9. Složitější aplikace s&nbsp;přepínači zadávanými na příkazovém řádku</a></p>
+<p><a href="#k10">10. Projektový soubor testované aplikace</a></p>
+<p><a href="#k11">11. Překlad aplikace s&nbsp;přidáním &bdquo;sledovacího&ldquo; kódu</a></p>
+<p><a href="#k12">12. Spuštění aplikace s&nbsp;uvedením několika přepínačů na příkazovém řádku (různé režimy činnosti)</a></p>
+<p><a href="#k13">13. Spojení a konverze automaticky vytvořených souborů s&nbsp;informacemi o činnosti aplikace</a></p>
+<p><a href="#k14">14. Výpis informací bězích aplikace na úrovni funkcí a metod</a></p>
+<p><a href="#k15">15. Vizualizace volaných a nevolaných řádků na webové stránce</a></p>
+<p><a href="#k16">16. Závěrečné zhodnocení</a></p>
+<p><a href="#k17">17. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k18">18. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Nová funkcionalita v&nbsp;Go 1.20: detekce skutečně volaných řádků v&nbsp;programovém kódu</h2>
+
+<p><a href="https://go.dev/doc/go1.20">V&nbsp;Go verze 1.20</a> se objevila
+poměrně dlouho očekávaná funkcionalita. Jedná se o relativně snadno využitelnou
+technologii umožňující <a href="https://go.dev/doc/go1.20#cover">detekci</a>
+skutečně volaných řádků v&nbsp;programovém kódu. Díky této nové funkcionalitě
+je tedy možné například detekovat sémanticky &bdquo;mrtvý&ldquo; kód, kód, jenž
+je použit jen ve specifických případech atd. Při bližším pohledu zjistíme, že
+se vlastně ve skutečnosti nejedná o zcela novou technologii, protože již
+v&nbsp;prvních verzích programovacího jazyka Go měli programátoři možnost
+zjistit pokrytí kódu testy, což ovšem byla technologie do značné míry svázaná
+s&nbsp;nástrojem <strong>go test</strong> a taktéž se standardním balíčkem <a
+href="https://pkg.go.dev/testing">testing</a>. Použití mimo takto definované
+mantinely bylo velmi složité a mnohdy i nemožné.</p>
+
+<p>Není tedy divu, že praktické využití této technologie bylo omezeno na
+jednotkové testy (<i>unit tests</i>) popř.&nbsp;pro testy komponent (ovšem za
+předpokladu, že testy komponent jsou založeny na výše zmíněném balíčku
+<strong>testing</strong>). S&nbsp;příchodem Go verze 1.20 je nově umožněno
+například spustit backend naprogramovaný v&nbsp;jazyce Go, provést několik
+operací na frontendu (UI) a následně zjistit, které části backendu byly
+v&nbsp;tomto konkrétním případě využity. Totéž je pochopitelně možné provést i
+v&nbsp;případě mikroslužeb (bez frontendu) atd. atd. &ndash; nyní se již žádné
+překážky nekladou, jak ostatně uvidíme v&nbsp;dalším textu.</p>
+
+<p><div class="rs-tip-major">Poznámka: detekce, které části kódu byly volány,
+se provádí na úrovni funkcí, metod a programových bloků. To tedy znamená, že
+může dojít k&nbsp;situaci, kdy je nějaká funkce volána, ovšem některých
+z&nbsp;programových bloků uvnitř této funkce volán není (typicky se jedná o
+blok reagující na chybu).</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Nástroj <i>cover</i> a jednotkové testy</h2>
+
+<p>Jak jsme si již řekli <a href="#k01">v&nbsp;úvodní kapitole</a>, bylo
+zjištění, které části programového kódu jsou volány, v&nbsp;předchozích verzích
+jazyka Go omezeno na jednotkové testy, resp.&nbsp;přesněji řečeno na standardní
+balíček <strong>testing</strong> a na něj navazujícího nástroje
+<strong>cover</strong>. Pro úplnost si tedy v&nbsp;dalších kapitolách ukážeme
+dnes již zcela standardní způsob použití balíčku <strong>testing</strong>, a to
+včetně zobrazení (vizualizace) těch řádků v&nbsp;programovém kódu, které jsou
+jednotkovými testy přímo či nepřímo volány (tedy &bdquo;zasaženy&ldquo;). Jak
+uvidíme dále, je výsledkem této analýzy buď výstup ve formě seznamu funkcí a
+metod s&nbsp;procentuálním výpisem pokrytí testy, popř.&nbsp;HTML stránka
+(stránky) s&nbsp;podrobnějšími informacemi o tom, které programové řádky byly
+testy &bdquo;zasaženy&ldquo; a které nikoli (samozřejmě se ignorují řádky bez
+spustitelného kódu).</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Jednoduchá webová služba a její jednotkové testy</h2>
+
+<p>Nejprve si ukažme kód HTTP serveru, který budeme chtít testovat. Tento
+server po svém spuštění poskytuje statické soubory umístěné v&nbsp;aktuálním
+adresáři a na endpointech <strong>/data</strong> a <strong>/other</strong>
+odpovídá posláním odpovědi s&nbsp;nastaveným typem
+&bdquo;application/json&ldquo;. V&nbsp;obou případech je kód odpovědi 200 OK (a
+ve skutečnosti druhý handler nevrací validní JSON). Zdrojový kód tohoto HTTP
+serveru naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1.go</a></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+func <strong>dataHandler</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `"x": [1, 2, 3, 4, 5]`)
+}
+&nbsp;
+func <strong>otherHandler</strong>(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `foobar`)
+}
+&nbsp;
+func <strong>startHttpServer</strong>(address string) {
+        log.Printf("Starting server on address %s", address)
+        http.Handle("/", http.FileServer(http.Dir(".")))
+        http.HandleFunc("/data", dataHandler)
+        http.HandleFunc("/other", otherHandler)
+        http.ListenAndServe(address, nil)
+}
+&nbsp;
+func <strong>main</strong>() {
+        startHttpServer(":8080")
+}
+</pre>
+
+<p>Typickou úlohou je otestování funkcionality jednotlivých handlerů. Realizaci
+si ukážeme na jednoduchém testu pro handler obsluhující endpoint
+<strong>/data</strong>.  Nejdříve vytvoříme objekt realizující dotaz provedený
+HTTP metodou GET:</p>
+
+<pre>
+request, err := http.NewRequest("GET", "/data", nil)
+if err != nil {
+        t.Fatal(err)
+}
+</pre>
+
+<p>Dále vytvoříme objekt, který bude zaznamenávat provedené operace:</p>
+
+<pre>
+recorder := httptest.NewRecorder()
+</pre>
+
+<p>Třetím a posledním objektem je adaptér umožňující použít libovolnou funkci
+s&nbsp;příslušnou signaturou jako handler HTTP serveru:</p>
+
+<pre>
+handler := http.HandlerFunc(dataHandler)
+</pre>
+
+<p>Nyní spustíme &bdquo;záznam&ldquo; činnosti HTTP serveru pro již dříve
+vytvořený dotaz (HTTP GET na endpointu /data):</p>
+
+<pre>
+handler.ServeHTTP(recorder, request)
+</pre>
+
+<p>Celý průběh se zaznamená, což znamená, že později můžeme činnost handleru
+prozkoumat čtením atributů struktury <strong>recorder</strong>.</p>
+
+<p>Otestování HTTP kódu odpovědi (očekáváme 200 OK):</p>
+
+<pre>
+if status := recorder.Code; status != http.StatusOK {
+        t.Errorf("improper status code: got %v instead of %v",
+                status, http.StatusOK)
+}
+</pre>
+
+<p>Otestování, zda odpověď obsahuje hlavičku &bdquo;Content-Type&ldquo;
+s&nbsp;očekávaným obsahem &bdquo;application/json&ldquo;:</p>
+
+<pre>
+if ctype := recorder.Header().Get("Content-Type"); ctype != "application/json" {
+        t.Errorf("content type header does not match: got %s want %s",
+                ctype, "application/json")
+}
+</pre>
+
+<p>A pochopitelně můžeme přistupovat i k&nbsp;datům poslaným v&nbsp;těle
+odpovědi:</p>
+
+<pre>
+body := recorder.Body.String()
+if body != `"x": [1, 2, 3, 4, 5]` {
+        t.Errorf("wrong response body: %s", body)
+}
+</pre>
+
+<p>Úplný zdrojový kód jednotkového testu je umístěn na adrese: <a
+href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_test.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_test.go</a></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+        "net/http/httptest"
+        "testing"
+)
+&nbsp;
+func <strong>TestDataHandler</strong>(t *testing.T) {
+        request, err := http.NewRequest("GET", "/data", nil)
+        if err != nil {
+                t.Fatal(err)
+        }
+&nbsp;
+        recorder := httptest.NewRecorder()
+        handler := http.HandlerFunc(dataHandler)
+&nbsp;
+        handler.ServeHTTP(recorder, request)
+&nbsp;
+        if status := recorder.Code; status != http.StatusOK {
+                t.Errorf("improper status code: got %v instead of %v",
+                        status, http.StatusOK)
+        }
+&nbsp;
+        body := recorder.Body.String()
+        if body != `"x": [1, 2, 3, 4, 5]` {
+                t.Errorf("wrong response body: %s", body)
+        }
+&nbsp;
+        if ctype := recorder.Header().Get("Content-Type"); ctype != "application/json" {
+                t.Errorf("content type header does not match: got %s want %s",
+                        ctype, "application/json")
+        }
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Zjištění pokrytí kódu jednotkovými testy</h2>
+
+<p>Jednotkové testy pro naši implementaci služby spustíme příkazem <strong>go
+test</strong>:</p>
+
+<pre>
+$ <strong>go help test</strong>
+&nbsp;
+usage: go test [build/test flags] [packages] [build/test flags &amp; test binary flags]
+&nbsp;
+'Go test' automates testing the packages named by the import paths.
+It prints a summary of the test results in the format:
+&nbsp;
+        ok   archive/tar   0.011s
+        FAIL archive/zip   0.022s
+        ok   compress/gzip 0.033s
+        ...
+&nbsp;
+followed by detailed output for each failed package.
+&nbsp;
+...
+...
+...
+</pre>
+
+<p>Ovšem navíc budeme specifikovat, že je nutné zjistit pokrytí kódu testy a
+současně uložit naměřená data do souboru nazvaného &bdquo;coverage.out&ldquo;.
+K&nbsp;oběma zmíněným účelům slouží přepínač
+<strong>-coverprofile</strong>:</p>
+
+<pre>
+$ <strong>go test -coverprofile coverage.out</strong>
+</pre>
+
+<p>Výsledky budou vypadat následovně:</p>
+
+<pre>
+PASS
+coverage: 25.0% of statements
+ok      _/home/ptisnovs/src/go-root/article_A5/httpServer       0.003s
+</pre>
+
+<p>Soubor &bdquo;coverage.out&ldquo; obsahuje informace o spuštěných
+programových řádcích v&nbsp;průběhu testů; současně se ovšem jedná o soubor,
+který nebudeme přímo dekódovat, ale použijeme na to k&nbsp;tomu určené
+nástroje zmíněné <a href="#k05">v&nbsp;navazující kapitole</a>:</p>
+
+<pre>
+mode: set
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:18.69,22.2 3 1
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:24.70,28.2 3 0
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:30.38,36.2 5 0
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:38.13,40.2 1 0
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Výpis informací o pokrytí kódu jednotkovými testy</h2>
+
+<p>V&nbsp;této kapitole využijeme standardní nástroj <strong>cover</strong>,
+jenž se volá příkazem <strong>go tool cover</strong> a který akceptuje různé
+parametry vypsané v&nbsp;nápovědě:</p>
+
+<pre>
+$ <strong>go tool cover</strong>
+&nbsp;
+Usage of 'go tool cover':
+Given a coverage profile produced by 'go test':
+        go test -coverprofile=c.out
+&nbsp;
+Open a web browser displaying annotated source code:
+        go tool cover -html=c.out
+&nbsp;
+Write out an HTML file instead of launching a web browser:
+        go tool cover -html=c.out -o coverage.html
+&nbsp;
+Display coverage percentages to stdout for each function:
+        go tool cover -func=c.out
+&nbsp;
+Finally, to generate modified source code with coverage annotations
+(what go test -cover does):
+        go tool cover -mode=set -var=CoverageVariableName program.go
+&nbsp;
+Flags:
+  -V    print version and exit
+  -func string
+        output coverage profile information for each function
+  -html string
+        generate HTML representation of coverage profile
+  -mode string
+        coverage mode: set, count, atomic
+  -o string
+        file for output; default: stdout
+  -var string
+        name of coverage variable to generate (default "GoCover")
+&nbsp;
+  Only one of -html, -func, or -mode may be set.
+</pre>
+
+<p>Z&nbsp;vytvořeného souboru &bdquo;coverage.out&ldquo; vytvoříme čitelný
+výpis s&nbsp;informacemi o tom, jaké funkce HTTP serveru byly skutečně
+otestovány:</p>
+
+<pre>
+$ <strong>go tool cover -func=coverage.out</strong>
+</pre>
+
+<p>Výsledek by mohl vypadat následovně (cesty se samozřejmě budou ve vašem
+případě odlišovat, ovšem čísla řádků, jména funkcí a konkrétní naměřené hodnoty
+budou shodné):</p>
+
+<pre>
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:18:     dataHandler     100.0%
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:24:     otherHandler    0.0%
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:30:     startHttpServer 0.0%
+/home/ptisnovs/src/go-root/article_A5/httpServer/httpServer1.go:38:     main            0.0%
+total:                                                                  (statements)    25.0%
+</pre>
+
+<p>Vidíme, že handler realizovaný funkcí <strong>dataHandler</strong> je
+skutečně plně pokryt testy, na rozdíl od ostatního programového kódu.</p>
+
+<p>Navíc si můžeme nechat zobrazit HTML stránku (stránky), na nichž bude
+zvýrazněn kód pokrytý testy, ostatní programový kód a řádky, které programový
+kód netvoří:</p>
+
+<pre>
+$ <strong>go tool cover -html=coverage.out</strong>
+</pre>
+
+<p>S&nbsp;tímto výsledkem:</p>
+
+<a href="https://www.root.cz/obrazek/826120/"><img src="https://i.iinfo.cz/images/490/go-cover-0-prev.png" class="image-826120" data-prev-filename="https://i.iinfo.cz/images/490/go-cover-0-prev.png" data-prev-width="289" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/490/go-cover-0-large.png" data-large-width="562" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="289" height="270" /></a>
+<p><i>Obrázek 1: Vizualizace pokrytí programového kódu jednotkovými
+testy.</i></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Vygenerování upraveného zdrojového kódu aplikace s&nbsp;explicitními testy pokrytí</h2>
+
+<p>Nástroj <strong>cover</strong> navíc dokáže transformovat zvolený zdrojový
+kód takovým způsobem, že do něj přidá nový kód testující vstup do zvolené
+funkce, metody nebo programového bloku. Tento nový kód používá strukturu se
+jménem specifikovaným na příkazovém řádku, přičemž nový kód může pouze
+nastavovat příznak přístupu do funkce nebo programového bloku (tedy
+&bdquo;vstoupilo se/nevstoupilo se&ldquo;) nebo může příslušný čítač zvýšit o
+jedničku (tedy můžeme testovat, kolikrát byla funkce nebo programový blok
+volán) nebo je zvýšení hodnoty čítače realizováno atomickou operací (použití
+v&nbsp;gorutinách atd.). Pro generování transformovaného kódu jsou
+k&nbsp;dispozici tyto přepínače předávané nástroji <strong>cover</strong>:</p>
+
+<table>
+<tr><th>Přepínač</th><th>Stručný popis</th></tr>
+<tr><td>-mode=set</td><td>ve vygenerované části kódu se nastavuje příznak vstupu do funkce/bloku</td></tr>
+<tr><td>-mode=count</td><td>ve vygenerované části kódu se zvyšuje hodnota čítače vstupu do funkce/bloku</td></tr>
+<tr><td>-mode=atomic</td><td>podobné předchozímu, ovšem čítače jsou realizovány atomicky měnitelnými hodnotami</td></tr>
+<tr><td>-var=xyz</td><td>jméno datové struktury s&nbsp;čítači</td></tr>
+</table>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Ukázka transformace kódu nástrojem <strong>cover</strong></h2>
+
+<p>Podívejme se pro zajímavost, jak vlastně vypadají zdrojové kódy
+transformované nástrojem <strong>cover</strong>. Nejdříve si necháme vytvořit
+kód se &bdquo;sledovací&ldquo; strukturou, jejíž prvky se nastavují na 0 nebo
+na 1, podle toho, zda je nějaký blok kódu volán či nikoli. Tento kód se vytvoří
+příkazem:</p>
+
+<pre>
+$ <strong>go tool cover -mode=set -var=coverageVariable httpServer1.go</strong>
+</pre>
+
+<p>Výsledkem bude následující kód, jehož upravené (přidané) části jsou
+zvýrazněny:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+func dataHandler(writer http.ResponseWriter, request *http.Request) {<strong>coverageVariable.Count[0] = 1;</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `"x": [1, 2, 3, 4, 5]`)
+}
+&nbsp;
+func otherHandler(writer http.ResponseWriter, request *http.Request) {<strong>coverageVariable.Count[1] = 1;</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `foobar`)
+}
+&nbsp;
+func startHttpServer(address string) {<strong>coverageVariable.Count[2] = 1;</strong>
+        log.Printf("Starting server on address %s", address)
+        http.Handle("/", http.FileServer(http.Dir(".")))
+        http.HandleFunc("/data", dataHandler)
+        http.HandleFunc("/other", otherHandler)
+        http.ListenAndServe(address, nil)
+}
+&nbsp;
+func main() {<strong>coverageVariable.Count[3] = 1;</strong>
+        startHttpServer(":8080")
+}
+&nbsp;
+<strong>var coverageVariable = struct {</strong>
+<strong>        Count     [4]uint32</strong>
+<strong>        Pos       [3 * 4]uint32</strong>
+<strong>        NumStmt   [4]uint16</strong>
+<strong>} {</strong>
+<strong>        Pos: [3 * 4]uint32{</strong>
+<strong>                18, 22, 0x20045, // [0]</strong>
+<strong>                24, 28, 0x20046, // [1]</strong>
+<strong>                30, 36, 0x20026, // [2]</strong>
+<strong>                38, 40, 0x2000d, // [3]</strong>
+<strong>        },</strong>
+<strong>        NumStmt: [4]uint16{</strong>
+<strong>                3, // 0</strong>
+<strong>                3, // 1</strong>
+<strong>                5, // 2</strong>
+<strong>                1, // 3</strong>
+<strong>        },</strong>
+<strong>}</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že nová struktura je
+dobře připravena pro vygenerování výsledného reportu.</div></p>
+
+<p>Druhý zdrojový kód byl získán přidáním čítačů do původního kódu. Pro jeho
+vygenerování použijeme tento příkaz:</p>
+
+<pre>
+$ <strong>go tool cover -mode=count -var=coverageVariable httpServer1.go</strong>
+</pre>
+
+<p>Výsledek je podobný předchozím výsledku, až na odlišné chování &ndash; při
+vstupu do testovaných funkcí se hodnota čítačů zvyšuje o jedničku a nikoli
+přímo nastavuje na jedničku, takže lze snadno získat přehled o počtu
+volání:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+func dataHandler(writer http.ResponseWriter, request *http.Request) {<strong>coverageVariable.Count[0]++;</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `"x": [1, 2, 3, 4, 5]`)
+}
+&nbsp;
+func otherHandler(writer http.ResponseWriter, request *http.Request) {<strong>coverageVariable.Count[1]++;</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `foobar`)
+}
+&nbsp;
+func startHttpServer(address string) {<strong>coverageVariable.Count[2]++;</strong>
+        log.Printf("Starting server on address %s", address)
+        http.Handle("/", http.FileServer(http.Dir(".")))
+        http.HandleFunc("/data", dataHandler)
+        http.HandleFunc("/other", otherHandler)
+        http.ListenAndServe(address, nil)
+}
+&nbsp;
+func main() {<strong>coverageVariable.Count[3]++;</strong>
+        startHttpServer(":8080")
+}
+&nbsp;
+<strong>var coverageVariable = struct {</strong>
+<strong>        Count     [4]uint32</strong>
+<strong>        Pos       [3 * 4]uint32</strong>
+<strong>        NumStmt   [4]uint16</strong>
+<strong>} {</strong>
+<strong>        Pos: [3 * 4]uint32{</strong>
+<strong>                18, 22, 0x20045, // [0]</strong>
+<strong>                24, 28, 0x20046, // [1]</strong>
+<strong>                30, 36, 0x20026, // [2]</strong>
+<strong>                38, 40, 0x2000d, // [3]</strong>
+<strong>        },</strong>
+<strong>        NumStmt: [4]uint16{</strong>
+<strong>                3, // 0</strong>
+<strong>                3, // 1</strong>
+<strong>                5, // 2</strong>
+<strong>                1, // 3</strong>
+<strong>        },</strong>
+<strong>}</strong>
+</pre>
+
+<p>A konečně poslední příklad ukazuje, jak se namísto běžných čítačů
+(tj.&nbsp;prvků typu <strong>uint32</strong>) používají atomické čítače. Kód
+tedy bude připraven pro běh ve více gorutinách:</p>
+
+<pre>
+$ <strong>go tool cover -mode=atomic -var=coverageVariable httpServer1.go</strong>
+</pre>
+
+<p>Podívejme se na výsledek:</p>
+
+<pre>
+package main; import _cover_atomic_ "sync/atomic"
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+func dataHandler(writer http.ResponseWriter, request *http.Request) {<strong>_cover_atomic_.AddUint32(&amp;coverageVariable.Count[0], 1);</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `"x": [1, 2, 3, 4, 5]`)
+}
+&nbsp;
+func otherHandler(writer http.ResponseWriter, request *http.Request) {<strong>_cover_atomic_.AddUint32(&amp;coverageVariable.Count[1], 1);</strong>
+        writer.Header().Set("Content-Type", "application/json")
+        writer.WriteHeader(http.StatusOK)
+        fmt.Fprintf(writer, `foobar`)
+}
+&nbsp;
+func startHttpServer(address string) {<strong>_cover_atomic_.AddUint32(&amp;coverageVariable.Count[2], 1);</strong>
+        log.Printf("Starting server on address %s", address)
+        http.Handle("/", http.FileServer(http.Dir(".")))
+        http.HandleFunc("/data", dataHandler)
+        http.HandleFunc("/other", otherHandler)
+        http.ListenAndServe(address, nil)
+}
+&nbsp;
+func main() {<strong>_cover_atomic_.AddUint32(&camp;overageVariable.Count[3], 1);</strong>
+        startHttpServer(":8080")
+<strong>}</strong>
+&nbsp;
+<strong>var coverageVariable = struct {</strong>
+<strong>        Count     [4]uint32</strong>
+<strong>        Pos       [3 * 4]uint32</strong>
+<strong>        NumStmt   [4]uint16</strong>
+<strong>} {</strong>
+<strong>        Pos: [3 * 4]uint32{</strong>
+<strong>                18, 22, 0x20045, // [0]</strong>
+<strong>                24, 28, 0x20046, // [1]</strong>
+<strong>                30, 36, 0x20026, // [2]</strong>
+<strong>                38, 40, 0x2000d, // [3]</strong>
+<strong>        },</strong>
+<strong>        NumStmt: [4]uint16{</strong>
+<strong>                3, // 0</strong>
+<strong>                3, // 1</strong>
+<strong>                5, // 2</strong>
+<strong>                1, // 3</strong>
+<strong>        },</strong>
+<strong>}</strong>
+<strong>var _ = _cover_atomic_.LoadUint32</strong>
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Od jednotkových testů k&nbsp;detekci řádků, které jsou spuštěny při reálném běhu aplikace</h2>
+
+<p>V&nbsp;předchozím textu jsme si ukázali, jakým způsobem je možné zjistit
+pokrytí zdrojových kódů (<i>code coverage</i>) jednotkovými testy (<i>unit
+tests</i>) a taktéž to, že samotné zdrojové kódy je možné transformovat takovým
+způsobem, že se na důležitá místa v&nbsp;kódu (začátky funkcí a metod, vstupy
+do programových bloků) explicitně vloží nové příkazy určené pro zjištění, které
+části programu jsou vlastně použity (ovšem samotný export dat atd. je již
+ponechán na vývojáři). V&nbsp;jazyce Go verze 1.19 i ve všech starších
+variantách jazyka Go však nebyla k&nbsp;dispozici žádná jednoduše použitelná
+technologie, která by oba přístupy sjednotila tak, aby bylo možné aplikaci
+spustit (klidně i vícekrát) a posléze získat informaci o tom, do kterých
+funkcí/metod/bloků se skutečně vstoupilo. Tato technologie byla přidána až do
+Go 1.20 a způsob jejího využití si ukážeme na nepatrně složitějším
+demonstračním příkladu (který částečně vychází ze zdrojových kódů reálné
+aplikace).</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Složitější aplikace s&nbsp;přepínači zadávanými na příkazovém řádku</h2>
+
+<p>Aplikace, kterou přeložíme, spustíme a budeme analyzovat v&nbsp;navazujících
+kapitolách, podporuje přepínače (<i>flags</i>) nastavované na příkazovém řádku.
+Tyto přepínače slouží pro spuštění některé části aplikace, popř.&nbsp;pro
+spuštění HTTP služby (samotná implementace této služby je vynechána &ndash;
+zbytečně by celý programový kód ještě více prodlužovala). Taktéž je možné, aby
+se aplikace pouze pokusila připojit k&nbsp;Apache Kafce atd. &ndash; jedná se
+tedy o aplikaci, která se po spuštění může ubírat několika větvemi. Ty se
+budeme snažit detekovat nástrojem <strong>cover</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "net/http"
+        "os"
+&nbsp;
+        "github.com/Shopify/sarama"
+&nbsp;
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+&nbsp;
+        "github.com/rs/zerolog/log"
+)
+&nbsp;
+<i>// Messages to be displayed on terminal or written into logs</i>
+const (
+        versionMessage                 = "Spejbl version 1.0"
+        authorsMessage                 = "Pavel Tisnovsky, Red Hat Inc."
+        connectionToBrokerMessage      = "Connection to broker"
+        operationFailedMessage         = "Operation failed"
+        notConnectedToBrokerMessage    = "Not connected to broker"
+        brokerConnectionSuccessMessage = "Broker connection OK"
+)
+&nbsp;
+<i>// Exit codes</i>
+const (
+        <i>// ExitStatusOK means that the tool finished with success</i>
+        ExitStatusOK = iota
+        <i>// ExitStatusConsumerError is returned in case of any consumer-related error</i>
+        ExitStatusConsumerError
+        <i>// ExitStatusKafkaError is returned in case of any Kafka-related error</i>
+        ExitStatusKafkaError
+        <i>// ExitStatusHTTPServerError is returned in case the HTTP server can not be started</i>
+        ExitStatusHTTPServerError
+)
+&nbsp;
+<i>// CliFlags represents structure holding all command line arguments and flags.</i>
+type <strong>CliFlags</strong> struct {
+        CheckConnectionToKafka bool
+        ShowVersion            bool
+        ShowAuthors            bool
+}
+&nbsp;
+type <strong>ConfigStruct</strong> struct {
+        <i>// Address represents Kafka address</i>
+        Address string `mapstructure:"address" toml:"address"`
+        <i>// SecurityProtocol represents the security protocol used by the broker</i>
+        SecurityProtocol string `mapstructure:"security_protocol" toml:"security_protocol"`
+        <i>//      CertPath is the path to a file containing the certificate to be used with the broker</i>
+        CertPath string `mapstructure:"cert_path" toml:"cert_path"`
+        <i>// SaslMechanism is the SASL mechanism used for authentication</i>
+        SaslMechanism string `mapstructure:"sasl_mechanism" toml:"sasl_mechanism"`
+        <i>// SaslUsername is the username used in case of PLAIN mechanism</i>
+        SaslUsername string `mapstructure:"sasl_username" toml:"sasl_username"`
+        <i>// SaslPassword is the password used in case of PLAIN mechanism</i>
+        SaslPassword string `mapstructure:"sasl_password" toml:"sasl_password"`
+        <i>// Topic is name of Kafka topic</i>
+        Topic string `mapstructure:"topic" toml:"topic"`
+        <i>// Group is name of Kafka group</i>
+        Group string `mapstructure:"group" toml:"group"`
+        <i>// Enabled is set to true if Kafka consumer is to be enabled</i>
+        Enabled bool `mapstructure:"enabled" toml:"enabled"`
+&nbsp;
+        MetricsAddress string
+}
+&nbsp;
+<i>// showVersion function displays version information to standard output.</i>
+func <strong>showVersion</strong>() {
+        fmt.Println(versionMessage)
+}
+&nbsp;
+<i>// showAuthors function displays information about authors to standard output.</i>
+func <strong>showAuthors</strong>() {
+        fmt.Println(authorsMessage)
+}
+&nbsp;
+<i>// tryToConnectToKafka function just tries to establish connection to Kafka</i>
+<i>// broker</i>
+func <strong>tryToConnectToKafka</strong>(configuration *ConfigStruct) (int, error) {
+        log.Info().Msg("Checking connection to Kafka")
+&nbsp;
+        <i>// display basic info about broker that will be used</i>
+        log.Info().
+                Str("broker address", configuration.Address).
+                Msg("Broker address")
+&nbsp;
+        <i>// create new broker instance (w/o any checks)</i>
+        broker := sarama.NewBroker(configuration.Address)
+&nbsp;
+        <i>// check broker connection</i>
+        err := broker.Open(nil)
+        if err != nil {
+                log.Error().Err(err).Msg(connectionToBrokerMessage)
+                return ExitStatusKafkaError, err
+        }
+&nbsp;
+        <i>// check if connection remain</i>
+        connected, err := broker.Connected()
+        if err != nil {
+                log.Error().Err(err).Msg(connectionToBrokerMessage)
+                return ExitStatusKafkaError, err
+        }
+        if !connected {
+                log.Error().Err(err).Msg(notConnectedToBrokerMessage)
+                return ExitStatusConsumerError, err
+        }
+&nbsp;
+        <i>// connection was established</i>
+        log.Info().Msg(brokerConnectionSuccessMessage)
+&nbsp;
+        <i>// everything seems to be ok</i>
+        return ExitStatusOK, nil
+}
+&nbsp;
+<i>// startService function tries to start the notification writer service,</i>
+<i>// connect to storage and initialize connection to message broker.</i>
+func <strong>startService</strong>(configuration *ConfigStruct) (int, error) {
+        <i>// prepare HTTP server with metrics exposed</i>
+        err := startHTTPServer(configuration.MetricsAddress)
+        if err != nil {
+                log.Error().Err(err)
+                return ExitStatusHTTPServerError, err
+        }
+&nbsp;
+        return ExitStatusOK, nil
+}
+&nbsp;
+<i>// startHTTP server starts HTTP or HTTPS server with exposed metrics.</i>
+func <strong>startHTTPServer</strong>(address string) error {
+        <i>// setup handlers</i>
+        http.Handle("/metrics", promhttp.Handler())
+&nbsp;
+        <i>// start the server</i>
+        log.Info().Str("HTTP server address", address).Msg("Starting HTTP server")
+        err := http.ListenAndServe(address, nil) <i>// #nosec G114</i>
+        if err != nil {
+                log.Error().Err(err).Msg("Listen and serve")
+                return err
+        }
+        return nil
+}
+&nbsp;
+func <strong>doSelectedOperation</strong>(configuration *ConfigStruct, cliFlags CliFlags) (int, error) {
+        switch {
+        case cliFlags.ShowVersion:
+                showVersion()
+                return ExitStatusOK, nil
+        case cliFlags.ShowAuthors:
+                showAuthors()
+                return ExitStatusOK, nil
+        case cliFlags.CheckConnectionToKafka:
+                return tryToConnectToKafka(configuration)
+        default:
+                exitCode, err := startService(configuration)
+                return exitCode, err
+        }
+        <i>// this can not happen: return ExitStatusOK, nil</i>
+}
+&nbsp;
+<i>// main function is entry point to the Notification writer service.</i>
+func <strong>main</strong>() {
+        var cliFlags CliFlags
+&nbsp;
+        <i>// define and then parse all command line options</i>
+        flag.BoolVar(&amp;cliFlags.CheckConnectionToKafka, "check-kafka", false, "check connection to Kafka")
+        flag.BoolVar(&amp;cliFlags.ShowVersion, "version", false, "show version")
+        flag.BoolVar(&amp;cliFlags.ShowAuthors, "authors", false, "show authors")
+        flag.Parse()
+&nbsp;
+        configuration := ConfigStruct{}
+&nbsp;
+        <i>// perform selected operation</i>
+        exitStatus, err := doSelectedOperation(&amp;configuration, cliFlags)
+        if err != nil {
+                log.Err(err).Msg("Do selected operation")
+                os.Exit(exitStatus)
+                return
+        }
+&nbsp;
+        log.Debug().Msg("Finished")
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Projektový soubor testované aplikace</h2>
+
+<p>Pro úplnost se podívejme na to, jak vypadá projektový soubor testované
+aplikace, tedy soubor se jménem <strong>go.mod</strong>:</p>
+
+<pre>
+module app
+&nbsp;
+go 1.20
+&nbsp;
+require (
+        github.com/Shopify/sarama v1.35.0
+        github.com/prometheus/client_golang v1.12.1
+        github.com/rs/zerolog v1.21.0
+)
+&nbsp;
+require (
+        github.com/beorn7/perks v1.0.1 // indirect
+        github.com/cespare/xxhash/v2 v2.1.2 // indirect
+        github.com/davecgh/go-spew v1.1.1 // indirect
+        github.com/eapache/go-resiliency v1.3.0 // indirect
+        github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
+        github.com/eapache/queue v1.1.0 // indirect
+        github.com/golang/protobuf v1.5.2 // indirect
+        github.com/golang/snappy v0.0.4 // indirect
+        github.com/hashicorp/errwrap v1.0.0 // indirect
+        github.com/hashicorp/go-multierror v1.1.1 // indirect
+        github.com/hashicorp/go-uuid v1.0.2 // indirect
+        github.com/jcmturner/aescts/v2 v2.0.0 // indirect
+        github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
+        github.com/jcmturner/gofork v1.0.0 // indirect
+        github.com/jcmturner/gokrb5/v8 v8.4.2 // indirect
+        github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+        github.com/klauspost/compress v1.15.8 // indirect
+        github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+        github.com/pierrec/lz4/v4 v4.1.15 // indirect
+        github.com/prometheus/client_model v0.2.0 // indirect
+        github.com/prometheus/common v0.32.1 // indirect
+        github.com/prometheus/procfs v0.7.3 // indirect
+        github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
+        golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+        golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
+        golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+        google.golang.org/protobuf v1.26.0 // indirect
+)
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Překlad aplikace s&nbsp;přidáním &bdquo;sledovacího&ldquo; kódu</h2>
+
+<p>Výše uvedenou aplikaci můžeme přeložit běžným způsobem; konkrétně tímto
+příkazem:</p>
+
+<pre>
+$ <strong>go build</strong>
+</pre>
+
+<p>Při použití Go 1.20 na architektuře x86-64 bude mít výsledný binární
+spustitelný soubor velikost <strong>14&nbsp;963&nbsp;996</strong> bajtů.</p>
+
+<p>My ovšem budeme potřebovat, aby výsledný spustitelný program obsahoval i
+logiku pro zjištění těch částí kódu, které jsou skutečně volány. Proto budeme
+muset provést překlad tímto příkazem:</p>
+
+<pre>
+$ <strong>go build -cover</strong>
+</pre>
+
+<p>Výsledkem bude binární spustitelný soubor o velikosti
+<strong>15&nbsp;061&nbsp;624 </strong> bajtů. Větší velikost je pochopitelná,
+protože nyní jsme vlastně do výsledné aplikace přidali další funkcionalitu (a
+to ne zcela triviální).</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Spuštění aplikace s&nbsp;uvedením několika přepínačů na příkazovém řádku (různé režimy činnosti)</h2>
+
+<p>Nyní tedy máme k&nbsp;dispozici binární spustitelný kód aplikace, která
+dokáže po každém svém spuštění vygenerovat soubor s&nbsp;informacemi o tom,
+které bloky programového kódu byly skutečně volány. Ovšem export těchto
+informací je nejprve nutné nakonfigurovat, protože bez korektní konfigurace se
+aplikace sice bez problémů spustí, ale export dat neprovede (viz podtržené
+chybové hlášení):</p>
+
+<pre>
+$ <strong>./app --help</strong>
+&nbsp;
+<u>warning: GOCOVERDIR not set, no coverage data emitted</u>
+Usage of ./app:
+  -authors
+        show authors
+  -check-kafka
+        check connection to Kafka
+  -version
+        show version
+</pre>
+
+<p>Ve skutečnosti je konfigurace velmi snadná. Nejdříve si vytvoříme nový
+podadresář, do kterého se budou ukládat soubory s&nbsp;informacemi o
+pokrytí:</p>
+
+<pre>
+$ <strong>mkdir coverage</strong>
+</pre>
+
+<p>Jméno tohoto adresáře uložíme do proměnné prostředí nazvané
+<strong>GOCOVERDIR</strong>:</p>
+
+<pre>
+$ <strong>export GOCOVERDIR=coverage/</strong>
+</pre>
+
+<p>Aplikaci spustíme; nejprve si necháme zobrazit nápovědu:</p>
+
+<pre>
+$ <strong>./app --help</strong>
+&nbsp;
+Usage of ./app:
+  -authors
+        show authors
+  -check-kafka
+        check connection to Kafka
+  -version
+        show version
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: už nyní dojde k&nbsp;vytvoření prvního
+souboru v&nbsp;nakonfigurovaném podadresáři.</div></p>
+
+<p>Dále si necháme vypsat informaci o verzi aplikace:</p>
+
+<pre>
+$ <strong>./app -version</strong>
+&nbsp;
+Spejbl version 1.0
+{"level":"debug","time":"2023-02-22T14:53:26+01:00","message":"Finished"}
+</pre>
+
+<p>A konečně se pokusíme o připojení k&nbsp;message brokeru, což se
+v&nbsp;tomto případě nepodaří (podle očekávání), protože broker v&nbsp;daném
+okamžiku na počítači neběžel:</p>
+
+<pre>
+$ <strong>./app -check-kafka</strong>
+&nbsp;
+{"level":"info","time":"2023-02-22T14:53:44+01:00","message":"Checking connection to Kafka"}
+{"level":"info","broker address":"","time":"2023-02-22T14:53:44+01:00","message":"Broker address"}
+{"level":"error","error":"dial tcp: missing address","time":"2023-02-22T14:53:44+01:00","message":"Connection to broker"}
+{"level":"error","error":"dial tcp: missing address","time":"2023-02-22T14:53:44+01:00","message":"Do selected operation"}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Spojení a konverze automaticky vytvořených souborů s&nbsp;informacemi o činnosti aplikace</h2>
+
+<p>Vzhledem k&nbsp;tomu, že jsme testovanou aplikaci spustiti třikrát, měli
+bychom v&nbsp;podadresáři <strong>coverage</strong> najít minimálně tři soubory
+obsahující zjištěné informace o běhu aplikace. Tyto soubory začínají slovem
+<strong>covcounters</strong>. Navíc by se zde měl nacházet čtvrtý soubor
+s&nbsp;metainformacemi, jehož jméno začíná slovem <strong>covmeta</strong>. Na
+mém testovacím počítači se jedná o tuto čtveřici souborů (ve vašem případě se
+budou konkrétní jména odlišovat, to však vůbec nevadí):</p>
+
+<pre>
+$ <strong>ls -l coverage</strong>
+&nbsp;
+total 16
+-rw-rw-r-- 1 ptisnovs ptisnovs 142 Feb 20 17:52 covcounters.810ac8e7733136bd7e57b4cac39e2180.2759513.1676911936041875369
+-rw-rw-r-- 1 ptisnovs ptisnovs 154 Feb 20 17:52 covcounters.810ac8e7733136bd7e57b4cac39e2180.2759662.1676911945240574602
+-rw-rw-r-- 1 ptisnovs ptisnovs 164 Feb 20 17:52 covcounters.810ac8e7733136bd7e57b4cac39e2180.2759853.1676911951857842965
+-rw-rw-r-- 1 ptisnovs ptisnovs 426 Feb 20 17:52 covmeta.810ac8e7733136bd7e57b4cac39e2180
+</pre>
+
+<p>Nyní musíme provést dvojí konverzi &ndash; spojení souborů
+<strong>covcounters</strong> do souboru jediného a konverze výsledku do
+textového souboru se (strojově zpracovatelnými) informacemi o tom, které části
+kódu byly volány a které nikoli.</p>
+
+<p>Spojení souborů do souboru jediného zajišťuje příkaz:</p>
+
+<pre>
+$ <strong>go tool covdata merge -i=coverage/ -o=.</strong>
+</pre>
+
+<p>Dojde k&nbsp;vytvoření souboru s&nbsp;názvem
+<strong>covcounters.810ac8e7733136bd7e57b4cac39e2180.0.1677074073986857547</strong>
+(ovšem konkrétní jméno se může lišit).</p>
+
+<p>Export dat do textového formátu provedeme příkazem:</p>
+
+<pre>
+$ <strong>go tool covdata textfmt -i=. -o=out.txt</strong>
+</pre>
+
+<p>Výsledkem činnosti těchto nástrojů by měl být soubor nazvaný
+<strong>out.txt</strong>, který obsahuje (strojově čitelné) informace o tom,
+které řádky původního programového kódu byly skutečně spuštěny. Obsah tohoto
+souboru si můžeme snadno vypsat &ndash; měl by vypadat takto:</p>
+
+<pre>
+$ <strong>cat out.txt</strong>
+&nbsp;
+mode: set
+app/app.go:69.20,71.2 1 1
+app/app.go:74.20,76.2 1 0
+app/app.go:80.68,93.16 5 1
+app/app.go:93.16,96.3 2 0
+app/app.go:99.2,100.16 2 1
+app/app.go:100.16,103.3 2 1
+app/app.go:104.2,104.16 1 0
+app/app.go:104.16,107.3 2 0
+app/app.go:110.2,113.26 2 0
+app/app.go:118.61,121.16 2 0
+app/app.go:121.16,124.3 2 0
+app/app.go:126.2,126.26 1 0
+app/app.go:130.44,137.16 4 0
+app/app.go:137.16,140.3 2 0
+app/app.go:141.2,141.12 1 0
+app/app.go:144.87,145.9 1 1
+app/app.go:146.28,148.27 2 1
+app/app.go:149.28,151.27 2 0
+app/app.go:152.39,153.44 1 1
+app/app.go:154.10,156.23 2 0
+app/app.go:162.13,175.16 8 1 
+app/app.go:175.16,179.3 3 1
+app/app.go:181.2,181.29 1 1
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výpis informací bězích aplikace na úrovni funkcí a metod</h2>
+
+<p>Nyní již můžeme soubor <strong>out.txt</strong>, který byl vygenerován
+příkazy popsanými <a href="#k13">v&nbsp;předchozí kapitole</a>, použít pro
+zobrazení informace o tom, které funkce a metody byly volány a kolik řádků
+z&nbsp;každé funkce/metody bylo spuštěno. Pro snazší porovnání je počet řádků
+uveden relativně vůči celkovému počtu řádků a hodnota je ze zlomku převedena na
+procenta.</p>
+
+<p>Výsledek vypadá následovně:</p>
+
+<pre>
+$ <strong>go tool cover -func=out.txt</strong>
+&nbsp;
+app/app.go:69:  showVersion             100.0%
+app/app.go:74:  showAuthors             0.0%
+app/app.go:80:  tryToConnectToKafka     56.2%
+app/app.go:118: startService            0.0%
+app/app.go:130: startHTTPServer         0.0%
+app/app.go:144: doSelectedOperation     50.0%
+app/app.go:162: main                    100.0%
+total:          (statements)            52.0%
+</pre>
+
+<p>Ze zobrazených výsledků je patrné, že pouze u dvou funkcí byly spuštěny
+všechny řádky, tři funkce nebyly zavolány vůbec a u dvou funkcí bylo spuštěna
+jen přibližně polovina příkazů.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Vizualizace volaných a nevolaných řádků na webové stránce</h2>
+
+<p>V&nbsp;případě, že nám <a href="#k14">výše uvedené výsledky</a> nedostačují
+(například když je nutné přesně znát řádky, které byly spuštěny), je možné si
+nechat nástrojem <strong>cover</strong> spustit webový server, který
+v&nbsp;prohlížeči zobrazí podrobnější informace o analyzovaném zdrojovém kódu,
+a to právě až na úrovni jednotlivých programových řádků:</p>
+
+<pre>
+$ <strong>go tool cover -html=out.txt</strong>
+</pre>
+
+<p>Výsledky budou v&nbsp;našem konkrétním případě vypadat takto:</p>
+
+<a href="https://www.root.cz/obrazek/826116/"><img src="https://i.iinfo.cz/images/680/go-cover-1-prev.png" class="image-826116" data-prev-filename="https://i.iinfo.cz/images/680/go-cover-1-prev.png" data-prev-width="370" data-prev-height="102" data-large-filename="https://i.iinfo.cz/images/680/go-cover-1.png" data-large-width="689" data-large-height="190" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="370" height="102" /></a>
+<p><i>Obrázek 2: Funkce <strong>showVersion</strong> byla zavolána, zatímco funkce <strong>showAuthors</strong> nikoli.</i></p>
+
+<a href="https://www.root.cz/obrazek/826117/"><img src="https://i.iinfo.cz/images/680/go-cover-2-prev.png" class="image-826117" data-prev-filename="https://i.iinfo.cz/images/680/go-cover-2-prev.png" data-prev-width="269" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/680/go-cover-2-large.png" data-large-width="523" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="269" height="270" /></a>
+<p><i>Obrázek 3: Ve funkci <strong>tryToConnectToKafka</strong> se nepodařilo
+připojení k&nbsp;brokeru, takže byl z&nbsp;funkce proveden výskok ještě před
+jejím koncem.</i></p>
+
+<a href="https://www.root.cz/obrazek/826118/"><img src="https://i.iinfo.cz/images/680/go-cover-3-prev.png" class="image-826118" data-prev-filename="https://i.iinfo.cz/images/680/go-cover-3-prev.png" data-prev-width="370" data-prev-height="255" data-large-filename="https://i.iinfo.cz/images/680/go-cover-3-large.png" data-large-width="720" data-large-height="497" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="370" height="255" /></a>
+<p><i>Obrázek 4: Tyto funkce nebyly volány vůbec.</i></p>
+
+<a href="https://www.root.cz/obrazek/826119/"><img src="https://i.iinfo.cz/images/680/go-cover-4-prev.png" class="image-826119" data-prev-filename="https://i.iinfo.cz/images/680/go-cover-4-prev.png" data-prev-width="345" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/680/go-cover-4-large.png" data-large-width="670" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="345" height="270" /></a>
+<p><i>Obrázek 5: Rozeskok ve funkci <strong>doSelectedOperation</strong> a plné
+pokrytí hlavní funkce <strong>main</strong>.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Závěrečné zhodnocení</h2>
+
+<p>Rozšíření možností poskytovaných nástrojem <strong>cover</strong> je velmi
+užitečné. Například je možné zjistit, jak kvalitní a podrobné jsou integrační
+testy, testy komponent, nebo <a
+href="https://www.root.cz/clanky/behavior-driven-development-v-pythonu-s-vyuzitim-knihovny-behave/">BDD
+testy</a> (které navíc mohou být psány v&nbsp;jiném jazyce, neboť Go
+v&nbsp;tomto případě nemusí být ideálním řešením). Popř.&nbsp;je možné
+v&nbsp;testovacím nebo předprodukčním prostředí detekovat zcela mrtvé části
+kódu.</p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>httpServer1.go</td><td>implementace jednoduché webové služby s&nbsp;několika endpointy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1.go</a></td></tr>
+<tr><td> 2</td><td>httpServer1_test.go</td><td>jednotkové testy pro webovou službu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_test.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_test.go</a></td></tr>
+<tr><td> 3</td><td>httpServer1_cover_set.go</td><td>automaticky transformovaný kód obsahující &bdquo;sledovače&ldquo; vstupu do funkcí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_set.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_set.go</a></td></tr>
+<tr><td> 4</td><td>httpServer1_cover_count.go</td><td>automaticky transformovaný kód obsahující čítače vstupu do funkcí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_count.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_count.go</a></td></tr>
+<tr><td> 5</td><td>httpServer1_cover_atomic.go</td><td>automaticky transformovaný kód obsahující atomické čítače vstupu do funkcí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_atomic.go">https://github.com/tisnik/go-root/blob/master/article_A5/httpServer/httpServer1_cover_atomic.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>app.go</td><td>zdrojový kód aplikace, u níž se detekují použité části kódu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/app/app.go">https://github.com/tisnik/go-root/blob/master/article_A5/app/app.go</a></td></tr>
+<tr><td> 7</td><td>go.mod</td><td>projektový soubor aplikace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/app/go.mod">https://github.com/tisnik/go-root/blob/master/article_A5/app/go.mod</a></td></tr>
+<tr><td> 8</td><td>go.sum</td><td>seznam všech tranzitivních závislostí aplikace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A5/app/go.sum">https://github.com/tisnik/go-root/blob/master/article_A5/app/go.sum</a></td></tr>
+</table>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go 1.20 Release Notes<br />
+<a href="https://go.dev/doc/go1.20">https://go.dev/doc/go1.20</a>
+</li>
+
+<li>Go 1.20 Release Notes: Cover<br />
+<a href="https://go.dev/doc/go1.20#cover">https://go.dev/doc/go1.20#cover</a>
+</li>
+
+<li>Working with coverage data files<br />
+<a href="https://go.dev/testing/coverage/#working">https://go.dev/testing/coverage/#working</a>
+</li>
+
+<li>Proposal: extend code coverage testing to include applications<br />
+<a href="https://github.com/golang/go/issues/51430">https://github.com/golang/go/issues/51430</a>
+</li>
+
+<li>Package trace<br />
+<a href="https://golang.org/pkg/runtime/trace/">https://golang.org/pkg/runtime/trace/</a>
+</li>
+
+<li>An Introduction to Benchmarking Your Go Programs<br />
+<a href="https://tutorialedge.net/golang/benchmarking-your-go-programs/">https://tutorialedge.net/golang/benchmarking-your-go-programs/</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>Highly extensible Go source code linter providing checks currently missing from other linters<br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Fast linters runner for Go<br />
+<a href="https://github.com/golangci/golangci-lint">https://github.com/golangci/golangci-lint</a>
+</li>
+
+<li>Checkers from the “performance” group<br />
+<a href="https://go-critic.com/overview#checkers-from-the-performance-group">https://go-critic.com/overview#checkers-from-the-performance-group</a>
+</li>
+
+<li>rangeValCopy<br />
+<a href="https://go-critic.com/overview#rangeValCopy-ref">https://go-critic.com/overview#rangeValCopy-ref</a>
+</li>
+
+<li>C vs Rust vs Go: performance analysis<br />
+<a href="https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c">https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c</a>
+</li>
+
+<li>Golang Performance Comparison | Why is GO Fast?<br />
+<a href="https://www.golinuxcloud.com/golang-performance/">https://www.golinuxcloud.com/golang-performance/</a>
+</li>
+
+<li>Go mutex vs channels benchmark<br />
+<a href="https://github.com/danil/go_mutex_vs_channels_benchmark">https://github.com/danil/go_mutex_vs_channels_benchmark</a>
+</li>
+
+<li>Techniques to Maximize Your Go Application’s Performance<br />
+<a href="https://golangdocs.com/techniques-to-maximize-your-go-applications-performance">https://golangdocs.com/techniques-to-maximize-your-go-applications-performance</a>
+</li>
+
+<li>Go language performance optimization<br />
+<a href="https://www.programmerall.com/article/8929467838/">https://www.programmerall.com/article/8929467838/</a>
+</li>
+
+<li>Ultimate Golang Performance Optimization Guide<br />
+<a href="https://www.bacancytechnology.com/blog/golang-performance">https://www.bacancytechnology.com/blog/golang-performance</a>
+</li>
+
+<li>Optimizing a Golang service to reduce over 40% CPU<br />
+<a href="https://medium.com/coralogix-engineering/optimizing-a-golang-service-to-reduce-over-40-cpu-366b67c67ef9">https://medium.com/coralogix-engineering/optimizing-a-golang-service-to-reduce-over-40-cpu-366b67c67ef9</a>
+</li>
+
+<li>Tutorial for optimizing golang program<br />
+<a href="https://github.com/caibirdme/hand-to-hand-optimize-go/blob/master/README.md">https://github.com/caibirdme/hand-to-hand-optimize-go/blob/master/README.md</a>
+</li>
+
+<li>How to optimise your Go code<br />
+<a href="https://codeburst.io/how-to-optimise-your-go-code-c6b27d4f1452">https://codeburst.io/how-to-optimise-your-go-code-c6b27d4f1452</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2023</small></p>
+</body>
+</html>
+
