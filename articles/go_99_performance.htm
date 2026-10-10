@@ -1,0 +1,1416 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Základní optimalizace v Go aneb pomáháme překladači (2)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Základní optimalizace v Go aneb pomáháme překladači (2)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku o programovacím jazyku Go se seznámíme s dalšími optimalizacemi, které je v některých případech vhodné či nutné provádět na úrovni zdrojového kódu. Jedná se o problematiku předávání polí odkazem či hodnotou, optimalizace průchodu poli, řezy i mapami a taktéž použití synchronizačních mechanismů u gorutin.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Krátké ohlédnutí k&nbsp;problematice předávání parametrů hodnotou a odkazem</a></p>
+<p><a href="#k02">2. Role polí v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k03">3. Řezy (slices) jako forma abstrakce nad &bdquo;surovými&ldquo; poli</a></p>
+<p><a href="#k04">4. Řezy i pole se předávají hodnotou &ndash; co to ale konkrétně znamená?</a></p>
+<p><a href="#k05">5. Předávání polí a řezů: od teorie k&nbsp;praxi</a></p>
+<p><a href="#k06">6. Výsledky benchmarku</a></p>
+<p><a href="#k07">7. Reálnější benchmark</a></p>
+<p><a href="#k08">8. Výsledky benchmarku</a></p>
+<p><a href="#k09">9. Průchod všemi prvky pole či řezu</a></p>
+<p><a href="#k10">10. Benchmark měřicí dva způsoby průchodu polem</a></p>
+<p><a href="#k11">11. Výsledky benchmarku</a></p>
+<p><a href="#k12">12. Průchod všemi prvky mapy</a></p>
+<p><a href="#k13">13. Benchmark měřicí dva způsoby průchodu mapou</a></p>
+<p><a href="#k14">14. Výsledky benchmarku</a></p>
+<p><a href="#k15">15. Mutexy vs. kanály v&nbsp;roli synchronizační struktury</a></p>
+<p><a href="#k16">16. Benchmark: dva způsoby synchronizace</a></p>
+<p><a href="#k17">17. Výsledky benchmarku</a></p>
+<p><a href="#k18">18. Shrnutí</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Krátké ohlédnutí k&nbsp;problematice předávání parametrů hodnotou a odkazem</h2>
+
+<p>V&nbsp;<a
+href="https://www.root.cz/clanky/zakladni-optimalizace-v-go-aneb-pomahame-prekladaci/">předchozím
+článku</a> jsme se mj.&nbsp;zabývali technikou volání funkcí v&nbsp;jazyce Go.
+Řekli jsme si, že všechny parametry jsou předávány hodnotou a nikoli referencí.
+To by mohlo vést k&nbsp;dojmu, že uvnitř funkce (nebo metod) není možné
+modifikovat hodnotu parametru tak, aby to bylo zvenčí viditelné (tedy jinými
+slovy, že Go v&nbsp;tomto případě podporuje neměnitelné struktury). Ovšem ve
+skutečnosti tomu tak není; typickým příkladem jsou řezy, jejichž obsah
+<i>je</i> možné uvnitř funkce změnit. Podívejme se na jednoduchý příklad,
+v&nbsp;němž do funkce předáme řez, který je uvnitř funkce modifikován, přičemž
+změna je viditelná i vně funkce:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>changeMe</strong>(slice []int) {
+        slice[0] = 42
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// vytvoření řezu (nikoli pole)</i>
+        s := []int{1, 2, 3}
+        fmt.Println(s)
+        changeMe(s)
+        fmt.Println(s)
+}
+</pre>
+
+<p>Výsledek ukazuje, že byl řez skutečně modifikován, i když je předáván
+hodnotou a nikoli odkazem:</p>
+
+<pre>
+[1 2 3]
+[42 2 3]
+</pre>
+
+<p>Proč vlastně k&nbsp;tomuto chování dochází si vysvětlíme v&nbsp;navazujících
+kapitolách.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Role polí v&nbsp;programovacím jazyku Go</h2>
+
+<p><a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">V&nbsp;programovacím
+jazyce Go</a> se, ostatně podobně jako v&nbsp;mnoha dalších programovacích
+jazycích, setkáme s&nbsp;poli (<i>array</i>). Pole jsou v&nbsp;pojetí jazyka Go
+homogenní datovou strukturou, což v&nbsp;tomto kontextu znamená, že prvky pole
+mají vždy stejný a již v&nbsp;čase překladu známý typ, kterým ovšem může být
+v&nbsp;krajním případě i prázdné rozhraní (<strong>interface{}</strong>). Pole
+mají současně (minimálně v&nbsp;jazyce Go) neměnnou délku, kterou je nutné
+specifikovat již při vytváření pole a délka pole je součástí typu. Současně
+jsou ovšem pole plnohodnotnými datovými typy s&nbsp;vlastní sémantikou a
+dokonce i vlastními metadaty, na rozdíl od programovacího jazyka C, v&nbsp;němž
+je práce se skutečnými poli v&nbsp;mnoha případech omezena typovým
+systémem.</p>
+
+<p>Podívejme se nejdříve na způsob definice pole bez jeho přímé inicializace.
+Prvky pole budou mít v&nbsp;takovém případě nulovou hodnotu (kde pojem
+&bdquo;nulová hodnota&ldquo; záleží na tom, o jaký datový typ se jedná &ndash;
+může se totiž jednat i o struktury, jiná pole, řezy, ukazatele, řetězce
+atd.):</p>
+
+<pre>
+var a1 [10]byte
+</pre>
+
+<p>Pole ovšem můžeme současně inicializovat a navíc můžeme využít <i>typové
+inference</i>:</p>
+
+<pre>
+a3 := [10]int32{1,10,2,9,3,8,4,7,5,6}
+</pre>
+
+<p>&bdquo;Čtení&ldquo; datového typu je zde provedeno přímočaře zleva doprava:
+&bdquo;pole deseti prvků typu int32 s&nbsp;hodnotami 1,10 ...&ldquo;</p>
+
+<p>Vytvořit pochopitelně můžeme i vícerozměrná pole:</p>
+
+<pre>
+var matice [10][10]float32
+</pre>
+
+<p>Pro zjištění délky pole použijeme funkci <strong>len</strong>,
+tj.&nbsp;například:</p>
+
+<pre>
+x := len(a1)
+</pre>
+
+<p>A pro přístup k&nbsp;prvkům se používají klasické hranaté závorky, přičemž
+první prvek má nulový index, podobně jako v&nbsp;dalších
+&bdquo;céčkovských&ldquo; programovacích jazycích:</p>
+
+<pre>
+for i:= 0; i &lt; len(a1); i++ {
+        a[i] = i*2;
+}
+</pre>
+
+<p>Podívejme se nyní na úplný příklad, v&nbsp;němž se deklaruje a použije
+několik polí:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        var a1 [10]byte
+        var a2 [10]int32
+        a3 := [10]int32{1,10,2,9,3,8,4,7,5,6}
+&nbsp;
+        fmt.Printf("Delka pole 1: %d\n", len(a1))
+        fmt.Printf("Delka pole 2: %d\n", len(a2))
+        fmt.Printf("Delka pole 3: %d\n", len(a3))
+&nbsp;
+&nbsp;
+        var a[10]int
+&nbsp;
+        fmt.Printf("Pole pred upravou: %v\n", a)
+&nbsp;
+        for i:= 0; i &lt; len(a1); i++ {
+                a[i] = i*2;
+        }
+&nbsp;
+        fmt.Printf("Pole po uprave:    %v\n", a)
+&nbsp;
+        var matice [10][10]float32
+        fmt.Printf("Matice:    %v\n", matice)
+}
+</pre>
+
+<p><div class="rs-tip-major">Pole ve skutečnosti nejsou příliš flexibilním
+datovým typem, mj.&nbsp;i z&nbsp;toho důvodu, že typová informace o poli
+v&nbsp;sobě zahrnuje i délku pole (počet prvků). Tím pádem je složité vytvářet
+například funkce akceptující jako svůj parametr pole (až na speciální případy
+typu transformační matice atd.). Ovšem to v&nbsp;praxi příliš nevadí, protože
+pole většinou slouží jako základ pro jiný typ &ndash; řez
+(<i>slice</i>):</div></p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+<i>// je nutné uvést délku pole</i>
+func <strong>printLength</strong>(x [10]int) {
+        fmt.Println(len(x))
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// zde je délka pole vypočtena automaticky překladačem a doplněna na místo ...</i>
+        x := [...]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+        printLength(x)
+}
+</pre>
+
+<p>Zajímavé bude zjistit, co se stane v&nbsp;případě, že v&nbsp;programu
+vytvoříme novou proměnnou a přiřadíme jí pole:</p>
+
+<pre>
+a2 := a1
+</pre>
+
+<p>V&nbsp;tomto případě se sémantika odlišuje podle použitého jazyka:</p>
+
+<ol>
+<li>V&nbsp;jazyce Go se provede skutečná kopie pole, takže výsledkem budou dvě na sobě nezávislá pole.</li>
+<li>V&nbsp;Javě (například) se jen přiřadí reference, takže dvě proměnné budou ukazovat na stejné pole.</li>
+</ol>
+
+<p>Chování Go si můžeme velmi snadno otestovat na následujícím příkladu,
+v&nbsp;němž nejprve vytvoříme kopii pole a posléze původní pole změníme:</p>
+
+<pre>
+package main
+&nbsp;
+import "fmt"
+&nbsp;
+func main() {
+        var a1[10]int
+&nbsp;
+        <strong>a2 := a1</strong>
+&nbsp;
+        fmt.Printf("Pole 1: %v\n", a1)
+        fmt.Printf("Pole 2: %v\n", a2)
+&nbsp;
+        for i:= 0; i &lt;len(a1); i++ {
+                a1[i] = i*2;
+        }
+&nbsp;
+        fmt.Printf("Pole 1: %v\n", a1)
+        fmt.Printf("Pole 2: %v\n", a2)
+}
+</pre>
+
+<p>Výsledek odpovídá předchozímu popisu &ndash; pole jsou odlišná:</p>
+
+<pre>
+Pole 1: [0 0 0 0 0 0 0 0 0 0]
+Pole 2: [0 0 0 0 0 0 0 0 0 0]
+Pole 1: [0 2 4 6 8 10 12 14 16 18]
+Pole 2: [0 0 0 0 0 0 0 0 0 0]
+</pre>
+
+<p>Přibližně syntakticky (ne ovšem sémanticky!) ekvivalentní program
+v&nbsp;Javě by mohl vypadat takto:</p>
+
+<pre>
+import java.util.Arrays;
+&nbsp;
+public class Test {
+    public static void main(String[] args) {
+        int[] a1 = new int[10];
+        int[] a2 = a1;
+&nbsp;
+        for (int i=0; i&lt;a1.length; i++) {
+            a1[i] = i*2;
+        }
+&nbsp;
+        System.out.println(Arrays.toString(a1));
+        System.out.println(Arrays.toString(a2));
+    }
+}
+</pre>
+
+<p>Po překladu a spuštění se ovšem vypíšou dva stejné řádky &ndash; to znamená,
+že v&nbsp;programové smyčce jsme měnili prvky pole sdíleného mezi proměnnými
+<strong>a1</strong> a <strong>a2</strong>:</p>
+
+<pre>
+[0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
+[0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: sice to nebylo primárním cílem
+porovnání, ale povšimněte si, že Javovská varianta je více
+&bdquo;ukecanější&ldquo;</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Řezy (slices) jako forma abstrakce nad &bdquo;surovými&ldquo; poli</h2>
+
+<p>Jak jsme si již řekli <a href="#k02">v&nbsp;předchozí kapitole</a>, nemusí
+být klasické pole dostatečně flexibilní datovou strukturou, která by plně
+vyhovovala potřebám vytvářené aplikace popř.&nbsp;implementovaného algoritmu.
+Pro dosažení větší flexibility byl do programovacího jazyka Go přidán další
+datový typ nazývaný <i>řez</i> neboli <i>slice</i>. Interně se jedná o
+referenci na automaticky vytvořené pole nebo na pole, které je explicitně
+&bdquo;nasalámováno&ldquo; operací, s&nbsp;níž se seznámíme v&nbsp;navazující
+kapitole. Každý řez je v&nbsp;operační paměti uložen ve formě trojice hodnot
+(jde o záznam &ndash; <i>struct</i> či <i>record</i>):</p>
+
+<ol>
+<li>Ukazatele (reference) na zvolený prvek pole s&nbsp;daty, ke kterým přes řez přistupujeme.</li>
+<li>Délky řezu, tj.&nbsp;počtu prvků.</li>
+<li>Kapacity řezu (do jaké míry může řez narůstat v&nbsp;důsledku přidávání dalších prvků).</li>
+</ol>
+
+<p>Tato interní struktura řezů s&nbsp;sebou přináší několik zajímavých
+důsledků. Je totiž možné, aby existovalo větší množství řezů ukazujících na
+obecně různé prvky jediného pole. Pokud nyní změníme prvek v&nbsp;jednom řezu,
+znamená to, že se vlastně modifikuje obsah původního pole a i ostatní řezy nový
+prvek uvidí. Co je však užitečnější &ndash; s&nbsp;řezy jako s&nbsp;datovým
+typem se velmi snadno pracuje; řezy mohou být předávány do funkcí, vráceny
+z&nbsp;funkcí atd.</p>
+
+<p><div class="rs-tip-major">Poznámka: s&nbsp;řezy, i když měly poněkud jiné
+chování, jsme se seznámili například při popisu programovacího jazyka Rust. Viz
+<a
+href="https://www.root.cz/clanky/prace-s-vektory-v-programovacim-jazyku-rust/#k05">řezy
+vektoru</a> a <a
+href="https://www.root.cz/clanky/prace-s-poli-v-programovacim-jazyku-rust/#k06">řezy
+pole</a>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Řezy i pole se předávají hodnotou &ndash; co to ale konkrétně znamená?</h2>
+
+<p>V&nbsp;jazyce Go se všechny parametry předávají do funkcí a metod hodnotou,
+což znamená, že interně vždy dochází ke kopii hodnoty. To platí i pro pole (na
+rozdíl od mnoha jiných programovacích jazyků), takže pole uvnitř funkce je
+kopií původního pole. V&nbsp;případě, že potřebujeme předat ukazatel na pole,
+je nutné tuto operaci explicitně zapsat do zdrojového kódu. Jak je tomu u řezů
+(<i>slices</i>)? Ty se taktéž předávají hodnotou, což znamená, že se provede
+kopie řezu. Ovšem jak již víme z&nbsp;předchozího textu, je řez reprezentován
+trojicí hodnot (velikost, kapacita, ukazatel na pole). Tyto hodnoty jsou
+zkopírovány (tj.&nbsp;například nelze změnit velikost řezu), ovšem samotné pole
+kopírováno není, protože v&nbsp;řezu je uložen pouze ukazatel na něj. To
+mj.&nbsp;znamená, že pole, na které se řez odkazuje, je možné uvnitř funkcí
+modifikovat (jinými slovy &ndash; Go nezaručuje absolutní neměnnost hodnot!).
+To ovšem platí i ve chvíli, kdy je pole součástí datové struktury:</p>
+
+<p>Změna pole interně používaného řezem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Employee</strong> struct {
+        id    int
+        name  string
+        wages []int
+}
+&nbsp;
+func <strong>changeMe</strong>(employee Employee) {
+        employee.id = -1
+        employee.name = "Someone else"
+        employee.wages[0] = -1
+}
+&nbsp;
+func <strong>main</strong>() {
+        franta := Employee{
+                id:    1,
+                name:  "Franta",
+                wages: []int{30000, 32000, 30500, 29900},
+        }
+&nbsp;
+        fmt.Println(franta)
+        changeMe(franta)
+        fmt.Println(franta)
+}
+</pre>
+
+<p>Výsledky, z&nbsp;nichž je patrné, že pole referencované přes řez lze uvnitř
+funkce modifikovat:</p>
+
+<pre>
+$ <strong>go run pass_by_value_2.go </strong>
+&nbsp;
+{1 Franta [30000 32000 30500 29900]}
+{1 Franta [-1 32000 30500 29900]}
+</pre>
+
+<p>Předání struktury s&nbsp;polem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+const MONTHS = 12
+&nbsp;
+type <strong>Employee</strong> struct {
+        id    int
+        name  string
+        wages [MONTHS]int
+}
+&nbsp;
+func <strong>changeMe</strong>(employee Employee) {
+        employee.id = -1
+        employee.name = "Someone else"
+        employee.wages[0] = -1
+}
+&nbsp;
+func <strong>main</strong>() {
+        franta := Employee{
+                id:    1,
+                name:  "Franta",
+                wages: [...]int{30000, 32000, 30500, 29900, 10000, 35000, 30000, 32000, 30500, 29900, 10000, 35000},
+        }
+&nbsp;
+        fmt.Println(franta)
+        changeMe(franta)
+        fmt.Println(franta)
+}
+</pre>
+
+<p>Výsledky ukazující, že modifikace pole uvnitř funkce
+<strong>changeMe</strong> je pouze lokální:</p>
+
+<pre>
+$ <strong>go run pass_by_value_3.go </strong>
+&nbsp;
+{1 Franta [30000 32000 30500 29900 10000 35000 30000 32000 30500 29900 10000 35000]}
+{1 Franta [30000 32000 30500 29900 10000 35000 30000 32000 30500 29900 10000 35000]}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Předávání polí a řezů: od teorie k&nbsp;praxi</h2>
+
+<p>Nyní již víme, jakým způsobem se předávají pole a řezy do funkcí a metod.
+Ajťácký selský rozum by tedy mohl napovídat, že u delších polí se bude provádět
+časově a paměťově velmi náročná kopie pole. Pojďme si tedy tento předpoklad
+ověřit na benchmarku, který bude volat (interně) podobné funkce, kterým se bude
+předávat řez, pole hodnotou a pole přes ukazatel (tedy vlastně odkazem). Tyto
+funkce budou modifikovat první a poslední prvek pole (protože přes řez se
+interně předává ukazatel na pole):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+const MAX_VALS = 1000
+const DEFAULT_VALUE = 0
+const FIRST_VALUE = -1
+const LAST_VALUE = -2
+&nbsp;
+func <strong>changeMe1</strong>(values []int) {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+}
+&nbsp;
+func <strong>changeMe2</strong>(values [MAX_VALS]int) {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+}
+&nbsp;
+func <strong>changeMe3</strong>(values *[MAX_VALS]int) {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+}
+&nbsp;
+func <strong>BenchmarkPassSlice</strong>(b *testing.B) {
+        var values []int = make([]int, MAX_VALS)
+
+        for i := 0; i &lt; b.N; i++ {
+                changeMe1(values)
+        }
+        if values[0] != FIRST_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != LAST_VALUE {
+                b.Fatal()
+        }
+}
+&nbsp;
+func <strong>BenchmarkPassArrayByValue</strong>(b *testing.B) {
+        var values [MAX_VALS]int = [MAX_VALS]int{DEFAULT_VALUE}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                changeMe2(values)
+        }
+        if values[0] != DEFAULT_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != DEFAULT_VALUE {
+                b.Fatal()
+        }
+}
+&nbsp;
+func <strong>BenchmarkPassArrayByReference</strong>(b *testing.B) {
+        var values [MAX_VALS]int = [MAX_VALS]int{DEFAULT_VALUE}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                changeMe3(&amp;values)
+        }
+        if values[0] != FIRST_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != LAST_VALUE {
+                b.Fatal()
+        }
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Výsledky benchmarku</h2>
+
+<p>Vyzkoušejme si nyní benchmark, jehož zdrojový kód byl uveden <a
+href="#k05">v&nbsp;předchozí kapitole</a>, spustit. Výsledky nás možná
+překvapí:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000000x -cpuprofile profile.out</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: parameters-benchmark
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPassSlice-8                    100000000                0.4799 ns/op
+BenchmarkPassArrayByValue-8             100000000                0.2371 ns/op
+BenchmarkPassArrayByReference-8         100000000                0.4740 ns/op
+PASS
+ok      parameters-benchmark    0.305s
+</pre>
+
+<p>Z&nbsp;výsledků vyplývá, že předávání polí hodnotou je nejrychlejší operací!
+Ovšem není tomu tak z&nbsp;toho důvodu, že by neustálé kopie tisíce hodnot typu
+<strong>int</strong> nějakým způsobem zrychlovalo operace prováděné
+mikroprocesorem. Důvod je jednoduchý &ndash; překladač programovacího jazyka Go
+zdetekoval, že operace s&nbsp;polem prováděná uvnitř funkce
+<strong>change2</strong> není vně funkce viditelná (modifikace lokální kopie
+pole) a celé volání funkce odstranil (a posléze linker odstranil i objektový
+kód této funkce).</p>
+
+<p>K&nbsp;témuž závěru můžeme dojít po otevření výsledků profileru, který se
+spustí příkazem:</p>
+
+<pre>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<a href="https://www.root.cz/obrazek/730177/"><img src="https://i.iinfo.cz/images/357/go-performance-2-1-prev.png" class="image-730177" data-prev-filename="https://i.iinfo.cz/images/357/go-performance-2-1-prev.png" data-prev-width="370" data-prev-height="170" data-large-filename="https://i.iinfo.cz/images/357/go-performance-2-1-large.png" data-large-width="720" data-large-height="331" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="370" height="170" /></a>
+<p><i>Obrázek 1: Z&nbsp;benchmarku <strong>BenchmarkPassArrayByValue</strong>
+se ve skutečnosti žádná testovaná funkce nevolá.</i></p>
+
+<img src="https://i.iinfo.cz/images/357/go-performance-2-2.png" class="image-730178" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="650" height="265" />
+<p><i>Obrázek 2: I z&nbsp;tohoto výsledku je patrné, že se volají pouze funkce
+<strong>changeMe1</strong> a <strong>changeMe3</strong>.</i></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Reálnější benchmark</h2>
+
+<p>Abychom obešli optimalizaci kódu bez vnějšího efektu, upravíme předchozí
+benchmark do podoby, v&nbsp;níž se bude pole/řez nejenom modifikovat (ať již
+lokálně či globálně), ale vrátíme i nějakou hodnotu z&nbsp;této datové
+struktury. Takové funkce již není možné z&nbsp;výsledného kódu jednoduše
+odstranit a na druhou stranu je překladač jazyka Go dostatečně
+&bdquo;hloupý&ldquo; na to, aby provedl inlining následovaný eliminací kopie
+atd.:</p>
+
+<pre>
+<strong>package main</strong>
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+const MAX_VALS = 1000
+const DEFAULT_VALUE = 0
+const FIRST_VALUE = -1
+const LAST_VALUE = -2
+&nbsp;
+func <strong>changeMe1</strong>(values []int) int {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+        return values[MAX_VALS/2]
+}
+&nbsp;
+func <strong>changeMe2</strong>(values [MAX_VALS]int) int {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+        return values[MAX_VALS/2]
+}
+&nbsp;
+func <strong>changeMe3</strong>(values *[MAX_VALS]int) int {
+        values[0] = FIRST_VALUE
+        values[MAX_VALS-1] = LAST_VALUE
+        return values[MAX_VALS/2]
+}
+&nbsp;
+func <strong>BenchmarkPassSlice</strong>(b *testing.B) {
+        var values []int = make([]int, MAX_VALS)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                r := changeMe1(values)
+                if r != DEFAULT_VALUE {
+                        b.Fatal()
+                }
+        }
+        if values[0] != FIRST_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != LAST_VALUE {
+                b.Fatal()
+        }
+}
+&nbsp;
+func <strong>BenchmarkPassArrayByValue</strong>(b *testing.B) {
+        var values [MAX_VALS]int = [MAX_VALS]int{DEFAULT_VALUE}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                r := changeMe2(values)
+                if r != DEFAULT_VALUE {
+                        b.Fatal()
+                }
+        }
+        if values[0] != DEFAULT_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != DEFAULT_VALUE {
+                b.Fatal()
+        }
+}
+&nbsp;
+func <strong>BenchmarkPassArrayByReference</strong>(b *testing.B) {
+        var values [MAX_VALS]int = [MAX_VALS]int{DEFAULT_VALUE}
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                r := changeMe3(&amp;values)
+                if r != DEFAULT_VALUE {
+                        b.Fatal()
+                }
+        }
+        if values[0] != FIRST_VALUE {
+                b.Fatal()
+        }
+        if values[MAX_VALS-1] != LAST_VALUE {
+                b.Fatal()
+        }
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Výsledky benchmarku</h2>
+
+<p>Opět si benchmark spustíme a zjistíme, jak se budou lišit časy volání funkcí
+s&nbsp;předáním pole hodnotou, odkazem a nepřímo přes řez:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000000x -cpuprofile profile.out</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: parameters-benchmark
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPassSlice-8                    100000000                0.4768 ns/op
+BenchmarkPassArrayByValue-8             100000000              135.3 ns/op
+BenchmarkPassArrayByReference-8         100000000                0.5629 ns/op
+PASS
+ok      parameters-benchmark    13.734s
+</pre>
+
+<p>Nyní je vše jasné &ndash; předání pole hodnotou je podle očekávání (i podle
+ajťáckého selského rozumu) nejméně efektivní operací.</p>
+
+<p>Pro úplnost se podívejme na výsledky získané profilerem:</p>
+
+<pre>
+$ <strong>go tool pprof -http=:6060 profile.out</strong>
+</pre>
+
+<img src="https://i.iinfo.cz/images/357/go-performance-2-3.png" class="image-730179" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="695" height="752" />
+<p><i>Obrázek 3: Profiler zobrazí jen informace o druhém benchmarku, protože
+ten zabere prakticky 99% strojového času.</i></p>
+
+<img src="https://i.iinfo.cz/images/357/go-performance-2-4.png" class="image-730180" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="660" height="211" />
+<p><i>Obrázek 4: Tytéž informace jsou zobrazeny i na tomto reportu.</i></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Průchod všemi prvky pole či řezu</h2>
+
+<p>Ve druhé části dnešního článku se budeme zabývat zdánlivě triviální úlohou.
+Na vstupu budeme mít pole nebo řez s&nbsp;prvky libovolného typu:</p>
+
+<pre>
+type <strong>item</strong> struct {
+        value   int
+        payload [PAYLOAD_SIZE]byte
+}
+&nbsp;
+const MAX_ITEMS = 10000
+&nbsp;
+var items [MAX_ITEMS]item
+...
+...
+...
+<i>// inicializace prvků...</i>
+...
+...
+...
+</pre>
+
+<p>Naším úkolem bude projít všemi prvky pole (řezu) a vypočítat součet všech
+hodnot <strong>value</strong>. V&nbsp;jazyce Go se pro tento účel používá
+idiomatický zápis smyčky založený na klíčových slovech <strong>for</strong> a
+<strong>range</strong>:</p>
+
+<pre>
+for _, item := range items {
+        sum += item.value
+}
+</pre>
+
+<p>Podstata problému spočívá v&nbsp;&bdquo;maličkosti&ldquo; &ndash; hodnota
+každého prvku se bude kopírovat do lokální proměnné <strong>item</strong>. A to
+je potenciálně velká výkonnostní brzda, zejména pro interní smyčky (na tento
+problém jsme již několikrát narazili v&nbsp;praxi).</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Benchmark měřicí dva způsoby průchodu polem</h2>
+
+<p>To, o jak velký problém se jedná, zjistíme dvojicí benchmarků, v&nbsp;nichž
+budeme jednou procházet prvky pole s&nbsp;využitím výše uvedené idiomatické
+programové smyčky a podruhé budeme &bdquo;pouze&ldquo; přistupovat
+k&nbsp;prvkům pole přes jejich index, což je spíše &bdquo;céčkový&ldquo;
+přístup vypadající následovně:</p>
+
+<pre>
+for j := 0; j &lt; len(items); j++ {
+        sum += items[j].value
+}
+</pre>
+
+<p>Zdrojový kód s&nbsp;benchmarky vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+const PAYLOAD_SIZE = 100
+&nbsp;
+type <strong>item</strong> struct {
+        value   int
+        payload [PAYLOAD_SIZE]byte
+}
+&nbsp;
+const MAX_ITEMS = 10000
+&nbsp;
+func <strong>BenchmarkCountValues1</strong>(b *testing.B) {
+        b.StopTimer()
+&nbsp;
+        var items [MAX_ITEMS]item
+&nbsp;
+        for i := 0; i &lt; len(items); i++ {
+                items[i].value = i
+                items[i].payload = [PAYLOAD_SIZE]byte{}
+        }
+&nbsp;
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                sum := 0
+&nbsp;
+                for _, item := range items {
+                        sum += item.value
+                }
+&nbsp;
+                if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+                        b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkCountValues2</strong>(b *testing.B) {
+        b.StopTimer()
+&nbsp;
+        var items [MAX_ITEMS]item
+&nbsp;
+        for i := 0; i &lt; len(items); i++ {
+                items[i].value = i
+                items[i].payload = [PAYLOAD_SIZE]byte{}
+        }
+&nbsp;
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                sum := 0
+&nbsp;
+                for j := 0; j &lt; len(items); j++ {
+                        sum += items[j].value
+                }
+&nbsp;
+                if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+                        b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+                }
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotná alokace pole a jeho naplnění
+hodnotami není součástí benchmarku &ndash; tento čas se nepočítá.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Výsledky benchmarku</h2>
+
+<p>Benchmark spustíme pouze 100000&times;, protože každá testovaná operace
+spočívá v&nbsp;průchodu celým polem, což je sama o sobě dlouhotrvající operace
+v&nbsp;porovnání s&nbsp;předchozími benchmarky (které tak byly opakovány
+vícekrát):</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: range-val-copy-1
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkCountValues1-8           100000             70310 ns/op
+BenchmarkCountValues2-8           100000             10687 ns/op
+PASS
+ok      range-val-copy-1        8.104s
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, že první způsob průchodu programovou smyčkou (ten
+idiomatický) je přibližně sedmkrát pomalejší než způsob první. V&nbsp;tomto
+konkrétním případě jsou rozdíly tak velké zejména proto, že každý prvek pole je
+poměrně objemný.</p>
+
+<p>Zajímavé bude zjistit, v&nbsp;jaké části kódu se stráví nejvíce času. Opět
+se, podobně jako tomu bylo v&nbsp;předchozím článku, jedná o rutinu <i>duff
+copy</i>, která je naprogramovaná v&nbsp;assembleru (rozbalená smyčka) a tedy
+obecně velmi rychlá:</p>
+
+<pre>
+      File: range-val-copy-1.test
+Type: cpu
+Time: Dec 9, 2022 at 4:38pm (CET)
+Duration: 8.42s, Total samples = 8.21s (97.51%)
+Showing nodes accounting for 8.21s, 100% of 8.21s total
+----------------------------------------------------------+-------------
+      flat  flat%   sum%        cum   cum%   calls calls% + context     
+----------------------------------------------------------+-------------
+                                             6.67s   100% |   testing.(*B).runN /opt/go/src/testing/benchmark.go:193
+     3.90s 47.50% 47.50%      6.67s 81.24%                | range-val-copy-1.BenchmarkCountValues1 /home/ptisnovs/src/go-root/article_99/range-val-copy-1/parameters_test.go:31
+                                             0.22s  3.30% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:393
+                                             0.20s  3.00% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:408
+                                             0.18s  2.70% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:420
+                                             0.16s  2.40% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:413
+                                             0.16s  2.40% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:423
+                                             0.14s  2.10% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:418
+                                             0.13s  1.95% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:425
+                                             0.12s  1.80% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:392
+                                             0.11s  1.65% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:403
+                                             0.10s  1.50% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:398
+                                             0.10s  1.50% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:407
+                                             0.10s  1.50% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:412
+                                             0.09s  1.35% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:405
+                                             0.09s  1.35% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:410
+                                             0.08s  1.20% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:395
+                                             0.08s  1.20% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:402
+                                             0.08s  1.20% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:404
+                                             0.08s  1.20% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:414
+                                             0.08s  1.20% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:422
+                                             0.07s  1.05% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:397
+                                             0.07s  1.05% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:417
+                                             0.06s   0.9% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:400
+                                             0.06s   0.9% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:427
+                                             0.05s  0.75% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:415
+                                             0.05s  0.75% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:424
+                                             0.04s   0.6% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:399
+                                             0.04s   0.6% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:409
+                                             0.02s   0.3% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:394
+                                             0.01s  0.15% |   runtime.duffcopy /opt/go/src/runtime/duff_amd64.s:419
+----------------------------------------------------------+-------------
+                                             0.96s   100% |   testing.(*B).runN /opt/go/src/testing/benchmark.go:193
+     0.96s 11.69% 59.20%      0.96s 11.69%                | range-val-copy-1.BenchmarkCountValues2 /home/ptisnovs/src/go-root/article_99/range-val-copy-1/parameters_test.go:57
+----------------------------------------------------------+-------------
+                                             0.31s   100% |   testing.(*B).runN /opt/go/src/testing/benchmark.go:193
+     0.31s  3.78% 62.97%      0.31s  3.78%                | range-val-copy-1.BenchmarkCountValues1 /home/ptisnovs/src/go-root/article_99/range-val-copy-1/parameters_test.go:32
+----------------------------------------------------------+-------------
+                                             0.26s   100% |   testing.(*B).runN /opt/go/src/testing/benchmark.go:193
+     0.26s  3.17% 66.14%      0.26s  3.17%                | range-val-copy-1.BenchmarkCountValues2 /home/ptisnovs/src/go-root/article_99/range-val-copy-1/parameters_test.go:56
+</pre>
+
+<p>Kumulativní časy zobrazené graficky:</p>
+
+<a href="https://www.root.cz/obrazek/730181/"><img src="https://i.iinfo.cz/images/357/go-performance-2-5-prev.png" class="image-730181" data-prev-filename="https://i.iinfo.cz/images/357/go-performance-2-5-prev.png" data-prev-width="365" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/357/go-performance-2-5-large.png" data-large-width="709" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="365" height="270" /></a>
+<p><i>Obrázek 5: Výsledky benchmarku zobrazené graficky (pro odlišný počet
+běhů).</i></p>
+
+<p>A konečně kumulativní časy zobrazené v&nbsp;tabulce:</p>
+
+<img src="https://i.iinfo.cz/images/357/go-performance-2-6.png" class="image-730182" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="536" height="203" />
+<p><i>Obrázek 6: Kumulativní časy benchmarků zobrazené v&nbsp;tabulkové
+podobě.</i></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Průchod všemi prvky mapy</h2>
+
+<p>Programovací jazyk Go nabízí programátorům i možnost idiomatického zápisu
+programové smyčky určené pro průchod klíči a prvky mapy. Zápis je prakticky
+totožný, jako v&nbsp;případě polí či řezů, ovšem namísto indexů se vrací
+klíče:</p>
+
+<pre>
+for key, value := range items {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Ovšem opět platí, že klíče a hodnoty jsou v&nbsp;tomto případě kopírovány do
+lokálních proměnných <strong>key</strong> a <strong>value</strong>, což může u
+objemnějších datových struktur být dosti významným faktorem ovlivňujícím
+celkový výkon aplikace. Alternativně lze procházet jen klíči (což samo o sobě
+může vést ke kopiím, ovšem klíče nebývají příliš objemné) a k&nbsp;hodnotám
+mapy přistupovat přímo, ideálně k&nbsp;jejich adrese:</p>
+
+<pre>
+for key, _ := range items {
+        ...
+        ...
+        ...
+        items[key]
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: situace je o něco složitější kvůli tomu,
+že se v&nbsp;jazyce Go mapy běžně používají i pro implementaci dalších datových
+struktur, například množin.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Benchmark měřicí dva způsoby průchodu mapou</h2>
+
+<p>Abychom si oba <a href="#k12">výše zmíněné</a> způsoby průchodu mapou
+otestovali a změřili jejich výpočetní složitost, použijeme opět benchmark, jenž
+nejdříve naplní mapu strukturami, z&nbsp;nichž každá má velikost přesahující
+100 bajtů. Následně se ve smyčkách mapami projde a provede se výpočet, který
+zjistí, zda se skutečně prošlo všemi prvky mapy. Opět se ovšem měří pouze čas
+průchodu mapou, nikoli samotná alokace a inicializace mapy.:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+)
+&nbsp;
+const PAYLOAD_SIZE = 100
+&nbsp;
+type item struct {
+        value   int
+        payload [PAYLOAD_SIZE]byte
+}
+&nbsp;
+const MAX_ITEMS = 10000
+&nbsp;
+func <strong>BenchmarkCountValues1</strong>(b *testing.B) {
+        b.StopTimer()
+&nbsp;
+        var items map[int]item = make(map[int]item, MAX_ITEMS)
+&nbsp;
+        for i := 0; i &lt; MAX_ITEMS; i++ {
+                items[i] = item{
+                        value:   i,
+                        payload: [PAYLOAD_SIZE]byte{},
+                }
+        }
+&nbsp;
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                sum := 0
+&nbsp;
+                for _, item := range items {
+                        sum += item.value
+                }
+&nbsp;
+                if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+                        b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkCountValues2</strong>(b *testing.B) {
+        b.StopTimer()
+&nbsp;
+        var items [MAX_ITEMS]item
+&nbsp;
+        for i := 0; i &lt; len(items); i++ {
+                items[i].value = i
+                items[i].payload = [PAYLOAD_SIZE]byte{}
+        }
+&nbsp;
+        b.StartTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                sum := 0
+&nbsp;
+                for key, _ := range items {
+                        sum += items[key].value
+                }
+&nbsp;
+                if sum != MAX_ITEMS/2*(MAX_ITEMS-1) {
+                        b.Fatal(sum, MAX_ITEMS/2*(MAX_ITEMS-1))
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výsledky benchmarku</h2>
+
+<p>Po spuštění benchmarku uvidíme ještě výraznější rozdíly v&nbsp;rychlosti,
+než tomu bylo v&nbsp;příkladu, v&nbsp;němž jsme procházeli (iterovali) prvky
+pole:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000x -cpuprofile profile.out</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: range-val-copy-1
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkCountValues1-8           100000            144225 ns/op
+BenchmarkCountValues2-8           100000             12300 ns/op
+PASS
+ok      range-val-copy-1        15.853s
+</pre>
+
+<p>Z&nbsp;grafického vyjádření je zřejmé, že největší množství času se strávilo
+ve funkci <strong>mapiternext</strong>, za níž následuje nám již známá
+(optimalizovaná) operace <i>duff copy</i> pro kopii hodnot.</p>
+
+<img src="https://i.iinfo.cz/images/357/go-performance-2-7.png" class="image-730183" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="880" height="828" />
+<p><i>Obrázek 7: Volání mapiternext a rutiny duff copy.</i></p>
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Mutexy vs. kanály v&nbsp;roli synchronizační struktury</h2>
+
+<p>Mezi nejlepší (a možná taktéž nejvíce diskutované) vlastnosti programovacího
+jazyka Go patří podpora takzvaných <i>gorutin</i> zajišťujících souběžný běh
+více funkcí, přičemž počet gorutin není prakticky omezen (bez problémů lze mít
+souběžně spuštěno například 100000 gorutin). Ovšem pochopitelně je nutné
+v&nbsp;aplikaci, v&nbsp;níž dochází k&nbsp;souběhu, dokázat mezi gorutinami
+předávat data. K&nbsp;tomu slouží buď kanály (<i>channels</i>) nebo sdílená
+paměť. V&nbsp;případě použití sdílené paměti je nutné použít buď atomické
+hodnoty nebo <i>mutexy</i>, které umožňují uzamčení části kódu tak, že
+k&nbsp;němu bude mít v&nbsp;daný okamžik přístup jen jediná gorutina (a
+v&nbsp;této části kódu je realizován přístup ke sdílené paměti).</p>
+
+<p>Někdy se ovšem namísto mutexů používají pro zajištění exkluzivního přístupu
+taktéž kanály, které se ovšem nepoužijí pro přenosy dat mezi gorutinami, ale
+využívá se toho, že zápis i čtení z&nbsp;kanálů jsou blokující operace: čtení
+z&nbsp;prázdného kanálu vede k&nbsp;čekání na zápis jinou gorutinou a naopak
+zápis do plného kanálu vede k&nbsp;čekání na přečtení předchozí hodnoty jinou
+gorutinou.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Benchmark: dva způsoby synchronizace</h2>
+
+<p>Oba dva způsoby synchronizace mezi gorutinami se pravděpodobně budou lišit
+rychlostí operací. To si ostatně ověříme na benchmarku, jehož zdrojový kód je
+uveden pod tímto odstavcem. V&nbsp;tomto benchmarku je proveden souběžný (a
+většinou i paralelní) výpočet v&nbsp;několika subrutinách (souběžně může být
+spuštěno až 100 subrutin), které přistupují ke stejnému prvku
+<strong>i</strong> zvolené datové struktury. A právě při operaci přístupu je
+použit zámek (mutex nebo kanál) pro zajištění exkluzivity přístupu
+(alternativně lze použít i atomické typy):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "sync"
+        "testing"
+)
+&nbsp;
+type <strong>valueWithMutex</strong> struct {
+        i     int
+        mutex *sync.Mutex
+}
+&nbsp;
+type <strong>valueWithChannel</strong> struct {
+        i       int
+        channel chan struct{}
+}
+&nbsp;
+func (value *valueWithMutex) <strong>lock</strong>() {
+        value.mutex.Lock()
+}
+&nbsp;
+func (value *valueWithMutex) <strong>unlock</strong>() {
+        value.mutex.Unlock()
+}
+&nbsp;
+func (value *valueWithChannel) <strong>lock</strong>() {
+        <i>// blokující přečtení hodnoty z kanálu</i>
+        &lt;-value.channel
+}
+&nbsp;
+func (value *valueWithChannel) <strong>unlock</strong>() {
+        <i>// (blokující) zápis hodnoty do kanálu</i>
+        value.channel &lt;- struct{}{}
+}
+&nbsp;
+const MAX_ITEMS = 100
+const EXPECTED_SUM = MAX_ITEMS / 2 * (MAX_ITEMS - 1)
+&nbsp;
+func <strong>BenchmarkAccumulationMutexVariant</strong>(b *testing.B) {
+        var waitgroup sync.WaitGroup
+        value := &amp;valueWithMutex{
+                mutex: new(sync.Mutex),
+                i:     0,
+        }
+&nbsp;
+        for n := 0; n &lt; b.N; n++ {
+                value.i = 0
+                for i := 0; i &lt; MAX_ITEMS; i++ {
+                        waitgroup.Add(1)
+                        go func(i int) {
+                                value.lock()
+                                defer value.unlock()
+                                defer waitgroup.Done()
+                                value.i += i
+                        }(i)
+                }
+                waitgroup.Wait()
+                if value.i != EXPECTED_SUM {
+                        b.Fatal(value.i, EXPECTED_SUM)
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkAccumulationChannelVariant</strong>(b *testing.B) {
+        var waitgroup sync.WaitGroup
+        value := &amp;valueWithChannel{
+                channel: make(chan struct{}, 1),
+                i:       0,
+        }
+        <i>// ve výchozím stavu obsahuje kanál hodnotu</i>
+        value.channel &lt;- struct{}{}
+&nbsp;
+        for n := 0; n &lt; b.N; n++ {
+                value.i = 0
+&nbsp;
+                for i := 0; i &lt; MAX_ITEMS; i++ {
+                        waitgroup.Add(1)
+                        go func(i int) {
+                                value.lock()
+                                defer value.unlock()
+                                defer waitgroup.Done()
+                                value.i += i
+                        }(i)
+                }
+                waitgroup.Wait()
+                if value.i != EXPECTED_SUM {
+                        b.Fatal(value.i, EXPECTED_SUM)
+                }
+        }
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Výsledky benchmarku</h2>
+
+<p>Po spuštění benchmarku, jehož zdrojový kód byl uveden <a
+href="#k16">v&nbsp;předchozí kapitole</a>, získáme výsledky, které ukazují, že
+použití kanálu ve funkci synchronizační struktury není nejrychlejší způsob,
+protože klasické mutexy jsou přibližně dvakrát rychlejší:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=100000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: mutex-channel
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkAccumulationMutexVariant-8               100000             29044 ns/op
+BenchmarkAccumulationChannelVariant-8             100000             49570 ns/op
+PASS
+ok      mutex-channel   7.864s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to však neznamená, že by se kanály
+neměly používat! Je tomu právě naopak &ndash; pokud je vyžadováno předávání dat
+mezi gorutinami (a to prakticky vždycky je zapotřebí), zajistí kanály mnohem
+snadnější, bezpečnější a snadněji testovatelné operace, než by tomu bylo
+v&nbsp;případě využití sdílené paměti se zajištěním výhradního přístupu
+k&nbsp;ní</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Shrnutí</h2>
+
+<p>Zajímavé je, že všechny optimalizace, které jsme si v&nbsp;dnešním článku
+ukázali, vlastně nutí programátory k&nbsp;opuštění idiomatického způsobu zápisu
+zdrojového kódu, tedy takového způsobu, který je doporučován a používán
+v&nbsp;oficiální dokumentaci, v&nbsp;učebnicích, v&nbsp;kurzech atd. Tyto
+optimalizace má tedy (většinou) smysl provádět až ve chvíli, kdy je takový kód
+volán velmi často (ve vnitřní smyčce atd.) a zejména tehdy, pokud jsou oba
+možné způsoby zápisu programu (idiomatický a optimalizovaný) ověřeny
+benchmarkem. Teprve v&nbsp;případě, že benchmark ukáže výrazné zlepšení, je
+vhodné zdrojový kód změnit, ideálně s&nbsp;případnými poznámkami pro kolegy
+(nebo budoucí já), v&nbsp;nichž bude vysvětleno, z&nbsp;jakého důvodu je daná
+část zdrojového kódu zkonstruována neidiomatickým způsobem. Neboli: pravidla je
+vhodné dodržovat, ovšem odborník by měl vědět, kdy je vhodné je porušit.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/zakladni-optimalizace-v-go-aneb-pomahame-prekladaci/">minule</a>
+i dnes použitých demonstračních příkladů byly uloženy do nového Git repositáře,
+který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>maps/map1_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu UUID a hodnoty jsou časovými razítky</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map1_test.go</a></td></tr>
+<tr><td> 2</td><td>maps/map2_test.go</td><td>benchmark pro mapy, jejichž klíče jsou typu <strong>int</strong> a i hodnoty jsou stejného typu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map2_test.go</a></td></tr>
+<tr><td> 3</td><td>maps/map3_test.go</td><td>benchmark pro mapy, jejichž prvky jsou prázdnými strukturami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map3_test.go</a></td></tr>
+<tr><td> 4</td><td>maps/map4_test.go</td><td>benchmark pro mapy, jejichž klíče mají velikost 100 bajtů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go">https://github.com/tisnik/go-root/blob/master/article_98/maps/map4_test.go</a></td></tr>
+<tr><td> 5</td><td>maps/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.mod</a></td></tr>
+<tr><td> 6</td><td>maps/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/maps/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>map_or_slice/map_or_slice_test.go</td><td>benchmark porovnávající použití řezů a map pro podobné operace vyhledání hodnoty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/map_or_slice_test.go</a></td></tr>
+<tr><td> 8</td><td>map_or_slice/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.mod</a></td></tr>
+<tr><td> 9</td><td>map_or_slice/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/map_or_slice/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>sets/map_or_slice_test.go</td><td>benchmark: je lepší použít mapu nebo řez pro implementaci množiny?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go">https://github.com/tisnik/go-root/blob/master/article_98/sets/map_or_slice_test.go</a></td></tr>
+<tr><td>11</td><td>sets/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/sets/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>parameter_value_reference/main.go</td><td>předávání rozsáhlých parametrů: hlavní program</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/main.go</a></td></tr>
+<tr><td>13</td><td>parameter_value_reference/config.toml</td><td>konfigurační soubor, který je načítán programem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/config.toml</a></td></tr>
+<tr><td>14</td><td>parameter_value_reference/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.mod</a></td></tr>
+<tr><td>15</td><td>parameter_value_reference/go.sum</td><td>seznam všech přímých i nepřímých závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/go.sum</a></td></tr>
+<tr><td>16</td><td>parameter_value_reference/conf/config.go</td><td>definice datové struktury s&nbsp;načítanou konfigurací</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.go</a></td></tr>
+<tr><td>17</td><td>parameter_value_reference/conf/config.toml</td><td>konfigurační soubor, který je načítán benchmarkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config.toml</a></td></tr>
+<tr><td>18</td><td>parameter_value_reference/conf/config_benchmark_test.go</td><td>benchmark: předávání velké struktury hodnotou nebo referencí?</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go">https://github.com/tisnik/go-root/blob/master/article_98/parameter_value_reference/conf/config_benchmark_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>config_to_asm.go</td><td>soubor, jehož překlad do assembleru se použil v&nbsp;dnešním článku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go">https://github.com/tisnik/go-root/blob/master/article_98/config_to_asm.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>20</td><td>pass_by_value_1.go</td><td>předání řezu hodnotou, změna řezu uvnitř funkce</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_1.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_1.go</a></td></tr>
+<tr><td>21</td><td>pass_by_value_2.go</td><td>předání struktury obsahující řez hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_2.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_2.go</a></td></tr>
+<tr><td>22</td><td>pass_by_value_3.go</td><td>předání struktury obsahující pole hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_3.go">https://github.com/tisnik/go-root/blob/master/article_99/pass_by_value_3.go</a></td></tr>
+<tr><td>23</td><td>parameters_benchmark_1/parameters_test.go</td><td>benchmark: předání řezu a pole do funkce, která řez/pole modifikuje</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/parameters_test.go">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/parameters_test.go</a></td></tr>
+<tr><td>24</td><td>parameters_benchmark_1/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_1/go.mod</a></td></tr>
+<tr><td>25</td><td>parameters_benchmark_2/parameters_test.go</td><td>benchmark: předání řezu a pole do funkce, která vrací prvek z&nbsp;pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/parameters_test.go">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/parameters_test.go</a></td></tr>
+<tr><td>26</td><td>parameters_benchmark_2/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/parameters_benchmark_2/go.mod</a></td></tr>
+<tr><td>27</td><td>range-val-copy-1/range_val_copy_test.go</td><td>iterace přes všechny prvky pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/range_val_copy_test.go">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/range_val_copy_test.go</a></td></tr>
+<tr><td>28</td><td>range-val-copy-1/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-1/go.mod</a></td></tr>
+<tr><td>29</td><td>range-val-copy-2/range_val_copy_test.go</td><td>iterace přes všechny prvky mapy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/range_val_copy_test.go">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/range_val_copy_test.go</a></td></tr>
+<tr><td>30</td><td>range-val-copy-2/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/range-val-copy-2/go.mod</a></td></tr>
+<tr><td>31</td><td>mutex_channel/mutex_channel_test.go</td><td>synchronizace přes mutex nebo kanál</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/mutex_channel_test.go">https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/mutex_channel_test.go</a></td></tr>
+<tr><td>32</td><td>mutex_channel/go.mod</td><td>projektový soubor s&nbsp;definicí modulu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/go.mod">https://github.com/tisnik/go-root/blob/master/article_99/mutex_channel/go.mod</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>An Introduction to Benchmarking Your Go Programs<br />
+<a href="https://tutorialedge.net/golang/benchmarking-your-go-programs/">https://tutorialedge.net/golang/benchmarking-your-go-programs/</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>Performance at Scale: MinIO Pushes Past 1.4 terabits per second with 256 NVMe Drives<br />
+<a href="https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/">https://blog.min.io/performance-at-scale-minio-pushes-past-1-3-terabits-per-second-with-256-nvme-drives/</a>
+</li>
+
+<li>Benchmarking MinIO vs. AWS S3 for Apache Spark<br />
+<a href="https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/">https://blog.min.io/benchmarking-apache-spark-vs-aws-s3/</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>Highly extensible Go source code linter providing checks currently missing from other linters<br />
+<a href="https://github.com/go-critic/go-critic">https://github.com/go-critic/go-critic</a>
+</li>
+
+<li>Fast linters runner for Go<br />
+<a href="https://github.com/golangci/golangci-lint">https://github.com/golangci/golangci-lint</a>
+</li>
+
+<li>Checkers from the “performance” group<br />
+<a href="https://go-critic.com/overview#checkers-from-the-performance-group">https://go-critic.com/overview#checkers-from-the-performance-group</a>
+</li>
+
+<li>rangeValCopy<br />
+<a href="https://go-critic.com/overview#rangeValCopy-ref">https://go-critic.com/overview#rangeValCopy-ref</a>
+</li>
+
+<li>C vs Rust vs Go: performance analysis<br />
+<a href="https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c">https://medium.com/@marek.michalik/c-vs-rust-vs-go-performance-analysis-945ab749056c</a>
+</li>
+
+<li>Golang Performance Comparison | Why is GO Fast?<br />
+<a href="https://www.golinuxcloud.com/golang-performance/">https://www.golinuxcloud.com/golang-performance/</a>
+</li>
+
+<li>Go mutex vs channels benchmark<br />
+<a href="https://github.com/danil/go_mutex_vs_channels_benchmark">https://github.com/danil/go_mutex_vs_channels_benchmark</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
