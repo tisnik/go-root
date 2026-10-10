@@ -1,0 +1,2196 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Knihovny s implementací generických datových typů pro programovací jazyk Go (2)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Knihovny s implementací generických datových typů pro programovací jazyk Go (2)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na předchozí článek o knihovně Go18DS dnes navážeme. Popíšeme si další dva velmi důležité kontejnery, konkrétně stromy (několika typů) a binární haldu. Ovšem nezapomeneme ani na benchmarky, které ověří vlastnosti jednotlivých kontejnerů.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Knihovny s&nbsp;implementací generických datových typů pro programovací jazyk Go (2)</a></p>
+<p><a href="#k02">2. Čtyři varianty stromů v&nbsp;knihovně Go18DS</a></p>
+<p><a href="#k03">3. Přidání prvků do stromu, tisk struktury stromu</a></p>
+<p><a href="#k04">4. B-stromy</a></p>
+<p><a href="#k05">5. Průchod všemi uzly stromu</a></p>
+<p><a href="#k06">6. Přečtení všech prvků stromu</a></p>
+<p><a href="#k07">7. Přečtení zvoleného prvku stromu</a></p>
+<p><a href="#k08">8. Binární halda</a></p>
+<p><a href="#k09">9. Vložení prvků na haldu v&nbsp;jiném pořadí</a></p>
+<p><a href="#k10">10. Průchod prvky uloženými na binární haldě</a></p>
+<p><a href="#k11">11. Časová složitost operací se seznamy</a></p>
+<p><a href="#k12">12. Benchmark &ndash; operace se seznamy</a></p>
+<p><a href="#k13">13. Výsledky benchmarku</a></p>
+<p><a href="#k14">14. Časová složitost operací se stromy</a></p>
+<p><a href="#k15">15. Benchmark &ndash; operace se stromy</a></p>
+<p><a href="#k16">16. Výsledky benchmarku</a></p>
+<p><a href="#k17">17. Obsah navazujícího článku</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Knihovny s&nbsp;implementací generických datových typů pro programovací jazyk Go (2)</h2>
+
+<p>Na <a
+href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/">předchozí
+článek</a> o knihovně <i>Go18DS</i>, která do Go přináší různé generické datové
+typy/kontejnery, dnes navážeme. Popíšeme si další dva velmi důležité
+kontejnery, konkrétně stromy (několika typů) a taktéž binární haldu (<i>binary
+heap</i>). Ovšem nezapomeneme ani na benchmarky, které ověří vlastnosti
+jednotlivých kontejnerů (prozatím si ukážeme benchmarky seznamů a stromů):</p>
+
+<table>
+<tr><th>Kontejner</th><th>Překlad</th></tr>
+<tr><td>List</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k06">seznam</a></td></tr>
+<tr><td>Set</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k17">množina</a></td></tr>
+<tr><td>Stack</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k14">zásobník</a></td></tr>
+<tr><td>Tree</td><td><a href="#k02">strom</a></td></tr>
+<tr><td>BinaryHeap</td><td><a href="#08">binární halda</a></td></tr>
+<tr><td>Map</td><td>mapa</td></tr>
+</table>
+
+<p>Ovšem vzhledem k&nbsp;tomu, že neexistuje taková implementace těchto
+datových struktur v&nbsp;podobě, v&nbsp;níž by všechny algoritmy byly
+realizovány s&nbsp;optimální složitostí, je každá výše zmíněná datová struktura
+realizována (implementována) hned několikrát, přičemž u každé implementace jsou
+některé operace optimální a jiné nikoli. Liší se i paměťová náročnost:</p>
+
+<table>
+<tr><th>Rozhraní</th><th>Implementace</th></tr>
+<tr><td>List</td><td>ArrayList SinglyLinkedList DoublyLinkedList</td></tr>
+<tr><td>Set</td><td>HashSet TreeSet LinkedHashSet</td></tr>
+<tr><td>Stack</td><td>LinkedListStack ArrayStack</td></tr>
+<tr><td>Tree</td><td>RedBlackTree AVLTree BTree BinaryHeap</td></tr>
+<tr><td>Map</td><td>HashMap TreeMap LinkedHashMap HashBidiMap TreeBidiMap</td></tr>
+</table>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Čtyři varianty stromů v&nbsp;knihovně Go18DS</h2>
+
+<p>V&nbsp;knihovně <i>Go18DS</i> nalezneme celkem čtyři různé implementace
+stromových datových struktur, přičemž tři z&nbsp;těchto struktur zařazují
+(přidávají) prvky do stromu na základě jejich váhy tak, aby se při průchodu
+stromem prvky vracely seřazené (podle váhy) a navíc bylo umožněno efektivní
+vyhledávání prvku ve stromu, ideálně se složitostí O(log N) s&nbsp;různým
+základem logaritmu. Poněkud odlišná je binární halda (<i>binary heap</i>)
+popsaná v&nbsp;samostatné kapitole:</p>
+
+<table>
+<tr><th>#</th><th>Datový typ</th><th>Jméno struktury</th><th>Popis struktury</th></tr>
+<tr><td>1</td><td>BTree</td><td>B-strom</td><td><a href="https://cs.wikipedia.org/wiki/B-strom">https://cs.wikipedia.org/wiki/B-strom</a></td></tr>
+<tr><td>2</td><td>RedBlackTree</td><td>červeno-černý strom</td><td><a href="https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom">https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom</a></td></tr>
+<tr><td>3</td><td>AVLTree</td><td>AVL strom</td><td><a href="https://cs.wikipedia.org/wiki/AVL-strom">https://cs.wikipedia.org/wiki/AVL-strom</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>4</td><td>BinaryHeap</td><td>binární halda</td><td><a href="https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda">https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda</a></td></tr>
+</table>
+
+<p>Tyto implementace splňují (<i>satisfy</i>) rozhraní
+<strong>Tree</strong>:</p>
+
+<pre>
+type <strong>Tree[T comparable]</strong> interface {
+    containers.Container[T]
+}
+</pre>
+
+<p>A současně splňují i nám již dobře známé rozhraní
+<strong>Container</strong>:</p>
+
+<pre>
+type <strong>Container[T any]</strong> interface {
+    Empty() bool
+    Size() int
+    Clear()
+    Values() []T
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: kromě toho je zajištěn přístup ke
+zvolenému prvku metodou <strong>Get</strong>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Přidání prvků do stromu, tisk struktury stromu</h2>
+
+<p>AVL-stromy a červeno-černé stromy se vytváří s&nbsp;využitím několika typů
+konstruktorů, jejichž jména určují, jak vlastně budou reprezentovány váhy
+jednotlivých uzlů. Poměrně typické je využití celočíselných vah. Takové stromy
+se vytváří konstruktorem <strong>NewWithIntComparator</strong>. Stromy jako
+takové jsou generickou datovou strukturou, takže musíme specifikovat i typ
+ukládaných hodnot (zde konkrétně se jedná o řetězce):</p>
+
+<pre>
+tree := <strong>treeImpl.NewWithIntComparator[string]()</strong>
+</pre>
+
+<p>kde <strong>treeImpl</strong> je buď balíček implementující AVL-stromy nebo
+červeno-černé stromy.</p>
+
+<p>Základní operací, kterou podporují všechny implementace stromů
+v&nbsp;knihovně <i>Go18DS</i>, je přidání nového prvku či prvků do stromu.
+K&nbsp;tomuto účelu slouží metoda <strong>Put</strong>. Prvním parametrem této
+metody je váha uzlu, druhým parametrem pak ukládaná hodnota (či hodnoty,
+protože lze uložit více hodnot současně):</p>
+
+<pre>
+<strong>tree.Put(1, "G")</strong>
+</pre>
+
+<p>A konečně pro zobrazení struktury vytvořeného stromu lze použít standardní
+funkci <strong>fmt.Println</strong>:</p>
+
+<pre>
+<strong>fmt.Println(tree)</strong>
+</pre>
+
+<p>Podívejme se nyní na postupnou konstrukci AVL-stromu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/avltree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(1, "G")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(2, "a")
+        tree.Put(3, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(4, "a")
+        tree.Put(5, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(6, "a")
+        tree.Put(7, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(8, "a")
+        tree.Put(9, "b")
+        fmt.Println(tree)
+}
+</pre>
+
+<p>Prakticky naprosto stejným způsobem je možné vytvořit červeno-černý strom;
+liší se jen jméno importovaného balíčku:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/redblacktree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(1, "G")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(2, "a")
+        tree.Put(3, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(4, "a")
+        tree.Put(5, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(6, "a")
+        tree.Put(7, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(8, "a")
+        tree.Put(9, "b")
+        fmt.Println(tree)
+}
+</pre>
+
+<p>Po spuštění prvního příkladu získáme postupné tvary AVL-stromu:</p>
+
+<pre>
+AVLTree
+&nbsp;
+AVLTree
+└── 1
+&nbsp;
+AVLTree
+│   ┌── 3
+└── 2
+    └── 1
+&nbsp;
+AVLTree
+│       ┌── 5
+│   ┌── 4
+│   │   └── 3
+└── 2
+    └── 1
+&nbsp;
+AVLTree
+│       ┌── 7
+│   ┌── 6
+│   │   └── 5
+└── 4
+    │   ┌── 3
+    └── 2
+        └── 1
+&nbsp;
+AVLTree
+│           ┌── 9
+│       ┌── 8
+│       │   └── 7
+│   ┌── 6
+│   │   └── 5
+└── 4
+    │   ┌── 3
+    └── 2
+        └── 1
+</pre>
+
+<p>Porovnejme tyto výsledky s&nbsp;červeno-černým stromem, jenž je budován
+odlišně:</p>
+
+<pre>
+RedBlackTree
+&nbsp;
+RedBlackTree
+└── 1
+&nbsp;
+RedBlackTree
+│   ┌── 3
+└── 2
+    └── 1
+&nbsp;
+RedBlackTree
+│       ┌── 5
+│   ┌── 4
+│   │   └── 3
+└── 2
+    └── 1
+&nbsp;
+RedBlackTree
+│           ┌── 7
+│       ┌── 6
+│       │   └── 5
+│   ┌── 4
+│   │   └── 3
+└── 2
+    └── 1
+&nbsp;
+RedBlackTree
+│           ┌── 9
+│       ┌── 8
+│       │   └── 7
+│   ┌── 6
+│   │   └── 5
+└── 4
+    │   ┌── 3
+    └── 2
+        └── 1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že AVL-strom je více
+vyvážený, zejména v&nbsp;páté variantě se sedmi prvky.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. B-stromy</h2>
+
+<p>V&nbsp;knihovně <i>Go18DS</i> nalezneme i podporu pro známou datovou
+strukturu B-strom. Při konstrukci tohoto typu stromu je nutné specifikovat jeho
+řád (<i>order</i>), což znamená, že se konstruktor B-stromu odlišuje od
+konstruktoru AVL-stromů i červeno-černých stromů:</p>
+
+<pre>
+tree := treeImpl.NewWithIntComparator[string](3)
+</pre>
+
+<p>I strukturu B-stromu lze vypsat na terminál, ovšem ne v&nbsp;tak názorné
+podobě, jako je tomu u dalších dvou typů stromů:</p>
+
+<pre>
+<strong>fmt.Println(tree)</strong>
+</pre>
+
+<p>V&nbsp;následujícím demonstračním příkladu je zkonstruován B-strom řádu
+3:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](<strong>3</strong>)
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(1, "G")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(2, "a")
+        tree.Put(3, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(4, "a")
+        tree.Put(5, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(6, "a")
+        tree.Put(7, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(8, "a")
+        tree.Put(9, "b")
+        fmt.Println(tree)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+BTree
+&nbsp;
+BTree
+1
+&nbsp;
+BTree
+    1
+2
+    3
+&nbsp;
+BTree
+    1
+2
+    3
+4
+    5
+&nbsp;
+BTree
+        1
+    2
+        3
+4
+        5
+    6
+        7
+&nbsp;
+BTree
+        1
+    2
+        3
+4
+        5
+    6
+        7
+    8
+        9
+</pre>
+
+<p>Nyní se pokusíme zkonstruovat B-strom řádu 4:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](<strong>4</strong>)
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(1, "G")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(2, "a")
+        tree.Put(3, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(4, "a")
+        tree.Put(5, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(6, "a")
+        tree.Put(7, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(8, "a")
+        tree.Put(9, "b")
+        fmt.Println(tree)
+}
+</pre>
+
+<p>Výsledkem bude mnohem plošší strom:</p>
+
+<pre>
+BTree
+&nbsp;
+BTree
+1
+&nbsp;
+BTree
+1
+2
+3
+&nbsp;
+BTree
+    1
+2
+    3
+    4
+    5
+&nbsp;
+BTree
+    1
+2
+    3
+4
+    5
+    6
+    7
+&nbsp;
+BTree
+    1
+2
+    3
+4
+    5
+6
+    7
+    8
+    9
+</pre>
+
+<p>A konečně se pokusme zkonstruovat B-strom řádu 20:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](<strong>20</strong>)
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(1, "G")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(2, "a")
+        tree.Put(3, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(4, "a")
+        tree.Put(5, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(6, "a")
+        tree.Put(7, "b")
+        fmt.Println(tree)
+&nbsp;
+        tree.Put(8, "a")
+        tree.Put(9, "b")
+        fmt.Println(tree)
+}
+</pre>
+
+<p>B-strom je v&nbsp;tomto případě de facto zploštěn do podoby seznamu:</p>
+
+<pre>
+BTree
+&nbsp;
+BTree
+1
+&nbsp;
+BTree
+1
+2
+3
+&nbsp;
+BTree
+1
+2
+3
+4
+5
+&nbsp;
+BTree
+1
+2
+3
+4
+5
+6
+7
+&nbsp;
+BTree
+1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Průchod všemi uzly stromu</h2>
+
+<p>Všechny implementace stromů podporují průchod prvky stromu s&nbsp;využitím
+<i>iterátoru</i>, což nám umožňuje velmi snadno realizovat průchod založený na
+následující programové smyčce:</p>
+
+<pre>
+it := tree.Iterator()
+for it.Next() {
+        value := it.Value()
+        fmt.Printf("%3s \t %T\n", value, value)
+}
+</pre>
+
+<p>Podívejme se na použití této smyčky v&nbsp;případě AVL-stromů</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/avltree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree)
+&nbsp;
+        it := tree.Iterator()
+        for it.Next() {
+                value := it.Value()
+                fmt.Printf("%3s \t %T\n", value, value)
+        }
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+AVLTree
+│           ┌── 9
+│       ┌── 8
+│       │   └── 7
+│   ┌── 6
+│   │   │   ┌── 5
+│   │   └── 4
+└── 3
+    └── 2
+        └── 1
+&nbsp;
+  a      string
+  b      string
+  c      string
+  d      string
+  e      string
+  f      string
+  g      string
+  h      string
+  i      string
+</pre>
+
+<p>Naprosto stejným způsobem můžeme realizovat průchod červeno-černým
+stromem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/redblacktree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree)
+&nbsp;
+        it := tree.Iterator()
+        for it.Next() {
+                value := it.Value()
+                fmt.Printf("%3s \t %T\n", value, value)
+        }
+&nbsp;
+}
+</pre>
+
+<p>Strom je sice interně odlišný, ale prvky jsou procházeny ve stejném
+pořadí:</p>
+
+<pre>
+│       ┌── 9
+│   ┌── 8
+│   │   │   ┌── 7
+│   │   └── 6
+│   │       └── 5
+└── 4
+    │   ┌── 3
+    └── 2
+        └── 1
+&nbsp;
+  a      string
+  b      string
+  c      string
+  d      string
+  e      string
+  f      string
+  g      string
+  h      string
+  i      string
+</pre>
+
+<p>A konečně se podívejme na průchod B-stromem:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](3)
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree)
+&nbsp;
+        it := tree.Iterator()
+        for it.Next() {
+                value := it.Value()
+                fmt.Printf("%3s \t %T\n", value, value)
+        }
+&nbsp;
+}
+</pre>
+
+<p>S&nbsp;výsledkem se stejným pořadím prvků:</p>
+
+<pre>
+BTree
+        1
+    2
+        3
+4
+        5
+    6
+        7
+    8
+        9
+&nbsp;
+  a      string
+  b      string
+  c      string
+  d      string
+  e      string
+  f      string
+  g      string
+  h      string
+  i      string
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Přečtení všech prvků stromu</h2>
+
+<p>Pro přečtení všech prvků uložených ve stromu (libovolného typu) se používá
+metoda <strong>Values</strong>, která je ostatně společná pro všechny
+kontejnery (<i>containers</i>).</p>
+
+<p>Přečtení všech prvků uložených do AVL-stromu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/avltree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Values())
+}
+</pre>
+
+<p>Výsledkem je sekvence:</p>
+
+<pre>
+[a b c d e f g h i]
+</pre>
+
+<p>Přečtení všech prvků uložených do červeno-černého stromu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/redblacktree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Values())
+}
+</pre>
+
+<p>Výsledkem je naprosto stejná sekvence:</p>
+
+<pre>
+[a b c d e f g h i]
+</pre>
+
+<p>A konečně přečtení všech prvků z&nbsp;B-stromu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](3)
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Values())
+}
+</pre>
+
+<p>Výsledkem je opět naprosto stejná sekvence:</p>
+
+<pre>
+[a b c d e f g h i]
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Přečtení zvoleného prvku stromu</h2>
+
+<p>Mnohdy ovšem nepotřebujeme přečíst všechny prvky uložené do stromu nebo
+procházet všemi těmito prvky. Některé algoritmy vyžadují získání prvku na
+základě jeho klíče (nebo indexu), což konkrétně v&nbsp;našich demonstračních
+příkladech znamená použití celočíselné váhy/indexu. K&nbsp;tomu slouží metoda
+<strong>Get</strong>, která navíc vrací i příznak, zda prvek existuje či nikoli
+(už tuto metodu známe z&nbsp;předchozích dvou článků).</p>
+
+<p>První příklad opět využívá AVL-strom:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/avltree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Get(0))
+        fmt.Println(tree.Get(1))
+        fmt.Println(tree.Get(9))
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+ false
+a true
+i true
+</pre>
+
+<p>Stejný příklad, ovšem založený na červeno-černých stromech:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/redblacktree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string]()
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Get(0))
+        fmt.Println(tree.Get(1))
+        fmt.Println(tree.Get(9))
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+ false
+a true
+i true
+</pre>
+
+<p>A konečně prakticky totožný příklad, ovšem využívající B-stromy:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        treeImpl "github.com/daichi-m/go18ds/trees/btree"
+)
+&nbsp;
+func <strong>main</strong>() {
+        tree := treeImpl.NewWithIntComparator[string](3)
+&nbsp;
+        tree.Put(1, "a")
+        tree.Put(9, "i")
+        tree.Put(2, "b")
+        tree.Put(8, "h")
+        tree.Put(3, "c")
+        tree.Put(7, "g")
+        tree.Put(4, "d")
+        tree.Put(6, "f")
+        tree.Put(5, "e")
+&nbsp;
+        fmt.Println(tree.Get(0))
+        fmt.Println(tree.Get(1))
+        fmt.Println(tree.Get(9))
+}
+</pre>
+
+<p>Opět získáme totožný výsledek:</p>
+
+<pre>
+ false
+a true
+i true
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Binární halda</h2>
+
+<p>Další datovou strukturou je takzvaná <i>binární halda</i> neboli <i>binary
+heap</i>. Interně je binární halda, jakožto konkrétní implementace
+strukturovaného datového typu <i>haldy</i>, reprezentována speciálně uloženým
+binárním stromem, na nějž jsou vztažena další dvě omezení:</p>
+
+<ol>
+
+<li>Až na poslední úroveň musí být binární strom vyvážený. Poslední úroveň může
+být buď kompletní (potom je pochopitelně celý binární strom vyvážený) nebo
+nekompletní. V&nbsp;případě, že je poslední úroveň nekompletní, naplňují se
+uzly na této úrovni zleva doprava.</li>
+
+<li>Hodnota uložená v&nbsp;každém uzlu takového binárního stromu musí být
+<strong>větší nebo rovna</strong> hodnotám uloženým v&nbsp;potomcích uzlu.
+Naproti tomu tato vlastnost nijak přesněji nespecifikuje, jak (a zda vůbec)
+musí být potomci daného uzlu uspořádány. Pokud například oba potomky nějakého
+uzlu prohodíme, jedná se o zcela korektní operaci, která nijak toto pravidlo
+(omezení) neporuší.</li>
+
+</ol>
+
+<p>Samozřejmě platí, že podmínka <strong>větší nebo rovna</strong> je
+volitelná, resp.&nbsp;přesněji řečeno si programátor sám může zvolit funkci,
+která tuto podmínku testuje.</p>
+
+<p><div class="rs-tip-major">Poznámka: halda jakožto datová struktura musí
+splňovat takzvanou <i>vlastnost haldy</i>: pokud je B potomek A, pak platí x(A)
+&gt;= x(B). To znamená, že v&nbsp;kořenu stromu je vždy umístěn prvek
+s&nbsp;nejvyšším klíčem.</div></p>
+
+<p>Nejjednodušší způsob použití haldy je založen na její konstrukci následované
+operacemi <strong>Push</strong> pro vložení prvků na haldu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        heapImpl "github.com/daichi-m/go18ds/trees/binaryheap"
+)
+&nbsp;
+func <strong>main</strong>() {
+        heap := heapImpl.NewWithIntComparator()
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(1)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(2)
+        heap.Push(3)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(4)
+        heap.Push(5)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(6)
+        heap.Push(7)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(8)
+        heap.Push(9)
+        fmt.Println(heap)
+}
+</pre>
+
+<p>Výsledek po spuštění ukazuje způsob uložení prvků z&nbsp;pohledu
+programátora:</p>
+
+<pre>
+BinaryHeap
+&nbsp;
+BinaryHeap
+1
+BinaryHeap
+1, 2, 3
+BinaryHeap
+1, 2, 3, 4, 5
+BinaryHeap
+1, 2, 3, 4, 5, 6, 7
+BinaryHeap
+1, 2, 3, 4, 5, 6, 7, 8, 9
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Vložení prvků na haldu v&nbsp;jiném pořadí</h2>
+
+<p>Pokusme se nyní na haldu uložit prvky v&nbsp;jiném pořadí. Přitom je nutné
+mít na paměti, že uspořádání prvků je založeno přímo na jejich hodnotě, na
+rozdíl od stromů, do nichž se ukládaly dvojice klíč(váha):hodnota:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        heapImpl "github.com/daichi-m/go18ds/trees/binaryheap"
+)
+&nbsp;
+func <strong>main</strong>() {
+        heap := heapImpl.NewWithIntComparator()
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(9)
+        heap.Push(8)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(7)
+        heap.Push(6)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(5)
+        heap.Push(4)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(3)
+        heap.Push(2)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(1)
+        fmt.Println(heap)
+}
+</pre>
+
+<p>Povšimněte si, že nyní budou výsledky skutečně odlišné v&nbsp;porovnáním
+s&nbsp;příkladem <a href="#k08">z&nbsp;předchozí kapitoly</a>:</p>
+
+<pre>
+BinaryHeap
+&nbsp;
+BinaryHeap
+8, 9
+BinaryHeap
+6, 7, 8, 9
+BinaryHeap
+4, 6, 5, 9, 7, 8
+BinaryHeap
+2, 3, 4, 6, 7, 8, 5, 9
+BinaryHeap
+1, 2, 4, 3, 7, 8, 5, 9, 6
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Průchod prvky uloženými na binární haldě</h2>
+
+<p>Vzhledem k&nbsp;tomu, že i binární halda splňuje rozhraní <i>Container</i>,
+můžeme snadno realizovat průchod jejími prvky, a to následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        heapImpl "github.com/daichi-m/go18ds/trees/binaryheap"
+)
+&nbsp;
+func <strong>main</strong>() {
+        heap := heapImpl.NewWithIntComparator()
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(9)
+        heap.Push(8)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(7)
+        heap.Push(6)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(5)
+        heap.Push(4)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(3)
+        heap.Push(2)
+        fmt.Println(heap)
+&nbsp;
+        heap.Push(1)
+        fmt.Println(heap)
+&nbsp;
+        it := heap.Iterator()
+        for it.Next() {
+                value := it.Value()
+                fmt.Printf("%3d \t %T\n", value, value)
+        }
+}
+</pre>
+
+<p>S&nbsp;těmito výsledky:</p>
+
+<pre>
+BinaryHeap
+&nbsp;
+BinaryHeap
+8, 9
+BinaryHeap
+6, 7, 8, 9
+BinaryHeap
+4, 6, 5, 9, 7, 8
+BinaryHeap
+2, 3, 4, 6, 7, 8, 5, 9
+BinaryHeap
+1, 2, 4, 3, 7, 8, 5, 9, 6
+  1      int
+  2      int
+  4      int
+  3      int
+  7      int
+  8      int
+  5      int
+  9      int
+  6      int
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Časová složitost operací se seznamy</h2>
+
+<p>Víme již, že seznamy popsané rozhraním nazvaným <strong>List</strong>
+existují v&nbsp;knihovně Go18DS ve třech implementacích:</p>
+
+<ol>
+<li><strong>ArrayList</strong>: seznam postavený nad polem, které se může realokovat, pokud počet prvků překročí kapacitu pole</li>
+<li><strong>SinglyLinkedList</strong>: lineárně jednosměrně vázaný seznam</li>
+<li><strong>DoublyLinkedList</strong>: obousměrně vázaný seznam</li>
+</ol>
+
+<p>Jednotlivé implementace seznamů se od sebe pochopitelně liší jak svoji
+vnitřní strukturou, tak i odlišnou časovou složitostí některých operací.
+Teoretické rozdíly v&nbsp;časové složitosti jsou naznačeny v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th>Implementace</th><th>Přístup k&nbsp;prvku</th><th>Insert</th><th>Append</th><th>Iterace vpřed</th><th>Iterace vzad</th></tr>
+<tr><td>ArrayList</td><td>O(1)</td><td>O(n)</td><td>O(1)-O(n)</td><td>O(1)</td><td>O(1)</td></tr>
+<tr><td>SinglyLinkedList</td><td>O(n)</td><td>O(1)</td><td>O(n)</td><td>O(1)</td><td>O(n)</td></tr>
+<tr><td>DoublyLinkedList</td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>O(1)</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: operace pro smazání prvku budou mít
+podobné složitosti jako operace typu <strong>Insert</strong> a
+<strong>Append</strong>.</div></p>
+
+<p>Jaké jsou skutečné nároky jednotlivých operací v&nbsp;reálných časových
+jednotkách zjistíme na základě benchmarku zmíněného <a
+href="#k12">v&nbsp;navazující kapitole</a>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Benchmark &ndash; operace se seznamy</h2>
+
+<p>Pro zjištění délky trvání základních operací se seznamy realizovanými různým
+způsobem byl vytvořen následující benchmark, který se spouští s&nbsp;využitím
+standardních nástrojů programovacího jazyka Go &ndash; <strong>go
+test</strong>. Přitom je možné specifikovat, kolikrát se má daná část kódu
+spustit; tato hodnota je dostupná přes strukturu <strong>testing.B</strong>
+v&nbsp;prvku (atributu) <strong>N</strong> (ostatně to uvidíme dále):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+&nbsp;
+        "github.com/daichi-m/go18ds/lists"
+        "github.com/daichi-m/go18ds/lists/arraylist"
+        "github.com/daichi-m/go18ds/lists/doublylinkedlist"
+        "github.com/daichi-m/go18ds/lists/singlylinkedlist"
+)
+&nbsp;
+func <strong>BenchmarkArrayListInsert0Operation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(0, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListInsert0Operation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(0, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListInsert0Operation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(0, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkArrayListInsertMiddleOperation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(l.Size()/2, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListInsertMiddleOperation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(l.Size()/2, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListInsertMiddleOperation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Insert(l.Size()/2, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkArrayListAppendOperation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Add(i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListAppendOperation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Add(i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListAppendOperation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        for i := 0; i &lt; b.N; i++ {
+                l.Add(i)
+        }
+}
+&nbsp;
+func <strong>fillInList</strong>(l lists.List[int], n int) {
+        for i := 0; i &lt; n; i++ {
+                l.Add(i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkArrayListRemoveFirstOperation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(0)
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListRemoveFirstOperation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(0)
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListRemoveFirstOperation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(0)
+        }
+}
+&nbsp;
+func <strong>BenchmarkArrayListRemoveLastOperation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(l.Size() - 1)
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListRemoveLastOperation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(l.Size() - 1)
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListRemoveLastOperation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                l.Remove(l.Size() - 1)
+        }
+}
+&nbsp;
+func <strong>BenchmarkArrayListGetOperation</strong>(b *testing.B) {
+        l := arraylist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, exist := l.Get(i)
+                if !exist {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkSinglyLinkedListGetOperation</strong>(b *testing.B) {
+        l := singlylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, exist := l.Get(i)
+                if !exist {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkDoublyLinkedListGetOperation</strong>(b *testing.B) {
+        l := doublylinkedlist.New[int]()
+        fillInList(l, b.N)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, exist := l.Get(i)
+                if !exist {
+                        b.Fail()
+                }
+        }
+}
+</pre>
+
+<p>Implementováno je tedy měření doby trvání těchto operací:</p>
+
+<ol>
+<li>Vložení prvku na začátek seznamu</li>
+<li>Vložení prvku doprostřed seznamu</li>
+<li>Přidání prvku za konec seznamu</li>
+<li>Odstranění prvního prvku ze seznamu</li>
+<li>Odstranění posledního prvku ze seznamu</li>
+<li>Postupné přečtení všech prvků ze seznamu</li>
+</ol>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Výsledky benchmarku</h2>
+
+<p>Benchmark, jehož zdrojový kód byl uveden <a href="#k12">v&nbsp;předchozí
+kapitole</a>, budeme postupně spouštět se zvyšující se hodnotou
+<strong>N</strong>, takže uvidíme, jak jsou operace náročné pro malé seznamy a
+jak se jejich časová náročnost zvětší společně se zvyšujícím se počtem prvků
+v&nbsp;seznamech.</p>
+
+<p>Začneme se seznamy o maximální délce jednoho prvku:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=1x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkArrayListInsert0Operation-8                           1               972.0 ns/op
+BenchmarkSinglyLinkedListInsert0Operation-8                    1               666.0 ns/op
+BenchmarkDoublyLinkedListInsert0Operation-8                    1               522.0 ns/op
+BenchmarkArrayListInsertMiddleOperation-8                      1               664.0 ns/op
+BenchmarkSinglyLinkedListInsertMiddleOperation-8               1               485.0 ns/op
+BenchmarkDoublyLinkedListInsertMiddleOperation-8               1               458.0 ns/op
+BenchmarkArrayListAppendOperation-8                            1               680.0 ns/op
+BenchmarkSinglyLinkedListAppendOperation-8                     1               500.0 ns/op
+BenchmarkDoublyLinkedListAppendOperation-8                     1               427.0 ns/op
+BenchmarkArrayListRemoveFirstOperation-8                       1               772.0 ns/op
+BenchmarkSinglyLinkedListRemoveFirstOperation-8                1               887.0 ns/op
+BenchmarkDoublyLinkedListRemoveFirstOperation-8                1              1121 ns/op
+BenchmarkArrayListRemoveLastOperation-8                        1               820.0 ns/op
+BenchmarkSinglyLinkedListRemoveLastOperation-8                 1               846.0 ns/op
+BenchmarkDoublyLinkedListRemoveLastOperation-8                 1              1011 ns/op
+BenchmarkArrayListGetOperation-8                               1              1170 ns/op
+BenchmarkSinglyLinkedListGetOperation-8                        1               911.0 ns/op
+BenchmarkDoublyLinkedListGetOperation-8                        1               925.0 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: všechny operace prozatím trvají řádově
+stejnou dobu a mezi jednotlivými implementacemi seznamů tak nejsou podstatné
+rozdíly.</div></p>
+
+<p>Nyní zvýšíme počet operací (a tím pádem i prvků v&nbsp;seznamu) na
+tisíc:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=1000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkArrayListInsert0Operation-8                        1000                50.74 ns/op
+BenchmarkSinglyLinkedListInsert0Operation-8                 1000                47.76 ns/op
+BenchmarkDoublyLinkedListInsert0Operation-8                 1000                49.05 ns/op
+BenchmarkArrayListInsertMiddleOperation-8                   1000                38.22 ns/op
+BenchmarkSinglyLinkedListInsertMiddleOperation-8            1000               301.3 ns/op
+BenchmarkDoublyLinkedListInsertMiddleOperation-8            1000               314.8 ns/op
+BenchmarkArrayListAppendOperation-8                         1000                15.46 ns/op
+BenchmarkSinglyLinkedListAppendOperation-8                  1000                31.87 ns/op
+BenchmarkDoublyLinkedListAppendOperation-8                  1000                28.25 ns/op
+BenchmarkArrayListRemoveFirstOperation-8                    1000                66.13 ns/op
+BenchmarkSinglyLinkedListRemoveFirstOperation-8             1000                45.42 ns/op
+BenchmarkDoublyLinkedListRemoveFirstOperation-8             1000                50.19 ns/op
+BenchmarkArrayListRemoveLastOperation-8                     1000                35.48 ns/op
+BenchmarkSinglyLinkedListRemoveLastOperation-8              1000               568.3 ns/op
+BenchmarkDoublyLinkedListRemoveLastOperation-8              1000                39.47 ns/op
+BenchmarkArrayListGetOperation-8                            1000                21.56 ns/op
+BenchmarkSinglyLinkedListGetOperation-8                     1000               578.4 ns/op
+BenchmarkDoublyLinkedListGetOperation-8                     1000               278.6 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde se již začíná ukazovat relativní
+složitost některých operací, ovšem počet prvků je stále velmi malý na to, aby
+bylo možné rozhodnout, kdy jaké typy seznamů použít.</div></p>
+
+<p>Zvyšme tedy počet operací na 10000:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=10000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkArrayListInsert0Operation-8                       10000               574.8 ns/op
+BenchmarkSinglyLinkedListInsert0Operation-8                10000                27.98 ns/op
+BenchmarkDoublyLinkedListInsert0Operation-8                10000                30.98 ns/op
+BenchmarkArrayListInsertMiddleOperation-8                  10000               193.3 ns/op
+BenchmarkSinglyLinkedListInsertMiddleOperation-8           10000              3444 ns/op
+BenchmarkDoublyLinkedListInsertMiddleOperation-8           10000              4593 ns/op
+BenchmarkArrayListAppendOperation-8                        10000                10.63 ns/op
+BenchmarkSinglyLinkedListAppendOperation-8                 10000                21.70 ns/op
+BenchmarkDoublyLinkedListAppendOperation-8                 10000                30.95 ns/op
+BenchmarkArrayListRemoveFirstOperation-8                   10000               541.4 ns/op
+BenchmarkSinglyLinkedListRemoveFirstOperation-8            10000                39.63 ns/op
+BenchmarkDoublyLinkedListRemoveFirstOperation-8            10000                41.80 ns/op
+BenchmarkArrayListRemoveLastOperation-8                    10000                28.46 ns/op
+BenchmarkSinglyLinkedListRemoveLastOperation-8             10000              5606 ns/op
+BenchmarkDoublyLinkedListRemoveLastOperation-8             10000                45.79 ns/op
+BenchmarkArrayListGetOperation-8                           10000                24.72 ns/op
+BenchmarkSinglyLinkedListGetOperation-8                    10000              4855 ns/op
+BenchmarkDoublyLinkedListGetOperation-8                    10000              2758 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: podle očekávání je vkládání a odebírání
+prvků ze seznamu založeného na poli pomalejší, než u dalších dvou typů seznamů.
+Na druhou stranu přístup k&nbsp;prvku na základě jeho indexu je u tohoto typu
+seznamu prakticky konstantní.</div></p>
+
+<p>Počet prvků dále zvýšíme, a to desetkrát:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=100000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkArrayListInsert0Operation-8                      100000              8034 ns/op
+BenchmarkSinglyLinkedListInsert0Operation-8               100000                25.11 ns/op
+BenchmarkDoublyLinkedListInsert0Operation-8               100000                27.59 ns/op
+BenchmarkArrayListInsertMiddleOperation-8                 100000              3475 ns/op
+BenchmarkSinglyLinkedListInsertMiddleOperation-8          100000             38085 ns/op
+BenchmarkDoublyLinkedListInsertMiddleOperation-8          100000             51326 ns/op
+BenchmarkArrayListAppendOperation-8                       100000                 7.919 ns/op
+BenchmarkSinglyLinkedListAppendOperation-8                100000                31.44 ns/op
+BenchmarkDoublyLinkedListAppendOperation-8                100000                26.86 ns/op
+BenchmarkArrayListRemoveFirstOperation-8                  100000              8230 ns/op
+BenchmarkSinglyLinkedListRemoveFirstOperation-8           100000                39.10 ns/op
+BenchmarkDoublyLinkedListRemoveFirstOperation-8           100000                44.39 ns/op
+BenchmarkArrayListRemoveLastOperation-8                   100000                25.78 ns/op
+BenchmarkSinglyLinkedListRemoveLastOperation-8            100000             58259 ns/op
+BenchmarkDoublyLinkedListRemoveLastOperation-8            100000                41.96 ns/op
+BenchmarkArrayListGetOperation-8                          100000                21.33 ns/op
+BenchmarkSinglyLinkedListGetOperation-8                   100000             52119 ns/op
+BenchmarkDoublyLinkedListGetOperation-8                   100000             32143 ns/op
+</pre>
+
+<p>Nyní jsou rozdíly mezi arraylistem na straně jedné a lineárně vázanými
+seznamy na straně druhé ještě markantnější. Ovšem povšimněte si toho, že
+odebrání posledního prvku je u obousměrně vázaného seznamu triviální operací,
+kdežto u jednosměrně vázaného seznamu se jedná o operaci pomalou (a závislou na
+velikosti seznamu) &ndash; což je opět očekávatelné chování.</p>
+
+<p>A konečně spusťme benchmark pro N=200000:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=200000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkArrayListInsert0Operation-8                      200000             46394 ns/op
+BenchmarkSinglyLinkedListInsert0Operation-8               200000                31.87 ns/op
+BenchmarkDoublyLinkedListInsert0Operation-8               200000                42.38 ns/op
+BenchmarkArrayListInsertMiddleOperation-8                 200000              9252 ns/op
+BenchmarkSinglyLinkedListInsertMiddleOperation-8          200000             77002 ns/op
+BenchmarkDoublyLinkedListInsertMiddleOperation-8          200000            105458 ns/op
+BenchmarkArrayListAppendOperation-8                       200000                 8.773 ns/op
+BenchmarkSinglyLinkedListAppendOperation-8                200000                26.50 ns/op
+BenchmarkDoublyLinkedListAppendOperation-8                200000                35.79 ns/op
+BenchmarkArrayListRemoveFirstOperation-8                  200000             45917 ns/op
+BenchmarkSinglyLinkedListRemoveFirstOperation-8           200000               139.4 ns/op
+BenchmarkDoublyLinkedListRemoveFirstOperation-8           200000               138.5 ns/op
+BenchmarkArrayListRemoveLastOperation-8                   200000                53.20 ns/op
+BenchmarkSinglyLinkedListRemoveLastOperation-8            200000            122137 ns/op
+BenchmarkDoublyLinkedListRemoveLastOperation-8            200000                60.09 ns/op
+BenchmarkArrayListGetOperation-8                          200000                23.92 ns/op
+BenchmarkSinglyLinkedListGetOperation-8                   200000            108607 ns/op
+BenchmarkDoublyLinkedListGetOperation-8                   200000             68191 ns/op
+</pre>
+
+<p>Nyní jsou rozdíly zcela zřetelné a říkají:</p>
+
+<ol>
+<li>Arraylist je skvělý při potřebě náhodného přístupu k&nbsp;prvkům přes index</li>
+<li>Jednosměrně vázaný seznam má rychlé operace přidání prvku na začátek seznamu a odstranění prvku ze začátku seznamu, ostatní operace mají minimálně složitost O(n)</li>
+<li>Obousměrně vázané seznamy navíc dokážou velmi rychle přidávat a odebírat prvky na konec seznamu, ovšem ostatní operace jsou (o konstantu) pomalejší a větší je i náročnost na kapacitu operační paměti</li>
+</ol>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Časová složitost operací se stromy</h2>
+
+<p>Stromy patří mezi datové struktury, které byly vynalezeny primárně právě
+z&nbsp;toho důvodu, aby byly některé operace s&nbsp;nimi prováděny s&nbsp;lepší
+než lineární časovou složitostí O(n). Typicky jsou stromy navrženy tak, aby se
+složitost typických operací blížila k&nbsp;O(log N) s&nbsp;různým základem
+logaritmu (2 či výše). V&nbsp;následujícím benchmarku si tedy otestujeme
+reálnou časovou složitost vybraných operací nad stromy, resp.&nbsp;přesněji
+řečeno nad prvky stromů.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Benchmark &ndash; operace se stromy</h2>
+
+<p>Podívejme se na následující realizaci benchmarku, v&nbsp;němž jsou
+realizovány některé operace se stromy, konkrétně:</p>
+
+<ol>
+<li>Vložení prvků do stromů všech typů (B-tree je realizován s&nbsp;různým řádem - <i>order</i>)</li>
+<li>Přečtení prvku ze stromů všech typů</li>
+</ol>
+
+<p>Zdrojový kód benchmarku vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "testing"
+&nbsp;
+        "github.com/daichi-m/go18ds/trees/avltree"
+        "github.com/daichi-m/go18ds/trees/btree"
+        "github.com/daichi-m/go18ds/trees/redblacktree"
+)
+&nbsp;
+func <strong>BenchmarkAVLTreePutOperation</strong>(b *testing.B) {
+        t := avltree.NewWithIntComparator[int]()
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkRBTreePutOperation</strong>(b *testing.B) {
+        t := redblacktree.NewWithIntComparator[int]()
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>3PutOperation(b *testing.B) {
+        t := btree.NewWithIntComparator[int](3)
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>4PutOperation(b *testing.B) {
+        t := btree.NewWithIntComparator[int](4)
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>5PutOperation(b *testing.B) {
+        t := btree.NewWithIntComparator[int](5)
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>9PutOperation(b *testing.B) {
+        t := btree.NewWithIntComparator[int](9)
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>99PutOperation(b *testing.B) {
+        t := btree.NewWithIntComparator[int](99)
+        for i := 0; i &lt; b.N; i++ {
+                t.Put(i, i)
+        }
+}
+&nbsp;
+const MAX = 10000
+&nbsp;
+func <strong>BenchmarkAVLTreeGet</strong>(b *testing.B) {
+        t := avltree.NewWithIntComparator[int]()
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+&nbsp;
+func <strong>BenchmarkRBTreeGet</strong>(b *testing.B) {
+        t := redblacktree.NewWithIntComparator[int]()
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>3Get(b *testing.B) {
+        t := btree.NewWithIntComparator[int](3)
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>4Get(b *testing.B) {
+        t := btree.NewWithIntComparator[int](4)
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>9Get(b *testing.B) {
+        t := btree.NewWithIntComparator[int](9)
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+&nbsp;
+func <strong>BenchmarkBTree</strong>99Get(b *testing.B) {
+        t := btree.NewWithIntComparator[int](99)
+        for i := 0; i &lt; MAX; i++ {
+                t.Put(i, i)
+        }
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                _, _ = t.Get(i % MAX)
+        }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výsledky benchmarku</h2>
+
+<p>Nejprve opět spustíme benchmark pouze pro jediné opakování:</p>
+
+<pre>
+$ <strong>go test --bench=. tree_test.go -benchtime=1x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkAVLTreePutOperation-8                 1               554.0 ns/op
+BenchmarkRBTreePutOperation-8                  1               574.0 ns/op
+BenchmarkBTree3PutOperation-8                  1              1097 ns/op
+BenchmarkBTree4PutOperation-8                  1               937.0 ns/op
+BenchmarkBTree5PutOperation-8                  1              1082 ns/op
+BenchmarkBTree9PutOperation-8                  1              1380 ns/op
+BenchmarkBTree99PutOperation-8                 1               944.0 ns/op
+BenchmarkAVLTreeGet-8                          1           2237783 ns/op
+BenchmarkRBTreeGet-8                           1           1636171 ns/op
+BenchmarkBTree3Get-8                           1           5913260 ns/op
+BenchmarkBTree4Get-8                           1           5330595 ns/op
+BenchmarkBTree9Get-8                           1           2149327 ns/op
+BenchmarkBTree99Get-8                          1            898313 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde se projevilo &bdquo;zahřívání&ldquo;
+kódu, takže jsme prozatím nezjistili nic zajímavého.</div></p>
+
+<p>Následuje operace se stromy majícími 1000 prvků:</p>
+
+<pre>
+$ <strong>go test --bench=. tree_test.go -benchtime=1000x</strong>
+goos: linux
+goarch: amd64
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkAVLTreePutOperation-8              1000               126.8 ns/op
+BenchmarkRBTreePutOperation-8               1000               201.1 ns/op
+BenchmarkBTree3PutOperation-8               1000               727.4 ns/op
+BenchmarkBTree4PutOperation-8               1000               660.6 ns/op
+BenchmarkBTree5PutOperation-8               1000               420.7 ns/op
+BenchmarkBTree9PutOperation-8               1000               300.5 ns/op
+BenchmarkBTree99PutOperation-8              1000               146.2 ns/op
+BenchmarkAVLTreeGet-8                       1000              1452 ns/op
+BenchmarkRBTreeGet-8                        1000              2015 ns/op
+BenchmarkBTree3Get-8                        1000              6934 ns/op
+BenchmarkBTree4Get-8                        1000              6724 ns/op
+BenchmarkBTree9Get-8                        1000              2753 ns/op
+BenchmarkBTree99Get-8                       1000              1228 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nejzajímavější je v&nbsp;tomto kontextu
+sledování vlivu řádu (<i>order</i>) B-stromu na časovou složitost jednotlivých
+operací &ndash; prozatím vyhrávají &bdquo;široké&ldquo; stromy s&nbsp;velký
+rozvětvením a malou hloubkou.</div></p>
+
+<p>Ve třetím kroku budeme pracovat s&nbsp;100000 prvky:</p>
+
+<pre>
+$ <strong>go test --bench=. tree_test.go -benchtime=100000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkAVLTreePutOperation-8            100000               166.8 ns/op
+BenchmarkRBTreePutOperation-8             100000               195.3 ns/op
+BenchmarkBTree3PutOperation-8             100000               698.7 ns/op
+BenchmarkBTree4PutOperation-8             100000               691.4 ns/op
+BenchmarkBTree5PutOperation-8             100000               412.4 ns/op
+BenchmarkBTree9PutOperation-8             100000               276.0 ns/op
+BenchmarkBTree99PutOperation-8            100000               118.8 ns/op
+BenchmarkAVLTreeGet-8                     100000                74.61 ns/op
+BenchmarkRBTreeGet-8                      100000                83.98 ns/op
+BenchmarkBTree3Get-8                      100000               157.7 ns/op
+BenchmarkBTree4Get-8                      100000               151.9 ns/op
+BenchmarkBTree9Get-8                      100000               101.7 ns/op
+BenchmarkBTree99Get-8                     100000                78.10 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zde kupodivu vyhrávají AVL-stromy a
+červeno-černé stromy nad hlubokými B-stromy, a to v&nbsp;obou
+operacích.</div></p>
+
+<p>A konečně se podívejme na chování při použití milionu prvků:</p>
+
+<pre>
+$ <strong>go test --bench=. tree_test.go -benchtime=1000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkAVLTreePutOperation-8           1000000               203.1 ns/op
+BenchmarkRBTreePutOperation-8            1000000               221.0 ns/op
+BenchmarkBTree3PutOperation-8            1000000               777.8 ns/op
+BenchmarkBTree4PutOperation-8            1000000               793.9 ns/op
+BenchmarkBTree5PutOperation-8            1000000               488.3 ns/op
+BenchmarkBTree9PutOperation-8            1000000               318.1 ns/op
+BenchmarkBTree99PutOperation-8           1000000               136.2 ns/op
+BenchmarkAVLTreeGet-8                    1000000                61.79 ns/op
+BenchmarkRBTreeGet-8                     1000000                68.14 ns/op
+BenchmarkBTree3Get-8                     1000000               113.9 ns/op
+BenchmarkBTree4Get-8                     1000000               113.9 ns/op
+BenchmarkBTree9Get-8                     1000000                88.22 ns/op
+BenchmarkBTree99Get-8                    1000000                74.71 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: důležité je, že časová složitost operací
+se <i>prakticky</i> nezměnila, i když pracujeme s&nbsp;desetkrát větším
+množstvím prvků. Zde stromy libovolného typu jasně vyhrávají nad lineárními
+datovými strukturami typu seznam.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Obsah navazujícího článku</h2>
+
+<p>V&nbsp;navazujícím článku popis knihovny <i>Go18DS</i> dokončíme. Popíšeme
+si zbývající datové struktury, což je několik implementací map a následně se
+zaměříme na popis pomocných funkcí a datových struktur &ndash; například
+různých variant komparátorů atd.</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly
+uloženy do nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý,
+dnes má přibližně stovku kilobajtů), můžete namísto toho použít odkazy
+na jednotlivé demonstrační příklady, které naleznete v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>arraylist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist01.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist01.go</a></td></tr>
+<tr><td> 2</td><td>arraylist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist02.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist02.go</a></td></tr>
+<tr><td> 3</td><td>arraylist03.go</td><td>pokus o přidání prvků odlišného datového typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist03.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist03.go</a></td></tr>
+<tr><td> 4</td><td>arraylist04.go</td><td>pokus o přidání prvků odlišného datového typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist04.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist04.go</a></td></tr>
+<tr><td> 5</td><td>arraylist05.go</td><td>vymazání všech prvků ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist05.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist05.go</a></td></tr>
+<tr><td> 6</td><td>arraylist06.go</td><td>test na existenci prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist06.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist06.go</a></td></tr>
+<tr><td> 7</td><td>arraylist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist07.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist07.go</a></td></tr>
+<tr><td> 8</td><td>arraylist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist08.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist08.go</a></td></tr>
+<tr><td> 9</td><td>arraylist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist09.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist09.go</a></td></tr>
+<tr><td>10</td><td>arraylist10.go</td><td>operace Sort - setřídění prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist10.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist10.go</a></td></tr>
+<tr><td>11</td><td>arraylist11.go</td><td>implementace iterátoru nad seznamem typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist11.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>singlylinkedlist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist01.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist01.go</a></td></tr>
+<tr><td>13</td><td>singlylinkedlist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist02.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist02.go</a></td></tr>
+<tr><td>14</td><td>singlylinkedlist03.go</td><td>pokus o přidání prvků odlišného datového typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist03.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist03.go</a></td></tr>
+<tr><td>15</td><td>singlylinkedlist04.go</td><td>pokus o přidání prvků odlišného datového typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist04.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist04.go</a></td></tr>
+<tr><td>16</td><td>singlylinkedlist05.go</td><td>vymazání všech prvků ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist05.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist05.go</a></td></tr>
+<tr><td>17</td><td>singlylinkedlist06.go</td><td>test na existenci prvků v seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist06.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist06.go</a></td></tr>
+<tr><td>18</td><td>singlylinkedlist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist07.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist07.go</a></td></tr>
+<tr><td>19</td><td>singlylinkedlist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist08.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist08.go</a></td></tr>
+<tr><td>20</td><td>singlylinkedlist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu singlylinkedlist </td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist09.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist09.go</a></td></tr>
+<tr><td>21</td><td>singlylinkedlist10.go</td><td>operace Sort - setřídění prvků v seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist10.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist10.go</a></td></tr>
+<tr><td>22</td><td>singlylinkedlist11.go</td><td>implementace iterátoru nad seznamem typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist11.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>23</td><td>doublylinkedlist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist01.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist01.go</a></td></tr>
+<tr><td>24</td><td>doublylinkedlist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist02.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist02.go</a></td></tr>
+<tr><td>25</td><td>doublylinkedlist03.go</td><td>pokus o přidání prvků odlišného datového typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist03.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist03.go</a></td></tr>
+<tr><td>26</td><td>doublylinkedlist04.go</td><td>pokus o přidání prvků odlišného datového typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist04.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist04.go</a></td></tr>
+<tr><td>27</td><td>doublylinkedlist05.go</td><td>vymazání všech prvků ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist05.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist05.go</a></td></tr>
+<tr><td>28</td><td>doublylinkedlist06.go</td><td>test na existenci prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist06.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist06.go</a></td></tr>
+<tr><td>29</td><td>doublylinkedlist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist07.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist07.go</a></td></tr>
+<tr><td>30</td><td>doublylinkedlist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist08.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist08.go</a></td></tr>
+<tr><td>31</td><td>doublylinkedlist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist09.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist09.go</a></td></tr>
+<tr><td>32</td><td>doublylinkedlist10.go</td><td>operace Sort - setřídění prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist10.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist10.go</a></td></tr>
+<tr><td>33</td><td>doublylinkedlist11.go</td><td>implementace iterátoru nad seznamem typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist11.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>34</td><td>arraystack01.go</td><td>operace <strong>Push</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack01.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack01.go</a></td></tr>
+<tr><td>35</td><td>arraystack02.go</td><td>operace <strong>Pop</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack02.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack02.go</a></td></tr>
+<tr><td>36</td><td>arraystack03.go</td><td>operace <strong>Peek</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack03.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack03.go</a></td></tr>
+<tr><td>37</td><td>arraystack04.go</td><td>metody <strong>Size</strong> a <strong>Empty</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack04.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack04.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>38</td><td>linkedliststack01.go</td><td>operace <strong>Push</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack01.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack01.go</a></td></tr>
+<tr><td>39</td><td>linkedliststack02.go</td><td>operace <strong>Pop</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack02.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack02.go</a></td></tr>
+<tr><td>40</td><td>linkedliststack03.go</td><td>operace <strong>Peek</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack03.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack03.go</a></td></tr>
+<tr><td>41</td><td>linkedliststack04.go</td><td>metody <strong>Size</strong> a <strong>Empty</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack04.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack04.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>42</td><td>stack_rpn.go</td><td>vyhodnocení výrazu zapsaného v&nbsp;RPN</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn.go">https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn.go</a></td></tr>
+<tr><td>43</td><td>stack_rpn_B.go</td><td>vyhodnocení výrazu zapsaného v&nbsp;RPN, použití odlišné implementace zásobníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn_B.go">https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn_B.go</a></td></tr>
+<tr><td>44</td><td>rpn.go</td><td>vyhodnocení aritmetického výrazu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/rpn.go">https://github.com/tisnik/go-root/blob/master/article_92/rpn.go</a></td></tr>
+<tr><td>45</td><td>erasthotenes.go</td><td>implementace Eratosthenova síta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/erasthotenes.go">https://github.com/tisnik/go-root/blob/master/article_92/erasthotenes.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>46</td><td>avl-tree01.go</td><td>přidání prvků do stromu, výpis struktury stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree01.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree01.go</a></td></tr>
+<tr><td>47</td><td>avl-tree02.go</td><td>iterace přes všechny prvky stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree02.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree02.go</a></td></tr>
+<tr><td>48</td><td>avl-tree03.go</td><td>přečtení všech prvků uložených ve stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree03.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree03.go</a></td></tr>
+<tr><td>49</td><td>avl-tree04.go</td><td>získání obsahů prvků (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree04.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree04.go</a></td></tr>
+<tr><td>50</td><td>rb-tree01.go</td><td>přidání prvků do stromu, výpis struktury stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree01.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree01.go</a></td></tr>
+<tr><td>51</td><td>rb-tree02.go</td><td>iterace přes všechny prvky stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree02.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree02.go</a></td></tr>
+<tr><td>52</td><td>rb-tree03.go</td><td>přečtení všech prvků uložených ve stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree03.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree03.go</a></td></tr>
+<tr><td>53</td><td>rb-tree04.go</td><td>získání obsahů prvků (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree04.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree04.go</a></td></tr>
+<tr><td>54</td><td>btree01.go</td><td>konstrukce B-stromu řádu 3</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree01.go">https://github.com/tisnik/go-root/blob/master/article_93/btree01.go</a></td></tr>
+<tr><td>55</td><td>btree02.go</td><td>konstrukce B-stromu řádu 4</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree02.go">https://github.com/tisnik/go-root/blob/master/article_93/btree02.go</a></td></tr>
+<tr><td>56</td><td>btree03.go</td><td>konstrukce B-stromu řádu 20</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree03.go">https://github.com/tisnik/go-root/blob/master/article_93/btree03.go</a></td></tr>
+<tr><td>57</td><td>btree04.go</td><td>iterace přes všechny prvky stromu (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree04.go">https://github.com/tisnik/go-root/blob/master/article_93/btree04.go</a></td></tr>
+<tr><td>58</td><td>btree05.go</td><td>přečtení všech prvků uložených ve stromu (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree05.go">https://github.com/tisnik/go-root/blob/master/article_93/btree05.go</a></td></tr>
+<tr><td>59</td><td>btree06.go</td><td>získání obsahů prvků (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree06.go">https://github.com/tisnik/go-root/blob/master/article_93/btree06.go</a></td></tr>
+<tr><td>60</td><td>binary_heap01.go</td><td>konstrukce binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap01.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap01.go</a></td></tr>
+<tr><td>61</td><td>binary_heap02.go</td><td>přidání prvků do binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap02.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap02.go</a></td></tr>
+<tr><td>62</td><td>binary_heap03.go</td><td>iterace přes všechny prvky binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap03.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap03.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>63</td><td>lists_test.go</td><td>benchmark &ndash; operace se seznamy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/lists_test.go">https://github.com/tisnik/go-root/blob/master/article_93/lists_test.go</a></td></tr>
+<tr><td>64</td><td>tree_test.go</td><td>benchmark &ndash; operace se stromy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/tree_test.go">https://github.com/tisnik/go-root/blob/master/article_93/tree_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Genfuncs &ndash; implements various functions utilizing Go's Generics to help avoid writing boilerplate code<br />
+<a href="https://github.com/nwillc/genfuncs">https://github.com/nwillc/genfuncs</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Fp-go is a collection of Functional Programming helpers powered by Golang 1.18+ generics<br />
+<a href="https://github.com/repeale/fp-go">https://github.com/repeale/fp-go</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://go.dev/ref/spec">https://go.dev/ref/spec</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Type parameters in Go<br />
+<a href="https://bitfieldconsulting.com/golang/type-parameters">https://bitfieldconsulting.com/golang/type-parameters</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go 1.18 Release Notes<br />
+<a href="https://golang.org/doc/go1.18">https://golang.org/doc/go1.18</a>
+</li>
+
+<li>Go 1.17 Release Notes<br />
+<a href="https://golang.org/doc/go1.17">https://golang.org/doc/go1.17</a>
+</li>
+
+<li>Go 1.16 Release Notes<br />
+<a href="https://golang.org/doc/go1.16">https://golang.org/doc/go1.16</a>
+</li>
+
+<li>Go 1.15 Release Notes<br />
+<a href="https://golang.org/doc/go1.15">https://golang.org/doc/go1.15</a>
+</li>
+
+<li>Go 1.14 Release Notes<br />
+<a href="https://golang.org/doc/go1.14">https://golang.org/doc/go1.14</a>
+</li>
+
+<li>Go 1.13 Release Notes<br />
+<a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a>
+</li>
+
+<li>Go 1.12 Release Notes<br />
+<a href="https://golang.org/doc/go1.12">https://golang.org/doc/go1.12</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>A Proposal for Adding Generics to Go<br />
+<a href="https://go.dev/blog/generics-proposal">https://go.dev/blog/generics-proposal</a>
+</li>
+
+<li>Proposal: Go should have generics<br />
+<a href="https://github.com/golang/proposal/blob/master/design/15292-generics.md">https://github.com/golang/proposal/blob/master/design/15292-generics.md</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>The missing slice package<br />
+<a href="https://github.com/ssoroka/slice">https://github.com/ssoroka/slice</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy (dokončení)<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/</a>
+</li>
+
+<li>Generické datové typy v jazyce Go?<br />
+<a href="https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/">https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/</a>
+</li>
+
+<li>GoDS (Go Data Structures)<br />
+<a href="https://github.com/emirpasic/gods">https://github.com/emirpasic/gods</a>
+</li>
+
+<li>Binární halda<br />
+<a href="https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda">https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda</a>
+</li>
+
+<li>Binární strom<br />
+<a href="https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_strom">https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_strom</a>
+</li>
+
+<li>AVL-strom<br />
+<a href="https://cs.wikipedia.org/wiki/AVL-strom">https://cs.wikipedia.org/wiki/AVL-strom</a>
+</li>
+
+<li>Červeno-černý strom<br />
+<a href="https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom">https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom</a>
+</li>
+
+<li>B-strom<br />
+<a href="https://cs.wikipedia.org/wiki/B-strom">https://cs.wikipedia.org/wiki/B-strom</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
