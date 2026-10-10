@@ -1,0 +1,2443 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Knihovny s implementací generických datových typů pro programovací jazyk Go (3)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Knihovny s implementací generických datových typů pro programovací jazyk Go (3)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na předchozí dvojici článků o knihovně Go18DS dnes navážeme. Zabývat se budeme především mapami (asociativními poli), které jsou v knihovně Go18DS implementovány hned několika různými způsoby. Obecně patří mapy mezi jeden z nejužitečnějších kontejnerů vůbec.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Mapy jakožto jeden z&nbsp;nejužitečnějších datových kontejnerů</a></p>
+<p><a href="#k02">2. Implementace map v&nbsp;knihovně Go18DS</a></p>
+<p><a href="#k03">3. Hešovací mapy</a></p>
+<p><a href="#k04">4. Metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></a></p>
+<p><a href="#k05">5. Kontrola typů hodnot, s&nbsp;nimiž se pracuje, v&nbsp;době překladu</a></p>
+<p><a href="#k06">6. Mapy založené na červeno-černých stromech</a></p>
+<p><a href="#k07">7. Postupná iterace přes všechny prvky uložené do mapy</a></p>
+<p><a href="#k08">8. Mapa realizovaná strukturou <strong>LinkedHashMap</strong></a></p>
+<p><a href="#k09">9. Další chování map zachovávajících pořadí vložení prvků</a></p>
+<p><a href="#k10">10. Mapy s&nbsp;obousměrným mapováním &ndash; bi-directional map</a></p>
+<p><a href="#k11">11. Kontejner typu <strong>HashBidiMap</strong></a></p>
+<p><a href="#k12">12. Metody <strong>Get</strong> a <strong>GetKey</strong></a></p>
+<p><a href="#k13">13. Kontejner typu <strong>TreeBidiMap</strong></a></p>
+<p><a href="#k14">14. Benchmark pro porovnání různých implementací map</a></p>
+<p><a href="#k15">15. Výsledky benchmarku pro mapy s&nbsp;relativně malým počtem prvků</a></p>
+<p><a href="#k16">16. Výsledky benchmarku pro větší počet prvků</a></p>
+<p><a href="#k17">17. Shrnutí &ndash; všechny datové kontejnery poskytované knihovnou Go18DS</a></p>
+<p><a href="#k18">18. Všechny implementace kontejnerů poskytovaných knihovnou Go18DS</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Mapy jakožto jeden z&nbsp;nejužitečnějších datových kontejnerů</h2>
+
+<p>Při popisu knihovny <i>Go18DS</i>, která do <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovacího jazyka
+Go</a> přináší podporu pro různé genericky pojaté datové struktury, jsme se
+seznámili s&nbsp;většinou datových kontejnerů, které tato knihovna
+programátorům nabízí. Připomeňme si, že se jednalo o seznamy (<i>list</i>),
+množiny (<i>set</i>), zásobník (<i>stack</i>), stromy (<i>tree</i>) a taktéž o
+binární haldy (<i>binary heap</i>). První ze zmíněných datových kontejnerů,
+tedy seznamy, jsou velmi důležité, protože sémanticky rozšiřují možnosti polí a
+taktéž řezů (<i>slice</i>). V&nbsp;některých aplikacích se používají i množiny,
+a to například ve chvíli, kdy potřebujeme reprezentovat přítomnost či naopak
+nepřítomnost určitého prvku, a to nezávisle na jeho umístění v&nbsp;nějaké
+datové kolekci (nezajímá nás tedy například to, že se jedná o třetí prvek, ale
+o to, zda takový prvek vůbec existuje; navíc je zaručena unikátnost prvků).
+Právě množiny jsou v&nbsp;programovacím jazyku Go mnohdy realizovány pomocí
+vestavěných map, konkrétně map, jejichž prvky jsou typu
+<strong>struct{}</strong>, což lze ovšem považovat za (poněkud špinavý)
+trik.</p>
+
+<p>Výše zmíněné seznamy, množiny, zásobníky nebo stromy nalezneme
+v&nbsp;prakticky jakémkoli rozsáhlejším programu psaném v&nbsp;jazyce Go, ovšem
+zdaleka nejužitečnějším datovým typem (datovým kontejnerem) jsou pro
+vysokoúrovňové aplikace, nikoli nutně pro výpočty a systémové úlohy, mapy
+(<i>maps</i>). A právě velmi časté používání map v&nbsp;programech psaných
+v&nbsp;jazyce Go odlišuje tento jazyk například od céčka, kde je pochopitelně
+možné mapy taktéž implementovat, ovšem kvůli nutnosti manuální správy paměti (a
+neexistence generických datových typů) se ani zdaleka nejedná o elegantní
+řešení (typickým problémem je uvolňování prvků z&nbsp;mapy atd.). Mapy jsou
+skutečně velmi flexibilním a téměř univerzálním datovým typem (či možná lépe
+řečeno datovou strukturou), který může nahradit například hodnotové objekty
+(viz například <a href="https://www.youtube.com/watch?v=aSEQfqNYNAc">toto známé
+video</a>, které je orientováno na Clojure), mnohdy se používají namísto
+pojmenovaných parametrů funkcí (v&nbsp;Pythonu je nazýváme &bdquo;keyword
+parametry&ldquo;, v&nbsp;Go tato možnost chybí) a samozřejmě jsou (alespoň
+většinou) výsledkem deserializace souborů typu JSON, YAML, XML apod. Na tomto
+místě je nutné upozornit na to, že mapy, a to i jejich implementace popsané
+níže, nejsou persistentní datovou strukturou, což znamená, že do nich je možné
+přidávat prvky, odstraňovat prvky atd. &ndash; a tudíž může být problematické
+bez dalších technik (zámky atd.) mapy sdílet mezi gorutinami.</p>
+
+<p><div class="rs-tip-major">Poznámka: mapy jsou pochopitelně součástí
+standardního programovacího jazyka Go (viz například <a
+href="https://golangdocs.com/maps-in-golang">tuto dokumentaci</a>), což
+mj.&nbsp;znamená, že pro ně existuje speciální syntaxe přístupu k&nbsp;prvkům
+atd. Dnes se však budeme zabývat &bdquo;jen&ldquo; knihovní implementací map,
+konkrétně právě knihovnou Go18DS, která se od vestavěných map v&nbsp;několika
+ohledech liší.</div></p>
+
+
+
+<h2 id="k02">2. Implementace map v&nbsp;knihovně Go18DS</h2>
+
+<p>Existuje poměrně velké množství způsobů implementace map, přesněji řečeno
+způsobů ukládání dvojic klíč-hodnota do paměti s&nbsp;možností jejich
+pozdějšího přečtení. Jednotlivé implementace se od sebe odlišují svými
+základními vlastnostmi, například tím, zda jsou prvky v&nbsp;mapě setříděny na
+základě svého klíče, zda je naopak zachováno pořadí prvků podle pořadí jejich
+vkládání do mapy či zda jsou prvky obecně neuspořádány. Liší se i časové
+složitosti základních operací &ndash; tedy operace pro vložení prvku do mapy a
+operace pro získání prvku na základě jeho klíče. Navíc v&nbsp;některých
+případech vyžadujeme specifické chování mapy, například možnost mapování
+nejenom v&nbsp;jednom směru (tedy klasické klíč&rarr;hodnota), ale i ve směru
+opačném (hodnota&rarr;klíč). Toto chování realizují mapy, v&nbsp;jejichž jméně
+se objevuje zkratka &bdquo;bidi&ldquo; (neboli <i>bi-directional</i>). Všechny
+implementace map dostupné v&nbsp;knihovně Go18DS jsou vypsány
+v&nbsp;následujícím seznamu:</p>
+
+<ol>
+<li>HashMap</li>
+<li>TreeMap</li>
+<li>LinkedHashMap</li>
+<li>HashBidiMap</li>
+<li>TreeBidiMap</li>
+</ol>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Hešovací mapy</h2>
+
+<p>Nejprve si popišme hešovací mapy (<i>hash maps</i>), protože ty se
+v&nbsp;praxi používají velmi často. V&nbsp;knihovně Go18DS jsou standardní
+hešovací mapy realizovány v&nbsp;balíčku s&nbsp;plným jménem
+<strong>github.com/daichi-m/go18ds/maps/hashmap</strong>. Při konstrukci
+prázdné hešovací mapy je zapotřebí specifikovat jak typ klíčů, tak i typ hodnot
+&ndash; je tomu tak z&nbsp;toho důvodu, že knihovna Go18DS je založena na
+použití generických datových typů. Způsob volání konstruktoru hešovací mapy
+vypadá následovně:</p>
+
+<pre>
+m := <strong>mapImpl.New[string, string]()</strong>
+</pre>
+
+<p>Dvojice klíč-hodnota se do hešovací mapy (ale i do dalších typů map) přidává
+metodou <strong>Put</strong>, kterou lze zavolat velmi snadno (ovšem překladač
+provede kontrolu typů):</p>
+
+<pre>
+<strong>m.Put("klíč", "hodnota")</strong>
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to, zda jsou do mapy ukládány dvojice
+klíč-hodnota se korektního (resp.&nbsp;očekávaného) typu, je kontrolováno již
+v&nbsp;době překladu.</div></p>
+
+<p>V&nbsp;dnešním prvním demonstračním příkladu je ukázána jak konstrukce mapy,
+tak i její naplnění dvanácti dvojicemi klíč-hodnota. Jak klíče, tak i hodnoty
+musí být typu řetězec (v&nbsp;jazyce Go tedy <strong>string</strong>):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap01.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap01.go</a>.</div></p>
+
+<p>Po spuštění tohoto demonstračního příkladu se postupně začne vypisovat obsah
+hešovací mapy, a to od prázdné mapy vytvořené konstruktorem až do situace, kdy
+je mapa naplněna dvanácti dvojicemi:</p>
+
+<pre>
+HashMap
+map[]
+HashMap
+map[Leden:Ianuarius]
+HashMap
+map[Leden:Ianuarius Únor:Februarius]
+HashMap
+map[Březen:Martius Leden:Ianuarius Únor:Februarius]
+HashMap
+map[Březen:Martius Duben:Aprilis Leden:Ianuarius Únor:Februarius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius Červenec:Iulius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Únor:Februarius Červen:Iunius Červenec:Iulius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+HashMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Prosinec:December Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že prvky uložené
+v&nbsp;mapě obecně nejsou seřazeny.</div></p>
+
+<p>Pro přečtení prvku z&nbsp;mapy na základě klíče se používá metoda
+<strong>Get</strong>. Tato metoda vrací dvě hodnoty &ndash; samotnou hodnotu
+přečteného prvku (pokud byl prvek s&nbsp;uvedeným klíčem nalezen) a
+pravdivostní hodnotu <strong>true/false</strong> značící, zda prvek byl či
+naopak nebyl nalezen. Pokud prvek nalezen nebyl, je první vrácená hodnota
+&bdquo;nulovou&ldquo; hodnotou platnou pro daný typ (0 u numerických typů,
+prázdný řetězec u řetězců, prázdné pole u polí a řezů atd).</p>
+
+<p>Například pro mapu naplněnou názvy všech dvanácti měsíců v&nbsp;roce vypíšou
+následující dvě volání:</p>
+
+<pre>
+fmt.Println(<strong>m.Get("Leden")</strong>)
+fmt.Println(<strong>m.Get("Srpenec")</strong>)
+</pre>
+
+<p>dvojici řádků:</p>
+
+<pre>
+Ianuarius true
+ false
+</pre>
+
+<p>přičemž na druhém řádku je před hodnotou <strong>false</strong> prázdný
+řetězec oddělený mezerou.</p>
+
+<p>Opět se podívejme na úplný zdrojový kód demonstračního příkladu, který
+nejprve naplní hešovací mapu a následně se z&nbsp;ní pokusí přečíst dva
+prvky:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        fmt.Println(<strong>m.Get("Leden")</strong>)
+        fmt.Println(<strong>m.Get("Srpenec")</strong>)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap02.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap02.go</a>.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></h2>
+
+<p>Všechny implementace map a tedy pochopitelně i hešovací mapy nabízí i další
+užitečné metody. Jedná se o metodu <strong>Emptu</strong>, která vrací (podle
+očekávání) hodnotu <strong>true</strong>/<strong>false</strong> podle toho, zda
+je mapa zcela prázdná či nikoli, dále o metodu <strong>Size</strong> vracející
+počet dvojic klíč-hodnota uložených do mapy. Metoda <strong>Keys</strong> vrací
+řez se všemi klíči a metoda <strong>Values</strong> řez se všemi hodnotami.
+Použití těchto čtyř metod si ukážeme na dalším demonstračním příkladu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+        }
+&nbsp;
+        fmt.Println("Metadata")
+        fmt.Println("Empty?", <strong>m.Empty()</strong>)
+        fmt.Println("Size", <strong>m.Size()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Keys")
+        fmt.Printf("%T\n", <strong>m.Keys()</strong>)
+        fmt.Println(m.Keys())
+&nbsp;
+        fmt.Println()
+        fmt.Println("Values")
+        fmt.Printf("%T\n", <strong>m.Values()</strong>)
+        fmt.Println(m.Values())
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu se vypíšou
+metainformace o hešovací mapě, tedy zda je mapa prázdná, a kolik má prvků. Dále
+se vypíše řez se všemi klíči a následně i řez s&nbsp;hodnotami. Opět si
+povšimněte, že prvky nejsou v&nbsp;hešovací mapě nijak (z&nbsp;našeho pohledu
+rozumně) seřazeny:</p>
+
+<pre>
+Metadata
+Empty? false
+Size 12
+&nbsp;
+Keys
+[]string
+[Leden Duben Květen Červen Červenec Říjen Únor Březen Srpen Září Listopad Prosinec]
+&nbsp;
+Values
+[]string
+[Iunius Iulius October Ianuarius Aprilis Maius September November December Februarius Martius Augustus]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap03.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap03.go</a>.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Kontrola typů hodnot, s&nbsp;nimiž se pracuje, v&nbsp;době překladu</h2>
+
+<p>V&nbsp;tomto seriálu jsme si již řekli, že generické datové typy jsou
+v&nbsp;jazyce Go navrženy a implementovány takovým způsobem, že se kontroly
+typů provádí již v&nbsp;době překladu, nikoli v&nbsp;době běhu. Podívejme se
+tedy, co se stane ve chvíli, kdy se pokusíme do mapy, jejíž hodnoty mají být
+typu <strong>int</strong> (celé číslo) uložit prvky pod klíčem typu
+<strong>string</strong> (řetězec), ovšem s&nbsp;hodnotou taktéž typu
+<strong>string</strong> a nikoli <strong>int</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                ...
+                ...
+                ...
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                ...
+                ...
+                ...
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, int]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p>Překladač v&nbsp;tomto detekuje a vypíše chybu při pokusu o provedení
+operace <strong>Put</strong>:</p>
+
+<pre>
+./hashmap01error.go:50:16: cannot use lat[i] (variable of type string) as type int in argument to m.Put
+</pre>
+
+<p>Podobně je překladači známo, jakého typu budou hodnoty vrácené operací
+<strong>Get</strong>. V&nbsp;dalším příkladu se pokusíme o přiřazení výsledku
+do proměnné neočekávaného a nekompatibilního typu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                ...
+                ...
+                ...
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                ...
+                ...
+                ...
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        <strong>var name int</strong>
+&nbsp;
+        <strong>name, ok := m.Get("Leden")</strong>
+        fmt.Println(name, ok)
+}
+</pre>
+
+<p>Překladač v&nbsp;tomto případě opět korektně rozpozná nekompatibilní datový
+typ:</p>
+
+<pre>
+./hashmap02error.go:57:14: cannot use m.Get("Leden") (value of type string) as type int in assignment
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Mapy založené na červeno-černých stromech</h2>
+
+<p>Druhým typem mapy, s&nbsp;nímž se v&nbsp;knihovně Go18DS můžeme setkat, jsou
+mapy interně založené na červeno-černých stromech (<i>red-black tree</i>).
+Prvky jsou v&nbsp;těchto stromech automaticky zařazeny podle hodnoty klíče
+(hodnoty tedy musí být porovnatelné operací &bdquo;menší než&ldquo; atd.
+&ndash; ostatně příslušný komparátor se vybírá již při konstrukci prázdné mapy)
+a tedy všechny hodnoty mohou být následně získány a vypsány v&nbsp;seřazené
+podobě. Podívejme se nyní na konstrukci tohoto typu mapy i způsobu řazení prvků
+v&nbsp;ní:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/treemap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.NewWithStringComparator[string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu získáme obsah mapy, do které se
+prvky postupně přidávají a zařazují na své místo na základě porovnání hodnot
+klíčů:</p>
+
+<pre>
+TreeMap
+map[]
+TreeMap
+map[Leden:Ianuarius]
+TreeMap
+map[Leden:Ianuarius Únor:Februarius]
+TreeMap
+map[Březen:Martius Leden:Ianuarius Únor:Februarius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Leden:Ianuarius Únor:Februarius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+TreeMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Prosinec:December Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+</pre>
+
+<p>Povšimněte si, že prvky jsou na konci seřazeny podle abecedy, ovšem tedy
+s&nbsp;tím &bdquo;malým&ldquo; problémem, že řazení neodpovídá tuzemské
+normě.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/treemap01.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap01.go</a>.</div></p>
+
+<p>Podívejme se ještě na chování operace <strong>Get</strong>, které je totožné
+s&nbsp;hešovacími mapami:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/treemap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.NewWithStringComparator[string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        fmt.Println(<strong>m.Get("Leden")</strong>)
+        fmt.Println(<strong>m.Get("Srpenec")</strong>)
+}
+</pre>
+
+<p>Výsledky obou operací <strong>Get</strong> jsou vypsány na dvojici
+řádků:</p>
+
+<pre>
+Ianuarius true
+ false
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/treemap02.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap02.go</a>.</div></p>
+
+<p>Mapy založené na červeno-černých stromech nabízí i nám již známé metody
+<strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a
+<strong>Values</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/treemap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.NewWithStringComparator[string]()</strong>
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+        }
+&nbsp;
+        fmt.Println("Metadata")
+        fmt.Println("Empty?", <strong>m.Empty()</strong>)
+        fmt.Println("Size", <strong>m.Size()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Keys")
+        fmt.Printf("%T\n", <strong>m.Keys()</strong>)
+        fmt.Println(m.Keys())
+&nbsp;
+        fmt.Println()
+        fmt.Println("Values")
+        fmt.Printf("%T\n", <strong>m.Values()</strong>)
+        fmt.Println(m.Values())
+}
+</pre>
+
+<p>Výsledky získané po spuštění tohoto příkladu:</p>
+
+<pre>
+Metadata
+Empty? false
+Size 12
+&nbsp;
+Keys
+[]string
+[Březen Duben Květen Leden Listopad Prosinec Srpen Září Únor Červen Červenec Říjen]
+&nbsp;
+Values
+[]string
+[Martius Aprilis Maius Ianuarius November December Augustus September Februarius Iunius Iulius October]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/treemap03.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap03.go</a>.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Postupná iterace přes všechny prvky uložené do mapy</h2>
+
+<p>Vzhledem k&nbsp;tomu, že mapy založené na červeno-černých stromech zajišťují
+přesně dané pořadí uložení prvků ve stromu, je možné těmito prvky postupně
+procházet s&nbsp;využitím iterátorů. To je koncept, s&nbsp;nímž jsme se již
+setkali u dalších datových typů v&nbsp;knihovně Go18DS, takže jen
+v&nbsp;krátkosti se podívejme na použití iterátoru:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/treemap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.NewWithStringComparator[string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        it := <strong>m.Iterator()</strong>
+        for <strong>it.Next()</strong> {
+                key, value := <strong>it.Key()</strong>, <strong>it.Value()</strong>
+                fmt.Printf("%-10s \t %-10s \t %T\n", key, value, value)
+        }
+}
+</pre>
+
+<p>Povšimněte si, že v&nbsp;každé iteraci získáme jak klíč, tak i hodnotu
+prvku:</p>
+
+<pre>
+Březen           Martius         string
+Duben            Aprilis         string
+Květen           Maius           string
+Leden            Ianuarius       string
+Listopad         November        string
+Prosinec         December        string
+Srpen            Augustus        string
+Září             September       string
+Únor             Februarius      string
+Červen           Iunius          string
+Červenec         Iulius          string
+Říjen            October         string
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/treemap04.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap04.go</a>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Mapa realizovaná strukturou <strong>LinkedHashMap</strong></h2>
+
+<p>Třetí způsob implementace mapy v&nbsp;knihovně Go18DS se jmenuje
+<strong>LinkedHashMap</strong>. Interně se jedná o kombinaci hešovací mapy
+(tato část je použita pro uložení hodnot) a obousměrně vázaného seznamu pro
+uložení vzájemných uspořádání (seřazení) prvků. Právě díky použití seznamu je
+zajištěno, že je zachováno pořadí prvků &ndash; prvky je možné získat
+v&nbsp;takovém pořadí, v&nbsp;jakém byly do mapy vloženy. K&nbsp;dispozici je
+pochopitelně i možnost smazání prvku atd.</p>
+
+<p>Opět si pochopitelně ukážeme, jak se tyto mapy použijí v&nbsp;praxi. Jejich
+konstrukce a naplnění vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/linkedhashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p>Ze zpráv vypsaných tímto demonstračním příkladem je patrné, že prvky jsou
+uloženy v&nbsp;takovém pořadí, které odpovídá jejich vložení do mapy:</p>
+
+<pre>
+LinkedHashMap
+map[]
+LinkedHashMap
+map[Leden:Ianuarius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius Srpen:Augustus]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius Srpen:Augustus Září:September]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius Srpen:Augustus Září:September Říjen:October]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius Srpen:Augustus Září:September Říjen:October Listopad:November]
+LinkedHashMap
+map[Leden:Ianuarius Únor:Februarius Březen:Martius Duben:Aprilis Květen:Maius Červen:Iunius Červenec:Iulius Srpen:Augustus Září:September Říjen:October Listopad:November Prosinec:December]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap01.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap01.go</a>.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Další chování map zachovávajících pořadí vložení prvků</h2>
+
+<p>V&nbsp;demonstračních příkladech uvedených v&nbsp;této kapitole bude ukázáno
+další chování map, které zachovávají pořadí vložení prvků, tedy map
+implementovaných balíčkem
+<strong>github.com/daichi-m/go18ds/maps/linkedhashmap</strong>. Nejprve si
+ověřme, že metoda <strong>Get</strong> se chová stejně, jako u dalších typů
+map:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/linkedhashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        fmt.Println(<strong>m.Get("Leden")</strong>)
+        fmt.Println(<strong>m.Get("Srpenec")</strong>)
+}
+</pre>
+
+<p>S&nbsp;očekávaným výsledkem:</p>
+
+<pre>
+Ianuarius true
+ false
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap02.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap02.go</a>.</div></p>
+
+<p>Dále se podívejme na metody <strong>Empty</strong>, <strong>Size</strong>,
+<strong>Keys</strong> a <strong>Values</strong>, které již známe
+z&nbsp;předchozího textu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/linkedhashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+        }
+&nbsp;
+        fmt.Println("Metadata")
+        fmt.Println("Empty?", <strong>m.Empty()</strong>)
+        fmt.Println("Size", <strong>m.Size()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Keys")
+        fmt.Printf("%T\n", <strong>m.Keys()</strong>)
+        fmt.Println(<strong>m.Keys()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Values")
+        fmt.Printf("%T\n", <strong>m.Values()</strong>)
+        fmt.Println(<strong>m.Values()</strong>)
+}
+</pre>
+
+<p>Výsledky by opět neměly být překvapující (za zmínku stojí pořadí vrácených
+klíčů i prvků):</p>
+
+<pre>
+Metadata
+Empty? false
+Size 12
+&nbsp;
+Keys
+[]string
+[Leden Únor Březen Duben Květen Červen Červenec Srpen Září Říjen Listopad Prosinec]
+&nbsp;
+Values
+[]string
+[Ianuarius Februarius Martius Aprilis Maius Iunius Iulius Augustus September October November December]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap03.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap03.go</a>.</div></p>
+
+<p>A nakonec si ukážeme iteraci přes všechny prvky uložené v&nbsp;mapě:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/linkedhashmap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+&nbsp;
+        it := <strong>m.Iterator()</strong>
+        for <strong>it.Next()</strong> {
+                key, value := <strong>it.Key()</strong>, <strong>it.Value()</strong>
+                fmt.Printf("%-10s \t %-10s \t %T\n", key, value, value)
+        }
+}
+</pre>
+
+<p>Iteruje se přes prvky se zachováním pořadí jejich vložení do mapy:</p>
+
+<pre>
+Leden            Ianuarius       string
+Únor             Februarius      string
+Březen           Martius         string
+Duben            Aprilis         string
+Květen           Maius           string
+Červen           Iunius          string
+Červenec         Iulius          string
+Srpen            Augustus        string
+Září             September       string
+Říjen            October         string
+Listopad         November        string
+Prosinec         December        string
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zdrojový kód tohoto demonstračního
+příkladu je dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap04.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap04.go</a>.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Mapy s&nbsp;obousměrným mapováním &ndash; bi-directional map</h2>
+
+<p>Všechny tři implementace map, které jsme si až doposud popsali, tedy
+konkrétně balíčky <strong>hashmap</strong>, <strong>treemap</strong> i
+<strong>linkedhashmap</strong>, realizovaly klasicky pojaté mapy, u nichž je
+zajištěna unikátnost klíčů. To znamená, že v&nbsp;mapě se může každý klíč
+použít maximálně jen jedenkrát, čímž je zaručeno, že lze jednoznačně pro zadaný
+klíč přečíst hodnotu (tedy vlastní mapování), popř.&nbsp;zjistit, že taková
+hodnota neexistuje. Ovšem nic nám ve skutečnosti nebrání ve vytvoření odlišné,
+poněkud sofistikovanější datové struktury, u níž bude možné jak přečíst hodnotu
+na základě klíče, tak i klíč na základě hodnoty, tedy provést mapování opačným
+směrem. A právě tyto sice poněkud méně často používané, ale stále velmi
+užitečné datové kontejnery nalezneme i v&nbsp;knihovně Go18DS. Konkrétně se
+jedná o kontejnery <i>HashBidiMap</i> a <i>TreeBidiMap</i>, kde
+&bdquo;bidi&ldquo; znamená &bdquo;bi-directional&ldquo;.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Kontejner typu <strong>HashBidiMap</strong></h2>
+
+<p>Podívejme se nyní na kontejner typu <strong>HashBidiMap</strong>, což je
+implementace &bdquo;obousměrné&ldquo; mapy, v&nbsp;níž se interně prvky
+rozřazují na základě hešovací funkce aplikované na hodnoty klíčů. Nejprve si
+ukažme konstrukci této mapy a použití nám již velmi dobře známé metody
+<strong>Put</strong> určené pro vložení prvku do mapy:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashbidimap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu je patrné, že se skutečně používá
+hešovací funkce, která prvky &bdquo;rozhodí&ldquo;:</p>
+
+<pre>
+HashBidiMap
+{map[]}
+HashBidiMap
+{map[Leden:Ianuarius]}
+HashBidiMap
+{map[Leden:Ianuarius Únor:Februarius]}
+HashBidiMap
+{map[Březen:Martius Leden:Ianuarius Únor:Februarius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Leden:Ianuarius Únor:Februarius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius Červenec:Iulius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Únor:Februarius Červen:Iunius Červenec:Iulius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]}
+HashBidiMap
+{map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Prosinec:December Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Metody <strong>Get</strong> a <strong>GetKey</strong></h2>
+
+<p>U &bdquo;obousměrných&ldquo; map nalezneme jak již nám dobře známou operaci
+<strong>Get</strong>, tak i operaci <strong>GetKey</strong>, která vrátí klíč
+na základě zadané hodnoty (což je ono opačné mapování). Podívejme se nyní na
+chování této operace:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashbidimap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := mapImpl.New[string, string]()
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                m.Put(cz[i], lat[i])
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        fmt.Println(<strong>m.Get("Leden")</strong>)
+        fmt.Println(<strong>m.Get("Srpenec")</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println(<strong>m.GetKey("Ianuarius")</strong>)
+        fmt.Println(<strong>m.GetKey("xyzzy")</strong>)
+}
+</pre>
+
+<p>Výsledek všech čtyř řádků s&nbsp;operacemi <strong>Get</strong> a
+<strong>GetKey</strong>:</p>
+
+<pre>
+Ianuarius true
+ false
+&nbsp;
+Leden true
+ false
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na druhém a posledním řádku se vrátí
+prázdný řetězec a hodnota <strong>false</strong> značící, že klíč
+(popř.&nbsp;hodnota) nebyly v&nbsp;mapě nalezeny.</div></p>
+
+<p>Všechny ostatní operace jsou i v&nbsp;případě &bdquo;obousměrných&ldquo; map
+zachovány:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashbidimap"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.New[string, string]()</strong>
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+        }
+&nbsp;
+        fmt.Println("Metadata")
+        fmt.Println("Empty?", <strong>m.Empty()</strong>)
+        fmt.Println("Size", <strong>m.Size()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Keys")
+        fmt.Printf("%T\n", <strong>m.Keys()</strong>)
+        fmt.Println(<strong>m.Keys()</strong>)
+&nbsp;
+        fmt.Println()
+        fmt.Println("Values")
+        fmt.Printf("%T\n", <strong>m.Values()</strong>)
+        fmt.Println(<strong>m.Values()</strong>)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+Metadata
+Empty? false
+Size 12
+&nbsp;
+Keys
+[]string
+[Listopad Leden Únor Květen Červen Srpen Září Březen Duben Červenec Říjen Prosinec]
+&nbsp;
+Values
+[]string
+[Martius Iunius October December September November Ianuarius Februarius Aprilis Maius Iulius Augustus]
+</pre>
+
+<p>Ukázka toho, že kvůli nutnosti zachování unikátnosti hodnot se operací
+<strong>m.Put(4, 1)</strong> do mapy nevloží další prvek, ale přepíše se prvek
+stávající:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/hashbidimap"</strong>
+)
+&nbsp;
+func main() {
+        m := <strong>mapImpl.New[int, int]()</strong>
+&nbsp;
+        <strong>m.Put(1, 1)</strong>
+        <strong>m.Put(2, 2)</strong>
+        <strong>m.Put(3, 3)</strong>
+&nbsp;
+        fmt.Println("Size", m.Size())
+        fmt.Println("Keys", m.Keys())
+        fmt.Println("Values", m.Values())
+&nbsp;
+        fmt.Println()
+&nbsp;
+        <strong>m.Put(4, 1)</strong>
+&nbsp;
+        fmt.Println("Size", m.Size())
+        fmt.Println("Keys", m.Keys())
+        fmt.Println("Values", m.Values())
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+Size 3
+Keys [1 2 3]
+Values [1 2 3]
+&nbsp;
+Size 3
+Keys [4 2 3]
+Values [1 2 3]
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Kontejner typu <strong>TreeBidiMap</strong></h2>
+
+<p>Poslední implementací mapy v&nbsp;knihovně Go18DS je kontejner typu
+<strong>TreeBidiMap</strong>, tedy &bdquo;obousměrná&ldquo; mapa
+s&nbsp;uložením prvků do červeno-černého stromu. Mapa by tedy měla prvky řadit
+podle jejich klíčů, o čemž se ostatně můžeme velmi snadno přesvědčit
+(povšimněte si nutnosti specifikace komparátoru pro porovnávání hodnot):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        <strong>mapImpl "github.com/daichi-m/go18ds/maps/treebidimap"</strong>
+        <strong>"github.com/daichi-m/go18ds/utils"</strong>
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := <strong>mapImpl.NewWith(utils.StringComparator, utils.StringComparator)</strong>
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                <strong>m.Put(cz[i], lat[i])</strong>
+                fmt.Println(m)
+        }
+}
+</pre>
+
+<p>Výsledkem je mapa, jejíž prvky jsou v&nbsp;každém okamžiku správně seřazeny
+podle klíčů:</p>
+
+<pre>
+TreeBidiMap
+map[]
+TreeBidiMap
+map[Leden:Ianuarius]
+TreeBidiMap
+map[Leden:Ianuarius Únor:Februarius]
+TreeBidiMap
+map[Březen:Martius Leden:Ianuarius Únor:Februarius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Leden:Ianuarius Únor:Februarius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+TreeBidiMap
+map[Březen:Martius Duben:Aprilis Květen:Maius Leden:Ianuarius Listopad:November Prosinec:December Srpen:Augustus Září:September Únor:Februarius Červen:Iunius Červenec:Iulius Říjen:October]
+</pre>
+
+<p>Chování metod <strong>Get</strong> a <strong>GetKey</strong> je
+zachováno:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        mapImpl "github.com/daichi-m/go18ds/maps/treebidimap"
+        "github.com/daichi-m/go18ds/utils"
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := mapImpl.NewWith(utils.StringComparator, utils.StringComparator)
+        fmt.Println(m)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                m.Put(cz[i], lat[i])
+                fmt.Println(m)
+        }
+&nbsp;
+        fmt.Println()
+        fmt.Println(m.Get("Leden"))
+        fmt.Println(m.Get("Srpenec"))
+&nbsp;
+        fmt.Println()
+        fmt.Println(m.GetKey("Ianuarius"))
+        fmt.Println(m.GetKey("xyzzy"))
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+Ianuarius true
+ false
+&nbsp;
+Leden true
+ false
+</pre>
+
+<p>Stejně je zachováno i chování metod <strong>Empty</strong>,
+<strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        mapImpl "github.com/daichi-m/go18ds/maps/treebidimap"
+        "github.com/daichi-m/go18ds/utils"
+)
+&nbsp;
+func main() {
+        cz := []string{
+                "Leden",
+                "Únor",
+                "Březen",
+                "Duben",
+                "Květen",
+                "Červen",
+                "Červenec",
+                "Srpen",
+                "Září",
+                "Říjen",
+                "Listopad",
+                "Prosinec",
+        }
+&nbsp;
+        lat := []string{
+                "Ianuarius",
+                "Februarius",
+                "Martius",
+                "Aprilis",
+                "Maius",
+                "Iunius",
+                "Iulius",
+                "Augustus",
+                "September",
+                "October",
+                "November",
+                "December",
+        }
+&nbsp;
+        m := mapImpl.NewWith(utils.StringComparator, utils.StringComparator)
+&nbsp;
+        for i := 0; i &lt; len(cz); i++ {
+                m.Put(cz[i], lat[i])
+        }
+&nbsp;
+        fmt.Println("Metadata")
+        fmt.Println("Empty?", m.Empty())
+        fmt.Println("Size", m.Size())
+&nbsp;
+        fmt.Println()
+        fmt.Println("Keys")
+        fmt.Printf("%T\n", m.Keys())
+        fmt.Println(m.Keys())
+&nbsp;
+        fmt.Println()
+        fmt.Println("Values")
+        fmt.Printf("%T\n", m.Values())
+        fmt.Println(m.Values())
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<p>Ovšem <i>pozor</i> &ndash; hodnoty jsou taktéž vráceny formou seřazeného
+řezu!:</p>
+
+<pre>
+Metadata
+Empty? false
+Size 12
+&nbsp;
+Keys
+[]string
+[Březen Duben Květen Leden Listopad Prosinec Srpen Září Únor Červen Červenec Říjen]
+&nbsp;
+Values
+[]string
+[Aprilis Augustus December Februarius Ianuarius Iulius Iunius Maius Martius November October September]
+</pre>
+
+<p>A konečně chování obousměrné mapy při snaze o vložení prvku s&nbsp;hodnotou,
+která již v&nbsp;mapě existuje:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        mapImpl "github.com/daichi-m/go18ds/maps/treebidimap"
+        "github.com/daichi-m/go18ds/utils"
+)
+&nbsp;
+func main() {
+        m := mapImpl.NewWith(utils.NumberComparator[int], utils.NumberComparator[int])
+&nbsp;
+        m.Put(1, 1)
+        m.Put(2, 2)
+        m.Put(3, 3)
+&nbsp;
+        fmt.Println("Size", m.Size())
+        fmt.Println("Keys", m.Keys())
+        fmt.Println("Values", m.Values())
+&nbsp;
+        fmt.Println()
+&nbsp;
+        m.Put(4, 1)
+&nbsp;
+        fmt.Println("Size", m.Size())
+        fmt.Println("Keys", m.Keys())
+        fmt.Println("Values", m.Values())
+}
+</pre>
+
+<p>Výsledek by nás již neměl překvapit:</p>
+
+<pre>
+Size 3
+Keys [1 2 3]
+Values [1 2 3]
+&nbsp;
+Size 3
+Keys [2 3 4]
+Values [1 2 3]
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Benchmark pro porovnání různých implementací map</h2>
+
+<p>Víme již, že jednotlivé implementace map se od sebe odlišují především svým
+chováním (jak jsou uspořádány prvky atd.). Liší se však i vnitřní strukturou a
+tím pádem i složitostí jednotlivých operací. Pro zjištění časové složitosti
+obou základních operací, tedy <strong>Put</strong> a <strong>Get</strong>,
+vznikl následující benchmark:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+&nbsp;
+        "github.com/daichi-m/go18ds/maps"
+        "github.com/daichi-m/go18ds/maps/hashbidimap"
+        "github.com/daichi-m/go18ds/maps/hashmap"
+        "github.com/daichi-m/go18ds/maps/linkedhashmap"
+        "github.com/daichi-m/go18ds/maps/treebidimap"
+        "github.com/daichi-m/go18ds/maps/treemap"
+&nbsp;
+        "github.com/daichi-m/go18ds/utils"
+)
+&nbsp;
+const max = 1000
+&nbsp;
+func <strong>filledMapCheck</strong>(b *testing.B, m maps.Map[int, int]) {
+        if m.Empty() {
+                b.Fail()
+        }
+&nbsp;
+        if m.Size() != b.N {
+                b.Fail()
+        }
+}
+&nbsp;
+func <strong>BenchmarkHashMapPut</strong>(b *testing.B) {
+        m := hashmap.New[int, int]()
+        for i := 0; i &lt; b.N; i++ {
+                m.Put(i, i)
+        }
+&nbsp;
+        filledMapCheck(b, m)
+}
+&nbsp;
+func <strong>BenchmarkLinkedHashMapPut</strong>(b *testing.B) {
+        m := linkedhashmap.New[int, int]()
+        for i := 0; i &lt; b.N; i++ {
+                m.Put(i, i)
+        }
+&nbsp;
+        filledMapCheck(b, m)
+}
+&nbsp;
+func <strong>BenchmarkTreeMapPut</strong>(b *testing.B) {
+        m := treemap.NewWithIntComparator[int]()
+        for i := 0; i &lt; b.N; i++ {
+                m.Put(i, i)
+        }
+&nbsp;
+        filledMapCheck(b, m)
+}
+&nbsp;
+func <strong>BenchmarkHashBidiMapPut</strong>(b *testing.B) {
+        m := hashbidimap.New[int, int]()
+        for i := 0; i &lt; b.N; i++ {
+                m.Put(i, i)
+        }
+&nbsp;
+        filledMapCheck(b, m)
+}
+&nbsp;
+func <strong>BenchmarkTreeBidiMapPut</strong>(b *testing.B) {
+        m := treebidimap.NewWith(utils.NumberComparator[int], utils.NumberComparator[int])
+        for i := 0; i &lt; b.N; i++ {
+                m.Put(i, i)
+        }
+&nbsp;
+        filledMapCheck(b, m)
+}
+&nbsp;
+func <strong>fillInMap</strong>(m maps.Map[int, int], max int) {
+        for i := 0; i &lt; max; i++ {
+                m.Put(i, i)
+        }
+}
+&nbsp;
+func <strong>getFromMap</strong>(b *testing.B, m maps.Map[int, int], max int) {
+        for i := 0; i &lt; b.N; i++ {
+                for j := 0; j &lt; max; j++ {
+                        val, found := m.Get(j)
+                        if !found {
+                                b.Fail()
+                        }
+                        if val != j {
+                                b.Fail()
+                        }
+                }
+        }
+}
+&nbsp;
+func <strong>BenchmarkHashMapGet</strong>(b *testing.B) {
+        m := hashmap.New[int, int]()
+&nbsp;
+        fillInMap(m, max)
+        getFromMap(b, m, max)
+}
+&nbsp;
+func <strong>BenchmarkLinkedHashMapGet</strong>(b *testing.B) {
+        m := linkedhashmap.New[int, int]()
+&nbsp;
+        fillInMap(m, max)
+        getFromMap(b, m, max)
+}
+&nbsp;
+func <strong>BenchmarkTreeMapGet</strong>(b *testing.B) {
+        m := treemap.NewWithIntComparator[int]()
+&nbsp;
+        fillInMap(m, max)
+        getFromMap(b, m, max)
+}
+&nbsp;
+func <strong>BenchmarkHashBidiMapGet</strong>(b *testing.B) {
+        m := hashbidimap.New[int, int]()
+&nbsp;
+        fillInMap(m, max)
+        getFromMap(b, m, max)
+}
+&nbsp;
+func <strong>BenchmarkTreeBidiMapGet</strong>(b *testing.B) {
+        m := treebidimap.NewWith(utils.NumberComparator[int], utils.NumberComparator[int])
+&nbsp;
+        fillInMap(m, max)
+        getFromMap(b, m, max)
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Výsledky benchmarku pro mapy s&nbsp;relativně malým počtem prvků</h2>
+
+<p>Pro zjištění, jak se chová kód, který ještě nebyl dostatečně
+&bdquo;zahřátý&ldquo; (využití cache atd.) zavoláme benchmark s&nbsp;nastavením
+N=1:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=1x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkHashMapPut-8                  1              1565 ns/op
+BenchmarkLinkedHashMapPut-8            1              4550 ns/op
+BenchmarkTreeMapPut-8                  1              1189 ns/op
+BenchmarkHashBidiMapPut-8              1              4326 ns/op
+BenchmarkTreeBidiMapPut-8              1              1929 ns/op
+BenchmarkHashMapGet-8                  1            102056 ns/op
+BenchmarkLinkedHashMapGet-8            1            147455 ns/op
+BenchmarkTreeMapGet-8                  1            195639 ns/op
+BenchmarkHashBidiMapGet-8              1            235507 ns/op
+BenchmarkTreeBidiMapGet-8              1            419239 ns/op
+</pre>
+
+<p>Částečně podle předpokladů je nejpomalejší operací získání hodnoty
+z&nbsp;obousměrné mapy založené na stromech.</p>
+
+<p>Benchmark následně spustíme s&nbsp;N=100 (mapy spíše malé velikosti):</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=100x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkHashMapPut-8                100               192.6 ns/op
+BenchmarkLinkedHashMapPut-8          100               306.3 ns/op
+BenchmarkTreeMapPut-8                100               216.8 ns/op
+BenchmarkHashBidiMapPut-8            100               415.2 ns/op
+BenchmarkTreeBidiMapPut-8            100               528.6 ns/op
+BenchmarkHashMapGet-8                100             20457 ns/op
+BenchmarkLinkedHashMapGet-8          100             16144 ns/op
+BenchmarkTreeMapGet-8                100             63647 ns/op
+BenchmarkHashBidiMapGet-8            100             16347 ns/op
+BenchmarkTreeBidiMapGet-8            100             53554 ns/op
+</pre>
+
+<p>U hashmap prozatím nedojde ke kolizím a proto je práce s&nbsp;nimi
+nejrychlejší.</p>
+
+<p>Totéž platí pro N=10000</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=10000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkHashMapPut-8              10000                72.59 ns/op
+BenchmarkLinkedHashMapPut-8        10000               174.4 ns/op
+BenchmarkTreeMapPut-8              10000               170.7 ns/op
+BenchmarkHashBidiMapPut-8          10000               197.6 ns/op
+BenchmarkTreeBidiMapPut-8          10000               507.0 ns/op
+BenchmarkHashMapGet-8              10000             15136 ns/op
+BenchmarkLinkedHashMapGet-8        10000             14571 ns/op
+BenchmarkTreeMapGet-8              10000             61552 ns/op
+BenchmarkHashBidiMapGet-8          10000             15729 ns/op
+BenchmarkTreeBidiMapGet-8          10000             50818 ns/op
+</pre>
+
+<p>Stále je <strong>Put</strong> nejrychlejší pro hashmapu, což znamená, že i
+pro 10000 prvků je počet kolizí pravděpodobně velmi malý.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Výsledky benchmarku pro větší počet prvků</h2>
+
+<p>Hodnotu N nyní zvýšíme na 1000000x, čímž mj.&nbsp;zvýšíme počet kolizí
+v&nbsp;případě zahešovaných klíčů. A výsledek je patrný &ndash; operace
+<strong>Put</strong> již u hešovacích map není nejrychlejší, naopak je
+nejrychlejší prosté zařazování prvků do stromové struktury. Na druhou stranu je
+však získání prvků ze stromu operací <strong>Get</strong> výrazně
+nejpomalejší:</p>
+
+<pre>
+$ <strong>go test -bench=.  -benchtime=1000000x</strong>
+&nbsp;
+goos: linux
+goarch: amd64
+pkg: x
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkHashMapPut-8            1000000               333.6 ns/op
+BenchmarkLinkedHashMapPut-8      1000000               361.8 ns/op
+BenchmarkTreeMapPut-8            1000000               232.4 ns/o
+BenchmarkHashBidiMapPut-8        1000000               486.7 ns/op
+BenchmarkTreeBidiMapPut-8        1000000               657.2 ns/op
+BenchmarkHashMapGet-8            1000000             17671 ns/op
+BenchmarkLinkedHashMapGet-8      1000000             18113 ns/op
+BenchmarkTreeMapGet-8            1000000             71979 ns/op
+BenchmarkHashBidiMapGet-8        1000000             20001 ns/op
+BenchmarkTreeBidiMapGet-8        1000000             59455 ns/op
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pokud nám tedy nezáleží na zachování
+pořadí prvků ani na jejich seřazení podle klíče, je vhodné zůstat u klasických
+hešovacích map.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Shrnutí &ndash; všechny datové kontejnery poskytované knihovnou Go18DS</h2>
+
+<p>V&nbsp;následující tabulce jsou uvedeny všechny datové kontejnery, které
+jsou poskytované knihovnou Go18DS. U každého kontejneru je uveden i odkaz na
+odpovídající článek a kapitolu s&nbsp;popisem daného kontejneru:</p>
+
+<table>
+<tr><th>Kontejner</th><th>Překlad</th></tr>
+<tr><td>List</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k06">seznam</a></td></tr>
+<tr><td>Set</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k17">množina</a></td></tr>
+<tr><td>Stack</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go/#k14">zásobník</a></td></tr>
+<tr><td>Tree</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go-2/#k02">strom</a></td></tr>
+<tr><td>BinaryHeap</td><td><a href="https://www.root.cz/clanky/knihovny-s-implementaci-generickych-datovych-typu-pro-programovaci-jazyk-go-2/#08">binární halda</a></td></tr>
+<tr><td>Map</td><td><a href="#k01">mapa</a></td></tr>
+</table>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Všechny implementace kontejnerů poskytovaných knihovnou Go18DS</h2>
+
+<p>Každý z&nbsp;kontejnerů zmíněných <a href="#k17">v&nbsp;předchozí
+kapitole</a> existuje v&nbsp;několika implementacích, které se od sebe odlišují
+svou interní strukturou a mnohdy i rozdílným chováním (viz příklady map
+s&nbsp;prvky bez specifikovaného pořadí, setříděnými prvky podle klíče nebo
+s&nbsp;prvky uspořádanými podle toho, kdy byl prvek do mapy vložen). Všechny
+tyto implementace jsme si již popsali a jsou vypsány v&nbsp;další tabulce:</p>
+
+<table>
+<tr><th>Rozhraní (typ kontejneru)</th><th>Implementace kontejneru</th></tr>
+<tr><td>List</td><td>ArrayList SinglyLinkedList DoublyLinkedList</td></tr>
+<tr><td>Set</td><td>HashSet TreeSet LinkedHashSet</td></tr>
+<tr><td>Stack</td><td>LinkedListStack ArrayStack</td></tr>
+<tr><td>Tree</td><td>RedBlackTree AVLTree BTree BinaryHeap</td></tr>
+<tr><td>Map</td><td>HashMap TreeMap LinkedHashMap HashBidiMap TreeBidiMap</td></tr>
+</table>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly
+uloženy do nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý,
+dnes má přibližně stovku kilobajtů), můžete namísto toho použít odkazy
+na jednotlivé demonstrační příklady, které naleznete v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>arraylist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist01.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist01.go</a></td></tr>
+<tr><td> 2</td><td>arraylist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist02.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist02.go</a></td></tr>
+<tr><td> 3</td><td>arraylist03.go</td><td>pokus o přidání prvků odlišného datového typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist03.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist03.go</a></td></tr>
+<tr><td> 4</td><td>arraylist04.go</td><td>pokus o přidání prvků odlišného datového typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist04.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist04.go</a></td></tr>
+<tr><td> 5</td><td>arraylist05.go</td><td>vymazání všech prvků ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist05.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist05.go</a></td></tr>
+<tr><td> 6</td><td>arraylist06.go</td><td>test na existenci prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist06.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist06.go</a></td></tr>
+<tr><td> 7</td><td>arraylist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist07.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist07.go</a></td></tr>
+<tr><td> 8</td><td>arraylist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist08.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist08.go</a></td></tr>
+<tr><td> 9</td><td>arraylist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist09.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist09.go</a></td></tr>
+<tr><td>10</td><td>arraylist10.go</td><td>operace Sort - setřídění prvků v seznamu typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist10.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist10.go</a></td></tr>
+<tr><td>11</td><td>arraylist11.go</td><td>implementace iterátoru nad seznamem typu arraylist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraylist11.go">https://github.com/tisnik/go-root/blob/master/article_92/arraylist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>singlylinkedlist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist01.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist01.go</a></td></tr>
+<tr><td>13</td><td>singlylinkedlist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist02.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist02.go</a></td></tr>
+<tr><td>14</td><td>singlylinkedlist03.go</td><td>pokus o přidání prvků odlišného datového typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist03.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist03.go</a></td></tr>
+<tr><td>15</td><td>singlylinkedlist04.go</td><td>pokus o přidání prvků odlišného datového typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist04.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist04.go</a></td></tr>
+<tr><td>16</td><td>singlylinkedlist05.go</td><td>vymazání všech prvků ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist05.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist05.go</a></td></tr>
+<tr><td>17</td><td>singlylinkedlist06.go</td><td>test na existenci prvků v seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist06.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist06.go</a></td></tr>
+<tr><td>18</td><td>singlylinkedlist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist07.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist07.go</a></td></tr>
+<tr><td>19</td><td>singlylinkedlist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist08.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist08.go</a></td></tr>
+<tr><td>20</td><td>singlylinkedlist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu singlylinkedlist </td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist09.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist09.go</a></td></tr>
+<tr><td>21</td><td>singlylinkedlist10.go</td><td>operace Sort - setřídění prvků v seznamu typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist10.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist10.go</a></td></tr>
+<tr><td>22</td><td>singlylinkedlist11.go</td><td>implementace iterátoru nad seznamem typu singlylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist11.go">https://github.com/tisnik/go-root/blob/master/article_92/singlylinkedlist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>23</td><td>doublylinkedlist01.go</td><td>konstrukce seznamu s přidáním prvků pro seznam typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist01.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist01.go</a></td></tr>
+<tr><td>24</td><td>doublylinkedlist02.go</td><td>přidání nových prvků do seznamu metodou Add pro seznam typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist02.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist02.go</a></td></tr>
+<tr><td>25</td><td>doublylinkedlist03.go</td><td>pokus o přidání prvků odlišného datového typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist03.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist03.go</a></td></tr>
+<tr><td>26</td><td>doublylinkedlist04.go</td><td>pokus o přidání prvků odlišného datového typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist04.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist04.go</a></td></tr>
+<tr><td>27</td><td>doublylinkedlist05.go</td><td>vymazání všech prvků ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist05.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist05.go</a></td></tr>
+<tr><td>28</td><td>doublylinkedlist06.go</td><td>test na existenci prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist06.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist06.go</a></td></tr>
+<tr><td>29</td><td>doublylinkedlist07.go</td><td>přečtení prvků se zadaným indexem ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist07.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist07.go</a></td></tr>
+<tr><td>30</td><td>doublylinkedlist08.go</td><td>odstranění prvků se zadaným indexem ze seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist08.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist08.go</a></td></tr>
+<tr><td>31</td><td>doublylinkedlist09.go</td><td>operace Swap - prohození dvou prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist09.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist09.go</a></td></tr>
+<tr><td>32</td><td>doublylinkedlist10.go</td><td>operace Sort - setřídění prvků v seznamu typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist10.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist10.go</a></td></tr>
+<tr><td>33</td><td>doublylinkedlist11.go</td><td>implementace iterátoru nad seznamem typu doublylinkedlist</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist11.go">https://github.com/tisnik/go-root/blob/master/article_92/doublylinkedlist11.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>34</td><td>arraystack01.go</td><td>operace <strong>Push</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack01.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack01.go</a></td></tr>
+<tr><td>35</td><td>arraystack02.go</td><td>operace <strong>Pop</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack02.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack02.go</a></td></tr>
+<tr><td>36</td><td>arraystack03.go</td><td>operace <strong>Peek</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack03.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack03.go</a></td></tr>
+<tr><td>37</td><td>arraystack04.go</td><td>metody <strong>Size</strong> a <strong>Empty</strong> nad zásobníkem typu arraystack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/arraystack04.go">https://github.com/tisnik/go-root/blob/master/article_92/arraystack04.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>38</td><td>linkedliststack01.go</td><td>operace <strong>Push</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack01.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack01.go</a></td></tr>
+<tr><td>39</td><td>linkedliststack02.go</td><td>operace <strong>Pop</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack02.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack02.go</a></td></tr>
+<tr><td>40</td><td>linkedliststack03.go</td><td>operace <strong>Peek</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack03.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack03.go</a></td></tr>
+<tr><td>41</td><td>linkedliststack04.go</td><td>metody <strong>Size</strong> a <strong>Empty</strong> nad zásobníkem typu linkedliststack</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack04.go">https://github.com/tisnik/go-root/blob/master/article_92/linkedliststack04.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>42</td><td>stack_rpn.go</td><td>vyhodnocení výrazu zapsaného v&nbsp;RPN</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn.go">https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn.go</a></td></tr>
+<tr><td>43</td><td>stack_rpn_B.go</td><td>vyhodnocení výrazu zapsaného v&nbsp;RPN, použití odlišné implementace zásobníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn_B.go">https://github.com/tisnik/go-root/blob/master/article_92/stack_rpn_B.go</a></td></tr>
+<tr><td>44</td><td>rpn.go</td><td>vyhodnocení aritmetického výrazu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/rpn.go">https://github.com/tisnik/go-root/blob/master/article_92/rpn.go</a></td></tr>
+<tr><td>45</td><td>erasthotenes.go</td><td>implementace Eratosthenova síta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_92/erasthotenes.go">https://github.com/tisnik/go-root/blob/master/article_92/erasthotenes.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>46</td><td>avl-tree01.go</td><td>přidání prvků do stromu, výpis struktury stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree01.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree01.go</a></td></tr>
+<tr><td>47</td><td>avl-tree02.go</td><td>iterace přes všechny prvky stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree02.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree02.go</a></td></tr>
+<tr><td>48</td><td>avl-tree03.go</td><td>přečtení všech prvků uložených ve stromu (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree03.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree03.go</a></td></tr>
+<tr><td>49</td><td>avl-tree04.go</td><td>získání obsahů prvků (AVL-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/avl-tree04.go">https://github.com/tisnik/go-root/blob/master/article_93/avl-tree04.go</a></td></tr>
+<tr><td>50</td><td>rb-tree01.go</td><td>přidání prvků do stromu, výpis struktury stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree01.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree01.go</a></td></tr>
+<tr><td>51</td><td>rb-tree02.go</td><td>iterace přes všechny prvky stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree02.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree02.go</a></td></tr>
+<tr><td>52</td><td>rb-tree03.go</td><td>přečtení všech prvků uložených ve stromu (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree03.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree03.go</a></td></tr>
+<tr><td>53</td><td>rb-tree04.go</td><td>získání obsahů prvků (RB-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/rb-tree04.go">https://github.com/tisnik/go-root/blob/master/article_93/rb-tree04.go</a></td></tr>
+<tr><td>54</td><td>btree01.go</td><td>konstrukce B-stromu řádu 3</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree01.go">https://github.com/tisnik/go-root/blob/master/article_93/btree01.go</a></td></tr>
+<tr><td>55</td><td>btree02.go</td><td>konstrukce B-stromu řádu 4</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree02.go">https://github.com/tisnik/go-root/blob/master/article_93/btree02.go</a></td></tr>
+<tr><td>56</td><td>btree03.go</td><td>konstrukce B-stromu řádu 20</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree03.go">https://github.com/tisnik/go-root/blob/master/article_93/btree03.go</a></td></tr>
+<tr><td>57</td><td>btree04.go</td><td>iterace přes všechny prvky stromu (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree04.go">https://github.com/tisnik/go-root/blob/master/article_93/btree04.go</a></td></tr>
+<tr><td>58</td><td>btree05.go</td><td>přečtení všech prvků uložených ve stromu (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree05.go">https://github.com/tisnik/go-root/blob/master/article_93/btree05.go</a></td></tr>
+<tr><td>59</td><td>btree06.go</td><td>získání obsahů prvků (B-stromy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/btree06.go">https://github.com/tisnik/go-root/blob/master/article_93/btree06.go</a></td></tr>
+<tr><td>60</td><td>binary_heap01.go</td><td>konstrukce binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap01.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap01.go</a></td></tr>
+<tr><td>61</td><td>binary_heap02.go</td><td>přidání prvků do binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap02.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap02.go</a></td></tr>
+<tr><td>62</td><td>binary_heap03.go</td><td>iterace přes všechny prvky binární haldy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/binary_heap03.go">https://github.com/tisnik/go-root/blob/master/article_93/binary_heap03.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>63</td><td>lists_test.go</td><td>benchmark &ndash; operace se seznamy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/lists_test.go">https://github.com/tisnik/go-root/blob/master/article_93/lists_test.go</a></td></tr>
+<tr><td>64</td><td>tree_test.go</td><td>benchmark &ndash; operace se stromy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_93/tree_test.go">https://github.com/tisnik/go-root/blob/master/article_93/tree_test.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>65</td><td>hashmap01.go</td><td>konstrukce hešovací mapy, metoda <strong>Put</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap01.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap01.go</a></td></tr>
+<tr><td>66</td><td>hashmap02.go</td><td>konstrukce hešovací mapy, metoda <strong>Get</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap02.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap02.go</a></td></tr>
+<tr><td>67</td><td>hashmap03.go</td><td>metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap03.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap03.go</a></td></tr>
+<tr><td>68</td><td>treemap01.go</td><td>konstrukce mapy založené na stromu, metoda <strong>Put</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treemap01.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap01.go</a></td></tr>
+<tr><td>69</td><td>treemap02.go</td><td>konstrukce mapy založené na stromu, metoda <strong>Get</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treemap02.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap02.go</a></td></tr>
+<tr><td>70</td><td>treemap03.go</td><td>metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treemap03.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap03.go</a></td></tr>
+<tr><td>71</td><td>treemap04.go</td><td>iterace přes všechny dvojice klíč-hodnota</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treemap04.go">https://github.com/tisnik/go-root/blob/master/article_94/treemap04.go</a></td></tr>
+<tr><td>72</td><td>linkedhashmap01.go</td><td>konstrukce hešovací mapy s&nbsp;lineárními seznamy pro prvky se stejným hešem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap01.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap01.go</a></td></tr>
+<tr><td>73</td><td>linkedhashmap02.go</td><td>konstrukce hešovací mapy s&nbsp;lineárními seznamy pro prvky se stejným hešem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap02.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap02.go</a></td></tr>
+<tr><td>74</td><td>linkedhashmap03.go</td><td>metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap03.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap03.go</a></td></tr>
+<tr><td>75</td><td>linkedhashmap04.go</td><td>iterace přes všechny dvojice klíč-hodnota</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap04.go">https://github.com/tisnik/go-root/blob/master/article_94/linkedhashmap04.go</a></td></tr>
+<tr><td>76</td><td>hashbidimap01.go</td><td>hešovací &bdquo;obousměrná&ldquo; mapa &ndash; konstrukce a přidání prvků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap01.go">https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap01.go</a></td></tr>
+<tr><td>77</td><td>hashbidimap02.go</td><td>hešovací &bdquo;obousměrná&ldquo; mapa &ndash; přečtení hodnoty či naopak klíče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap02.go">https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap02.go</a></td></tr>
+<tr><td>78</td><td>hashbidimap03.go</td><td>hešovací &bdquo;obousměrná&ldquo; mapa &ndash; metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap03.go">https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap03.go</a></td></tr>
+<tr><td>79</td><td>hashbidimap04.go</td><td>hešovací &bdquo;obousměrná&ldquo; mapa &ndash; mapování mezi celými čísly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap04.go">https://github.com/tisnik/go-root/blob/master/article_94/hashbidimap04.go</a></td></tr>
+<tr><td>80</td><td>treebidimap01.go</td><td>&bdquo;obousměrná&ldquo; mapa založená na stromu &ndash; konstrukce a přidání prvků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treebidimap01.go">https://github.com/tisnik/go-root/blob/master/article_94/treebidimap01.go</a></td></tr>
+<tr><td>81</td><td>treebidimap02.go</td><td>&bdquo;obousměrná&ldquo; mapa založená na stromu &ndash; přečtení hodnoty či naopak klíče</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treebidimap02.go">https://github.com/tisnik/go-root/blob/master/article_94/treebidimap02.go</a></td></tr>
+<tr><td>82</td><td>treebidimap03.go</td><td>&bdquo;obousměrná&ldquo; mapa založená na stromu &ndash; metody <strong>Empty</strong>, <strong>Size</strong>, <strong>Keys</strong> a <strong>Values</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treebidimap03.go">https://github.com/tisnik/go-root/blob/master/article_94/treebidimap03.go</a></td></tr>
+<tr><td>83</td><td>treebidimap04.go</td><td>&bdquo;obousměrná&ldquo; mapa založená na stromu &ndash; mapování mezi celými čísly</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/treebidimap04.go">https://github.com/tisnik/go-root/blob/master/article_94/treebidimap04.go</a></td></tr>
+<tr><td>84</td><td>hashmap01error.go</td><td>kontrola datových typů u operace <strong>Put</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap01error.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap01error.go</a></td></tr>
+<tr><td>85</td><td>hashmap02error.go</td><td>kontrola datových typů u operace <strong>Get</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/hashmap02error.go">https://github.com/tisnik/go-root/blob/master/article_94/hashmap02error.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>86</td><td>maps_test.go</td><td>benchmark &ndash; základní operace s&nbsp;mapami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_94/benchmarks/maps_test.go">https://github.com/tisnik/go-root/blob/master/article_94/benchmarks/maps_test.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Genfuncs &ndash; implements various functions utilizing Go's Generics to help avoid writing boilerplate code<br />
+<a href="https://github.com/nwillc/genfuncs">https://github.com/nwillc/genfuncs</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Fp-go is a collection of Functional Programming helpers powered by Golang 1.18+ generics<br />
+<a href="https://github.com/repeale/fp-go">https://github.com/repeale/fp-go</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://go.dev/ref/spec">https://go.dev/ref/spec</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Type parameters in Go<br />
+<a href="https://bitfieldconsulting.com/golang/type-parameters">https://bitfieldconsulting.com/golang/type-parameters</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go 1.18 Release Notes<br />
+<a href="https://golang.org/doc/go1.18">https://golang.org/doc/go1.18</a>
+</li>
+
+<li>Go 1.17 Release Notes<br />
+<a href="https://golang.org/doc/go1.17">https://golang.org/doc/go1.17</a>
+</li>
+
+<li>Go 1.16 Release Notes<br />
+<a href="https://golang.org/doc/go1.16">https://golang.org/doc/go1.16</a>
+</li>
+
+<li>Go 1.15 Release Notes<br />
+<a href="https://golang.org/doc/go1.15">https://golang.org/doc/go1.15</a>
+</li>
+
+<li>Go 1.14 Release Notes<br />
+<a href="https://golang.org/doc/go1.14">https://golang.org/doc/go1.14</a>
+</li>
+
+<li>Go 1.13 Release Notes<br />
+<a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a>
+</li>
+
+<li>Go 1.12 Release Notes<br />
+<a href="https://golang.org/doc/go1.12">https://golang.org/doc/go1.12</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>A Proposal for Adding Generics to Go<br />
+<a href="https://go.dev/blog/generics-proposal">https://go.dev/blog/generics-proposal</a>
+</li>
+
+<li>Proposal: Go should have generics<br />
+<a href="https://github.com/golang/proposal/blob/master/design/15292-generics.md">https://github.com/golang/proposal/blob/master/design/15292-generics.md</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>The missing slice package<br />
+<a href="https://github.com/ssoroka/slice">https://github.com/ssoroka/slice</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy (dokončení)<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/</a>
+</li>
+
+<li>Generické datové typy v jazyce Go?<br />
+<a href="https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/">https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/</a>
+</li>
+
+<li>GoDS (Go Data Structures)<br />
+<a href="https://github.com/emirpasic/gods">https://github.com/emirpasic/gods</a>
+</li>
+
+<li>Binární halda<br />
+<a href="https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda">https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_halda</a>
+</li>
+
+<li>Binární strom<br />
+<a href="https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_strom">https://cs.wikipedia.org/wiki/Bin%C3%A1rn%C3%AD_strom</a>
+</li>
+
+<li>AVL-strom<br />
+<a href="https://cs.wikipedia.org/wiki/AVL-strom">https://cs.wikipedia.org/wiki/AVL-strom</a>
+</li>
+
+<li>Červeno-černý strom<br />
+<a href="https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom">https://cs.wikipedia.org/wiki/%C4%8Cerveno-%C4%8Dern%C3%BD_strom</a>
+</li>
+
+<li>B-strom<br />
+<a href="https://cs.wikipedia.org/wiki/B-strom">https://cs.wikipedia.org/wiki/B-strom</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
