@@ -1,0 +1,1757 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Podpora programovacího paradigmatu založeného na tocích (dat) knihovnou glow</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Podpora programovacího paradigmatu založeného na tocích (dat) knihovnou glow</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku si popíšeme knihovnu nazvanou glow. Jedná se o knihovnu podporující paradigma FBP neboli Flow-Based Programming v programovacím jazyku Go. Na Glow je nejzajímavější způsob automatického odvození a následné kontroly datových typů prvků, které &bdquo;proudí&ldquo; grafem.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Podpora programovacího paradigmatu založeného na tocích (dat) knihovnou <i>glow</i></a></p>
+<p><a href="#k02">2. Krátké zopakování: programovací paradigma založené na tocích (dat)</a></p>
+<p><a href="#k03">3. Knihovna <strong>glow</strong></a></p>
+<p><a href="#k04">4. Instalace knihovny <strong>glow</strong></a></p>
+<p><a href="#k05">5. Ukázka toku <i>Reduce&rarr;Map</i> (nejjednodušší možný praktický příklad)</a></p>
+<p><a href="#k06">6. Realizace celého příkladu; výsledek výpočtu</a></p>
+<p><a href="#k07">7. Ukázka toku <i>Reduce&rarr;Map</i>, využití anonymních funkcí</a></p>
+<p><a href="#k08">8. Nepatrně složitější graf toku: <i>Map&rarr;Reduce&rarr;Map</i></a></p>
+<p><a href="#k09">9. Metoda <strong>Partition</strong></a></p>
+<p><a href="#k10">10. Využití operace <i>Partition</i> zajišťující distribuci vstupních dat</a></p>
+<p><a href="#k11">11. Import takzvaného <i>driveru</i>; podpora pro vizualizaci grafu toku</a></p>
+<p><a href="#k12">12. Bezproblémové použití odlišných typů dat v&nbsp;jednotlivých hranách grafu toku</a></p>
+<p><a href="#k13">13. Vliv parametru předaného operaci <i>Partition</i> na průběh výpočtu</a></p>
+<p><a href="#k14">14. Načtení a zpracování dat uložených v&nbsp;textovém souboru</a></p>
+<p><a href="#k15">15. Načítání strukturovaných souborů</a></p>
+<p><a href="#k16">16. Použití uživatelsky definovaných datových typů v&nbsp;celém řetězci zpracování</a></p>
+<p><a href="#k17">17. Operace typu <i>Sort</i></a></p>
+<p><a href="#k18">18. Problematika operace <i>Reduce</i> při agregaci výsledků</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Podpora programovacího paradigmatu založeného na tocích (dat) knihovnou <i>glow</i></h2>
+
+<p>V&nbsp;dnešním článku, jenž nepřímo navazuje na článek <a
+href="https://www.root.cz/clanky/programovaci-paradigma-zalozene-na-tocich-dat-a-knihovna-goflow/">Programovací
+paradigma založené na tocích (dat) a knihovna goflow</a>, si popíšeme knihovnu
+nazvanou <i>glow</i>. Jedná se o knihovnu podporující <i>FBP</i> neboli
+<i>Flow-Based Programming</i> v&nbsp;programovacím jazyku Go. Toto paradigma se
+poněkud odlišuje od dnes již klasického paradigmatu <i>dataflow</i> a zcela se
+odlišuje od imperativního programování. Některé společné vlastnosti ale i
+rozdíly mezi jednotlivými paradigmaty jsou shrnuty v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th>Vlastnost</th><th>Flow-based</th><th>Dataflow</th><th>Imperativní</th></tr>
+<tr><td>Základní myšlenka</td><td>data proudí mezi komponentami, které data transformují specifikovanými operacemi</td><td>data proudí mezi komponentami, které data transformují specifikovanými operacemi</td><td>operace jsou spouštěny nad daty v&nbsp;určitém přesně uvedeném pořadí a za určitých podmínek</td></tr>
+<tr><td>Programovací model</td><td>graf s&nbsp;propojenými komponentami</td><td>graf s&nbsp;propojenými komponentami</td><td>sekvence instrukcí popisujících jednotlivé operace i jejich návaznost</td></tr>
+<tr><td>Vizualizace modelu</td><td>graf toku dat</td><td>graf toku dat</td><td>vývojový diagram</td></tr>
+<tr><td>Reprezentace modelu</td><td>vizuální (graf) + zdrojový kód komponent</td><td>typicky vizuální</td><td>prakticky vždy formou zdrojového kódu</td></tr>
+<tr><td>Paralelizace</td><td>implicitní<br />(všechny operace mohou běžet paralelně)</td><td>implicitní nebo explicitní</td><td>explicitní<br />(paralelní běh musí být korektně popsán a naprogramován)</td></tr>
+<tr><td>Model řízení</td><td>aktivní<br />(komponenty si řídí svůj životní cyklus)</td><td>reaktivní<br />(komponenty jsou aktivovány externími událostmi)</td><td>aktivní<br />(komponenty si řídí svůj životní cyklus)</td></tr>
+</table>
+
+<img src="https://i.iinfo.cz/images/688/goflow1-10.png" class="image-572632" alt="foo" title='Autor: tisnik, podle licence: &lt;a href="https://creativecommons.org/publicdomain/mark/1.0/deed.en"&gt;Public Domain&lt;/a&gt;' width="641" height="193">
+<p><i>Obrázek 1: Příklad jednoduchého grafu s&nbsp;několika uzly, které si
+předávají data.</i></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Krátké zopakování: programovací paradigma založené na tocích (dat)</h2>
+
+<p><i>&bdquo;The real world is asynchronous: don't try to force everything into
+a synchronous framework derived from the architecture of early
+computers.&ldquo;<br />
+J. Paul Morrison, inventor/discoverer of Flow-Based Programming</i></p>
+
+<p>Zopakujme si nyní v&nbsp;krátkosti základní informace o programovacím
+paradigmatu založenému na tocích dat, které se v&nbsp;angličtině označuje
+zkratkou <i>FBP</i> znamenající <i>Flow-based programming</i>. Jedná se o
+paradigma, v&nbsp;němž se aplikace definují jako sítě procesů &ndash;
+&bdquo;černé skříňky&ldquo; &ndash;, které si mezi sebou posílají data
+předáváním zpráv předem definovanými cestami (tedy nikoli &bdquo;náhodně&ldquo;
+či libovolně, jako je tomu například v&nbsp;klasickém OOP). Tyto procesy neboli
+černé skříňky lze prakticky libovolně propojovat a vytvářet tak různé aplikace,
+aniž by bylo nutné je (tedy ony <i>procesy</i>) interně nějakým způsobem
+modifikovat. FBP je tedy paradigma, které zcela přirozeně vede k&nbsp;tvorbě
+více či méně samostatně pracujících komponent.</p>
+
+<p>V&nbsp;FBP se upouští od klasického (řekněme von Neumannovského) pohledu na
+aplikace jako na sekvenční proces. Namísto toho se aplikace modelují jako síť
+asynchronně běžících procesů, které si předávají data přes <i>buffery</i>
+(resp.&nbsp;přes <i>fronty</i>). Každý proces v&nbsp;FBP provádí činnost ve
+chvíli, kdy dostává vstupní data a díky oddělení procesů a jejich nezávislosti
+na ostatních procesech vlastně zcela zadarmo získáme plnou podporu pro
+paralelní (a samozřejmě i souběžný) běh aplikace jako celku &ndash; o to bez
+nutnosti explicitní práce s&nbsp;mutexy či s&nbsp;dalšími synchronizačními
+mechanismy.</p>
+
+<p><div class="rs-tip-major">Poznámka: každé programovací paradigma (kromě
+původního nestrukturovaného programování) vývojářům nabízí vyšší úrovně
+abstrakce, ovšem současně je i nutí se něčeho vzdát. V&nbsp;FBP se konkrétně
+vzdáváme explicitního řízení/určení pořadí provádění operací pro všechny
+vstupní události. To pochopitelně znamená, že FBP nemusí být výhodné pro
+všechny typy aplikací.</div></p>
+
+<p>Základními stavebními prvky při návrhu aplikace při použití paradigmatu FBP
+jsou <i>komponenty</i>. Interně se typicky jedná o třídy, struktury+metody
+(Go), uzávěry (<i>closure</i>) či někdy o obyčejné funkce popř.&nbsp;o funkce
+se statickými proměnnými (pokud tento koncept daný programovací jazyk vůbec
+podporuje). Instance <i>komponent</i> umístěné do grafu/sítě se nazývají
+<i>procesy</i>. Z&nbsp;jedné komponenty lze pochopitelně odvodit větší množství
+procesů.</p>
+
+<p>Jednotlivé procesy spolu nekomunikují přímo (voláním), ale příjmem dat na
+vstupních portech popř.&nbsp;posíláním dat na porty výstupní. Jednotlivá
+spojení (<i>connection</i>) mohou obsahovat buffery resp.&nbsp;přesněji řečeno
+fronty (<i>FIFO</i>, <i>queue</i>), typicky s&nbsp;předem nastavenou kapacitou
+(tedy maximálním počtem v&nbsp;dané chvíli čekajících zpráv). Některá propojení
+mohou mít kapacitu nastavenou na nulu; zde na sebe budou procesy čekat a
+navzájem se tak do jisté míry synchronizovat &ndash; posílání či příjem dat
+tedy může být blokující operací.</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Knihovna <strong>glow</strong></h2>
+
+<p>Knihovna <i>glow</i>, kterou se budeme v&nbsp;dnešním článku zabývat, celý
+koncept nepatrně upravuje, a to takovým způsobem, že komponentami jsou běžné
+anonymní nebo pojmenované funkce (popř.&nbsp;uzávěry &ndash; <i>closures</i>),
+namísto portů se přímo pracuje s&nbsp;parametry funkcí (vstupní porty) a
+návratovými hodnotami funkcí (výstupní porty). Navíc <i>glow</i>, na rozdíl od
+mnoha dalších podobně koncipovaných knihoven, umožňuje automatické odvození
+typů předávaných dat na základě typů parametrů a návratových hodnot. Výsledné
+programy tedy vypadají dosti odlišně od klasických <i>FBP</i> programů, jak
+ostatně uvidíme v&nbsp;navazujících kapitolách.</p>
+
+<p><div class="rs-tip-major">Poznámka: knihovna <i>Glow</i> může být použita
+pro zpracování dat na jediném počítači v&nbsp;rámci jediného procesu
+(s&nbsp;mnoha gorutinami), ovšem taktéž je možné spustit souběžné (a paralelní)
+zpracování na větším množství počítačů zapojených do clusteru.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Instalace knihovny <strong>glow</strong></h2>
+
+<p>Instalace této knihovny je jednoduchá. Postačuje si příkazem:</p>
+
+<pre>
+$ <strong>go mod init glow-test-1</strong>
+</pre>
+
+<p>vytvořit nový projektový soubor, který by měl vypadat následovně:</p>
+
+<pre>
+module glow-test-1
+&nbsp;  
+go 1.18
+</pre>
+
+<p>Dále ve stejném adresáři vytvoříme kostru programu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+&nbsp;
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.New()
+}
+
+</pre>
+
+<p>Po zadání příkazu:</p>
+
+<pre>
+$ <strong>go get .</strong>
+</pre>
+
+<p>by se měly nainstalovat všechny potřebné balíčky:</p>
+
+<pre>
+go: downloading github.com/chrislusf/glow v0.0.0-20181102060906-4c40a2717eee
+go: downloading github.com/psilva261/timsort v1.0.0
+go: added github.com/chrislusf/glow v0.0.0-20181102060906-4c40a2717eee
+go: added github.com/psilva261/timsort v1.0.0
+</pre>
+
+<p>A projektový soubor by se měl změnit do podoby:</p>
+
+<pre>
+module glow-test-1
+&nbsp;  
+go 1.18
+&nbsp;  
+require (
+        github.com/chrislusf/glow v0.0.0-20181102060906-4c40a2717eee // indirect
+        github.com/psilva261/timsort v1.0.0 // indirect
+)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;dalších demonstračních příkladech
+bude projektový soubor obsahovat ještě další dvě závislosti:</div></p>
+
+<pre>
+module glow-test-1
+&nbsp;  
+go 1.18
+&nbsp;  
+require (
+        github.com/chrislusf/glow v0.0.0-20181102060906-4c40a2717eee // indirect
+        github.com/golang/protobuf v1.5.2 // indirect
+        github.com/psilva261/timsort v1.0.0 // indirect
+        google.golang.org/protobuf v1.26.0 // indirect
+)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-0/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-0/</a>.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Ukázka toku <i>Reduce&rarr;Map</i> (nejjednodušší možný praktický příklad)</h2>
+
+<p>Ukažme si nyní nějaký reálněji pojatý příklad, v&nbsp;němž využijeme alespoň
+základní možnosti nabízené knihovnou <i>Glow</i>. Naprogramujeme (jinými slovy
+vytvoříme graf) následující operace:</p>
+
+<ol>
+<li>Vstupem bude sekvence celočíselných hodnot od 1 do 10.</li>
+<li>Prvky z&nbsp;této sekvence budou postupně sečteny.</li>
+<li>Výsledek součtu bude vypsán na standardní výstup.</li>
+</ol>
+
+<p>Graf tedy bude obsahovat trojici uzlů. Prvním z&nbsp;těchto uzlů je sekvence
+celočíselných hodnot od 1 do 10. Ta se v&nbsp;knihovně <i>Glow</i> tvoří
+metodou <strong>Slice</strong>:</p>
+
+<pre>
+Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+</pre>
+
+<p>V&nbsp;dalším uzlu je tato sekvence postupně <i>redukována</i> operací
+<strong>Reduce</strong>. Ta nejprve zpracuje první dvě hodnoty a vypočítá
+mezivýsledek. Tento postupně akumulovaný mezivýsledek je použit společně
+s&nbsp;dalším prvkem ve vstupní sekvenci pro další výpočet atd. atd. až je celá
+vstupní sekvence (resp.&nbsp;v&nbsp;našem případě řez) zredukován na jedinou
+výslednou hodnotu:</p>
+
+<pre>
+Reduce(sum)
+</pre>
+
+<p>A konečně v&nbsp;posledním uzlu je výsledek součtu vypsán na standardní
+výstup:</p>
+
+<pre>
+Map(printSum)
+</pre>
+
+<p>Sestrojení celého grafu bude vypadat následovně &ndash; povšimněte si, že za
+<strong>New</strong> se volají metody objektu představujícího celý graf:</p>
+
+<pre>
+flow.
+        New().
+        Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+        Reduce(sum).
+        Map(printSum)
+</pre>
+
+<p>Graf můžeme nejen vytvořit, ale i &bdquo;spustit&ldquo;, a to zavoláním
+metody <strong>Run</strong>:</p>
+
+<pre>
+flow.
+        New().
+        Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+        Reduce(sum).
+        Map(printSum).Run()
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Realizace celého příkladu; výsledek výpočtu</h2>
+
+<p>V&nbsp;definici grafu jsme použili dvojici funkcí <strong>sum</strong> a
+<strong>printSum</strong>. Tyto dvě funkce samozřejmě musíme implementovat, a
+to konkrétně následujícím způsobem:</p>
+
+<pre>
+func <strong>sum</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>printSum</strong>(x int) {
+        fmt.Println("Sum:", x)
+}
+</pre>
+
+<p>Povšimněte si, že se jedná o jedinou část celého programu
+(resp.&nbsp;definice grafu), v&nbsp;níž pracujeme s&nbsp;datovými typy.
+Kontrolu datových typů, tedy zda jsou funkci <strong>sum</strong> skutečně
+předána celá čísla a návratová hodnota této funkce odpovídá typu parametru
+funkce <strong>printSum</strong>, automaticky provádí knihovně <i>Glow</i>.</p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+&nbsp;
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>sum</strong>(x int, y int) int {
+        return x + y
+}
+&nbsp;
+func <strong>printSum</strong>(x int) {
+        fmt.Println("Sum:", x)
+}
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Reduce(sum).
+                Map(printSum).Run()
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu by se měl na
+standardní výstup vypsat výsledek součtu všech prvků ze vstupního řezu:</p>
+
+<pre>
+$ <strong>go run main.go</strong>
+&nbsp;
+Sum: 55
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-1/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-1/</a>.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Ukázka toku <i>Reduce&rarr;Map</i>, využití anonymních funkcí</h2>
+
+<p>Mnohdy je programový kód, který se v&nbsp;rámci jednotlivých uzlů grafu
+spouští, velmi krátký. To je ostatně i náš případ, protože těla funkcí
+<strong>sum</strong> a <strong>printSum</strong> obsahují jediný příkaz.
+V&nbsp;takovém případě může být výhodnější namísto pojmenovaných funkcí použít
+funkce anonymní, jejichž těla budou zapsána přímo v&nbsp;definici grafu:</p>
+
+<pre>
+New().
+Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+Reduce(func(x int, y int) int {
+        return x + y
+}).
+Map(func(x int) {
+        println("sum:", x)
+})
+</pre>
+
+<p>Podívejme se nyní na kód takto upraveného příkladu, v&nbsp;němž jsou opět
+knihovnou <i>Glow</i> kontrolovány datové typy parametrů funkcí i návratových
+hodnot (tedy vstupů a výstupů uzlů grafu):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>Výsledek získaný po překladu a spuštění by měl být totožný s&nbsp;předchozím
+příkladem, o čemž se můžeme velmi snadno přesvědčit:</p>
+
+<pre>
+$ <strong>go run main.go</strong>
+&nbsp;
+sum: 55
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-2/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-2/</a>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Nepatrně složitější graf toku: <i>Map&rarr;Reduce&rarr;Map</i></h2>
+
+<p>Velká síla a potenciální užitečnost FBP (a vlastně i knihovny <i>Glow</i>)
+spočívá v&nbsp;tom, že funkce vyššího řádu <strong>Map</strong> může být
+aplikována souběžně (a v&nbsp;ideálním případě i paralelně) na velký počet
+vstupních prvků. Tuto vlastnost jsme prozatím nevyužili, protože se
+v&nbsp;<strong>Map</strong> pouze vytiskla jediná hodnota na standardní výstup.
+Ovšem nic nám nebrání v&nbsp;tom upravit si původní příklad tak, že se všechny
+prvky ze vstupního řezu souběžně zdvojnásobí, tj.&nbsp;interně vlastně vznikne
+nový řez dále zpracovaný operací <strong>Reduce</strong>. Nová podoba definice
+grafu bude vypadat následovně (první funkce <strong>Map</strong> je aplikována
+paralelně):</p>
+
+<pre>
+Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+Map(func(value int) int {
+        return value * 2
+}).
+Reduce(func(x int, y int) int {
+        return x + y
+}).
+Map(func(x int) {
+        println("sum:", x)
+}).
+</pre>
+
+<p>Podívejme se nyní na takto upravený kód demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+&nbsp;
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Map(func(value int) int {
+                        return value * 2
+                }).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>V&nbsp;případě, že přeložíme a spustíme tento demonstrační příklad, měla by
+být výsledkem hodnota 110 a nikoli 55. Je to logické, protože se nesčítají
+hodnoty z&nbsp;číselné řady 1, 2, 3, ... 10, ale z&nbsp;řady 2, 4, 6, ...
+20:</p>
+
+<pre>
+$ <strong>go run main.go</strong>
+&nbsp;
+sum: 110
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-3/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-3/</a>.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Metoda <strong>Partition</strong></h2>
+
+<p>Operace <strong>Map</strong>, s&nbsp;níž jsme se setkali v&nbsp;předchozích
+kapitolách, může být na vstupní data aplikována paralelně. Nejdříve je ovšem
+nutné tato vstupní data vhodným způsobem rozdělit do více skupin a následně
+každou skupinu skutečně paralelně zpracovat. K&nbsp;tomuto účelu slouží metoda
+<strong>Partition</strong>, které se předá počet oddílů, do kterých se vstupní
+data rozdělí. Pokud například zadáme <strong>Partition(3)</strong>, budou
+vstupní data rozdělena do tří oddílů atd.</p>
+
+<p>Jak jsou však vstupní data rozdělena? Existují dvě možnosti &ndash; buď se
+rozdělí na základě <i>klíče</i> nebo na základě hešovacího kódu. Rozdělení
+podle klíče se provádí ve chvíli, kdy prvky ve vstupních datech mají podobu
+struktury, řezu nebo pole (tedy ne, že prvky jsou uloženy v&nbsp;řezu či poli,
+ale skutečně je každý prvek řezem či polem). V&nbsp;tomto případě je klíčem
+první prvek ve struktuře/prvku poli. Pokud vstupní prvky mají odlišný datový
+typ (typicky celé číslo, řetězec apod.), vypočítá se hešovací hodnota těchto
+prvků a na základě této hodnoty se prvky rozdělí do oddílů.</p>
+
+<p><div class="rs-tip-major">Poznámka: to ovšem znamená, že rozdělením prvků do
+oddílů se ztratí původní pořadí prvků. Pro mnohé výpočty nehraje pořadí žádnou
+roli (výpočet sumy), ovšem později si ukážeme příklad, kde má pořadí svůj
+význam a změní výsledek.</div></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Využití operace <i>Partition</i> zajišťující distribuci vstupních dat</h2>
+
+<p>Operaci <i>Partition</i>, která byla popsána <a href="#k09">v&nbsp;předchozí
+kapitole</a>, je možné v&nbsp;praxi použít velmi snadno. Například můžeme
+vstupní data (v&nbsp;našem případě představovaná řezem hodnot) rozdělit do tří
+oddílů zavoláním metody <strong>Partition(3)</strong>. To mj.&nbsp;znamená, že
+navazující operace <strong>Map</strong> bude běžet souběžně (a většinou i
+paralelně), a to bez nutnosti explicitní práce s&nbsp;vlákny či gorutinami:</p>
+
+<pre>
+New().
+Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+<strong>Partition(3)</strong>.
+Map(func(value int) int {
+        return value * 2
+}).
+Reduce(func(x int, y int) int {
+        return x + y
+}).
+Map(func(x int) {
+        println("sum:", x)
+}).
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samozřejmě nám nic nebrání ve zvýšení
+počtu oddílů, například použitím <strong>Partition(20)</strong>.</div></p>
+
+<p>Úplný program, který před zpracováním dat operací <strong>Map</strong>
+rozdělí data do tří oddílů, vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+&nbsp;
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Partition(3).
+                Map(func(value int) int {
+                        return value * 2
+                }).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>Výsledek získaný tímto programem by se neměl lišit od předchozích výsledků,
+což si snadno otestujeme:</p>
+
+<pre>
+$ <strong>go run main.go</strong>
+&nbsp;
+sum: 110
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-4/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-4/</a>.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Import takzvaného <i>driveru</i>; podpora pro vizualizaci grafu toku</h2>
+
+<p>Graf, který je knihovnou Glow zkonstruován ještě předtím, než proběhnou
+výpočty, může být kvůli operacím <i>Partition</i> a <i>Reduce</i> mnohdy i
+velmi složitý. Proto by bylo vhodné dokázat si takový graf vizualizovat. I tuto
+funkcionalitu knihovna Glow programátorům nabízí. V&nbsp;samotném zdrojovém
+kódu je nejprve nutné provést nepatrnou změnu &ndash; musí se naimportovat
+balíček <strong>glow/driver</strong>, a to následujícím způsobem:</p>
+
+<pre>
+imported and not used: "github.com/chrislusf/glow/driver"
+</pre>
+
+<p>Vzhledem k&nbsp;tomu, že se používá jmenný alias &bdquo;_&ldquo;, není možné
+přistupovat k&nbsp;symbolům (konstantám, proměnným, funkcím) definovaným
+v&nbsp;tomto balíčku, což ovšem ani nebudeme potřebovat. Důležitější však je,
+že nám překladač povolí provést import tohoto balíčku, aniž by nahlásil
+chybu:</p>
+
+<pre>
+imported and not used: "fmt"
+</pre>
+
+<p>Výsledný zdrojový kód by měl vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Partition(3).
+                Map(func(value int) int {
+                        return value * 2
+                }).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>Tento program přeložíme příkazem:</p>
+
+<pre>
+$ <strong>go build main.go</strong>
+</pre>
+
+<p>Díky tomu, že je importován balíček <strong>glow/driver</strong>, začne
+přeložený program nabízet velké množství nových (dříve nedostupných) voleb,
+které lze zobrazit přepínačem <strong>--help</strong>:</p>
+
+<pre>
+$ <strong>./glow-test-5 --help</strong>
+</pre>
+
+<p>Mezi nově dostupnými volbami se mj.&nbsp;nachází i volba
+<strong>-glow.flow.plot</strong>, která je na výpisu zvýrazněna:</p>
+
+<pre>
+Usage of ./main:
+  -ca.file string
+        A PEM eoncoded CA's certificate file
+  -cert.file string
+        A PEM eoncoded certificate file
+  -glow
+        start in driver mode
+  -glow.agent.address string
+        agent hostname:port
+  -glow.channel.bufferSize int
+        channel buffer size for reading inputs
+  -glow.dataCenter string
+        preferred data center name
+  -glow.driver.host string
+        driver runs on this host address. Required in 2-way SSL mode.
+  -glow.driver.port int
+        driver listens on this port to copy files to agents. Required to specify and open this port.
+  -glow.exe.hash string
+        hash of executable binary file
+  -glow.flow.bid float
+        total bid price in a flow to compete for resources (default 100)
+  -glow.flow.id int
+        flow id (default -1)
+  <strong>-glow.flow.plot</strong>
+        print out task group flow in graphviz dot format
+  -glow.flow.stat
+        show flow details at the end of execution
+  -glow.leader string
+        leader server (default "localhost:8930")
+  -glow.module string
+        a name to group related jobs together on agent
+  -glow.rack string
+        preferred rack name
+  -glow.related.files string
+        ':' separated list of files
+  -glow.request.id uint
+        request id received from agent
+  -glow.task.memoryMB int
+        request one task memory size in MB (default 64)
+  -glow.task.name string
+        name of first task in the task group
+  -glow.taskGroup.id int
+        task group id (default -1)
+  -glow.taskGroup.inputs string
+        comma and @ seperated input locations
+  -key.file string
+</pre>
+
+<p>Volbou <strong>--glow.flow.plot</strong> je možné si nechat vyexportovat
+popis grafu ve formátu kompatibilním s&nbsp;nástrojem <strong>dot</strong> (viz
+též článek <a
+href="https://www.root.cz/clanky/tvorba-grafu-a-diagramu-s-vyuzitim-domenove-specifickeho-jazyka-nastroje-graphviz/">Tvorba
+grafů a diagramů s&nbsp;využitím doménově specifického jazyka nástroje
+Graphviz</a>:</p>
+
+<pre>
+$ <strong>./glow-test-5 --glow --glow.flow.plot &gt; plot.gv</strong>
+</pre>
+
+<p>Vygenerovaný soubor s&nbsp;popisem grafu je plně čitelný:</p>
+
+<pre>
+digraph glow {
+  subgraph group_0{
+    node [style=filled,color=white];
+    style=filled;
+    color=lightgrey;
+    Input0 -&gt; Partition_scatter1;
+    label = "group_0";
+  }
+  subgraph group_1{
+    node [style=filled,color=white];
+    style=filled;
+    color=lightgrey;
+    Partition_collect2_0_3 -&gt; Map3_0_3 -&gt; LocalReduce4_0_3;
+    label = "group_1";
+  }
+  subgraph group_2{
+    node [style=filled,color=white];
+    style=filled;
+    color=lightgrey;
+    Partition_collect2_1_3 -&gt; Map3_1_3 -&gt; LocalReduce4_1_3;
+    label = "group_2";
+  }
+  subgraph group_3{
+    node [style=filled,color=white];
+    style=filled;
+    color=lightgrey;
+    Partition_collect2_2_3 -&gt; Map3_2_3 -&gt; LocalReduce4_2_3;
+    label = "group_3";
+  }
+  subgraph group_4{
+    node [style=filled,color=white];
+    style=filled;
+    color=lightgrey;
+    MergeReduce5 -&gt; Map6;
+    label = "group_4";
+  }
+  input0 [shape=doublecircle];
+  input0 -&gt; Input0;
+  Partition_scatter1 -&gt; d1_0;
+  Partition_scatter1 -&gt; d1_1;
+  Partition_scatter1 -&gt; d1_2;
+  d1_0 -&gt; Partition_collect2_0_3;
+  LocalReduce4_0_3 -&gt; d4_0;
+  d1_1 -&gt; Partition_collect2_1_3;
+  LocalReduce4_1_3 -&gt; d4_1;
+  d1_2 -&gt; Partition_collect2_2_3;
+  LocalReduce4_2_3 -&gt; d4_2;
+  d4_0 -&gt; MergeReduce5;
+  d4_1 -&gt; MergeReduce5;
+  d4_2 -&gt; MergeReduce5;
+  Map6 -&gt; end;
+  center=true;
+  compound=true;
+  end [shape=Msquare];
+}
+</pre>
+
+<p>Následně si necháme graf vytisknout do rastrového formátu PNG:</p>
+
+<pre>
+$ <strong>dot -Tpng plot.gv &gt; plot.png</strong>
+</pre>
+
+<p>S&nbsp;tímto výsledkem:</p>
+
+<img src="https://i.iinfo.cz/images/550/glow-1.png" class="image-762225" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="959" height="1100" />
+<p><i>Obrázek 2: Vizualizace grafu popsaného v&nbsp;pátém demonstračním
+příkladu.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-5/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-5/</a>.</div></p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Bezproblémové použití odlišných typů dat v&nbsp;jednotlivých hranách grafu toku</h2>
+
+<p>Pravděpodobně nejdůležitější vlastností knihovny Glow oproti konkurenčním
+knihovnám je automatické odvození a kontrola datových typů prvků, které
+&bdquo;proudí&ldquo; grafem. Podívejme se na tento popis grafu, z&nbsp;něhož
+bude vše zřejmé:</p>
+
+<pre>
+Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+Partition(3).
+Map(<strong>func(value int) string</strong> {
+        return strconv.Itoa(value)
+}).
+Reduce(<strong>func(x string, y string) string</strong> {
+        return x + "," + y
+}).
+Map(<strong>func(x string)</strong> {
+        println("joined:", x)
+}).
+</pre>
+
+<p>Z&nbsp;tohoto popisu grafu je patrné, že operace <i>Map</i> je realizována
+funkcí akceptující celé číslo a produkující řetězec. Následuje operace
+<i>Reduce</i>, která naopak akceptuje dvojici řetězců a produkuje další
+řetězec. A konečně poslední operace <i>Map</i> akceptuje řetězec. Tok mezi
+<i>Map</i>, <i>Reduce</i> a dalším <i>Map</i> je kontrolován při konstrukci
+grafu, tj.&nbsp;například není možné změnit typ návratové hodnoty u realizace
+první operace <i>Map</i>, aniž by se adekvátním způsobem změnila hlavička
+funkce realizující operaci <i>Reduce</i> atd.</p>
+
+<p>Celý zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "strconv"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+                Partition(3).
+                Map(func(value int) string {
+                        return strconv.Itoa(value)
+                }).
+                Reduce(func(x string, y string) string {
+                        return x + "," + y
+                }).
+                Map(func(x string) {
+                        println("joined:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>Z&nbsp;výsledků získaných po spuštění tohoto příkladu můžeme odvodit, jak se
+vlastně prvky ze vstupu rozdělily do tří oddílů:</p>
+
+<pre>
+joined: 2,5,8,3,6,9,1,4,7,10
+</pre>
+
+<p>První oddíl obsahoval prvky 2, 5 a 8, druhý oddíl prvky 3, 6 a 9 a třetí
+oddíl prvky 1, 4, 7 a 10.</p>
+
+<img src="https://i.iinfo.cz/images/550/glow-2.png" class="image-762226" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="227" height="644" />
+<p><i>Obrázek 3: Vizualizace grafu popsaného v&nbsp;šestém demonstračním
+příkladu.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-6/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-6/</a>.</div></p>
+
+<p>Co se ovšem stane ve chvíli, kdy datové typy v&nbsp;grafu
+&bdquo;nesedí&ldquo;, tj.&nbsp;když jeden uzel posílá jinému uzlu data
+v&nbsp;neočekávaném formátu? Můžeme si to snadno vyzkoušet. Povšimněte si
+označené části kódu s&nbsp;nesprávným typem vstupního parametru:</p>
+
+<pre>
+flow.
+        New().
+        Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
+        Partition(3).
+        Map(func(value int) string {
+                return strconv.Itoa(value)
+        }).
+        Reduce(func(<strong>x int</strong>, y string) string {
+                return strconv.Itoa(x) + "," + y
+        }).
+        Map(func(x string) {
+                println("joined:", x)
+        }).
+        Run()
+</pre>
+
+<p>Tato chyba bude detekována, ale nikoli při překladu (překladač jazyka Go
+totiž nemá možnosti, jak odvozené typy kontrolovat), ale při spuštění a
+konstrukci grafu:</p>
+
+<pre>
+panic: reflect: <strong>Call using string as type int</strong>
+&nbsp;
+goroutine 32 [running]:
+reflect.Value.call({0x8214a0?, 0x8d9588?, 0x13?}, {0x8a1976, 0x4}, {0xc00020ef08, 0x2, 0x2?})
+        /opt/go/src/reflect/value.go:411 +0x19ff
+reflect.Value.Call({0x8214a0?, 0x8d9588?, 0x0?}, {0xc0001ccf08, 0x2, 0x2})
+        /opt/go/src/reflect/value.go:339 +0xbf
+github.com/chrislusf/glow/flow.(*Dataset).LocalReduce.func1(0x0?)
+        /home/ptisnovs/go/pkg/mod/github.com/chrislusf/glow@v0.0.0-20181102060906-4c40a2717eee/flow/dataset_reduce.go:28 +0x20b
+github.com/chrislusf/glow/flow.(*Task).RunTask(0xc00012ea80)
+        /home/ptisnovs/go/pkg/mod/github.com/chrislusf/glow@v0.0.0-20181102060906-4c40a2717eee/flow/step_task.go:33 +0x2a
+github.com/chrislusf/glow/flow.(*Step).RunStep.func1(0x0?, 0x0?)
+        /home/ptisnovs/go/pkg/mod/github.com/chrislusf/glow@v0.0.0-20181102060906-4c40a2717eee/flow/step.go:22 +0x57
+created by github.com/chrislusf/glow/flow.(*Step).RunStep
+        /home/ptisnovs/go/pkg/mod/github.com/chrislusf/glow@v0.0.0-20181102060906-4c40a2717eee/flow/step.go:20 +0x4e
+panic: reflect: Call using string as type int
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Vliv parametru předaného operaci <i>Partition</i> na průběh výpočtu</h2>
+
+<p>Zdrojový kód <a href="#k12">z&nbsp;předchozí kapitoly</a> dokáže díky
+použití řetězců (které se spojují zcela odlišným způsobem, než se sčítají čísla
+&ndash; operace spojení například není komutativní) naznačit, jakým způsobem je
+vlastně vstupní řez s&nbsp;hodnotami rozdělen do oddílů na základě parametru
+předaného operaci <i>Partition</i>. V&nbsp;dalším demonstračním příkladu
+postupně zpracujeme 24 prvků, přičemž dojde k&nbsp;rozdělení těchto prvků na 1,
+2, 4, 6, 8, 12 a 24 oddílů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "strconv"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>newRangeSlice</strong>(sliceLength int) []int {
+        result := make([]int, sliceLength)
+        for i := 0; i &lt; sliceLength; i++ {
+                result[i] = i + 1
+        }
+        return result
+}
+&nbsp;
+func <strong>compute</strong>(sliceLength int, partitions int) {
+        flow.
+                New().
+                Slice(newRangeSlice(sliceLength)).
+                Partition(partitions).
+                Map(func(value int) string {
+                        return strconv.Itoa(value)
+                }).
+                Reduce(func(x string, y string) string {
+                        return x + "," + y
+                }).
+                Map(func(x string) {
+                        println("joined:", x)
+                }).
+                Run()
+}
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        compute(24, 1)
+        compute(24, 2)
+        compute(24, 3)
+        compute(24, 4)
+        compute(24, 6)
+        compute(24, 8)
+        compute(24, 12)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-7/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-7/</a>.</div></p>
+
+<p>V&nbsp;získaných výsledcích můžeme vypozorovat způsob rozdělení prvků ze
+vstupu od oddílů. Každý lichý oddíl je zvýrazněn:</p>
+
+<pre>
+joined: <strong>1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24</strong>
+joined: <strong>2,4,6,8,10,12,14,16,18,20,22,24</strong>,1,3,5,7,9,11,13,15,17,19,21,23
+joined: <strong>2,5,8,11,14,17,20,23</strong>,1,4,7,10,13,16,19,22,<strong>3,6,9,12,15,18,21,24</strong>
+joined: <strong>3,7,11,15,19,23</strong>,2,6,10,14,18,22,<strong>1,5,9,13,17,21</strong>,4,8,12,16,20,24
+joined: <strong>2,8,14,20</strong>,3,9,15,21,<strong>5,11,17,23</strong>,6,12,18,24,<strong>1,7,13,19</strong>,4,10,16,22
+joined: <strong>7,15,23</strong>,8,16,24,<strong>6,14,22</strong>,1,9,17,<strong>3,11,19</strong>,2,10,18,<strong>5,13,21</strong>,4,12,20
+joined: <strong>12,24</strong>,11,23,<strong>5,17</strong>,8,20,<strong>6,18</strong>,3,15,<strong>2,14</strong>,4,16,<strong>7,19</strong>,1,13,<strong>9,21</strong>,10,22
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že pořadí oddílů není
+pevně dané a při běžných výpočtech by nás ani nemělo zajímat.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Načtení a zpracování dat uložených v&nbsp;textovém souboru</h2>
+
+<p>Prozatím jsme v&nbsp;předchozích demonstračních příkladech získávali vstupní
+prvky pro graf z&nbsp;řezu (<i>slice</i>) obsahujícího celočíselné hodnoty.
+V&nbsp;praxi se však setkáme s&nbsp;tím, že vstupní data jsou uložena
+v&nbsp;databázích, čteny z&nbsp;Apache Kafka, nebo jsou načítány ze souborů.
+Knihovna Glow některé výše zmíněné datové zdroje přímo podporuje, což
+samozřejmě zjednodušuje návrh grafů a taktéž se uživatel-programátor nemusí
+starat například o prealokaci paměti (což u objemnějších dat není možné)
+atd.</p>
+
+<p>Pravděpodobně nejjednodušší je načítání dat z&nbsp;textových souborů,
+protože pro tento účel slouží metoda <strong>TextFile</strong>. Této metodě se
+předává jméno souboru se vstupními daty (každý záznam je uložen na samostatném
+řádku) a taktéž počet oddílů, do kterých se vstupní data rozdělí:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "strconv"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                <strong>TextFile("data.txt", 1).</strong>
+                Map(func(line string) int {
+                        value, _ := strconv.Atoi(line)
+                        return value
+                }).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<img src="https://i.iinfo.cz/images/550/glow-3.png" class="image-762227" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="823" height="836" />
+<p><i>Obrázek 4: Vizualizace grafu popsaného v&nbsp;osmém demonstračním
+příkladu.</i></p>
+
+<p>V&nbsp;případě, že bude vstupní datový soubor obsahovat tyto záznamy:</p>
+
+<pre>
+1
+10
+100
+1000
+10000
+100000
+1000000
+10000000
+</pre>
+
+<p>Bude výsledkem výpočtu hodnota:</p>
+
+<pre>
+$ <strong>go run main.go </strong>
+&nbsp;
+sum: 11111111
+</pre>
+
+<p>Vstupní data můžeme samozřejmě rozdělit do většího množství oddílů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "strconv"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                <strong>TextFile("data.txt", <u>3</u>).</strong>
+                Map(func(line string) int {
+                        value, _ := strconv.Atoi(line)
+                        return value
+                }).
+                Reduce(func(x int, y int) int {
+                        return x + y
+                }).
+                Map(func(x int) {
+                        println("sum:", x)
+                }).
+                Run()
+}
+</pre>
+
+<p>Výpočet bude totožný, ovšem lišit se bude graf i průběh výpočtu:</p>
+
+<img src="https://i.iinfo.cz/images/550/glow-4.png" class="image-762228" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="141" height="548" />
+<p><i>Obrázek 5: Vizualizace grafu popsaného v&nbsp;osmém demonstračním
+příkladu.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-8/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-8/</a>.</div></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Načítání strukturovaných souborů</h2>
+
+<p>Soubor obsahující na každém řádku jedinou číselnou hodnotu samozřejmě není
+typickým příkladem toho, jak datové soubory v&nbsp;praxi vypadají. Zkusme si
+tedy zpracovat soubor s&nbsp;nepatrně složitější strukturou. Bude se jednat o
+textový soubor, který na každém řádku obsahuje jednoho vítěze známé <a
+href="https://en.wikipedia.org/wiki/Turing_Award">Turingovy ceny</a>
+v&nbsp;daném roce (z&nbsp;mnoha vítězů jsem vybral své favority):</p>
+
+<pre>
+1983 Ken Thompson
+1983 Dennis Ritchie
+1988 Ivan Sutherland
+1979 Kenneth Iverson
+1989 William Kahan
+1977 John Backus
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: situaci si poněkud zjednodušíme a budeme
+předpokládat, že každý řádek obsahuje jen tři hodnoty oddělené mezerou: rok,
+jméno, příjmení. Nebudeme tedy počítat se jmény typu Pablo Diego José Francisco
+de Paula Juan Nepomuceno María de los Remedios Cipriano de la Santísima
+Trinidad Ruiz y Picasso.</div></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Použití uživatelsky definovaných datových typů v&nbsp;celém řetězci</h2>
+
+<p>Každý záznam z&nbsp;textového souboru popsaného <a
+href="#k15">v&nbsp;předchozí kapitole</a> budeme reprezentovat datovou
+strukturou, která vypadá takto:</p>
+
+<pre>
+type <strong>Recipient</strong> struct {
+        Year    int
+        Name    string
+        Surname string
+}
+</pre>
+
+<p>To znamená, že bude nutné provést dvojí transformaci:</p>
+
+<ol>
+
+<li>Převod řetězce (například &bdquo;1983 Ken Thompson&ldquo;) na řez třech
+řetězců (["1983", "Ken", "Thompson"]).</li>
+
+<li>Převod prvního řetězce z&nbsp;řezu na celé číslo následované konstrukcí
+datové struktury <strong>Recipient</strong></li>
+
+</ol>
+
+<p>První transformaci lze v&nbsp;celém řetězci realizovat snadno:</p>
+
+<pre>
+Map(func(<strong>line string</strong>) <strong>[]string</strong> {
+        return strings.Fields(line)
+}).
+</pre>
+
+<p>Povšimněte si typu vstupního parametru i typu návratové hodnoty.</p>
+
+<p>Podobně můžeme druhou transformaci dat z&nbsp;řezu na hodnotu typu
+<strong>Recipient</strong> popsat:</p>
+
+<pre>
+Map(func(<strong>input []string</strong>) <strong>Recipient</strong> {
+        year, _ := strconv.Atoi(input[0])
+        return Recipient{
+                year,
+                input[1],
+                input[2]}
+}).
+</pre>
+
+<p>Typ vstupní hodnoty tedy odpovídá typu návratové hodnoty předchozí
+operace.</p>
+
+<p>A konečně operace pro vytištění výsledku musí akceptovat parametr typu
+<strong>Recipient</strong>:</p>
+
+<pre>
+Map(func(<strong>recipient Recipient</strong>) {
+        fmt.Printf("%4d  %-12s  %-12s\n", recipient.Year, recipient.Name, recipient.Surname)
+}).
+</pre>
+
+<p>Popis celého grafu tedy může vypadat takto:</p>
+
+<pre>
+TextFile("data.txt", 1).
+Map(func(line string) []string {
+        return strings.Fields(line)
+}).
+Map(func(input []string) Recipient {
+        year, _ := strconv.Atoi(input[0])
+        return Recipient{
+                year,
+                input[1],
+                input[2]}
+}).
+Map(func(recipient Recipient) {
+        fmt.Printf("%4d  %-12s  %-12s\n", recipient.Year, recipient.Name, recipient.Surname)
+}).
+</pre>
+
+<p>Úplný zdrojový kód v&nbsp;pořadí již devátého demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "strconv"
+        "strings"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+type <strong>Recipient</strong> struct {
+        Year    int
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                TextFile("data.txt", 1).
+                Map(func(line string) []string {
+                        return strings.Fields(line)
+                }).
+                Map(func(input []string) Recipient {
+                        year, _ := strconv.Atoi(input[0])
+                        return Recipient{
+                                year,
+                                input[1],
+                                input[2]}
+                }).
+                Map(func(recipient Recipient) {
+                        fmt.Printf("%4d  %-12s  %-12s\n", recipient.Year, recipient.Name, recipient.Surname)
+                }).
+                Run()
+}
+</pre>
+
+<p>Tento demonstrační příklad po svém spuštění vypíše naformátované hodnoty
+reprezentované strukturami typu <strong>Recipient</strong>:</p>
+
+<pre>
+1983  Ken           Thompson    
+1983  Dennis        Ritchie     
+1988  Ivan          Sutherland  
+1979  Kenneth       Iverson     
+1989  William       Kahan       
+1977  John          Backus      
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-9/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-9/</a>.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Operace typu <i>Sort</i></h2>
+
+<p>Do grafu s&nbsp;popisem toku a zpracování dat lze přidat i operaci typu
+<i>Sort</i>. Tato operace na vstupu akceptuje dvojici hodnot a vrací
+pravdivostní hodnotu <strong>true/false</strong> na základě toho, zda má být
+první prvek zařazen za prvek druhý či naopak. Tímto způsobem lze zajistit
+seřazení prvků jakéhokoli typu, a to například i prvků typu
+<strong>Recipient</strong>, pokud explicitně zvolíme, která položka nebo
+položky se mají porovnávat:</p>
+
+<pre>
+<strong>Sort(func(recipient1 Recipient, recipient2 Recipient) bool</strong> {
+        return recipient1.Year &lt; recipient2.Year
+}).
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se stále jedná o
+klasický uzel grafu typu &bdquo;vstupy&rarr;výstupy&ldquo;, ovšem funkce, která
+je volaná při řazení prvků, vrací pouze pravdivostní hodnotu. Tato hodnota
+(resp.&nbsp;série hodnot) je zpracována operací <i>Sort</i>. Navíc je možné
+provádět <i>Sort</i> paralelně pro více oddílů, protože lze zajistit
+<i>Merge</i> již seřazených prvků.</div></p>
+
+<p>Úplný zdrojový kód dnešního předposledního demonstračního příkladu vypadá
+takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "strconv"
+        "strings"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+type <strong>Recipient</strong> struct {
+        Year    int
+        Name    string
+        Surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                TextFile("data.txt", 1).
+                Map(func(line string) []string {
+                        return strings.Fields(line)
+                }).
+                Map(func(input []string) Recipient {
+                        year, _ := strconv.Atoi(input[0])
+                        return Recipient{
+                                year,
+                                input[1],
+                                input[2]}
+                }).
+                Sort(func(recipient1 Recipient, recipient2 Recipient) bool {
+                        return recipient1.Year &lt; recipient2.Year
+                }).
+                Map(func(recipient Recipient) {
+                        fmt.Printf("%4d  %-12s  %-12s\n", recipient.Year, recipient.Name, recipient.Surname)
+                }).
+                Run()
+}
+</pre>
+
+<p>Po překladu a spuštění získáme výherce Turing Award seřazené podle roku
+získání ceny:</p>
+
+<pre>
+1977  John          Backus      
+1979  Kenneth       Iverson     
+1983  Ken           Thompson    
+1983  Dennis        Ritchie     
+1988  Ivan          Sutherland  
+1989  William       Kahan       
+</pre>
+
+<img src="https://i.iinfo.cz/images/550/glow-5.png" class="image-762229" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="219" height="740" />
+<p><i>Obrázek 6: Vizualizace grafu popsaného v&nbsp;desátém demonstračním
+příkladu.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-A/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-A/</a>.</div></p>
+
+<p>Triviálním způsobem lze zajistit seřazení podle příjmení:</p>
+
+<pre>
+<strong>Sort(func(recipient1 Recipient, recipient2 Recipient) bool</strong> {
+        return recipient1.Surnam &lt; recipient2.Surnam
+}).
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+1977  John          Backus      
+1979  Kenneth       Iverson     
+1989  William       Kahan       
+1983  Dennis        Ritchie     
+1988  Ivan          Sutherland  
+1983  Ken           Thompson    
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Problematika operace <i>Reduce</i> při agregaci výsledků</h2>
+
+<p>V&nbsp;dnešním posledním demonstračním příkladu si ukážeme způsob agregace
+výsledků přes operaci typu <i>Reduce</i>. Tuto operaci již známe, ovšem
+prozatím jsme měli &bdquo;štěstí&ldquo;, protože jsme počítali sumu prvků. A
+samotná suma je představována celým číslem, tj.&nbsp;stejným typem, jako
+samotné prvky, takže jsme vlastně nemuseli řešit typy parametrů vstupujících do
+operace <i>Reduce</i>.</p>
+
+<p>Nyní však budeme chtít prvky typu <strong>Recipient</strong> sloučit do
+jediného řezu. Mohlo by se tedy zdát, že postačuje nadefinovat tento graf:</p>
+
+<pre>
+Map(func(input []string) Recipient {
+        year, _ := strconv.Atoi(input[0])
+        return Recipient{
+                year,
+                input[1],
+                input[2]}
+}).
+Reduce(func(<strong>recipients []Recipient, recipient Recipient</strong>) <strong>[]Recipient</strong> {
+        x := append(recipients, recipient)
+        return x
+}).
+</pre>
+
+<p>Toto zdánlivě logické řešení však není korektní, protože operace
+<i>Reduce</i> očekává, že oba vstupy budou stejného typu. Budeme si tedy muset
+pomoci malým trikem &ndash; oba vstupy budou shodného typu &bdquo;řez
+Recipienty&ldquo; s&nbsp;tím, že do celého řetězce ještě přidáme přemapování
+jediné hodnoty typu <strong>Recipient</strong> na řez. Na konci zpracování
+vytvoříme z&nbsp;řezů tabulku, kterou vytiskneme na standardní výstup:</p>
+
+<pre>
+Map(func(input []string) Recipient {
+        year, _ := strconv.Atoi(input[0])
+        return Recipient{
+                year,
+                input[1],
+                input[2]}
+}).
+Map(func(recipient Recipient) <strong>[]Recipient</strong> {
+        var x []Recipient = []Recipient{recipient}
+        return x
+}).
+Reduce(func(<strong>recipients []Recipient, recipient []Recipient</strong>) <strong>[]Recipient</strong> {
+        x := append(recipients, recipient...)
+        return x
+}).
+Map(func(recipients []Recipient) {
+        fmt.Println(" #  Year  First name    Surname")
+        for i, recipient := range recipients {
+                fmt.Printf("%2d  %4d  %-12s  %-12s\n", i, recipient.year, recipient.name, recipient.surname)
+        }
+}).
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že nyní skutečně operace
+<i>Reduce</i> získá při každém volání dvojici řezů, ovšem druhý řez bude
+v&nbsp;každém případě obsahovat jediný prvek.</div></p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "flag"
+        "fmt"
+        "strconv"
+        "strings"
+&nbsp;
+        _ "github.com/chrislusf/glow/driver"
+        "github.com/chrislusf/glow/flow"
+)
+&nbsp;
+type <strong>Recipient</strong> struct {
+        year    int
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        flag.Parse()
+&nbsp;
+        flow.
+                New().
+                TextFile("data.txt", 1).
+                Map(func(line string) []string {
+                        return strings.Fields(line)
+                }).
+                Map(func(input []string) Recipient {
+                        year, _ := strconv.Atoi(input[0])
+                        return Recipient{
+                                year,
+                                input[1],
+                                input[2]}
+                }).
+                Map(func(recipient Recipient) []Recipient {
+                        var x []Recipient = []Recipient{recipient}
+                        return x
+                }).
+                Reduce(func(recipients []Recipient, recipient []Recipient) []Recipient {
+                        x := append(recipients, recipient...)
+                        return x
+                }).
+                Map(func(recipients []Recipient) {
+                        fmt.Println(" #  Year  First name    Surname")
+                        for i, recipient := range recipients {
+                                fmt.Printf("%2d  %4d  %-12s  %-12s\n", i, recipient.year, recipient.name, recipient.surname)
+                        }
+                }).
+                Run()
+}
+</pre>
+
+<p>Podívejme se nyní, jaký výsledek získáme po překladu a spuštění dnešního
+posledního demonstračního příkladu:</p>
+
+<pre>
+ #  Year  First name    Surname
+ 0  1983  Ken           Thompson    
+ 1  1983  Dennis        Ritchie     
+ 2  1988  Ivan          Sutherland  
+ 3  1979  Kenneth       Iverson     
+ 4  1989  William       Kahan       
+ 5  1977  John          Backus      
+</pre>
+
+<img src="https://i.iinfo.cz/images/550/glow-6.png" class="image-762230" alt="&#160;" title="Autor: tisnik + third party, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" width="227" height="836" />
+<p><i>Obrázek 7: Vizualizace grafu popsaného v&nbsp;jedenáctém demonstračním
+příkladu.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: tento projekt naleznete na adrese <a
+href="https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-B/">https://github.com/tisnik/go-root/tree/master/article_A0/glow-test-B/</a>.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář (ten je ovšem &ndash;
+alespoň prozatím &ndash; velmi malý, dnes má přibližně stovku kilobajtů),
+můžete namísto toho použít odkazy na jednotlivé demonstrační příklady, které
+naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>glow-test-0/main.go</td><td>kostra projektu pro stažení všech závislých balíčků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/main.go</a></td></tr>
+<tr><td> 2</td><td>glow-test-0/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/go.mod</a></td></tr>
+<tr><td> 3</td><td>glow-test-0/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-0/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 4</td><td>glow-test-1/main.go</td><td>ukázka toku <i>Reduce&rarr;Map</i> (nejjednodušší možný příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/main.go</a></td></tr>
+<tr><td> 5</td><td>glow-test-1/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/go.mod</a></td></tr>
+<tr><td> 6</td><td>glow-test-1/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-1/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>glow-test-2/main.go</td><td>ukázka toku <i>Reduce&rarr;Map</i>, využití anonymních funkcí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/main.go</a></td></tr>
+<tr><td> 8</td><td>glow-test-2/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/go.mod</a></td></tr>
+<tr><td> 9</td><td>glow-test-2/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-2/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>10</td><td>glow-test-3/main.go</td><td>tok <i>Map&rarr;Reduce&rarr;Map</i></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/main.go</a></td></tr>
+<tr><td>11</td><td>glow-test-3/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/go.mod</a></td></tr>
+<tr><td>12</td><td>glow-test-3/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-3/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>glow-test-4/main.go</td><td>operace <i>Partition</i> zajišťující distribuci vstupních dat</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/main.go</a></td></tr>
+<tr><td>14</td><td>glow-test-4/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/go.mod</a></td></tr>
+<tr><td>15</td><td>glow-test-4/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-4/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>glow-test-5/main.go</td><td>import driveru; podpora pro vizualizaci grafu toku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/main.go</a></td></tr>
+<tr><td>17</td><td>glow-test-5/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/go.mod</a></td></tr>
+<tr><td>18</td><td>glow-test-5/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-5/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>glow-test-6/main.go</td><td>bezproblémové použití odlišných typů dat v&nbsp;jednotlivých hranách grafu toku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/main.go</a></td></tr>
+<tr><td>20</td><td>glow-test-6/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/go.mod</a></td></tr>
+<tr><td>21</td><td>glow-test-6/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-6/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>22</td><td>glow-test-7/main.go</td><td>vliv počtu segmentů na průběh výpočtu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/main.go</a></td></tr>
+<tr><td>23</td><td>glow-test-7/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/go.mod</a></td></tr>
+<tr><td>24</td><td>glow-test-7/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-7/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>25</td><td>glow-test-8/main.go</td><td>načítání dat ze souborů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/main.go</a></td></tr>
+<tr><td>26</td><td>glow-test-8/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.mod</a></td></tr>
+<tr><td>27</td><td>glow-test-8/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>28</td><td>glow-test-9/main.go</td><td>zpracování strukturovaných dat</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-9/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/main.go</a></td></tr>
+<tr><td>29</td><td>glow-test-9/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-9/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.mod</a></td></tr>
+<tr><td>30</td><td>glow-test-9/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-9/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>31</td><td>glow-test-A/main.go</td><td>řazení (strukturovaných) dat</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-A/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/main.go</a></td></tr>
+<tr><td>32</td><td>glow-test-A/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-A/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.mod</a></td></tr>
+<tr><td>33</td><td>glow-test-A/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-A/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.sum</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>34</td><td>glow-test-B/main.go</td><td><i>map-reduce</i> a řezy v&nbsp;jazyce Go</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-B/main.go">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/main.go</a></td></tr>
+<tr><td>35</td><td>glow-test-B/go.mod</td><td>projektový soubor</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-B/go.mod">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.mod</a></td></tr>
+<tr><td>36</td><td>glow-test-B/go.sum</td><td>seznam přímých i nepřímých závislostí tohoto projektu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-B/go.sum">https://github.com/tisnik/go-root/blob/master/article_A0/glow-test-8/go.sum</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>glow<br />
+<a href="https://github.com/chrislusf/glow">https://github.com/chrislusf/glow</a>
+</li>
+
+<li>Glow - wiki<br />
+<a href="https://github.com/chrislusf/glow/wiki#glow-apis">https://github.com/chrislusf/glow/wiki#glow-apis</a>
+</li>
+
+<li>Gleam<br />
+<a href="https://github.com/chrislusf/gleam">https://github.com/chrislusf/gleam</a>
+</li>
+
+<li>Get into the flow<br />
+<a href="https://appliedgo.net/flow/">https://appliedgo.net/flow/</a>
+</li>
+
+<li>Flow-based and dataflow programming library for Go programming language<br />
+<a href="https://github.com/trustmaster/goflow">https://github.com/trustmaster/goflow</a>
+</li>
+
+<li>Flow-based programming (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Flow-based_programming">https://en.wikipedia.org/wiki/Flow-based_programming</a>
+</li>
+
+<li>FlowBasedProgramming (Python wiki)<br />
+<a href="https://wiki.python.org/moin/FlowBasedProgramming">https://wiki.python.org/moin/FlowBasedProgramming</a>
+</li>
+
+<li>Flow Based Programming<br />
+<a href="https://github.com/flowbased/flowbased.org/wiki">https://github.com/flowbased/flowbased.org/wiki</a>
+</li>
+
+<li>Concepts<br />
+<a href="https://github.com/flowbased/flowbased.org/wiki/Concepts">https://github.com/flowbased/flowbased.org/wiki/Concepts</a>
+</li>
+
+<li>Circular buffer<br />
+<a href="https://en.wikipedia.org/wiki/Circular_buffer">https://en.wikipedia.org/wiki/Circular_buffer</a>
+</li>
+
+<li>Circular Buffers in Linux kernel<br />
+<a href="https://www.kernel.org/doc/html/latest/core-api/circular-buffers.html">https://www.kernel.org/doc/html/latest/core-api/circular-buffers.html</a>
+</li>
+
+<li>Flow-based Programming<br />
+<a href="https://jpaulm.github.io/fbp/">https://jpaulm.github.io/fbp/</a>
+</li>
+
+<li>DrawFBP<br />
+<a href="https://github.com/jpaulm/drawfbp">https://github.com/jpaulm/drawfbp</a>
+</li>
+
+<li>Panta Rhei<br />
+<a href="https://blogs.bu.edu/marsh-vocation/2016/09/29/panta-rhei/">https://blogs.bu.edu/marsh-vocation/2016/09/29/panta-rhei/</a>
+</li>
+
+<li>Hérakleitos<br />
+<a href="https://cs.wikipedia.org/wiki/H%C3%A9rakleitos">https://cs.wikipedia.org/wiki/H%C3%A9rakleitos</a>
+</li>
+
+<li>FlowBasedProgramming (Wiki)<br />
+<a href="https://www.jpaulmorrison.com/cgi-bin/wiki.pl">https://www.jpaulmorrison.com/cgi-bin/wiki.pl</a>
+</li>
+
+<li>FBP Network Protocol<br />
+<a href="https://flowbased.github.io/fbp-protocol/">https://flowbased.github.io/fbp-protocol/</a>
+</li>
+
+<li>Flow-based programming specification wiki<br />
+<a href="https://flow-based.org/">https://flow-based.org/</a>
+</li>
+
+<li>Flow Based Programming<br />
+<a href="http://wiki.c2.com/?FlowBasedProgramming">http://wiki.c2.com/?FlowBasedProgramming</a>
+</li>
+
+<li>FlowBasedProgramming<br />
+<a href="http://www.jpaulmorrison.com/cgi-bin/wiki.pl">http://www.jpaulmorrison.com/cgi-bin/wiki.pl</a>
+</li>
+
+<li>BrokerageApplication<br />
+<a href="http://www.jpaulmorrison.com/cgi-bin/wiki.pl?BrokerageApplication">http://www.jpaulmorrison.com/cgi-bin/wiki.pl?BrokerageApplication</a>
+</li>
+
+<li>What the Hell Is Flow-Based Programming?<br />
+<a href="https://medium.com/bitspark/what-the-hell-is-flow-based-programming-d9e88a6a7265">https://medium.com/bitspark/what-the-hell-is-flow-based-programming-d9e88a6a7265</a>
+</li>
+
+<li>Flow-based visual scripting for Python<br />
+<a href="https://ryven.org/">https://ryven.org/</a>
+</li>
+
+<li>PyFlow<br />
+<a href="https://github.com/gangtao/pyflow">https://github.com/gangtao/pyflow</a>
+</li>
+
+<li>Flow-based Programming<br />
+<a href="https://pypi.org/project/flowpipe/">https://pypi.org/project/flowpipe/</a>
+</li>
+
+<li>The state of Flow-based Programming<br />
+<a href="https://blog.kodigy.com/post/state-of-flow-based-programming/">https://blog.kodigy.com/post/state-of-flow-based-programming/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
