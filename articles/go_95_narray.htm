@@ -1,0 +1,1703 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Zpracování n-rozměrných polí v jazyce Go s využitím knihovny narray</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Zpracování n-rozměrných polí v jazyce Go s využitím knihovny narray</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku se seznámíme s knihovnou nazvanou narray. Jedná se o knihovnu určenou pro programovací jazyk Go, která je navržena pro efektivní práci s n-rozměrnými poli s využitím ručně &bdquo;vektorizovaného&ldquo; kódu napsanému v assembleru.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Zpracování n-rozměrných polí v&nbsp;jazyce Go s&nbsp;využitím knihovny <i>narray</i></a></p>
+<p><a href="#k02">2. Projekt Gonum Numerical Packages (Gonum)</a></p>
+<p><a href="#k03">3. Podpora resp.&nbsp;nepodpora SIMD operací v&nbsp;jazyku Go a možná řešení</a></p>
+<p><a href="#k04">4. Projekt <i>narray</i> využívající možností dnešních mikroprocesorů</a></p>
+<p><a href="#k05">5. Instalace balíčku <strong>narray</strong></a></p>
+<p><a href="#k06">6. Konstrukce n-dimenzionálního pole</a></p>
+<p><a href="#k07">7. Konstrukce pole s&nbsp;inicializací jeho prvků</a></p>
+<p><a href="#k08">8. Součet a součin všech prvků uložených ve vektoru</a></p>
+<p><a href="#k09">9. Součet všech prvků dvojice vektorů</a></p>
+<p><a href="#k10">10. Skalární součin libovolného počtu vektorů</a></p>
+<p><a href="#k11">11. Serializace n-rozměrného pole do souboru</a></p>
+<p><a href="#k12">12. Deserializace (načtení) n-rozměrných polí ze souborů</a></p>
+<p><a href="#k13">13. Serializace n-rozměrného pole do formátu JSON</a></p>
+<p><a href="#k14">14. Operace <strong>AddConst</strong> a <strong>AddScaled</strong></a></p>
+<p><a href="#k15">15. Převod n-rozměrných polí se dvěma dimenzemi na matice</a></p>
+<p><a href="#k16">16. Základní operace s&nbsp;maticemi</a></p>
+<p><a href="#k17">17. Závěrečné zhodnocení</a></p>
+<p><a href="#k18">18. Předchozí články o rozsáhlém světu &bdquo;array programmingu&ldquo;</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Zpracování n-rozměrných polí v&nbsp;jazyce Go s&nbsp;využitím knihovny <i>narray</i></h2>
+
+<p>Na stránkách <a href="https://www.root.cz">Roota</a> jsme se již mnohokrát
+setkali s&nbsp;programovacími jazyky popř.&nbsp;s&nbsp;knihovnami, které jsou
+určeny pro zpracování n-rozměrných polí. Není se ostatně čemu divit, protože se
+skutečně jedná o velmi často využívané datové struktury, s&nbsp;nimiž se
+setkáme například při zpracování signálů, v&nbsp;lineární algebře, datové
+analýze atd. Současně se jedná o datové struktury a operace, u nichž má velký
+smysl využít SIMD instrukce, které jsou dostupné na všech moderních
+mikroprocesorových architekturách (viz paralelně běžící miniseriál na toto
+téma). Dnes se seznámíme s&nbsp;knihovnou nazvanou <strong>narray</strong>,
+která je navržena pro použití v&nbsp;ekosystému programovacího jazyka Go.
+Vzhledem k&nbsp;tomu, že standardní překladač Go automatickou vektorizaci
+neprovádí v&nbsp;dostatečném rozsahu (alespoň prozatím), jsou základní
+výpočetní operace v&nbsp;knihovně <strong>narray</strong> optimalizovány ručně,
+a to přímo v&nbsp;assembleru Go (jenž se v&nbsp;mnoha ohledech odlišuje od
+ostatních dnes používaných assemblerů).</p>
+
+<p>Současně tato knihovna podporuje matice z&nbsp;projektu <i>Gonum Numerical
+Packages</i> &ndash; viz též krátkou rekapitulaci uvedenou v&nbsp;další
+kapitole.</p>
+
+<p><div class="rs-tip-major">Poznámka: <strong>narray</strong> do značné míry
+přebírá vlastnosti z&nbsp;jazyka APL, takže se zde setkáme s&nbsp;pojmy
+<i>rank</i>, <i>shape</i> a <i>strides</i>.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Projekt Gonum Numerical Packages (Gonum)</h2>
+
+<p>Samotný programovací jazyk Go obsahuje podporu pro práci s&nbsp;maticemi a
+řezy neboli <i>slices</i> (ostatně se jedná o základní datové typy tohoto
+jazyka). Práce s&nbsp;těmito datovými strukturami je podporována i ve
+standardní knihovně jazyka Go. Ovšem například v&nbsp;porovnání se známou a
+velmi často používanou knihovnou <i>NumPy</i> ze světa Pythonu (nebo
+s&nbsp;možnostmi Matlabu či R) jsou možnosti standardní instalace Go
+v&nbsp;této oblasti mnohem menší. Ovšem některé operace, které známe
+z&nbsp;<i>NumPy</i>, byly implementovány v&nbsp;sadě knihoven, které jsou
+součástí projektu nazvaného jednoduše <i>Gonum Numerical Packages</i>. Tento
+projekt obsahuje zejména knihovnu pro práci s&nbsp;maticemi (naprosté základy,
+ale i složitější koncepty jsme si již řekli v&nbsp;samostatných článcích
+zmíněných na konci kapitoly), algoritmy lineární algebry, podporu pro tvorbu
+grafů, podporu práce s&nbsp;takzvanými &bdquo;datovými rámci&ldquo; (ve světě
+Pythonu se používá <i>pandas</i>) atd.</p>
+
+<img src="https://i.iinfo.cz/images/669/gophernotes1-4.png" class="image-400282" alt="&#160;" width="343" height="332" />
+<p><i>Obrázek 1: Logo projektu Gonum Numerical Packages.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je však vhodné
+poznamenat, že integrace <i>NumPy</i> do <i>Pythonu</i> je mnohem lepší, než je
+tomu v&nbsp;případě projektu <i>Gonum</i>. Je tomu tak z&nbsp;toho důvodu, že
+jazyk Go nepodporuje přetěžování operátorů, takže například není možné
+implementovat maticové operace &bdquo;přirozenou&ldquo; cestou (zrovna příklad
+<i>NumPy</i> ukazuje, že přetěžování operátorů, pokud je použito rozumně, může
+být velmi užitečné). Nicméně přesto se zdá, že Gonum se stává v&nbsp;této
+oblasti neoficiálním standardem.</div></p>
+
+<p>O knihovně Gonum jsme se zmínili v&nbsp;následujících článcích:</p>
+
+<ol>
+
+<li>Gophernotes: kombinace interaktivního prostředí Jupyteru s&nbsp;jazykem Go<br />
+<a href="https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/">https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/</a>
+</li>
+
+<li>Popis vybraných balíčků nabízených projektem Gonum <br />
+<a href="https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/">https://www.root.cz/clanky/popis-vybranych-balicku-nabizenych-projektem-gonum/</a>
+</li>
+
+</ol>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Podpora resp.&nbsp;nepodpora SIMD operací v&nbsp;jazyku Go a možná řešení</h2>
+
+<p><a href="#k02">Výše zmíněná knihovna Gonum</a> obsahuje i funkce určené pro
+zpracování vektorů a především dvourozměrných matic. Některé z&nbsp;těchto
+operací jsou z&nbsp;důvodu větší rychlosti provádění (konkrétně s&nbsp;využitím
+SIMD instrukcí) napsány v&nbsp;assembleru programovacího jazyka Go. Například
+se to týká souboru <a
+href="https://github.com/gonum/gonum/blob/72a4f789d0c895db6413242e039082b1945ba179/internal/asm/f64/addconst_amd64.s">addconst_amd64.s</a>.</p>
+
+<p>Na tomto místě se na chvíli zastavme, protože je důležité si říci, jakým
+způsobem je vlastně v&nbsp;programovacím jazyku Go možné využít SIMD operace
+nabízené všemi moderními typy mikroprocesorů. K&nbsp;dispozici je hned několik
+technologií, ovšem již na úvod je vhodné si říci, že žádná z&nbsp;těchto
+technologií není (alespoň v&nbsp;současnosti) ideální a prozatím se nezdá, že
+by se tato situace měla v&nbsp;nejbližší době změnit.</p>
+
+<p>Jeden z&nbsp;nejlepších způsobů spočívá v&nbsp;podpoře automatické
+&bdquo;vektorizace&ldquo; kódu prováděné přímo překladačem programovacího
+jazyka Go, například ve chvíli, kdy programátor napíše programovou smyčku,
+kterou lze nahradit vektorovou operací. Tyto typy optimalizací jsou podporovány
+například v&nbsp;alternativním překladači programovacího jazyka Go: <a
+href="https://gcc.gnu.org/onlinedocs/gccgo/">The GNU Go Compiler</a>. Problém
+spočívá v&nbsp;tom, že zdaleka ne všechen kód, který by bylo možné
+vektorizovat, skutečně vektorizován je (to se však pravděpodobně
+v&nbsp;budoucnosti zlepší).</p>
+
+<p>Další způsob, který je alespoň teoreticky dostupný, spočívá ve využití
+<i>intrinsic</i>, tedy pojmenovaných šablon vložených přímo do překladače,
+které jsou použity pro generování strojového kódu namísto volání funkcí. Touto
+problematikou se z&nbsp;pohledu programovacího jazyka C zabýváme
+v&nbsp;článcích <a
+href="https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-pro-nizkourovnove-optimalizace/">Podpora
+SIMD operací v&nbsp;GCC s&nbsp;využitím intrinsic pro nízkoúrovňové
+optimalizace</a> a <a
+href="https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-technologie-sse/">Podpora
+SIMD operací v&nbsp;GCC s&nbsp;využitím intrinsic: technologie SSE</a>. Ovšem
+intrinsic pro SIMD (a intrinsic obecně) nejsou v&nbsp;jazyce Go dostupné, takže
+tuto potenciálně velmi zajímavou technologii prozatím nemůžeme přímo
+v&nbsp;jazyce Go využít.</p>
+
+<p>Třetím způsob je nasnadě &ndash; vytvořit takový kód v&nbsp;jiném jazyce,
+například v&nbsp;C či ve Fortranu, a z&nbsp;programovacího jazyka Go pouze
+volat již připravené, otestované a optimalizované funkce. Problém spočívá
+v&nbsp;tom, že se přepíná kontext a navíc je nutné dbát na rozdílné typové
+systémy a taktéž na to, že Go má automatickou správu paměti. Nicméně tento
+způsob je stále poměrně dobře použitelný v&nbsp;praxi.</p>
+
+<p>A konečně poslední dostupný způsob je založen na použití assembleru jazyka
+Go. Ten je v&nbsp;mnoha ohledech pro většinu programátorů zvláštní a asi
+nejvíce ukazuje, kdo je autorem Go a v&nbsp;jaké oblasti se pohyboval :-).
+Nicméně se v&nbsp;současnosti může jednat o relativně dobrou alternativu
+k&nbsp;předchozím třem způsobům &ndash; a jedná se o alternativu, která je
+použita i v&nbsp;projektu <i>narray</i>.</p>
+
+<p>Assemblerem jazyka Go jsme se zabývali v&nbsp;těchto článcích:</p>
+
+<ol>
+
+<li>Programovací jazyk Go a assembler <br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler/</a>
+</li>
+
+<li>Programovací jazyk Go a assembler (2.část)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-2-cast/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-2-cast/</a>
+</li>
+
+<li>Programovací jazyk Go a assembler (3.část)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/</a>
+</li>
+
+</ol>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Projekt <i>narray</i> využívající možností dnešních mikroprocesorů</h2>
+
+<p>Na dnes poměrně úspěšný projekt <i>Gonum</i> nepřímo navazuje projekt
+nazvaný <i>narray</i>. Jedná se o balíček určený pro použití
+v&nbsp;programovacím jazyku Go, který umožňuje zpracování n-rozměrných polí,
+tedy nejenom vektorů a matic. Na tomto projektu je zajímavý především fakt, že
+většina operací prováděných nad n-rozměrnými poli je ručně
+&bdquo;vektorizována&ldquo;, což je patrné například při pohledu na <a
+href="https://github.com/akualab/narray/blob/master/na32/arrayfuncs_amd64.s">tento
+zdrojový kód</a>. Zdrojové kódy jsou přitom generovány na základě šablon pro
+každou podporovanou architekturu (což je dnes x86 a x86-64) a každý podporovaný
+datový typ (<strong>float32</strong> a <strong>float64</strong>).</p>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;předchozího textu plyne, že
+n-rozměrná pole nemohou obsahovat prvky libovolného typu; nejde tedy
+v&nbsp;tomto pohledu o generické datové struktury. Ovšem vzhledem k&nbsp;tomu,
+pro jaké účely knihovna <i>narray</i> vznikla, to pravděpodobně nebude
+vadit.</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Instalace balíčku <strong>narray</strong></h2>
+
+<p>Instalace balíčku <strong>narray</strong> je triviální, protože se jedná
+(možná o jeden z&nbsp;mála balíčků), který nemá další závislosti (a tranzitivní
+závislosti se v&nbsp;ekosystému jazyka Go pomalu stávají stejným problémem,
+jako v&nbsp;NPM). Postačuje vytvořit nový projekt příkazem:</p>
+
+<pre>
+$ <strong>go mod init project_name</strong>
+</pre>
+
+<p>Dále do libovolného zdrojového kódu projektu přidat import:</p>
+
+<pre>
+narray "github.com/akualab/narray/na32"
+</pre>
+
+<p>nebo:</p>
+
+<pre>
+narray "github.com/akualab/narray/na64"
+</pre>
+
+<p>A při pokusu o překlad:</p>
+
+<pre>
+go: downloading github.com/akualab/narray v0.0.0-20150719231847-f1469ca2dcda
+go: added github.com/akualab/narray v0.0.0-20150719231847-f1469ca2dcda
+</pre>
+
+<p>...se upraví soubor <strong>go.mod</strong> následovně (přidá se zvýrazněný
+řádek):</p>
+
+<pre>
+module narray-demos
+&nbsp;
+go 1.18
+&nbsp;
+<strong>require github.com/akualab/narray v0.0.0-20150719231847-f1469ca2dcda // indirect</strong>
+</pre>
+
+<p>Pro zajímavost se podívejme i na soubor <strong>go.sum</strong>, v&nbsp;němž
+jsou uloženy všechny závislosti, včetně tranzitivních závislostí:</p>
+
+<pre>
+github.com/akualab/narray v0.0.0-20150719231847-f1469ca2dcda h1:nQDCnea62a0m8ftKitrMXZfKrj0jBTcewPjTQLF6ZFo=
+github.com/akualab/narray v0.0.0-20150719231847-f1469ca2dcda/go.mod h1:6YzkTn3pv9xhDO6WcNUd3bot0eMQ5Zc8/X+IaAfSJOU=
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Konstrukce n-dimenzionálního pole</h2>
+
+<p>N-dimenzionální pole se vytváří konstruktorem <strong>New</strong>, přičemž
+už na základě toho, jaký balíček se naimportuje, se rozlišuje, jestli se bude
+jednat o pole s&nbsp;prvky typu <strong>float32</strong> nebo
+<strong>float64</strong>. Konstruktoru <strong>New</strong> se předává počet
+prvků v&nbsp;každé dimenzi (jedná se tedy o funkci s&nbsp;proměnným počtem
+parametrů). Můžeme tedy vytvořit skalár, vektor (1D), matici (2D) či
+trojrozměrné pole:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na32"
+)
+&nbsp;
+func main() {
+        scalar := <strong>narray.New()</strong>
+        vector := <strong>narray.New(10)</strong>
+        matrix := <strong>narray.New(4, 3)</strong>
+        cube := <strong>narray.New(3, 4, 5)</strong>
+&nbsp;
+        fmt.Println(scalar)
+        fmt.Println(vector)
+        fmt.Println(matrix)
+        fmt.Println(cube)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tato konstrukce v&nbsp;současné
+(poslední) verzi knihovny <i>narray</i> nepracuje korektně, takže všechny
+příklady budou ukázány na n-rozměrných polích typu
+<strong>float32</strong>.</div></p>
+
+<p>Stejnou konstrukci můžeme provést pro pole s&nbsp;prvky typu
+<strong>float64</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        scalar := <strong>narray.New()</strong>
+        vector := <strong>narray.New(10)</strong>
+        matrix := <strong>narray.New(4, 3)</strong>
+        cube := <strong>narray.New(3, 4, 5)</strong>
+&nbsp;
+        fmt.Println(scalar)
+        fmt.Println(vector)
+        fmt.Println(matrix)
+        fmt.Println(cube)
+}
+</pre>
+
+<p>Podívejme se nyní na výsledky:</p>
+
+<pre>
+narray rank:   0
+narray shape:  []
+[] =&gt; 0.000000
+&nbsp;
+narray rank:   1
+narray shape:  [10]
+[ 0] =&gt; 0.000000
+[ 1] =&gt; 0.000000
+[ 2] =&gt; 0.000000
+[ 3] =&gt; 0.000000
+[ 4] =&gt; 0.000000
+[ 5] =&gt; 0.000000
+[ 6] =&gt; 0.000000
+[ 7] =&gt; 0.000000
+[ 8] =&gt; 0.000000
+[ 9] =&gt; 0.000000
+&nbsp;
+narray rank:   2
+narray shape:  [4 3]
+[ 0 0] =&gt; 0.000000
+[ 0 1] =&gt; 0.000000
+[ 0 2] =&gt; 0.000000
+[ 1 0] =&gt; 0.000000
+[ 1 1] =&gt; 0.000000
+[ 1 2] =&gt; 0.000000
+[ 2 0] =&gt; 0.000000
+[ 2 1] =&gt; 0.000000
+[ 2 2] =&gt; 0.000000
+[ 3 0] =&gt; 0.000000
+[ 3 1] =&gt; 0.000000
+[ 3 2] =&gt; 0.000000
+&nbsp;
+narray rank:   3
+narray shape:  [3 4 5]
+[ 0 0 0] =&gt; 0.000000
+[ 0 0 1] =&gt; 0.000000
+[ 0 0 2] =&gt; 0.000000
+[ 0 0 3] =&gt; 0.000000
+[ 0 0 4] =&gt; 0.000000
+[ 0 1 0] =&gt; 0.000000
+[ 0 1 1] =&gt; 0.000000
+[ 0 1 2] =&gt; 0.000000
+[ 0 1 3] =&gt; 0.000000
+[ 0 1 4] =&gt; 0.000000
+[ 0 2 0] =&gt; 0.000000
+...
+...
+...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se používá stejný
+přístup, jako v&nbsp;programovacím jazyku APL nebo v&nbsp;NumPy &ndash; data
+jsou uložena v&nbsp;jednorozměrné datové struktuře a metainformace o počtu
+dimenzí (<i>rank</i>) a tvaru pole (<i>shape</i>) jsou uloženy zvlášť (což je
+později vhodné pro lepší &bdquo;vektorizaci&ldquo; atd.).</div></p>
+
+<p>Dokumentaci ke konstruktoru <strong>New</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#New">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#New</a>.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Konstrukce pole s&nbsp;inicializací jeho prvků</h2>
+
+<p>Kromě konstruktoru <strong>New</strong>, který všechny prvky n-rozměrného
+pole inicializuje na nulu, je možné použít i konstruktor nazvaný
+<strong>NewArray</strong>, kterému se kromě rozměrů a počtu dimenzí nového pole
+předávají i prvky, které se mají do pole uložit. Podívejme se tedy, jakým
+způsobem se tyto prvky předávají (v&nbsp;řezu &ndash; <i>slice</i>) a
+v&nbsp;jakém pořadí se do nového pole uloží:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector := <strong>narray.NewArray([]float64{1, 2, 3}, 3)</strong>
+        matrix := <strong>narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)</strong>
+        cube := <strong>narray.NewArray([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 3, 2, 2)</strong>
+&nbsp;
+        fmt.Println(vector)
+        fmt.Println(matrix)
+        fmt.Println(cube)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu by se měly zobrazit
+informace o trojici n-rozměrných polí:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [3]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   3
+narray shape:  [3 2 2]
+[ 0 0 0] =&gt; 1.000000
+[ 0 0 1] =&gt; 2.000000
+[ 0 1 0] =&gt; 3.000000
+[ 0 1 1] =&gt; 4.000000
+[ 1 0 0] =&gt; 5.000000
+[ 1 0 1] =&gt; 6.000000
+[ 1 1 0] =&gt; 7.000000
+[ 1 1 1] =&gt; 8.000000
+[ 2 0 0] =&gt; 9.000000
+[ 2 0 1] =&gt; 10.000000
+[ 2 1 0] =&gt; 11.000000
+[ 2 1 1] =&gt; 12.000000
+</pre>
+
+<p>Dokumentaci ke konstruktoru <strong>NewArray</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NewArray">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NewArray</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: teoreticky je možné u již vytvořeného
+pole změnit jeho tvar (<i>shape</i>) metodou <strong>Reshape</strong>. Ovšem
+prozatím není tato metoda implementována:</div></p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector := <strong>narray.NewArray([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 12)</strong>
+        matrix := vector.Reshape(4, 3)
+&nbsp;
+        fmt.Println(vector)
+        fmt.Println(matrix)
+}
+</pre>
+
+<p>Při pokusu o spuštění tohoto příkladu aplikace zhavaruje:</p>
+
+<pre>
+<strong>panic: not implemented</strong>
+&nbsp;
+goroutine 1 [running]:
+github.com/akualab/narray/na64.(*NArray).Reshape(...)
+        /home/ptisnovs/go/pkg/mod/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64/narray.go:678
+main.main()
+        /home/ptisnovs/src/go-root/article_95/04_reshape.go:11 +0x1e5
+exit status 2
+</pre>
+
+<p>Dokumentaci k&nbsp;metodě <strong>Reshape</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Reshape">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Reshape</a>.</p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Součet a součin všech prvků uložených ve vektoru</h2>
+
+<p>V&nbsp;poměrně mnoha algoritmech se setkáme s&nbsp;nutností provést součet
+či součin všech prvků uložených ve vektorech, takže je vhodné, aby tyto operace
+byly (ručně) &bdquo;vektorizovány&ldquo;. Implementaci těchto funkcí samozřejmě
+v&nbsp;knihovně <strong>narray</strong> nalezneme, a to v&nbsp;metodách
+<strong>Sum</strong> a <strong>Prod</strong>.</p>
+
+<p>Vyzkoušejme si nejprve součet prvků pětiprvkového vektoru:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := <strong>narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)</strong>
+&nbsp;
+        sum := <strong>vector1.Sum()</strong>
+        fmt.Println(sum)
+}
+</pre>
+
+<p>Hodnota získaná po překladu a spuštění tohoto příkladu:</p>
+
+<pre>
+15
+</pre>
+
+<p>Podobně si můžeme otestovat výpočet provedený metodou <strong>Prod</strong>
+(tedy součin prvků vektoru):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := <strong>narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)</strong>
+&nbsp;
+        prod := <strong>vector1.Prod()</strong>
+        fmt.Println(prod)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu získáme očekávanou hodnotu:</p>
+
+<pre>
+120
+</pre>
+
+<p>Dokumentaci k&nbsp;metodám <strong>Sum</strong> a <strong>Prod</strong>
+naleznete na adresách <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Sum">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Sum</a>
+a <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Prod">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Prod</a>.</p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Součet všech prvků dvojice vektorů</h2>
+
+<p>Další velmi často vyžadovanou operací je součet prvků z&nbsp;dvojice vektorů
+(tedy přesněji řečeno vždy odpovídajících si prvků). Jedná se o jednu
+z&nbsp;operací, která je &bdquo;vektorizována&ldquo; již tradičně, protože byla
+implementována již <a
+href="https://www.root.cz/clanky/superpocitace-cray-druha-cast/#k06">v&nbsp;superpočítačích
+Cray</a>. V&nbsp;knihovně <i>narray</i> nalezneme funkci (nikoli metodu)
+nazvanou <strong>Add</strong>, která vyžaduje reference na tři n-rozměrná pole
+&ndash; cílový vektor a dva zdrojové vektory. Pokud je namísto cílového vektoru
+použita hodnota <strong>nil</strong>, bude alokován a vrácen v&nbsp;návratové
+hodnotě funkce <strong>Add</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+        vector2 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+&nbsp;
+        vector3 := <strong>narray.Add(nil, vector1, vector2)</strong>
+        fmt.Println(vector1)
+        fmt.Println(vector2)
+        fmt.Println(vector3)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 2.000000
+[ 1] =&gt; 4.000000
+[ 2] =&gt; 6.000000
+[ 3] =&gt; 8.000000
+[ 4] =&gt; 10.000000
+</pre>
+
+<p>Často však nechceme, aby se cílový vektor stále vytvářel (což zatěžuje GC).
+Proto můžeme v&nbsp;prvním parametru funkce <strong>Add</strong> předat
+referenci na již alokovaný vektor:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+        vector2 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+        vector3 := narray.New(5)
+&nbsp;
+        <strong>narray.Add(vector3, vector1, vector2)</strong>
+        fmt.Println(vector1)
+        fmt.Println(vector2)
+        fmt.Println(vector3)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 2.000000
+[ 1] =&gt; 4.000000
+[ 2] =&gt; 6.000000
+[ 3] =&gt; 8.000000
+[ 4] =&gt; 10.000000
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: namísto vektorů je pochopitelně možné
+použít jakékoli n-rozměrné pole.</div></p>
+
+<p>Dokumentaci k&nbsp;funkci <strong>Add</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#Add">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#Add</a>.</p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Skalární součin libovolného počtu vektorů</h2>
+
+<p>Další v&nbsp;praxi často vyžadovanou operací je skalární součin dvou vektorů
+popř.&nbsp;libovolného počtu vektorů. Nejprve si ukažme způsob provedení
+operace, která provede skalární součin dvojice vektorů (pochopitelně o shodné
+délce). Tato operace je realizována funkcí nazvanou <strong>Dot</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+&nbsp;
+        dotProduct := <strong>narray.Dot(vector1, vector1)</strong>
+        fmt.Println(dotProduct)
+        fmt.Println(1*1 + 2*2 + 3*3 + 4*4 + 5*5)
+}
+</pre>
+
+<p>V&nbsp;demonstračním příkladu provádíme skalární součin vektorů
+s&nbsp;hodnotami [1, 2, 3, 4, 5], takže výsledkem by měla být hodnota 55:</p>
+
+<pre>
+55
+55
+</pre>
+
+<p>Ve skutečnosti ovšem nejsme omezeni pouze na skalární součin dvou vektorů,
+ale můžeme provést skalární součin většího množství vektorů o shodné délce.
+V&nbsp;dalším demonstračním příkladu je ukázán součin pro trojici vstupních
+vektorů, z&nbsp;nichž každý obsahuje jen tři prvky:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3}, 3)
+        vector2 := narray.NewArray([]float64{4, 5, 6}, 3)
+        vector3 := narray.NewArray([]float64{7, 8, 9}, 3)
+&nbsp;
+        dotProduct := <strong>narray.Dot(vector1, vector2, vector3)</strong>
+        fmt.Println(dotProduct)
+}
+</pre>
+
+<p>Výsledek v&nbsp;tomto případě vznikne výpočtem 1&times;4&times;7 +
+2&times;5&times;8 + 3&times;6&times;9 = 28 + 80 + 162 = 270. A skutečně:</p>
+
+<pre>
+270
+</pre>
+
+<p>Funkce pro výpočet skalárního součinu vektorů je zdokumentována na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Dot">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.Dot</a>.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Serializace n-rozměrného pole do souboru</h2>
+
+<p>Díky existenci metody <strong>WriteFile</strong> je možné serializovat
+(uložit) n-rozměrné pole do souboru. Přitom je použit textový formát, jehož
+výhodou je čitelnost, nevýhodou pak fakt, že u velkých polí budou soubory
+obrovské a budou se ukládat i načítat pomalu, a to kvůli nutnosti převodu
+hodnot typu <strong>float32</strong> nebo <strong>float64</strong> do textové
+podoby (a zpět).</p>
+
+<p>Vyzkoušejme si nyní, jak lze serializaci provést. Opět použijeme trojici
+polí s&nbsp;jednou, dvěma a třemi dimenzemi:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector := narray.NewArray([]float64{1, 2, 3}, 3)
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+        cube := narray.NewArray([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 3, 2, 2)
+&nbsp;
+        fmt.Println(vector)
+        fmt.Println(matrix)
+        fmt.Println(cube)
+&nbsp;
+        <strong>vector.WriteFile("vector.dat")</strong>
+        <strong>matrix.WriteFile("matrix.dat")</strong>
+        <strong>cube.WriteFile("cube.dat")</strong>
+}
+</pre>
+
+<p>Soubor &bdquo;vector.dat&ldquo; vypadá takto:</p>
+
+<pre>
+{"rank":1,"shape":[3],"data":[1,2,3],"strides":[1]}
+</pre>
+
+<p>Soubor &bdquo;matrix.dat&ldquo; vypadá následovně:</p>
+
+<pre>
+{"rank":2,"shape":[3,2],"data":[1,2,3,4,5,6],"strides":[2,1]}
+</pre>
+
+<p>A konečně se podívejme na soubor &bdquo;cube.dat&ldquo;:</p>
+
+<pre>
+{"rank":3,"shape":[3,2,2],"data":[1,2,3,4,5,6,7,8,9,10,11,12],"strides":[4,2,1]}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že kromě počtu dimenzí
+(<i>rank</i>) a tvaru pole (<i>shape</i>) se ukládají i offsety mezi prvky
+(<i>strides</i>), což umožňuje rychlý přístup k&nbsp;jednotlivým prvkům či
+k&nbsp;celým polím o dimenzi o jedničku menším.</div></p>
+
+<p>Dokumentaci k&nbsp;metodě <strong>WriteFile</strong> lze nalézt na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.WriteFile">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.WriteFile</a>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Deserializace (načtení) n-rozměrných polí ze souborů</h2>
+
+<p>Opětovné načtení (neboli deserializaci) n-rozměrného pole ze souboru lze
+provést funkcí (pochopitelně nikoli metodou) nazvanou
+<strong>ReadFile</strong>. Tato funkce vrací dvojici hodnot &ndash;
+deserializované pole a datovou strukturu s&nbsp;informacemi o chybě, která může
+v&nbsp;průběhu deserializace vzniknout. Jak je v&nbsp;jazyce Go zvykem, je
+druhá návratová hodnota rovna <strong>nil</strong> ve chvíli, kdy k&nbsp;chybě
+při načítání nedošlo, takže test na případnou chybu je triviální.</p>
+
+<p>Programový kód určený pro opětovné načtení polí ze souborů může vypadat
+takto:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector, err := <strong>narray.ReadFile("vector.dat")</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+&nbsp;
+        matrix, err := <strong>narray.ReadFile("matrix.dat")</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+&nbsp;
+        cube, err := <strong>narray.ReadFile("cube.dat")</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+&nbsp;
+        fmt.Println(vector)
+        fmt.Println(matrix)
+        fmt.Println(cube)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu by se měly zobrazit
+obsahy všech tří deserializovaných polí:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [3]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   3
+narray shape:  [3 2 2]
+[ 0 0 0] =&gt; 1.000000
+[ 0 0 1] =&gt; 2.000000
+[ 0 1 0] =&gt; 3.000000
+[ 0 1 1] =&gt; 4.000000
+[ 1 0 0] =&gt; 5.000000
+[ 1 0 1] =&gt; 6.000000
+[ 1 1 0] =&gt; 7.000000
+[ 1 1 1] =&gt; 8.000000
+[ 2 0 0] =&gt; 9.000000
+[ 2 0 1] =&gt; 10.000000
+[ 2 1 0] =&gt; 11.000000
+[ 2 1 1] =&gt; 12.000000
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět platí, že pro rozsáhlejší pole není
+ukládání do textových souborů a opětovné načítání pole z&nbsp;těchto souborů
+vhodnou technologií.</div></p>
+
+<p>Dokumentaci k&nbsp;funkci <strong>ReadFile</strong> lze nalézt na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#ReadFile">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#ReadFile</a>.</p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Serializace n-rozměrného pole do formátu JSON</h2>
+
+<p>Knihovna <i>narray</i> obsahuje i metodu nazvanou <strong>ToJSON</strong>,
+která &ndash; jak již ostatně její název velmi dobře napovídá &ndash; slouží
+pro serializaci n-rozměrného pole do JSONu. Opět platí, že se taková
+serializace vyplatí provádět pouze ve chvíli, kdy jsou pole relativně malá
+(tedy nikoli například pro serializaci rastrového obrázku a už vůbec ne videa
+:-). Podívejme se, jak se tato serializace provede v&nbsp;praxi:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+        "log"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector := narray.NewArray([]float64{1, 2, 3}, 3)
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+        cube := narray.NewArray([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 3, 2, 2)
+&nbsp;
+        j, err := <strong>vector.ToJSON()</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+&nbsp;
+        fmt.Println(j)
+&nbsp;
+        j, err = <strong>matrix.ToJSON()</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+&nbsp;
+        fmt.Println(j)
+&nbsp;
+        j, err = <strong>cube.ToJSON()</strong>
+        if err != nil {
+                log.Panic(err)
+        }
+        fmt.Println(j)
+}
+</pre>
+
+<p>Výsledky získané spuštěním tohoto demonstračního příkladu ukazují
+serializaci do JSONu provedenou bez &bdquo;pretty printingu&ldquo;:</p>
+
+<pre>
+{"rank":1,"shape":[3],"data":[1,2,3],"strides":[1]}
+&nbsp;
+{"rank":2,"shape":[3,2],"data":[1,2,3,4,5,6],"strides":[2,1]}
+&nbsp;
+{"rank":3,"shape":[3,2,2],"data":[1,2,3,4,5,6,7,8,9,10,11,12],"strides":[4,2,1]}
+</pre>
+
+<p>Ovšem můžeme použít nástroj typu <strong>jq</strong> pro vylepšení výstupu,
+ovšem za cenu prodloužení objemu dat:</p>
+
+<pre>
+{
+  "rank": 1,
+  "shape": [
+    3
+  ],
+  "data": [
+    1,
+    2,
+    3
+  ],
+  "strides": [
+    1
+  ]
+}
+</pre>
+
+<pre>
+{
+  "rank": 2,
+  "shape": [
+    3,
+    2
+  ],
+  "data": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "strides": [
+    2,
+    1
+  ]
+}
+</pre>
+
+<pre>
+{
+  "rank": 3,
+  "shape": [
+    3,
+    2,
+    2
+  ],
+  "data": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "strides": [
+    4,
+    2,
+    1
+  ]
+}
+</pre>
+
+<p>Dokumentaci k&nbsp;metodě <strong>ToJSON</strong> lze nalézt na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.ToJSON">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#NArray.ToJSON</a>.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Operace <strong>AddConst</strong> a <strong>AddScaled</strong></h2>
+
+<p>Vraťme se ještě na chvíli k&nbsp;dalším operacím, které je možné provádět se
+všemi prvky n-rozměrných polí. Jednou z&nbsp;těchto operací je přičtení stejné
+konstanty ke všem prvkům takového pole, což se provede funkcí
+<strong>AddConst</strong>, která se chová podobně, jako již popsaná funkce
+<strong>Add</strong> (včetně možnosti použití již připraveného vektoru pro
+uložení výsledků). Tuto operaci si otestujeme snadno:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+        vector2 := narray.New(5)
+&nbsp;
+        <strong>narray.AddConst(vector2, vector1, 100)</strong>
+        fmt.Println(vector1)
+        fmt.Println(vector2)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 101.000000
+[ 1] =&gt; 102.000000
+[ 2] =&gt; 103.000000
+[ 3] =&gt; 104.000000
+[ 4] =&gt; 105.000000
+</pre>
+
+<p>Dokumentaci k&nbsp;funkci <strong>AddConst</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#AddConst">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#AddConst</a>.</p>
+
+<p>Další užitečnou operací je součet prvků vektorů, přičemž prvky druhého
+vektoru jsou vynásobeny nějakou konstantou. Jedná se tedy o kombinaci součtu
+<strong>Add</strong> s&nbsp;vynásobením jednoho vektoru zvolenou konstantou.
+Otestování této funkce je snadné:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        vector1 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+        vector2 := narray.NewArray([]float64{1, 2, 3, 4, 5}, 5)
+&nbsp;
+        <strong>narray.AddScaled(vector1, vector2, 100)</strong>
+        fmt.Println(vector1)
+        fmt.Println(vector2)
+}
+</pre>
+
+<p>Nyní po překladu a spuštění příkladu dostaneme tyto výsledky:</p>
+
+<pre>
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 101.000000
+[ 1] =&gt; 202.000000
+[ 2] =&gt; 303.000000
+[ 3] =&gt; 404.000000
+[ 4] =&gt; 505.000000
+&nbsp;
+narray rank:   1
+narray shape:  [5]
+[ 0] =&gt; 1.000000
+[ 1] =&gt; 2.000000
+[ 2] =&gt; 3.000000
+[ 3] =&gt; 4.000000
+[ 4] =&gt; 5.000000
+</pre>
+
+<p>Dokumentaci k&nbsp;funkci <strong>AddScaled</strong> naleznete na adrese <a
+href="https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#AddScaled">https://pkg.go.dev/github.com/akualab/narray@v0.0.0-20150719231847-f1469ca2dcda/na64#AddScaled</a>.</p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Převod n-rozměrných polí se dvěma dimenzemi na matice</h2>
+
+<p>Ve <a href="#k02">druhé kapitole</a> jsme se zmínili o projektu <i>Gonum
+Numerical Packages</i>. Tento projekt je dnes poměrně rozšířený, i když se
+v&nbsp;oblasti numerických výpočtů spíše používá jazyk Julia. Nicméně autoři
+knihovny <i>narray</i> považovali za vhodné podporovat základní datový typ
+z&nbsp;knihovny <i>gonum</i>, což je konkrétně typ <strong>Matrix</strong>. Pro
+převod dvourozměrného pole (tedy n-rozměrného pole se dvěma dimenzemi) na
+matici lze použít metodu <strong>Matrix</strong> tak, jak je to ukázáno
+v&nbsp;dalším příkladu. Převádět lze i vícerozměrná pole, ovšem tehdy je nutné
+provést &bdquo;projekci&ldquo; pouze na dvě dimenze:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+&nbsp;
+        trueMatrix := <strong>matrix.Matrix(-1, -1)</strong>
+        fmt.Println(matrix)
+        fmt.Println(trueMatrix)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Základní operace s&nbsp;maticemi</h2>
+
+<p>S&nbsp;maticemi, tedy striktně dvourozměrnými poli, je možné provádět
+některé základní operace. Příkladem může být metoda <strong>Col</strong> určená
+pro přečtení n-tého sloupce z&nbsp;matice, přičemž se sloupce indexují od nuly
+a návratovou hodnotou je řez hodnot typu <strong>float32</strong> nebo
+<strong>float64</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+&nbsp;
+        trueMatrix := matrix.Matrix(-1, -1)
+        fmt.Println(matrix)
+        fmt.Println(trueMatrix)
+&nbsp;
+        col1 := <strong>trueMatrix.Col(nil, 0)</strong>
+        fmt.Println(col1)
+&nbsp;
+        col2 := <strong>trueMatrix.Col(nil, 1)</strong>
+        fmt.Println(col2)
+}
+</pre>
+
+<p>Po tisku původní matice by se měl vypsat obsah prvního a druhého
+sloupce:</p>
+
+<pre>
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+<strong>[1 3 5]</strong>
+<strong>[2 4 6]</strong>
+</pre>
+
+<p>Podobným způsobem můžeme metodou <strong>Row</strong> získat libovolný řádek
+matice:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+&nbsp;
+        trueMatrix := matrix.Matrix(-1, -1)
+        fmt.Println(matrix)
+        fmt.Println(trueMatrix)
+&nbsp;
+        row1 := <strong>trueMatrix.Row(nil, 0)</strong>
+        fmt.Println(row1)
+&nbsp;
+        row2 := <strong>trueMatrix.Row(nil, 1)</strong>
+        fmt.Println(row2)
+}
+</pre>
+
+<p>Opět se podívejme na výsledek vypsaný všemi operacemi:</p>
+
+<pre>
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+<strong>[1 2]</strong>
+<strong>[3 4]</strong>
+</pre>
+
+<p>A konečně metoda <strong>At</strong> slouží pro přečtení vybraného prvku
+z&nbsp;matice. V&nbsp;tomto případě se pochopitelně musí uvést index sloupce i
+řádku, jak je to ostatně patrné ze zdrojového kódu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+&nbsp;
+        trueMatrix := matrix.Matrix(-1, -1)
+        fmt.Println(matrix)
+        fmt.Println(trueMatrix)
+&nbsp;
+        fmt.Println(<strong>trueMatrix.At(0, 0)</strong>)
+        fmt.Println(<strong>trueMatrix.At(0, 1)</strong>)
+        fmt.Println(<strong>trueMatrix.At(0, 2)</strong>)
+        fmt.Println(<strong>trueMatrix.At(1, 0)</strong>)
+        fmt.Println(<strong>trueMatrix.At(1, 1)</strong>)
+        fmt.Println(<strong>trueMatrix.At(1, 2)</strong>)
+}
+</pre>
+
+<p>S&nbsp;výsledky:</p>
+
+<pre>
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+<strong>1</strong>
+<strong>2</strong>
+<strong>3</strong>
+<strong>3</strong>
+<strong>4</strong>
+<strong>5</strong>
+</pre>
+
+<p>Poslední metoda, s&nbsp;níž se dnes setkáme, slouží pro přečtení rozměrů
+matice. Opět se jedná o metodu, která je vyžadována rozhraním získaným
+z&nbsp;projektu <i>Gonum</i>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        narray "github.com/akualab/narray/na64"
+)
+&nbsp;
+func main() {
+        matrix := narray.NewArray([]float64{1, 2, 3, 4, 5, 6}, 3, 2)
+&nbsp;
+        trueMatrix := matrix.Matrix(-1, -1)
+        fmt.Println(matrix)
+        fmt.Println(trueMatrix)
+&nbsp;
+        fmt.Println(<strong>trueMatrix.Dims()</strong>)
+}
+</pre>
+
+<p>Výsledkem bude:</p>
+
+<pre>
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+narray rank:   2
+narray shape:  [3 2]
+[ 0 0] =&gt; 1.000000
+[ 0 1] =&gt; 2.000000
+[ 1 0] =&gt; 3.000000
+[ 1 1] =&gt; 4.000000
+[ 2 0] =&gt; 5.000000
+[ 2 1] =&gt; 6.000000
+&nbsp;
+<strong>3 2</strong>
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Závěrečné zhodnocení</h2>
+
+<p>Projekt <i>narray</i> je v&nbsp;současnosti zajímavý zejména
+z&nbsp;technologického hlediska, tedy proto, jakým způsobem jsou operace
+s&nbsp;n-rozměrnými poli ručně &bdquo;vektorizovány&ldquo; s&nbsp;využitím
+assembleru programovacího jazyka Go (a nikoli například voláním nativních
+funkcí naprogramovaných v&nbsp;céčku). Taktéž návaznost na projekt <i>Gonum</i>
+je poměrně dobrá, a to i z&nbsp;praktického hlediska. I když se však jedná o
+poměrně starý balíček, není stále ještě zcela dokončen a dokonce obsahuje i
+základní chyby při práci s&nbsp;poli s&nbsp;prvky typu
+<strong>float32</strong>, což pochopitelně může přinášet obavy z&nbsp;jeho
+dalšího využití ve vlastních projektech. I z&nbsp;těchto důvodů jsme prozatím
+tento balíček do našich &bdquo;produkčních&ldquo; projektů nezařadili, i když
+za to do jisté míry platíme menší výkonností aplikací, které nedokážou plně
+využít možností moderních mikroprocesorů s&nbsp;podporou SIMD operací.</p>
+
+<p><div class="rs-tip-major">Poznámka: popravdě se pro oblast lineární algebry
+či zpracování signálů programovací jazyk Go prozatím příliš nehodí. Nejedná se
+sice o tu nejhorší technologii, ale k&nbsp;dispozici jsou lepší alternativy,
+například již zmíněný jazyk Julia.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Předchozí články o rozsáhlém světu &bdquo;array programmingu&ldquo;</h2>
+
+<p>Programovacími jazyky, které jsou z&nbsp;větší či menší míry odvozeny od
+APL, jsme se již na stránkách Roota zabývali v&nbsp;několika článcích. Odkazy
+na tyto články naleznete pod odstavcem:</p>
+
+<ol>
+
+<li>Jazyky umožňující operace s&nbsp;poli aneb rozsáhlý svět &bdquo;array programmingu&ldquo;<br />
+<a href="https://www.root.cz/clanky/jazyky-umoznujici-operace-s-poli-aneb-rozsahly-svet-bdquo-array-programmingu-ldquo/">https://www.root.cz/clanky/jazyky-umoznujici-operace-s-poli-aneb-rozsahly-svet-bdquo-array-programmingu-ldquo/</a>
+</li>
+
+<li>Specializované jazyky pro práci s&nbsp;N-dimenzionálními poli: jazyk J<br />
+<a href="https://www.root.cz/clanky/specializovane-jazyky-pro-praci-s-n-dimenzionalnimi-poli-jazyk-j/">https://www.root.cz/clanky/specializovane-jazyky-pro-praci-s-n-dimenzionalnimi-poli-jazyk-j/</a>
+</li>
+
+<li>Programovací jazyky odvozené od APL: BQN a ivy aneb 1~×`1↓↕10<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyky-odvozene-od-apl-bqn-a-ivy-aneb-1-1-10/">https://www.root.cz/clanky/programovaci-jazyky-odvozene-od-apl-bqn-a-ivy-aneb-1-1-10/</a>
+</li>
+
+<li>Programovací jazyk K: důkaz, že mezi námi žijí mimozemšťané<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-k-dukaz-ze-mezi-nami-ziji-mimozemstane/">https://www.root.cz/clanky/programovaci-jazyk-k-dukaz-ze-mezi-nami-ziji-mimozemstane/</a>
+</li>
+
+<li>Programovací jazyk K: důkaz, že mezi námi žijí mimozemšťané (dokončení)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-k-dukaz-ze-mezi-nami-ziji-mimozemstane-dokonceni/">https://www.root.cz/clanky/programovaci-jazyk-k-dukaz-ze-mezi-nami-ziji-mimozemstane-dokonceni/</a>
+</li>
+
+<li>Nial Array Language: další z&nbsp;jazyků inspirovaných APL<br />
+<a href="https://www.root.cz/clanky/nial-array-language-dalsi-z-jazyku-inspirovanych-apl/">https://www.root.cz/clanky/nial-array-language-dalsi-z-jazyku-inspirovanych-apl/</a>
+</li>
+
+<li>Programování mainframů: jazyk APL<br />
+<a href="https://www.root.cz/clanky/programovani-mainframu-jazyk-apl/">https://www.root.cz/clanky/programovani-mainframu-jazyk-apl/</a>
+</li>
+
+<li>Programovací jazyk APL: programování bez smyček<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-apl-programovani-bez-smycek/">https://www.root.cz/clanky/programovaci-jazyk-apl-programovani-bez-smycek/</a>
+</li>
+
+<li>Programovací jazyk APL &ndash; dokončení<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-apl-dokonceni/">https://www.root.cz/clanky/programovaci-jazyk-apl-dokonceni/</a>
+</li>
+
+<li>Oslava 55 let od vzniku první implementace jazyka APL<br />
+<a href="https://www.root.cz/clanky/oslava-55-let-od-vzniku-prvni-implementace-programovaciho-jazyka-apl/">https://www.root.cz/clanky/oslava-55-let-od-vzniku-prvni-implementace-programovaciho-jazyka-apl/</a>
+</li>
+
+</ol>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; na dnešní poměry
+relativní malý, dnes má přibližně patnáct až šestnáct megabajtů), můžete
+namísto toho použít odkazy na jednotlivé příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_narray_na32.go</td><td>konstrukce pole s&nbsp;nulovými prvky typu <strong>float32</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/01_narray_na32.go">https://github.com/tisnik/go-root/blob/master/article_95/01_narray_na32.go</a></td></tr>
+<tr><td> 2</td><td>02_narray_na64.go</td><td>konstrukce pole s&nbsp;nulovými prvky typu <strong>float64</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/02_narray_na64.go">https://github.com/tisnik/go-root/blob/master/article_95/02_narray_na64.go</a></td></tr>
+<tr><td> 3</td><td>03_new_array.go</td><td>konstrukce pole se specifikací hodnot prvků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/03_new_array.go">https://github.com/tisnik/go-root/blob/master/article_95/03_new_array.go</a></td></tr>
+<td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></td>
+<tr><td> 4</td><td>04_reshape.go</td><td>funkce pro změnu tvaru pole (<i>reshape</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/04_reshape.go">https://github.com/tisnik/go-root/blob/master/article_95/04_reshape.go</a></td></tr>
+<tr><td> 5</td><td>05_sum.go</td><td>součet všech prvků pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/05_sum.go">https://github.com/tisnik/go-root/blob/master/article_95/05_sum.go</a></td></tr>
+<tr><td> 6</td><td>06_prod.go</td><td>součin všech prvků pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/06_prod.go">https://github.com/tisnik/go-root/blob/master/article_95/06_prod.go</a></td></tr>
+<tr><td> 7</td><td>07_add.go</td><td>součet prvků dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/07_add.go">https://github.com/tisnik/go-root/blob/master/article_95/07_add.go</a></td></tr>
+<tr><td> 8</td><td>08_add.go</td><td>součet prvků do s&nbsp;uložením do určeného vektoru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/08_add.go">https://github.com/tisnik/go-root/blob/master/article_95/08_add.go</a></td></tr>
+<tr><td> 9</td><td>09_dot.go</td><td>skalární součin dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/09_dot.go">https://github.com/tisnik/go-root/blob/master/article_95/09_dot.go</a></td></tr>
+<tr><td>10</td><td>10_dot.go</td><td>skalární součin tří vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/10_dot.go">https://github.com/tisnik/go-root/blob/master/article_95/10_dot.go</a></td></tr>
+<td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></td>
+<tr><td>11</td><td>11_writefile.go</td><td>serializace pole do souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/11_writefile.go">https://github.com/tisnik/go-root/blob/master/article_95/11_writefile.go</a></td></tr>
+<tr><td>12</td><td>12_readfile.go</td><td>deserializace pole ze souboru</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/12_readfile.go">https://github.com/tisnik/go-root/blob/master/article_95/12_readfile.go</a></td></tr>
+<tr><td>13</td><td>13_to_json.go</td><td>serializace pole do formátu JSON</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/13_to_json.go">https://github.com/tisnik/go-root/blob/master/article_95/13_to_json.go</a></td></tr>
+<tr><td>14</td><td>14_add_constant.go</td><td>funkce pro přičtení konstanty ke všem prvkům pole</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/14_add_constant.go">https://github.com/tisnik/go-root/blob/master/article_95/14_add_constant.go</a></td></tr>
+<tr><td>15</td><td>15_add_scaled.go</td><td>kombinace add a add_constant</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/15_add_scaled.go">https://github.com/tisnik/go-root/blob/master/article_95/15_add_scaled.go</a></td></tr>
+<td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></td>
+<tr><td>16</td><td>16_to_matrix.go</td><td>převod pole na typ <strong>Matrix</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/16_to_matrix.go">https://github.com/tisnik/go-root/blob/master/article_95/16_to_matrix.go</a></td></tr>
+<tr><td>17</td><td>17_matrix_column.go</td><td>získání celého sloupce matice (selektor)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/17_matrix_column.go">https://github.com/tisnik/go-root/blob/master/article_95/17_matrix_column.go</a></td></tr>
+<tr><td>18</td><td>18_matrix_row.go</td><td>získání celého řádku matice (selektor)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/18_matrix_row.go">https://github.com/tisnik/go-root/blob/master/article_95/18_matrix_row.go</a></td></tr>
+<tr><td>19</td><td>19_matrix_at.go</td><td>získání zvoleného prvku (selektor)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/19_matrix_at.go">https://github.com/tisnik/go-root/blob/master/article_95/19_matrix_at.go</a></td></tr>
+<tr><td>20</td><td>20_matrix_dims.go</td><td>přečtení rozměrů matice</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_95/20_matrix_dims.go">https://github.com/tisnik/go-root/blob/master/article_95/20_matrix_dims.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Package narray<br />
+<a href="https://github.com/akualab/narray">https://github.com/akualab/narray</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku narray/na32<br />
+<a href="https://pkg.go.dev/github.com/akualab/narray/na32">https://pkg.go.dev/github.com/akualab/narray/na32</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku narray/na64<br />
+<a href="https://pkg.go.dev/github.com/akualab/narray/na64">https://pkg.go.dev/github.com/akualab/narray/na64</a>
+</li>
+
+<li>The Gonum Numerical Computing Package<br />
+<a href="https://www.gonum.org/post/introtogonum/">https://www.gonum.org/post/introtogonum/</a>
+</li>
+
+<li>Gonum Numerical Packages<br />
+<a href="https://www.gonum.org/">https://www.gonum.org/</a>
+</li>
+
+<li>Accelerating data processing in Go with SIMD instructions<br />
+<a href="https://docs.google.com/presentation/d/1MYg8PyhEf0oIvZ9YU2panNkVXsKt5UQBl_vGEaCeB1k/htmlpresent#!">https://docs.google.com/presentation/d/1MYg8PyhEf0oIvZ9YU2panNkVXsKt5UQBl_vGEaCeB1k/htmlpresent#!</a>
+</li>
+
+<li>Programovací jazyk Go a assembler<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler/</a>
+</li>
+
+<li>Programovací jazyk Go a assembler (2.část)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-2-cast/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-2-cast/</a>
+</li>
+
+<li>Programovací jazyk Go a assembler (3.část)<br />
+<a href="https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/">https://www.root.cz/clanky/programovaci-jazyk-go-a-assembler-3-cast/</a>
+</li>
+
+<li>Comparison of programming languages (array)<br />
+<a href="https://en.wikipedia.org/wiki/Comparison_of_programming_languages_(array)">https://en.wikipedia.org/wiki/Comparison_of_programming_languages_(array)</a>
+</li>
+
+<li>Julia (front page)<br />
+<a href="http://julialang.org/">http://julialang.org/</a>
+</li>
+
+<li>Julia &ndash; dokumentace<br />
+<a href="http://docs.julialang.org/">http://docs.julialang.org/</a>
+</li>
+
+<li>Julia &ndash; repositář na GitHubu<br />
+<a href="https://github.com/JuliaLang/julia">https://github.com/JuliaLang/julia</a>
+</li>
+
+<li>Julia (programming language)<br />
+<a href="https://en.wikipedia.org/wiki/Julia_%28programming_language%29">https://en.wikipedia.org/wiki/Julia_%28programming_language%29</a>
+</li>
+
+<li>IJulia<br />
+<a href="https://github.com/JuliaLang/IJulia.jl">https://github.com/JuliaLang/IJulia.jl</a>
+</li>
+
+<li>Introducing Julia<br />
+<a href="https://en.wikibooks.org/wiki/Introducing_Julia">https://en.wikibooks.org/wiki/Introducing_Julia</a>
+</li>
+
+<li>Julia: the REPL<br />
+<a href="https://en.wikibooks.org/wiki/Introducing_Julia/The_REPL">https://en.wikibooks.org/wiki/Introducing_Julia/The_REPL</a>
+</li>
+
+<li>Month of Julia<br />
+<a href="https://github.com/DataWookie/MonthOfJulia">https://github.com/DataWookie/MonthOfJulia</a>
+</li>
+
+<li>Learn X in Y minutes (where X=Julia)<br />
+<a href="https://learnxinyminutes.com/docs/julia/">https://learnxinyminutes.com/docs/julia/</a>
+</li>
+
+<li>New Julia language seeks to be the C for scientists<br />
+<a href="http://www.infoworld.com/article/2616709/application-development/new-julia-language-seeks-to-be-the-c-for-scientists.html">http://www.infoworld.com/article/2616709/application-development/new-julia-language-seeks-to-be-the-c-for-scientists.html</a>
+</li>
+
+<li>Julia: A Fast Dynamic Language for Technical Computing<br />
+<a href="http://karpinski.org/publications/2012/julia-a-fast-dynamic-language">http://karpinski.org/publications/2012/julia-a-fast-dynamic-language</a>
+</li>
+
+<li>Array Programming<br />
+<a href="https://en.wikipedia.org/wiki/Array_programming">https://en.wikipedia.org/wiki/Array_programming</a>
+</li>
+
+<li>Discovering Array Languages<br />
+<a href="http://archive.vector.org.uk/art10008110">http://archive.vector.org.uk/art10008110</a>
+</li>
+
+<li>no stinking loops -- Kalothi<br />
+<a href="http://www.nsl.com/">http://www.nsl.com/</a>
+</li>
+
+<li>Vector (obsahuje odkazy na články, knihy a blogy o programovacích jazycích APL, J a K)<br />
+<a href="http://www.vector.org.uk/">http://www.vector.org.uk/</a>
+</li>
+
+<li>APL Wiki<br />
+<a href="https://aplwiki.com/wiki/">https://aplwiki.com/wiki/</a>
+</li>
+
+<li>The Array Cast<br />
+<a href="https://www.arraycast.com/episodes/episode-03-what-is-an-array">https://www.arraycast.com/episodes/episode-03-what-is-an-array</a>
+</li>
+
+<li>EnthusiastiCon 2019 &ndash; An Introduction to APL<br />
+<a href="https://www.youtube.com/watch?v=UltnvW83_CQ">https://www.youtube.com/watch?v=UltnvW83_CQ</a>
+</li>
+
+<li>Dyalog<br />
+<a href="https://www.dyalog.com/">https://www.dyalog.com/</a>
+</li>
+
+<li>Try APL!<br />
+<a href="https://tryapl.org/">https://tryapl.org/</a>
+</li>
+
+<li>The GNU Go Compiler<br />
+<a href="https://gcc.gnu.org/onlinedocs/gccgo/">https://gcc.gnu.org/onlinedocs/gccgo/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
