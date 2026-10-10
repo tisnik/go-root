@@ -1,0 +1,1843 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Obousměrná fronta (deque) v programovacím jazyku Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Obousměrná fronta (deque) v programovacím jazyku Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V jazyku Go nalezneme podporu pro několik datových kontejnerů. Jedná se o pole, řezy a o mapy, které jsou ve standardní knihovně doplněny o několik dalších kontejnerů. Ovšem zdaleka zde nenalezneme všechny potřebné datové kontejnery. Jedním z velmi užitečných kontejnerů je kontejner nazvaný deque neboli obousměrná fronta.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Obousměrná fronta &ndash; <i>deque</i> &ndash; v&nbsp;programovacím jazyku Go</a></p>
+<p><a href="#k02">2. Instalace balíčku <strong>deque</strong></a></p>
+<p><a href="#k03">3. Konstruktor obousměrné fronty s&nbsp;uvedením typů prvků</a></p>
+<p><a href="#k04">4. Operace <strong>push back</strong>, růst počtu prvků a kapacity fronty</a></p>
+<p><a href="#k05">5. Algoritmus pro zvýšení kapacity fronty při přidávání prvků</a></p>
+<p><a href="#k06">6. Čtení prvků z&nbsp;čela (začátku) fronty</a></p>
+<p><a href="#k07">7. Oboustranná fronta ve funkci klasické fronty: dvojice operací <strong>push back</strong> + <strong>pop front</strong> a <strong>push front</strong> + <strong>pop back</strong></a></p>
+<p><a href="#k08">8. Oboustranná fronta ve funkci klasického zásobníku: dvojice operací <strong>push back</strong> + <strong>pop back</strong> a <strong>push front</strong> + <strong>pop front</strong></a></p>
+<p><a href="#k09">9. Praktické využití zásobníku &ndash; výpočet výrazu zapsaného v&nbsp;RPN</a></p>
+<p><a href="#k10">10. Rotace prvků v&nbsp;oboustranné frontě</a></p>
+<p><a href="#k11">11. Časová složitost operací prováděných s&nbsp;oboustrannou frontou</a></p>
+<p><a href="#k12">12. Implementace benchmarku</a></p>
+<p><a href="#k13">13. Výsledky benchmarků pro krátké obousměrné fronty</a></p>
+<p><a href="#k14">14. Výsledky benchmarků pro fronty s&nbsp;větším počtem prvků</a></p>
+<p><a href="#k15">15. Závěrečné zhodnocení</a></p>
+<p><a href="#k16">16. Příloha 1: CSV soubor s&nbsp;výsledky benchmarků</a></p>
+<p><a href="#k17">17. Příloha 2: Názvy operací s&nbsp;obousměrnou frontou</a></p>
+<p><a href="#k18">18. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k19">19. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Obousměrná fronta &ndash; <i>deque</i> &ndash; v&nbsp;programovacím jazyku Go</h2>
+
+<p><a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">V&nbsp;programovacím
+jazyku Go</a> nalezneme podporu pro několik datových kontejnerů. Jedná se
+především o pole, řezy (tedy o &bdquo;pohledy&ldquo; na pole) a o mapy (nepřímo
+vlastně i o kanály), které jsou ve standardní knihovně doplněny o několik
+dalších kontejnerů. Ovšem zdaleka zde nenalezneme všechny potřebné datové
+kontejnery. Jedním z&nbsp;velmi užitečných kontejnerů je kontejner nazvaný
+<i>deque</i>, což je jedna z&nbsp;možných implementací obousměrné fronty
+(<i>double ended queue</i>). Jedná se tedy o kontejner, který podporuje operace
+připojení nového prvku k&nbsp;oběma koncům fronty popř.&nbsp;naopak
+k&nbsp;získání (a popřípadě i k&nbsp;odstranění) prvku z&nbsp;libovolného
+konce. Podporovány jsou ovšem i další dvě operace, které typicky u implementací
+&bdquo;čistých&ldquo; obousměrných front nenajdeme. Jedná se o operaci určenou
+pro rotaci prvků uložených ve frontě a taktéž o operaci, která dokáže do fronty
+vložit prvek na určené místo.</p>
+
+<p><div class="rs-tip-major">Poznámka: obousměrnou frontu je možné pochopitelně
+použít i ve funkci zásobníku (<i>stack</i>), což si ostatně ukážeme
+v&nbsp;navazujících kapitolách.</div></p>
+
+<p>Pro programovací jazyk Go vzniklo hned několik implementací obousměrné
+fronty. Jednu z&nbsp;těchto implementací nalezneme v&nbsp;repositáři <a
+href="https://github.com/gammazero/deque">https://github.com/gammazero/deque</a>.
+Tato implementace je interně založena na <i>ring bufferu</i>; jedná se tedy o
+cyklickou frontu, jejíž kapacita je v&nbsp;případě potřeby zvětšována. Základní
+operace s&nbsp;obousměrnou frontou jsou optimalizovány jak na rychlost, tak i
+na spotřebu paměti &ndash; nedochází tedy například k&nbsp;realokaci a přesunu
+prvků. Ovšem jak uvidíme dále, netypické operace, například operace
+<strong>Insert</strong>, trvá velmi dlouho a je lineárně závislá na počtu prvků
+ve frontě.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Instalace balíčku <strong>deque</strong></h2>
+
+<p>Samotná instalace balíčku <strong>deque</strong> je jednoduchá, protože
+postačuje použít příkaz:</p>
+
+<pre>
+$ <strong>go get github.com/gammazero/deque</strong>
+</pre>
+
+<p>Alternativně je možné vytvořit prázdný projekt příkazem:</p>
+
+<pre>
+$ <strong>go mod init deque-demo</strong>
+</pre>
+
+<p>A následně do nově vzniklého projektu vložit následující zdrojový kód, který
+balíček <strong>deque</strong> importuje a následně i používá:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        fmt.Println(q)</strong>)
+}
+</pre>
+
+<p>Při překladu (resp.&nbsp;přesněji řečeno při prvním překladu) si systém
+modulů programovacího jazyka Go automaticky vyžádá instalaci balíčku:</p>
+
+<pre>
+$ <strong>go get -v github.com/gammazero/deque</strong>
+&nbsp;
+go: downloading github.com/gammazero/deque v0.2.1
+go: added github.com/gammazero/deque v0.2.1
+</pre>
+
+<p>Po úspěšné instalaci by měl automaticky vygenerovaný soubor
+<strong>go.sum</strong> obsahovat následující dvojici řádků:</p>
+
+<pre>
+github.com/gammazero/deque v0.2.1 h1:qSdsbG6pgp6nL7A0+K/B7s12mcCY/5l5SIUpMOl+dC0=
+github.com/gammazero/deque v0.2.1/go.mod h1:LFroj8x4cMYCukHJDbxFCkT+r9AndaJnFMuZDV34tuU=
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že tento balíček závisí
+pouze na standardní knihovně jazyka Go, takže se nevyžadují žádné tranzitivní
+závislosti. To je v&nbsp;ekosystému Go dnes již rarita :-)</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Konstruktor obousměrné fronty s&nbsp;uvedením typů prvků</h2>
+
+<p>Balíček <strong>gammazero/deque</strong> využívá <a
+href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/">generické
+datové typy přidané do Go 1.18</a>, takže již v&nbsp;definici proměnné, která
+reprezentuje obousměrnou frontu, je možné specifikovat typy prvků, které budou
+ve frontě uloženy:</p>
+
+<pre>
+<strong>var q deque.Deque[int]</strong>
+</pre>
+
+<p>Fronta má určitou <i>délku</i>, což je počet prvků, které jsou v&nbsp;ní
+uloženy, a taktéž <i>kapacitu</i>, tj.&nbsp;celkový počet prvků, které je možné
+do fronty uložit, aniž by se musela alokovat nová paměť. Tyto dvě důležité
+informace o frontě získáme metodami <strong>Deque.Len()</strong> a
+<strong>Deque.Cap()</strong>:</p>
+
+<pre>
+fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+</pre>
+
+<p>Dokonce je možné si nechat vypsat všechny informace o frontě pouhým výpisem
+hodnoty příslušné proměnné:</p>
+
+<pre>
+fmt.Println("Deque value:   ", <strong>q</strong>)
+</pre>
+
+<p>Všechny tři výše zmíněné informace o prázdné frontě s&nbsp;výchozí kapacitou
+jsou vypsány tímto příkladem:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+        fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+        fmt.Println("Deque value:   ", <strong>q</strong>)
+}
+</pre>
+
+<p>Po překladu a spuštění se zobrazí následující údaje:</p>
+
+<pre>
+Deque length:   0
+Deque capacity: 0
+Deque value:    {[] <strong>0 0 0 0</strong>}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: význam všech čtyřech nul, z&nbsp;nichž
+každá nese odlišný typ informace, bude popsán dále.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Operace <strong>push back</strong>, růst počtu prvků a kapacity fronty</h2>
+
+<p>Jednou ze základních operací s&nbsp;obousměrnou frontou jsou operace pro
+přidání prvku na začátek fronty nebo na její konec. Pro přidání prvku na konec
+fronty slouží operace nazvaná <i>push back</i>, která je představována metodou
+<strong>Deque.PushBack()</strong>. Této metodě se pouze předá prvek, jenž se má
+do fronty přidat. Současně budeme sledovat délku fronty i její kapacitu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+                fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+                fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+                fmt.Println("Deque value:   ", <strong>q</strong>)
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Povšimněte si, jak se kapacita již po vložení prvního prvku ustálila na
+hodnotě 16 (mocnina dvou). Zajímavá je taktéž poslední čtveřice číslic, která
+určuje index prvního prvku, index posledního prvku, délku fronty (počet prvků)
+i její kapacitu. V&nbsp;demonstračním příkladu z&nbsp;předchozí kapitoly byly
+všechny čtyři hodnoty nulové, nyní se již mění:</p>
+
+<pre>
+Deque length:   1
+Deque capacity: 16
+Deque value:    {[101 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] <strong>0 1 1 16</strong>}
+&nbsp;
+Deque length:   2
+Deque capacity: 16
+Deque value:    {[101 102 0 0 0 0 0 0 0 0 0 0 0 0 0 0] <strong>0 2 2 16</strong>}
+&nbsp;
+Deque length:   3
+Deque capacity: 16
+Deque value:    {[101 102 103 0 0 0 0 0 0 0 0 0 0 0 0 0] <strong>0 3 3 16</strong>}
+&nbsp;
+Deque length:   4
+Deque capacity: 16
+Deque value:    {[101 102 103 104 0 0 0 0 0 0 0 0 0 0 0 0] <strong>0 4 4 16</strong>}
+&nbsp;
+Deque length:   5
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 0 0 0 0 0 0 0 0 0 0 0] <strong>0 5 5 16</strong>}
+&nbsp;
+Deque length:   6
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 0 0 0 0 0 0 0 0 0 0] <strong>0 6 6 16</strong>}
+&nbsp;
+Deque length:   7
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 0 0 0 0 0 0 0 0 0] <strong>0 7 7 16</strong>}
+&nbsp;
+Deque length:   8
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 0 0 0 0 0 0 0 0] <strong>0 8 8 16</strong>}
+&nbsp;
+Deque length:   9
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 0 0 0 0 0 0 0] <strong>0 9 9 16</strong>}
+&nbsp;
+Deque length:   10
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 110 0 0 0 0 0 0] <strong>0 10 10 16</strong>}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Algoritmus pro zvýšení kapacity fronty při přidávání prvků</h2>
+
+<p>Pojďme si nyní vyzkoušet, jak se vlastně počítá nová kapacita fronty ve
+chvíli, kdy již není možné do stávající fronty přidat další prvek. Pro tento
+účel použijeme demonstrační příklad, v&nbsp;němž postupně do fronty vložíme
+1000 prvků a (opět postupně) budeme vypisovat její délku a kapacitu:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        fmt.Println("Length Capacity")
+        for i := 1; i &lt;= 1000; i++ {
+                <strong>q.PushBack(i)</strong>
+                fmt.Printf("%5d %5d\n", <strong>q.Len()</strong>, <strong>q.Cap()</strong>)
+        }
+}
+</pre>
+
+<p>Následující výpis je zkrácen a jsou ukázány jen ta místa, v&nbsp;nichž se
+mění kapacita:</p>
+
+<pre>
+Length Capacity
+    1    16
+    2    16
+    3    16
+...
+...
+...
+   15    16
+   16    16
+   17    32
+   18    32
+...
+...
+...
+   31    32
+   32    32
+   33    64
+   34    64
+...
+...
+...
+  511   512
+  512   512
+  513  1024
+  514  1024
+...
+...
+...
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: samotný algoritmus pro zvětšení kapacity
+fronty je implementován následujícím relativně jednoduchým způsobem:</div></p>
+
+<pre>
+<i>// growIfFull resizes up if the buffer is full.</i>
+func (q *Deque[T]) <strong>growIfFull</strong>() {
+        if q.count != len(q.buf) {
+                return
+        }
+        if len(q.buf) == 0 {
+                if q.minCap == 0 {
+                        q.minCap = minCapacity
+                }
+                q.buf = make([]T, q.minCap)
+                return
+        }
+        q.resize()
+}
+&nbsp;
+<i>// resize resizes the deque to fit exactly twice its current contents. This is</i>
+<i>// used to grow the queue when it is full, and also to shrink it when it is</i>
+<i>// only a quarter full.</i>
+func (q *Deque[T]) <strong>resize</strong>() {
+        newBuf := make([]T, q.count&gt;&gt;1)
+        if q.tail &gt; q.head {
+                copy(newBuf, q.buf[q.head:q.tail])
+        } else {
+                n := copy(newBuf, q.buf[q.head:])
+                copy(newBuf[n:], q.buf[:q.tail])
+        }
+
+        q.head = 0
+        q.tail = q.count
+        q.buf = newBuf
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Čtení prvků z&nbsp;čela (začátku) fronty</h2>
+
+<p>V&nbsp;následujícím demonstračním příkladu je ukázáno, jakým způsobem se
+nejdříve fronta naplní (a to od konce, tedy operací <i>push back</i>) a
+následně se z&nbsp;ní postupně přečtou (a odstraní) všechny prvky, a to
+v&nbsp;tomto případě od začátku, tedy operací <i>pop front</i>. Povšimněte si,
+že čtení je prováděno v&nbsp;nekonečné smyčce, abychom zjistili, co se stane ve
+chvíli, kdy je již fronta prázdná:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+                fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+                fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+                fmt.Println("Deque value:   ", <strong>q</strong>)
+                fmt.Println()
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for true {
+                fmt.Println("Pop value:     ", <strong>q.PopFront()</strong>)
+                fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+                fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+                fmt.Println("Deque value:   ", <strong>q</strong>)
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Příklad po svém spuštění nejdříve začne s&nbsp;naplňováním fronty:</p>
+
+<pre>
+Deque length:   1
+Deque capacity: 16
+Deque value:    {[101 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 1 1 16}
+&nbsp;
+Deque length:   2
+Deque capacity: 16
+Deque value:    {[101 102 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 2 2 16}
+&nbsp;
+Deque length:   3
+Deque capacity: 16
+Deque value:    {[101 102 103 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 3 3 16}
+&nbsp;
+Deque length:   4
+Deque capacity: 16
+Deque value:    {[101 102 103 104 0 0 0 0 0 0 0 0 0 0 0 0] 0 4 4 16}
+&nbsp;
+Deque length:   5
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 0 0 0 0 0 0 0 0 0 0 0] 0 5 5 16}
+&nbsp;
+Deque length:   6
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 0 0 0 0 0 0 0 0 0 0] 0 6 6 16}
+&nbsp;
+Deque length:   7
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 0 0 0 0 0 0 0 0 0] 0 7 7 16}
+&nbsp;
+Deque length:   8
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 0 0 0 0 0 0 0 0] 0 8 8 16}
+&nbsp;
+Deque length:   9
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 0 0 0 0 0 0 0] 0 9 9 16}
+&nbsp;
+Deque length:   10
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 0 10 10 16}
+</pre>
+
+<p>Posléze se naopak začnou prvky z&nbsp;fronty číst a současně i odstraňovat
+&ndash; mimochodem se právě v&nbsp;tomto okamžiku bude měnit první index ze
+čtveřice hodnot popisujících stav fronty:</p>
+
+<pre>
+Pop value:      101
+Deque length:   9
+Deque capacity: 16
+Deque value:    {[0 102 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 1 10 9 16}
+&nbsp;
+Pop value:      102
+Deque length:   8
+Deque capacity: 16
+Deque value:    {[0 0 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 2 10 8 16}
+&nbsp;
+Pop value:      103
+Deque length:   7
+Deque capacity: 16
+Deque value:    {[0 0 0 104 105 106 107 108 109 110 0 0 0 0 0 0] 3 10 7 16}
+&nbsp;
+Pop value:      104
+Deque length:   6
+Deque capacity: 16
+Deque value:    {[0 0 0 0 105 106 107 108 109 110 0 0 0 0 0 0] 4 10 6 16}
+&nbsp;
+Pop value:      105
+Deque length:   5
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 106 107 108 109 110 0 0 0 0 0 0] 5 10 5 16}
+&nbsp;
+Pop value:      106
+Deque length:   4
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 107 108 109 110 0 0 0 0 0 0] 6 10 4 16}
+&nbsp;
+Pop value:      107
+Deque length:   3
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 108 109 110 0 0 0 0 0 0] 7 10 3 16}
+&nbsp;
+Pop value:      108
+Deque length:   2
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 109 110 0 0 0 0 0 0] 8 10 2 16}
+&nbsp;
+Pop value:      109
+Deque length:   1
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 0 110 0 0 0 0 0 0] 9 10 1 16}
+&nbsp;
+Pop value:      110
+Deque length:   0
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 10 10 0 16}
+</pre>
+
+<p>Jakmile je fronta prázdná, dojde k&nbsp;pádu aplikace &ndash; vyvolá se
+<strong>panic</strong>:</p>
+
+<pre>
+panic: deque: PopFront() called on empty queue
+&nbsp;
+goroutine 1 [running]:
+github.com/gammazero/deque.(*Deque[...]).PopFront(0xc00000e018?)
+        /home/ptisnovs/go/pkg/mod/github.com/gammazero/deque@v0.2.1/deque.go:110 +0x91
+main.main()
+        /home/ptisnovs/src/go-root/article_96/04_popfront_panic.go:23 +0x287
+exit status 2
+</pre>
+
+<p>Korektní způsob detekce prázdné fronty spočívá ve využití nám již dobře
+známé metody <strong>Deque.Len()</strong>. Ta je použita ve druhé programové
+smyčce:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+                fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+                fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+                fmt.Println("Deque value:   ", <strong>q</strong>)
+                fmt.Println()
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        for <strong>q.Len()</strong> &gt; 0 {
+                fmt.Println("Pop value:     ", <strong>q.PopFront()</strong>)
+                fmt.Println("Deque length:  ", <strong>q.Len()</strong>)
+                fmt.Println("Deque capacity:", <strong>q.Cap()</strong>)
+                fmt.Println("Deque value:   ", <strong>q</strong>)
+                fmt.Println()
+        }
+}
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+Deque length:   1
+Deque capacity: 16
+Deque value:    {[101 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 1 1 16}
+&nbsp;
+Deque length:   2
+Deque capacity: 16
+Deque value:    {[101 102 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 2 2 16}
+&nbsp;
+Deque length:   3
+Deque capacity: 16
+Deque value:    {[101 102 103 0 0 0 0 0 0 0 0 0 0 0 0 0] 0 3 3 16}
+&nbsp;
+Deque length:   4
+Deque capacity: 16
+Deque value:    {[101 102 103 104 0 0 0 0 0 0 0 0 0 0 0 0] 0 4 4 16}
+&nbsp;
+Deque length:   5
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 0 0 0 0 0 0 0 0 0 0 0] 0 5 5 16}
+&nbsp;
+Deque length:   6
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 0 0 0 0 0 0 0 0 0 0] 0 6 6 16}
+&nbsp;
+Deque length:   7
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 0 0 0 0 0 0 0 0 0] 0 7 7 16}
+&nbsp;
+Deque length:   8
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 0 0 0 0 0 0 0 0] 0 8 8 16}
+&nbsp;
+Deque length:   9
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 0 0 0 0 0 0 0] 0 9 9 16}
+&nbsp;
+Deque length:   10
+Deque capacity: 16
+Deque value:    {[101 102 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 0 10 10 16}
+&nbsp;
+&nbsp;
+&nbsp;
+Pop value:      101
+Deque length:   9
+Deque capacity: 16
+Deque value:    {[0 102 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 1 10 9 16}
+&nbsp;
+Pop value:      102
+Deque length:   8
+Deque capacity: 16
+Deque value:    {[0 0 103 104 105 106 107 108 109 110 0 0 0 0 0 0] 2 10 8 16}
+&nbsp;
+Pop value:      103
+Deque length:   7
+Deque capacity: 16
+Deque value:    {[0 0 0 104 105 106 107 108 109 110 0 0 0 0 0 0] 3 10 7 16}
+&nbsp;
+Pop value:      104
+Deque length:   6
+Deque capacity: 16
+Deque value:    {[0 0 0 0 105 106 107 108 109 110 0 0 0 0 0 0] 4 10 6 16}
+&nbsp;
+Pop value:      105
+Deque length:   5
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 106 107 108 109 110 0 0 0 0 0 0] 5 10 5 16}
+&nbsp;
+Pop value:      106
+Deque length:   4
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 107 108 109 110 0 0 0 0 0 0] 6 10 4 16}
+&nbsp;
+Pop value:      107
+Deque length:   3
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 108 109 110 0 0 0 0 0 0] 7 10 3 16}
+&nbsp;
+Pop value:      108
+Deque length:   2
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 109 110 0 0 0 0 0 0] 8 10 2 16}
+&nbsp;
+Pop value:      109
+Deque length:   1
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 0 110 0 0 0 0 0 0] 9 10 1 16}
+&nbsp;
+Pop value:      110
+Deque length:   0
+Deque capacity: 16
+Deque value:    {[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 10 10 0 16}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: že je fronta prázdná zjistíme mj.&nbsp;i
+ze čtveřice indexů popisujících frontu <strong>10 10 0 16</strong>. Důležité
+je, že oba první indexy jsou shodné (a délka je tím pádem nulová).</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Oboustranná fronta ve funkci klasické fronty: dvojice operací <strong>push back</strong> + <strong>pop front</strong> a <strong>push front</strong> + <strong>pop back</strong></h2>
+
+<p>Kontejner <i>deque</i> je možné využívat mnoha různými způsoby.
+V&nbsp;případě, že budeme prvky číst z&nbsp;opačného konce fronty, než
+k&nbsp;jakému jsou připojovány nové prvky, budeme tímto způsobem realizovat
+klasickou frontu, neboli <i>queue</i>. Jedna z&nbsp;možných realizací je
+založena na dvojici operací <i>push back</i> + <i>pop front</i>, tedy
+připojování prvků na konec fronty a čtení prvků (s&nbsp;jejich odstraněním) ze
+začátku fronty. Tyto dvě operace jsou v&nbsp;balíčku <strong>deque</strong>
+realizovány metodami <strong>Deque.PushBack()</strong> a
+<strong>Deque.PopFront()</strong>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i*2)</strong>
+                <strong>q.PushBack(101 + i*2)</strong>
+                fmt.Println(<strong>q.PopFront()</strong>)
+        }
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopFront()</strong>)
+        }
+}
+</pre>
+
+<p>V&nbsp;demonstračním příkladu vložíme do fronty vždy dva prvky a jeden
+přečteme (s&nbsp;jeho odstraněním). Ve druhé smyčce odstraníme zbylé prvky
+z&nbsp;fronty. Povšimněte si, že nezávisle na tom, jak jsou metody
+<strong>PushBack</strong> a <strong>PopFront</strong> promíchány, je vždy
+zachováno pořadí čtených prvků:</p>
+
+<pre>
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+</pre>
+
+<p><i>Deque</i> nabízí symetrické operace a tudíž je možné běžnou frontu
+realizovat jak již zmíněnou dvojicí operací <i>push back</i> + <i>pop
+front</i>, tak i operacemi <i>push front</i> + <i>pop back</i>. Z&nbsp;hlediska
+uživatele je výsledný efekt naprosto stejný a současně jsou obě alternativy i
+stejně rychlé (to ovšem nemusí platit vždy &ndash; záleží na konkrétní
+implementaci obousměrně vázané fronty):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushFront(100 + i*2)</strong>
+                <strong>q.PushFront(101 + i*2)</strong>
+                fmt.Println(<strong>q.PopBack()</strong>)
+        }
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopBack()</strong>)
+        }
+}
+</pre>
+
+<p>Výsledek, tedy výpis prvků ukládaných do fronty, bude totožný
+s&nbsp;předchozím demonstračním příkladem:</p>
+
+<pre>
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Oboustranná fronta ve funkci klasického zásobníku: dvojice operací <strong>push back</strong> + <strong>pop back</strong> a <strong>push front</strong> + <strong>pop front</strong></h2>
+
+<p>Oboustrannou frontu je pochopitelně možné využít i ve funkci zásobníku.
+V&nbsp;tomto případě je nutné prvky ukládat i číst z&nbsp;jednoho (libovolného)
+konce fronty. Můžeme tedy použít dvojici operací <i>push back</i> + <i>pop
+back</i>, kdy bude vrchol zásobníku umístěn vždy na konci fronty. Nebo lze
+naopak použít operace <i>push front</i> + <i>pop front</i>; v&nbsp;tomto
+případě bude vrchol zásobníku na začátku fronty.</p>
+
+<p>Nejprve si ukažme kombinaci operací <i>push front</i> + <i>pop
+front</i>:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushFront(100 + i)</strong>
+        }
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopFront()</strong>)
+        }
+}
+</pre>
+
+<p>Z&nbsp;výpisu je patrné, že se <i>deque</i> v&nbsp;tomto případě skutečně
+chová jako klasický zásobník:</p>
+
+<pre>
+110
+109
+108
+107
+106
+105
+104
+103
+102
+101
+</pre>
+
+<p>Kombinace operací <i>push back</i> + <i>pop back</i> pro implementaci
+zásobníku:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+        }
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopBack()</strong>)
+        }
+}
+</pre>
+
+<p>Výsledek získaný po překladu a spuštění tohoto demonstračního příkladu bude
+totožný:</p>
+
+<pre>
+110
+109
+108
+107
+106
+105
+104
+103
+102
+101
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Praktické využití zásobníku &ndash; výpočet výrazu zapsaného v&nbsp;RPN</h2>
+
+<p><a
+href="https://www.root.cz/clanky/lexikalni-a-syntakticka-analyza-zdrojovych-kodu-jazyka-go-2-cast/">V&nbsp;tomto
+článku</a> jsme se kromě dalších věcí seznámili i s&nbsp;tím, jakým způsobem je
+možné převést aritmetický či logický výraz zapsaný v&nbsp;klasické
+<i>infixové</i> notaci na totožný výraz, ovšem nyní zapsaný v&nbsp;notaci
+<i>postfixové</i> (označované taktéž zkratkou RPN). Tím se, kromě dalších věcí,
+odstraňuje nutnost použití závorek, které určují prioritu, protože v&nbsp;RPN
+je priorita určena způsobem řazení operandů a operátorů. Dále je v&nbsp;RPN
+zcela přesně určeno, ve kterém okamžiku se operace vykoná &ndash; konkrétně
+ihned poté, co je přijat její token. Z&nbsp;praktického pohledu je ovšem neméně
+důležité, že aritmetické i logické výrazy zapsané s&nbsp;využitím RPN se velmi
+snadno programově vyhodnocují, takže RPN může být použita i jako mezistupeň
+v&nbsp;interpretrech nebo například v&nbsp;SW kalkulačkách. A právě výpočtem
+výrazů zapsaných v&nbsp;postfixové notaci se budeme zabývat v&nbsp;navazujícím
+textu a velmi jednoduché implementaci vyhodnocovače výrazů.</p>
+
+<p>O tom, jak bude realizován výpočet postfixově zapsaného aritmetického nebo
+logického výrazu, jsme si taktéž řekli. Celý algoritmus je založen na použití
+<i>zásobníku operandů</i> (mimochodem &ndash; na zásobníku je založen i převod
+z&nbsp;infixové notace do notace postfixové, což je zvláštní shoda). Operandy
+(tj.&nbsp;numerické hodnoty popř.&nbsp;hodnoty proměnných) jsou totiž nejdříve
+odkládány na tento zásobník a teprve poté, co je přijat <i>operátor</i>, jsou
+operandy (popř.&nbsp;jeden operand) získány ze zásobníku operandů, a to operací
+typu <strong>pop</strong>, která tyto hodnoty ze zásobníku současně i odstraní.
+Celý výpočet by mohl probíhat následovně:</p>
+
+<ol>
+
+<li>Je načten token obsahující hodnotu symbolu z&nbsp;výrazu reprezentovaného
+v&nbsp;postfixové notaci (RPN). Jedná se buď o numerickou hodnotu, jméno
+proměnné nebo symbol operátoru (+, -, *, / a řekněme %).</li>
+
+<li>V&nbsp;případě, že se jedná o číselnou hodnotu, je tato hodnota uložena na
+zásobník (nazývaný, jak již víme, <i>zásobník operandů</i>, protože obsahuje
+operandy prováděných operací).</li>
+
+<li>Pokud se jedná o proměnnou, je její jméno uloženo na zásobník (při
+skutečném vyhodnocování výrazů lze v&nbsp;tomto okamžiku nahradit jméno
+proměnné jejím obsahem buď nyní, nebo až v&nbsp;dalším kroku).</li>
+
+<li>V&nbsp;případě, že se jedná o binární operátor, jsou ze zásobníku (přesněji
+řečeno ze zásobníku operandů) vyzvednuty oba operandy, operace se provede a
+výsledek se opět uloží na zásobník. U unárního operátoru (změna znaménka atd.)
+se pochopitelně pracuje pouze s&nbsp;jediným operandem.</li>
+
+<li>Na konci bude na zásobníku uložena jediná hodnota, kterou je výsledek.</li>
+
+</ol>
+
+<p>Podívejme se na velmi jednoduchou implementaci tohoto algoritmu, která
+dokáže s&nbsp;využitím struktury <strong>Deque</strong> vyhodnotit výrazy
+s&nbsp;konstantami (nikoli s&nbsp;proměnnými). Využíváme zde
+<strong>Deque</strong> jako striktní zásobník:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "strconv"
+        "strings"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func printStack(s *deque.Deque[int]) {
+        for i := 0; i &lt; <strong>s.Len()</strong>; i++ {
+                fmt.Println(<strong>s.At(i)</strong>)
+        }
+        fmt.Println()
+}
+&nbsp;
+func main() {
+        expression := "1 2 + 2 3 * 8 + *"
+        terms := strings.Split(expression, " ")
+        var stack <strong>deque.Deque[int]</strong>
+&nbsp;
+        for _, term := range terms {
+                switch term {
+                case "+":
+                        operand1 := <strong>stack.PopFront()</strong>
+                        operand2 := s<strong>tack.PopFront()</strong>
+                        <strong>stack.PushFront(operand1 + operand2)</strong>
+                        print("+ :\t")
+                        printStack(&amp;stack)
+                case "-":
+                        operand1 := <strong>stack.PopFront()</strong>
+                        operand2 := <strong>stack.PopFront()</strong>
+                        s<strong>tack.PushFront(operand2 - operand1)</strong>
+                        print("- :\t")
+                        printStack(&amp;stack)
+                case "*":
+                        operand1 := <strong>stack.PopFront()</strong>
+                        operand2 := <strong>stack.PopFront()</strong>
+                        <strong>stack.PushFront(operand1 * operand2)</strong>
+                        print("* :\t")
+                        printStack(&amp;stack)
+                case "/":
+                        operand1 := <strong>stack.PopFront()</strong>
+                        operand2 := <strong>stack.PopFront()</strong>
+                        <strong>stack.PushFront(operand2 / operand1)</strong>
+                        print("/ :\t")
+                        printStack(&amp;stack)
+                default:
+                        number, err := strconv.Atoi(term)
+                        if err == nil {
+                                <strong>stack.PushFront(number)</strong>
+                        }
+                        fmt.Printf("%-2d:\t", number)
+                        printStack(&amp;stack)
+                }
+        }
+        print("Result: ")
+        printStack(&amp;stack)
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu se výraz zapsaný v&nbsp;RPN bude
+postupně vyhodnocovat (a v&nbsp;průběhu vyhodnocování se bude vypisovat i obsah
+zásobníku operandů). Na konci vyhodnocení by měl zásobník obsahovat pouze
+jediný prvek &ndash; a to výsledek vyhodnocení výrazu:</p>
+
+<pre>
+1 :     1
+&nbsp;
+2 :     2
+1
+&nbsp;
++ :     3
+&nbsp;
+2 :     2
+3
+&nbsp;
+3 :     3
+2
+3
+&nbsp;
+* :     6
+3
+&nbsp;
+8 :     8
+6
+3
+&nbsp;
++ :     14
+3
+&nbsp;
+* :     42
+&nbsp;
+<strong>Result: 42</strong>
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Rotace prvků v&nbsp;oboustranné frontě</h2>
+
+<p>Zajímavou operací je rotace prvků v&nbsp;oboustranné frontě. Ve skutečnosti
+je totiž tato datová struktura v&nbsp;popisovaném balíčku implementována jako
+<i>kruhový buffer</i> (viz úvodní kapitolu), takže rotace prvků je provedena
+velmi efektivně &ndash; pouhým posunem indexů prvního a posledního prvku. Díky
+tomu se rotace obejde bez nutnosti přesunu dat v&nbsp;operační paměti. Ukažme
+si nejprve rotaci o kladné číslo (<i>offset</i>):</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+        }
+&nbsp;
+        <strong>q.Rotate(3)</strong>
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopFront()</strong>)
+        }
+}
+</pre>
+
+<p>Ze zobrazených výsledků je patrné, že se prvky čtou nikoli od prvku
+s&nbsp;hodnotou 101 do prvku s&nbsp;hodnotou 110, ale tak, že jsou skutečně
+posunuty o tři prvky (původní poslední prvek ve frontě je zvýrazněn):</p>
+
+<pre>
+104
+105
+106
+107
+108
+109
+110
+<strong>101</strong>
+102
+103
+</pre>
+
+<p>Možná je ovšem i rotace opačným směrem, kterou realizujeme předáním
+záporného offsetu do metody <strong>Deque.Rotate()</strong>. Opět si to
+pochopitelně otestujeme:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func main() {
+        <strong>var q deque.Deque[int]</strong>
+&nbsp;
+        for i := 1; i &lt;= 10; i++ {
+                <strong>q.PushBack(100 + i)</strong>
+        }
+&nbsp;
+        <strong>q.Rotate(-3)</strong>
+&nbsp;
+        for q.Len() &gt; 0 {
+                fmt.Println(<strong>q.PopFront()</strong>)
+        }
+}
+</pre>
+
+<p>Výsledek je (podle očekávání) odlišný, protože obsah obousměrné fronty byl
+otočen opačným směrem:</p>
+
+<pre>
+108
+109
+110
+<strong>101</strong>
+102
+103
+104
+105
+106
+107
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Časová složitost operací prováděných s&nbsp;oboustrannou frontou</h2>
+
+<p>Z&nbsp;pohledu uživatele je oboustranná fronta relativně složitým
+kontejnerem, protože umožňuje přidávat i ubírat prvky z&nbsp;obou konců. Navíc
+je možné prvky pouze přečíst, a to bez jejich odebrání. Podporována je i výše
+uvedená rotace prvků ve frontě, To však není vše, protože v&nbsp;tomto článku
+popisovaná varianta <strong>Deque</strong> navíc podporuje i vložení prvku do
+libovolného místa ve frontě i přečtení prvku z&nbsp;libovolného místa. Všechny
+tyto operace není možné provádět s&nbsp;konstantní složitostí &ndash; naopak se
+při návrhu vnitřní struktury oboustranné fronty musí programátor rozhodnout,
+které operace budou rychlé a které naopak (mnohdy velmi) pomalé. Samozřejmě se
+můžeme podívat do zdrojových kódů s&nbsp;implementací <strong>Deque</strong>,
+ovšem celý problém lze vyřešit i naopak &ndash; budeme se na
+<strong>Deque</strong> dívat jako na black box s&nbsp;několika metodami,
+přičemž pouze tyto metody jsou rozhraním k&nbsp;vnitřnímu stavu fronty. A dobu
+trvání těchto metod již dokážeme velmi snadno otestovat (za předpokladu, že
+jsou všechny operace synchronní, což v&nbsp;této konkrétní implementaci
+platí).</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Implementace benchmarku</h2>
+
+<p>Implementace benchmarku v&nbsp;jazyce Go je prakticky triviální, protože pro
+tento účel je možné využít podporu pro benchmarky nabízenou standardním
+balíčkem <strong>testing</strong>. V&nbsp;implementovaném benchmarku jsou
+testovány následující metody pro práci s&nbsp;frontou:</p>
+
+<ul>
+<li>Deque.PushFront</li>
+<li>Deque.PushBack</li>
+<li>Deque.PopFront (pro zaplněnou frontu)</li>
+<li>Deque.PopBack (pro zaplněnou frontu)</li>
+<li>Deque.Front (pouze čtení prvku)</li>
+<li>Deque.Back (pouze čtení prvku)</li>
+<li>Deque.Rotate</li>
+<li>Deque.At</li>
+<li>Deque.Insert (vložení prvku do středu fronty)</li>
+<li>Deque.Remove (odstranění prvku ze středu fronty)</li>
+</ul>
+
+<p>Samotný zdrojový kód benchmarku vypadá následovně:</p>
+
+<pre>
+package main
+&nbsp;
+import (
+        "testing"
+&nbsp;
+        "github.com/gammazero/deque"
+)
+&nbsp;
+func BenchmarkPushFrontInt(b *testing.B) {
+        var q deque.Deque[int]
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.PushFront(i)</strong>
+        }
+}
+&nbsp;
+func BenchmarkPushBackInt(b *testing.B) {
+        var q deque.Deque[int]
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.PushBack(i)</strong>
+        }
+}
+&nbsp;
+func fillInDequeFromBack(b *testing.B) deque.Deque[int] {
+        var q deque.Deque[int]
+&nbsp;
+        b.StopTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.PushBack(i)</strong>
+        }
+&nbsp;
+        b.StartTimer()
+        return q
+}
+&nbsp;
+func fillInDequeFromFront(b *testing.B) deque.Deque[int] {
+        var q deque.Deque[int]
+&nbsp;
+        b.StopTimer()
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.PushFront(i)</strong>
+        }
+&nbsp;
+        b.StartTimer()
+        return q
+}
+&nbsp;
+func BenchmarkPopFrontInt(b *testing.B) {
+        q := fillInDequeFromBack(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                val := <strong>q.PopFront()</strong>
+                if val != i {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func BenchmarkPopBackInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                val := <strong>q.PopBack()</strong>
+                if val != i {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func BenchmarkFrontInt(b *testing.B) {
+        q := fillInDequeFromBack(b)
+&nbsp;
+        b.StopTimer()
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.PushBack(i)</strong>
+        }
+&nbsp;
+        b.StartTimer()
+        for i := 0; i &lt; b.N; i++ {
+                val := <strong>q.Front()</strong>
+                if val != 0 {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func BenchmarkBackInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                val := <strong>q.Back()</strong>
+                if val != 0 {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func BenchmarkRotateInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <strong>q.Rotate(1)</strong>
+        }
+}
+&nbsp;
+func BenchmarkAtInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// at from the middle</i>
+                val := <strong>q.At(q.Len() / 2)</strong>
+                if val &lt; 0 || val &gt; b.N {
+                        b.Fail()
+                }
+        }
+}
+&nbsp;
+func BenchmarkInsertInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// insert into the middle</i>
+                <strong>q.Insert(q.Len()/2, i)</strong>
+        }
+}
+&nbsp;
+func BenchmarkRemoveInt(b *testing.B) {
+        q := fillInDequeFromFront(b)
+&nbsp;
+        for i := 0; i &lt; b.N; i++ {
+                <i>// remove from the middle</i>
+                <strong>q.Remove(q.Len() / 2)</strong>
+        }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Výsledky benchmarků pro krátké obousměrné fronty</h2>
+
+<p>Podívejme se nyní na výsledky benchmarků v&nbsp;situaci, kdy je počet
+operací s&nbsp;frontou (a u většiny benchmarků současně i maximální délka
+fronty) nastaven na hodnoty 10, 100, 1000 a 10000:</p>
+
+<pre>
+$ <strong>go test -bench=. -benchtime=10x</strong>
+$ <strong>go test -bench=. -benchtime=100x</strong>
+$ <strong>go test -bench=. -benchtime=1000x</strong>
+$ <strong>go test -bench=. -benchtime=10000x</strong>
+</pre>
+
+<p>I u takto krátkých front je však možné odhalit ty operace, které nemají
+konstantní složitost, ale například složitost lineární či (což zde nenastává)
+kvadratickou:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8               10                92.70 ns/op
+BenchmarkPushBackInt-8                10                81.10 ns/op
+BenchmarkPopFrontInt-8                10                43.20 ns/op
+BenchmarkPopBackInt-8                 10                53.50 ns/op
+BenchmarkFrontInt-8                   10                40.10 ns/op
+BenchmarkBackInt-8                    10                31.10 ns/op
+BenchmarkRotateInt-8                  10                51.60 ns/op
+BenchmarkAtInt-8                      10                46.40 ns/op
+BenchmarkInsertInt-8                  10                87.30 ns/op
+BenchmarkRemoveInt-8                  10                65.80 ns/op
+PASS
+ok      deque-demos     0.005s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8              100                66.15 ns/op
+BenchmarkPushBackInt-8               100                43.84 ns/op
+BenchmarkPopFrontInt-8               100                14.24 ns/op
+BenchmarkPopBackInt-8                100                20.21 ns/op
+BenchmarkFrontInt-8                  100                 5.85 ns/op
+BenchmarkBackInt-8                   100                 5.13 ns/op
+BenchmarkRotateInt-8                 100                21.99 ns/op
+BenchmarkAtInt-8                     100                 6.80 ns/op
+BenchmarkInsertInt-8                 100               147.80 ns/op
+BenchmarkRemoveInt-8                 100                66.56 ns/op
+PASS
+ok      deque-demos     0.006s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8             1000                16.40 ns/op
+BenchmarkPushBackInt-8              1000                12.02 ns/op
+BenchmarkPopFrontInt-8              1000                11.80 ns/op
+BenchmarkPopBackInt-8               1000                 7.21 ns/op
+BenchmarkFrontInt-8                 1000                 1.78 ns/op
+BenchmarkBackInt-8                  1000                 1.44 ns/op
+BenchmarkRotateInt-8                1000                13.70 ns/op
+BenchmarkAtInt-8                    1000                 2.89 ns/op
+BenchmarkInsertInt-8                1000               877.20 ns/op
+BenchmarkRemoveInt-8                1000               308.60 ns/op
+PASS
+ok      deque-demos     0.007s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8            10000                10.06 ns/op
+BenchmarkPushBackInt-8             10000                10.92 ns/op
+BenchmarkPopFrontInt-8             10000                 9.03 ns/op
+BenchmarkPopBackInt-8              10000                 5.84 ns/op
+BenchmarkFrontInt-8                10000                 1.25 ns/op
+BenchmarkBackInt-8                 10000                 0.99 ns/op
+BenchmarkRotateInt-8               10000                12.16 ns/op
+BenchmarkAtInt-8                   10000                 4.35 ns/op
+BenchmarkInsertInt-8               10000              7958.00 ns/op
+BenchmarkRemoveInt-8               10000              2610.00 ns/op
+PASS
+ok      deque-demos     0.113s
+</pre>
+
+<a href="https://www.root.cz/obrazek/677899/"><img src="https://i.iinfo.cz/images/663/go-deque-benchmarks-1-prev.png" class="image-677899" data-prev-filename="https://i.iinfo.cz/images/663/go-deque-benchmarks-1-prev.png" data-prev-width="370" data-prev-height="228" data-large-filename="https://i.iinfo.cz/images/663/go-deque-benchmarks-1-large.png" data-large-width="720" data-large-height="444" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="370" height="228" /></a>
+<p><i>Obrázek 1: Povšimněte si, že až na úvodní &bdquo;spiky&ldquo; (než se kód
+zahřeje) má všech osm operací konstantní složitost.</i></p>
+
+<p><div class="rs-tip-major">Poznámka: můžeme vidět, že prvních osm měřených
+operací má pravděpodobně konstantní složitost, kdežto u dalších dvou operací
+<strong>Insert</strong> a <strong>Remove</strong> je situace
+složitější.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Výsledky benchmarků pro fronty s&nbsp;větším počtem prvků</h2>
+
+<p>Nyní si vyzkoušejme délku trvání operací, zejména operací
+<strong>Insert</strong> a <strong>Remove</strong>, u front s&nbsp;délkou
+100000, 200000, 300000, 400000 a 500000 prvků. Sledovat budeme především
+operace <strong>Insert</strong> a <strong>Remove</strong>, které budou mít
+(pravděpodobně) lineární časovou složitost závislou na počtu prvků již
+vložených do fronty:</p>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8           100000                 7.84 ns/op
+BenchmarkPushBackInt-8            100000                12.54 ns/op
+BenchmarkPopFrontInt-8            100000                 5.33 ns/op
+BenchmarkPopBackInt-8             100000                 6.80 ns/op
+BenchmarkFrontInt-8               100000                 0.72 ns/op
+BenchmarkBackInt-8                100000                 0.95 ns/op
+BenchmarkRotateInt-8              100000                12.68 ns/op
+BenchmarkAtInt-8                  100000                 2.39 ns/op
+BenchmarkInsertInt-8              100000             88824.00 ns/op
+BenchmarkRemoveInt-8              100000             29699.00 ns/op
+PASS
+ok      deque-demos     11.871s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8           200000                11.74 ns/op
+BenchmarkPushBackInt-8            200000                11.13 ns/op
+BenchmarkPopFrontInt-8            200000                 6.59 ns/op
+BenchmarkPopBackInt-8             200000                 7.98 ns/op
+BenchmarkFrontInt-8               200000                 0.75 ns/op
+BenchmarkBackInt-8                200000                 0.95 ns/op
+BenchmarkRotateInt-8              200000                14.86 ns/op
+BenchmarkAtInt-8                  200000                 2.75 ns/op
+BenchmarkInsertInt-8              200000            189081.00 ns/op
+BenchmarkRemoveInt-8              200000             67279.00 ns/op
+PASS
+ok      deque-demos     51.330s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8           300000                10.45 ns/op
+BenchmarkPushBackInt-8            300000                11.11 ns/op
+BenchmarkPopFrontInt-8            300000                 6.45 ns/op
+BenchmarkPopBackInt-8             300000                 6.12 ns/op
+BenchmarkFrontInt-8               300000                 0.71 ns/op
+BenchmarkBackInt-8                300000                 1.02 ns/op
+BenchmarkRotateInt-8              300000                12.27 ns/op
+BenchmarkAtInt-8                  300000                 2.44 ns/op
+BenchmarkInsertInt-8              300000            309848.00 ns/op
+BenchmarkRemoveInt-8              300000            103180.00 ns/op
+PASS
+ok      deque-demos     123.962s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8           400000                 9.02 ns/op
+BenchmarkPushBackInt-8            400000                 9.71 ns/op
+BenchmarkPopFrontInt-8            400000                 5.60 ns/op
+BenchmarkPopBackInt-8             400000                 5.58 ns/op
+BenchmarkFrontInt-8               400000                 0.71 ns/op
+BenchmarkBackInt-8                400000                 0.95 ns/op
+BenchmarkRotateInt-8              400000                12.24 ns/op
+BenchmarkAtInt-8                  400000                 2.40 ns/op
+BenchmarkInsertInt-8              400000            406410.00 ns/op
+BenchmarkRemoveInt-8              400000            140504.00 ns/op
+PASS
+ok      deque-demos     218.827s
+</pre>
+
+<pre>
+goos: linux
+goarch: amd64
+pkg: deque-demos
+cpu: Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+BenchmarkPushFrontInt-8           500000                 8.22 ns/op
+BenchmarkPushBackInt-8            500000                 8.33 ns/op
+BenchmarkPopFrontInt-8            500000                 5.26 ns/op
+BenchmarkPopBackInt-8             500000                 5.20 ns/op
+BenchmarkFrontInt-8               500000                 0.81 ns/op
+BenchmarkBackInt-8                500000                 0.95 ns/op
+BenchmarkRotateInt-8              500000                12.34 ns/op
+BenchmarkAtInt-8                  500000                 2.39 ns/op
+BenchmarkInsertInt-8              500000            502974.00 ns/op
+BenchmarkRemoveInt-8              500000            174666.00 ns/op
+PASS
+ok      deque-demos     338.897s
+</pre>
+
+<p>V&nbsp;tomto případě je nejlepší, když si časovou složitost necháme
+vykreslit do grafu:</p>
+
+<a href="https://www.root.cz/obrazek/677900/"><img src="https://i.iinfo.cz/images/663/go-deque-benchmarks-2-prev.png" class="image-677900" data-prev-filename="https://i.iinfo.cz/images/663/go-deque-benchmarks-2-prev.png" data-prev-width="370" data-prev-height="218" data-large-filename="https://i.iinfo.cz/images/663/go-deque-benchmarks-2-large.png" data-large-width="720" data-large-height="424" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;https://creativecommons.org/publicdomain/mark/1.0/deed.en&quot;&gt;Public Domain&lt;/a&gt;" width="370" height="218" /></a>
+<p><i>Obrázek 2: Časová složitost operací <strong>Insert</strong> a
+<strong>Remove</strong> v&nbsp;závislosti na počtu prvků ve frontě.</i></p>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Závěrečné zhodnocení</h2>
+
+<p>Dnes zmíněná implementace obousměrně vázané fronty je implementována poměrně
+efektivním způsobem, a to s&nbsp;důrazem na malé nároky na CPU při provádění
+základních operací (kromě <strong>Insert</strong> a <strong>Remove</strong>,
+což jsou ovšem operace, které s&nbsp;frontou vlastně nesouvisí). Taktéž je
+výhodné, že jsou plně podporovány generické datové typy a operace
+s&nbsp;frontou jsou tedy (po stránce použitých typů) plně hlídány překladačem
+jazyka Go a pro každý typ je generován nový (efektivní) strojový kód. A navíc
+se jedná o balíček, jenž nezávisí na dalších balíčcích, což je
+v&nbsp;ekosystému jazyka Go dnes již poměrně velká výhoda (hlídání balíčků
+s&nbsp;potenciálním CVE je v&nbsp;těchto případech mnohem snazší atd.).</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Příloha 1: CSV soubor s&nbsp;výsledky benchmarků</h2>
+
+<p>Pro úplnost si uveďme CSV soubor, jenž obsahuje výsledky všech provedených
+benchmarků. Uvedené hodnoty reprezentují čas v&nbsp;nanosekundách:</p>
+
+<pre>
+Benchmark,    10x,  100x,  1000x,  10000x, 100000x,  200000x,  300000x,  400000x,  500000x
+PushFrontInt, 92.70, 66.15, 16.40,  10.06,    7.84,    11.74,    10.45,     9.02,     8.22
+PushBackInt,  81.10, 43.84, 12.02,  10.92,   12.54,    11.13,    11.11,     9.71,     8.33
+PopFrontInt,  43.20, 14.24, 11.80,   9.03,    5.33,     6.59,     6.45,     5.60,     5.26
+PopBackInt,   53.50, 20.21,  7.21,   5.84,    6.80,     7.98,     6.12,     5.58,     5.20
+FrontInt,     40.10,  5.85,  1.78,   1.25,    0.72,     0.75,     0.71,     0.71,     0.81
+BackInt,      31.10,  5.13,  1.43,   0.99,    0.95,     0.95,     1.02,     0.95,     0.95
+RotateInt,    51.60, 21.99, 13.70,  12.16,   12.68,    14.86,    12.27,    12.24,    12.34
+AtInt,        46.40,  6.80,  2.88,   4.35,    2.39,     2.75,     2.44,     2.40,     2.39
+InsertInt,    87.30,147.80,877.20,7958.00,88824.00,189081.00,309848.00,406410.00,502974.00
+RemoveInt,    65.80, 66.56,308.60,2610.00,29699.00, 67279.00,103180.00,140504.00,174666.00
+</pre>
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Příloha 2: Názvy operací s&nbsp;obousměrnou frontou</h2>
+
+<p>Názvy operací prováděných s&nbsp;obousměrnou frontou nejsou zcela
+standardizovány, takže se můžeme setkat s&nbsp;různým pojmenováním příslušných
+funkcí nebo metod. Následující tabulka byla <a
+href="https://en.wikipedia.org/wiki/Double-ended_queue#Operations">převzata
+z&nbsp;Wikipedie</a> a upravena pro účely dnešního článku:</p>
+
+<table>
+<tr><th>Go</th><th>Ada</th><th>C++</th><th>Java</th><th>Perl</th><th>PHP</th><th>Python</th><th>Ruby</th><th>Rust</th><th>JavaScript</th></tr>
+<tr><td><strong>PushBack</strong></td><td>Append</td><td>push_back</td><td>offerLast</td><td>push</td><td>array_push</td><td>append</td><td>push</td><td>push_back</td><td>push</td></tr>
+<tr><td><strong>PushFront</strong></td><td>Prepend</td><td>push_front</td><td>offerFirst</td><td>unshift</td><td>array_unshift</td><td>appendleft</td><td>unshift</td><td>push_front</td><td>unshift</td></tr>
+<tr><td><strong>PopBack</strong></td><td>Delete_Last</td><td>pop_back</td><td>pollLast</td><td>pop</td><td>array_pop</td><td>pop</td><td>pop</td><td>pop_back</td><td>pop</td></tr>
+<tr><td><strong>PopFront</strong></td><td>Delete_First</td><td>pop_front</td><td>pollFirst</td><td>shift</td><td>array_shift</td><td>popleft</td><td>shift</td><td>pop_front</td><td>shift</td></tr>
+<tr><td><strong>Back</strong></td><td>Last_Element</td><td>back</td><td>peekLast</td><td>$array[-1]</td><td>end</td><td>seznam[-1]</td><td>last</td><td>back</td><td>objekt.at(-1)</td></tr>
+<tr><td><strong>Front</strong></td><td>First_Element</td><td>front</td><td>peekFirst</td><td>$array[0]</td><td>reset</td><td>seznam[0]</td><td>first</td><td>front</td><td>objekt[0]</td></tr>
+</table>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+nového Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně stovku kilobajtů), můžete namísto toho použít odkazy na jednotlivé
+demonstrační příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad/soubor</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_empty_deque.go</td><td>vytvoření prázdné (plně funkční) obousměrné fronty</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/01_empty_deque.go">https://github.com/tisnik/go-root/blob/master/article_96/01_empty_deque.go</a></td></tr>
+<tr><td> 2</td><td>02_pushback.go</td><td>obousměrná fronta a operace typu <strong>push back</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/02_pushback.go">https://github.com/tisnik/go-root/blob/master/article_96/02_pushback.go</a></td></tr>
+<tr><td> 3</td><td>03_length_capacity.go</td><td>závislost délky a kapacity obousměrné fronty při přidávání prvků</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/03_length_capacity.go">https://github.com/tisnik/go-root/blob/master/article_96/03_length_capacity.go</a></td></tr>
+<tr><td> 4</td><td>04_popfront_panic.go</td><td>operace <strong>pop front</strong> bez testu, zda je fronta prázdná</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/04_popfront_panic.go">https://github.com/tisnik/go-root/blob/master/article_96/04_popfront_panic.go</a></td></tr>
+<tr><td> 5</td><td>05_popfront.go</td><td>operace <strong>pop front</strong> s&nbsp;korektním testem, zda je fronta prázdná</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/05_popfront.go">https://github.com/tisnik/go-root/blob/master/article_96/05_popfront.go</a></td></tr>
+<tr><td> 6</td><td>06_as_queue_1.go</td><td>obousměrná fronta použitá jako klasická fronta (<i>queue</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/06_as_queue_1.go">https://github.com/tisnik/go-root/blob/master/article_96/06_as_queue_1.go</a></td></tr>
+<tr><td> 7</td><td>07_as_queue_2.go</td><td>obousměrná fronta použitá jako klasická fronta (<i>queue</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/07_as_queue_2.go">https://github.com/tisnik/go-root/blob/master/article_96/07_as_queue_2.go</a></td></tr>
+<tr><td> 8</td><td>08_as_stack_1.go</td><td>obousměrná fronta použitá jako klasický zásobník (<i>stack</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/08_as_stack_1.go">https://github.com/tisnik/go-root/blob/master/article_96/08_as_stack_1.go</a></td></tr>
+<tr><td> 9</td><td>09_as_stack_2.go</td><td>obousměrná fronta použitá jako klasický zásobník (<i>stack</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/09_as_stack_2.go">https://github.com/tisnik/go-root/blob/master/article_96/09_as_stack_2.go</a></td></tr>
+<tr><td>10</td><td>10_stack_rpn.go</td><td>vyhodnocení RPN výrazů s&nbsp;využitím <i>deque</i> ve funkci zásobníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/10_stack_rpn.go">https://github.com/tisnik/go-root/blob/master/article_96/10_stack_rpn.go</a></td></tr>
+<tr><td>11</td><td>11_rotate.go</td><td>obousměrná fronta a operace <strong>rotate</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/11_rotate.go">https://github.com/tisnik/go-root/blob/master/article_96/11_rotate.go</a></td></tr>
+<tr><td>12</td><td>12_rotate.go</td><td>obousměrná fronta a operace <strong>rotate</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_96/12_rotate.go">https://github.com/tisnik/go-root/blob/master/article_96/12_rotate.go</a></td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: k&nbsp;dispozici je i benchmark, jenž je
+dostupný na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_96/benchmarks/">https://github.com/tisnik/go-root/blob/master/article_96/benchmarks/</a>.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Double-ended queue<br />
+<a href="https://en.wikipedia.org/wiki/Double-ended_queue">https://en.wikipedia.org/wiki/Double-ended_queue</a>
+</li>
+
+<li>Deque package reference documentation<br />
+<a href="https://pkg.go.dev/github.com/gammazero/deque">https://pkg.go.dev/github.com/gammazero/deque</a>
+</li>
+
+<li>Fast ring-buffer deque (double-ended queue) implementation.<br />
+<a href="https://github.com/gammazero/deque">https://github.com/gammazero/deque</a>
+</li>
+
+<li>Highly optimized double-ended queue<br />
+<a href="https://github.com/edwingeng/deque/tree/master/v2">https://github.com/edwingeng/deque/tree/master/v2</a>
+</li>
+
+<li>Genfuncs &ndash; implements various functions utilizing Go's Generics to help avoid writing boilerplate code<br />
+<a href="https://github.com/nwillc/genfuncs">https://github.com/nwillc/genfuncs</a>
+</li>
+
+<li>Go18DS (Go 1.18+ Data Structures)<br />
+<a href="https://github.com/daichi-m/go18ds">https://github.com/daichi-m/go18ds</a>
+</li>
+
+<li>TreeMap v2<br />
+<a href="https://github.com/igrmk/treemap">https://github.com/igrmk/treemap</a>
+</li>
+
+<li>Fp-go is a collection of Functional Programming helpers powered by Golang 1.18+ generics<br />
+<a href="https://github.com/repeale/fp-go">https://github.com/repeale/fp-go</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://go.dev/ref/spec">https://go.dev/ref/spec</a>
+</li>
+
+<li>Generics in Go<br />
+<a href="https://bitfieldconsulting.com/golang/generics">https://bitfieldconsulting.com/golang/generics</a>
+</li>
+
+<li>Tutorial: Getting started with generics<br />
+<a href="https://go.dev/doc/tutorial/generics">https://go.dev/doc/tutorial/generics</a>
+</li>
+
+<li>Type parameters in Go<br />
+<a href="https://bitfieldconsulting.com/golang/type-parameters">https://bitfieldconsulting.com/golang/type-parameters</a>
+</li>
+
+<li>Go Data Structures: Binary Search Tree<br />
+<a href="https://flaviocopes.com/golang-data-structure-binary-search-tree/">https://flaviocopes.com/golang-data-structure-binary-search-tree/</a>
+</li>
+
+<li>Gobs of data<br />
+<a href="https://blog.golang.org/gobs-of-data">https://blog.golang.org/gobs-of-data</a>
+</li>
+
+<li>How the Go runtime implements maps efficiently (without generics)<br />
+<a href="https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics">https://dave.cheney.net/2018/05/29/how-the-go-runtime-implements-maps-efficiently-without-generics</a>
+</li>
+
+<li>Go 1.18 Release Notes<br />
+<a href="https://golang.org/doc/go1.18">https://golang.org/doc/go1.18</a>
+</li>
+
+<li>Go 1.17 Release Notes<br />
+<a href="https://golang.org/doc/go1.17">https://golang.org/doc/go1.17</a>
+</li>
+
+<li>Go 1.16 Release Notes<br />
+<a href="https://golang.org/doc/go1.16">https://golang.org/doc/go1.16</a>
+</li>
+
+<li>Go 1.15 Release Notes<br />
+<a href="https://golang.org/doc/go1.15">https://golang.org/doc/go1.15</a>
+</li>
+
+<li>Go 1.14 Release Notes<br />
+<a href="https://golang.org/doc/go1.14">https://golang.org/doc/go1.14</a>
+</li>
+
+<li>Go 1.13 Release Notes<br />
+<a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a>
+</li>
+
+<li>Go 1.12 Release Notes<br />
+<a href="https://golang.org/doc/go1.12">https://golang.org/doc/go1.12</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.11 Release Notes<br />
+<a href="https://golang.org/doc/go1.11">https://golang.org/doc/go1.11</a>
+</li>
+
+<li>Go 1.10 Release Notes<br />
+<a href="https://golang.org/doc/go1.10">https://golang.org/doc/go1.10</a>
+</li>
+
+<li>Go 1.9 Release Notes<br />
+<a href="https://golang.org/doc/go1.9">https://golang.org/doc/go1.9</a>
+</li>
+
+<li>Go 1.8 Release Notes<br />
+<a href="https://golang.org/doc/go1.8">https://golang.org/doc/go1.8</a>
+</li>
+
+<li>A Proposal for Adding Generics to Go<br />
+<a href="https://go.dev/blog/generics-proposal">https://go.dev/blog/generics-proposal</a>
+</li>
+
+<li>Proposal: Go should have generics<br />
+<a href="https://github.com/golang/proposal/blob/master/design/15292-generics.md">https://github.com/golang/proposal/blob/master/design/15292-generics.md</a>
+</li>
+
+<li>Know Go: Generics (Kniha)<br />
+<a href="https://bitfieldconsulting.com/books/generics">https://bitfieldconsulting.com/books/generics</a>
+</li>
+
+<li>Go 1.18 Generics based slice package<br />
+<a href="https://golangexample.com/go-1-18-generics-based-slice-package/">https://golangexample.com/go-1-18-generics-based-slice-package/</a>
+</li>
+
+<li>The missing slice package<br />
+<a href="https://github.com/ssoroka/slice">https://github.com/ssoroka/slice</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-18-genericke-datove-typy/</a>
+</li>
+
+<li>Dlouho očekávaná novinka v Go 1.18 – generické datové typy (dokončení)<br />
+<a href="https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/">https://www.root.cz/clanky/dlouho-ocekavana-novinka-v-go-1-8-genericke-datove-typy-dokonceni/</a>
+</li>
+
+<li>Generické datové typy v jazyce Go?<br />
+<a href="https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/">https://www.root.cz/clanky/genericke-datove-typy-v-jazyce-go/</a>
+</li>
+
+<li>GoDS (Go Data Structures)<br />
+<a href="https://github.com/emirpasic/gods">https://github.com/emirpasic/gods</a>
+</li>
+
+<li>Circular buffer<br />
+<a href="https://en.wikipedia.org/wiki/Circular_buffer">https://en.wikipedia.org/wiki/Circular_buffer</a>
+</li>
+
+<li>Circular Buffer<br />
+<a href="http://wiki.c2.com/?CircularBuffer">http://wiki.c2.com/?CircularBuffer</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2022</small></p>
+</body>
+</html>
+
+<!--
+    6:00 -  7:00 51000
+    7:00 -  8:00 52000
+    8:00 -  9:00 53000
+    9:00 - 10:00 54000
+   10:00 - 11:00 55000
+
+    -->
