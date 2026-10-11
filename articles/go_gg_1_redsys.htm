@@ -1,0 +1,3226 @@
+<h2 id="k01">Tvorba 2D i 3D grafiky a animací v&nbsp;Go s&nbsp;využitím projektu GoGPU</h2>
+
+<p>Programovací jazyk Go se používá v&nbsp;mnoha oblastech &ndash; cloudové
+služby a platformy, vývoj back endu, nástroje ovládané z&nbsp;příkazové řádky,
+nástroje pro CI/CD apod. Go se ovšem z&nbsp;historických důvodů příliš často
+nepoužíval pro vývoj klasických desktopových aplikací (pouze pro jejich imitaci
+přes Electron). Poměrně dlouhou dobu totiž nebyly k&nbsp;dispozici vhodné
+nástroje a knihovny. Tato situace se do značné míry změnila s&nbsp;příchodem
+(relativně mladého) projektu nazvaného <i>GoGPU</i>, jenž je určen pro tvorbu
+desktopových aplikací s&nbsp;2D a popř.&nbsp;i 3D grafikou. Jak je ovšem
+v&nbsp;ekosystému jazyka Go dobrým zvykem, není <i>GoGPU</i> navržen jako
+všeobjímající framework, který do značné míry určuje architekturu aplikací. Je
+tomu přesně naopak, protože <i>GoGPU</i> je &bdquo;jen&ldquo; sadou knihoven,
+které lze v&nbsp;případě potřeby používat samostatně (což si ostatně ukážeme i
+dnes):</p>
+
+<table>
+<tr><th>Balíček</th><th>Stručný popis</th></tr>
+<tr><td>gogpu</td><td>jednoduchý grafický framework, integruje další balíčky (dnes ho nepoužijeme)</td></tr>
+<tr><td>gg</td><td>vykreslování rastrové 2D grafiky jak softwarově, tak pomocí GPU, téma dnešního článku</td></tr>
+<tr><td>gg-pdf</td><td>export vykreslené rastrové 2D grafiky do formátu PDF, rozšiřuje možnosti balíčku gg</td></tr>
+<tr><td>gg-svg</td><td>export vykreslené rastrové 2D grafiky do formátu SVG, rozšiřuje možnosti balíčku gg</td></tr>
+<tr><td>g3d</td><td>vykreslování 3D grafiky jak softwarově, tak pomocí GPU, de facto alternativa ke klasickému OpenGL</td></tr>
+<tr><td>gputypes</td><td>pomocný balíček s&nbsp;typy WebGPU, prozatím ho nepoužijeme</td></tr>
+<tr><td>ui</td><td>tvorba grafického uživatelského rozhraní</td></tr>
+<tr><td>editor</td><td>nový (a nedokončený!) balíček &ndash; bude se jednat o komponentu pro tvorbu textových vstupních polí</td></tr>
+<tr><td>systray</td><td>manipulace s&nbsp;obsahem hlavního panelu Windows a některých Linuxových desktopových prostředí</td></tr>
+<tr><td>audio</td><td>práce se zvukem (popíšeme si později)</td></tr>
+</table>
+
+<p>Jak již bylo napsáno výše, je možné jednotlivé balíčky používat samostatně.
+Příkladem je back end služba, která generuje rastrové obrázky popř.&nbsp;SVG
+kresby. V&nbsp;takových případech si vystačíme s&nbsp;<strong>gg</strong> nebo
+<strong>gg-svg</strong>. Naproti tomu jednoduchá aplikace s&nbsp;grafickým
+uživatelským rozhraním nebude vyžadovat <strong>g3d</strong> atd. Taktéž je
+možné vykreslování provádět jak softwarově, tak i s&nbsp;využitím GPU (výsledky
+ovšem mohou být nepatrně odlišné).</p>
+
+<p><div class="rs-tip-major">Poznámka: některé balíčky jsou relativně nové,
+ovšem všechny vlastnosti popsané v&nbsp;tomto článku i v&nbsp;článcích
+navazujících se budou týkat stabilního API.</div></p>
+
+
+
+<h2 id="k02">Knihovna <strong>gg</strong> &ndash; ale která?</h2>
+
+<p>Z&nbsp;předchozí kapitoly je zřejmé, že se projekt GoGPU skládá z&nbsp;mnoha
+balíčků, které za sebou mají různou historii vývoje. Týká se to mj.&nbsp;i
+balíčku, který se jmenuje <strong>gg</strong>. Čtenáři s&nbsp;lepší pamětí než
+autor tohoto článku (tj.&nbsp;všichni čtenáři) si možná vzpomenou, že jsme se
+s&nbsp;balíčkem <strong>gg</strong> <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;seriálu o
+programovacím jazyce Go</a> již kdysi setkali. Ovšem jednalo se tehdy o balíček
+<a href="https://github.com/fogleman/gg">fogleman/gg</a>, nikoli o <a
+href="https://github.com/gogpu/gg">gogpu/gg</a>. Oba balíčky mají podobné,
+ovšem nikoli totožné API. Dnes se pochopitelně zaměříme na druhý z&nbsp;těchto
+balíčků, tedy <strong>gogpu/gg</strong>, který je v&nbsp;některých ohledech
+odlišný, ovšem navíc nabízí propojení s&nbsp;balíčky <strong>go-pdf</strong>,
+<strong>go-svg</strong> a taktéž <strong>ui</strong>. V&nbsp;dalším textu tedy
+budeme pod názvem <strong>gg</strong> vždy myslet balíček
+<strong>gogpu/gg</strong>.</p>
+
+<p><div class="rs-tip-major">Poznámka: jen na okraj je dobré si povšimnout, jak
+dobře navržený je v&nbsp;ekosystému programovacího jazyka Go systém pojmenování
+balíčků. I v&nbsp;případě shody jmen nedojde k&nbsp;žádným problémům, dokonce
+ani tehdy ne, pokud bychom chtěli jak <strong>fogleman/gg</strong>, tak i
+<strong>gogpu/gg</strong> použít současně.</div></p>
+
+
+
+<h2 id="k03">Instalace knihovny <strong>GoGPU/gg</strong></h2>
+
+<p>V&nbsp;praktické části dnešního článku se &ndash; prozatím ovšem pouze
+v&nbsp;rychlosti a bez dalších podrobností &ndash; seznámíme s&nbsp;některými
+možnostmi, které nám v&nbsp;oblasti 2D grafiky poskytuje knihovna nazvaná
+GoGPU/gg (a tedy balíček <strong>gogpu/gg</strong>). Možnosti poskytované touto
+knihovnou do jisté míry připomínají knihovnu Cairo popř.&nbsp;<a
+href="https://www.root.cz/clanky/pouziti-knihoven-openvg-a-egl-nejenom-na-raspberry-pi/">OpenVG
+a EGL</a>: 2D scéna je při použití této knihovny vykreslována
+v&nbsp;<i>immediate</i> (přímém) režimu, přičemž se používá koncept takzvaných
+cest (<i>path</i>), stylů vykreslování i vyplňování a taktéž lineárních
+transformací, které je možné v&nbsp;případě potřeby skládat. Navíc tato
+knihovna podporuje rasterizaci TrueType fontů, takže je možné do obrázků
+vkládat různě transformovaný text (lineární transformace se pochopitelně
+vztahují i na text).</p>
+
+<p>Pozor je nutné si dát především na to, že GoGPU vyžaduje <a
+href="https://go.dev/dl/">relativně novou verzi jazyka Go</a>, konkrétně Go
+1.25. Pokud máte nainstalovánu starší verzi Go, je čas na upgrade:</p>
+
+<pre>
+$ <strong>sudo dnf upgrade golang</strong>
+&nbsp;
+Updating and loading repositories:
+Repositories loaded.
+Package                  Arch    Version                  Repository        Size
+Upgrading:
+ golang                  x86_64  1.25.10-2.fc42           updates        9.6 MiB
+   replacing golang      x86_64  1.24.10-1.fc42           updates        8.9 MiB
+ golang-bin              x86_64  1.25.10-2.fc42           updates       67.7 MiB
+   replacing golang-bin  x86_64  1.24.10-1.fc42           updates      122.1 MiB
+ golang-misc             noarch  1.25.10-2.fc42           updates       56.3 KiB
+   replacing golang-misc noarch  1.24.10-1.fc42           updates       60.2 KiB
+ golang-src              noarch  1.25.10-2.fc42           updates       81.5 MiB
+   replacing golang-src  noarch  1.24.10-1.fc42           updates       79.2 MiB
+&nbsp;
+Transaction Summary:
+ Upgrading:          4 packages
+ Replacing:          4 packages
+&nbsp;
+Total size of inbound packages is 33 MiB. Need to download 33 MiB.
+After this operation, 51 MiB will be freed (install 159 MiB, remove 210 MiB).
+Is this ok [y/N]: 
+</pre>
+
+<p>Po upgrade na novější verzi Go se přesvědčíme o tom, že je k&nbsp;dispozici
+alespoň Go 1.25:</p>
+
+<pre>
+$ <strong>go version</strong>
+&nbsp;
+go version go1.25.10 X:nodwarf5 linux/amd64
+</pre>
+
+<p>Samotná instalace knihovny <strong>gogpu/gg</strong> je stejná, jako
+v&nbsp;případě jiných externích balíčků, což konkrétně znamená, že se použije
+příkaz <strong>go get</strong> spuštěný v&nbsp;adresáři s&nbsp;projektem:</p>
+
+<pre>
+$ <strong>go get github.com/gogpu/gg</strong>
+&nbsp;
+go: downloading github.com/gogpu/gg v0.50.1
+go: downloading github.com/gogpu/gpucontext v0.21.0
+go: downloading golang.org/x/image v0.43.0
+go: downloading golang.org/x/text v0.38.0
+go: downloading github.com/gogpu/gputypes v0.5.1
+go: upgraded go 1.24.10 =&gt; 1.25.0
+go: added github.com/gogpu/gg v0.50.1
+go: added github.com/gogpu/gpucontext v0.21.0
+go: added github.com/gogpu/gputypes v0.5.1
+go: added golang.org/x/image v0.43.0
+go: added golang.org/x/text v0.38.0
+</pre>
+
+<p>Projektový soubor by měl nyní mít zhruba následující obsah:</p>
+
+<pre>
+module gg-demos
+&nbsp;
+go 1.25.0
+&nbsp;
+require (
+        github.com/gogpu/gg v0.50.1 // indirect
+        github.com/gogpu/gpucontext v0.21.0 // indirect
+        github.com/gogpu/gputypes v0.5.1 // indirect
+        golang.org/x/image v0.43.0 // indirect
+        golang.org/x/text v0.38.0 // indirect
+)
+</pre>
+
+<p>Konkrétní hashe použitých balíčků jsou, jak je zvykem, uloženy
+v&nbsp;souboru <strong>go.sum</strong>:</p>
+
+<pre>
+github.com/gogpu/gg v0.50.1 h1:6Xb+f68mw6YVOtBu0n7e4INIXE4NUy6+fvNucCMqgH8=
+github.com/gogpu/gg v0.50.1/go.mod h1:vdfjSLVXNp7Qx9DLH/NRZqvLiQniKhHRFN/JkSF3LJk=
+github.com/gogpu/gpucontext v0.21.0 h1:O1SnXBiednIyVP4Zx5SASh0svYiG6g/wF1igNZVo1Pc=
+github.com/gogpu/gpucontext v0.21.0/go.mod h1:6zwdmYXH5GQltoiHbb3WXVS/UJ5bFsCux0mXCVqGlzY=
+github.com/gogpu/gputypes v0.5.1 h1:X38OPcP6umQqqubzzJYL6Nm1tXHSNQj6TRSAoxdAJmg=
+github.com/gogpu/gputypes v0.5.1/go.mod h1:cnXrDMwTpWTvJLW1Vreop3PcT6a2YP/i3s91rPaOavw=
+golang.org/x/image v0.43.0 h1:FLxcP4ec2350nTfOC8ysKtqYSIFbk/QGjw1ZHNP4tsY=
+golang.org/x/image v0.43.0/go.mod h1:rrpelvGFt+kLPAjPM4HeWPgrl0FtafueU//e5N0qk/Q=
+golang.org/x/text v0.38.0 h1:sXmwo9DwP3OK9EZ7PqAdaooSGozfl/3a6/xJcbzPRhE=
+golang.org/x/text v0.38.0/go.mod h1:YXZt3QhHUKYT53r2lLKFIVi6Ao1jdzrTR/KQ09qyxF4=
+</pre>
+
+<p>Mimochodem, pokud budete s&nbsp;využitím GoGPU (a balíčku
+<strong>g3d</strong>) vytvářet 3D grafiku i s&nbsp;grafickým uživatelským
+rozhraním, budou závislosti odlišné (ale to již předbíháme):</p>
+
+<pre>
+module gg-demos-3D
+&nbsp;
+go 1.25.10
+&nbsp;
+require (
+        github.com/go-webgpu/goffi v0.5.6 // indirect
+        github.com/go-webgpu/webgpu v0.5.2 // indirect
+        github.com/gogpu/g3d v0.1.1 // indirect
+        github.com/gogpu/gogpu v0.44.1 // indirect
+        github.com/gogpu/gpucontext v0.21.0 // indirect
+        github.com/gogpu/gputypes v0.5.1 // indirect
+        github.com/gogpu/naga v0.17.15 // indirect
+        github.com/gogpu/wgpu v0.30.10 // indirect
+        golang.org/x/sys v0.46.0 // indirect
+)
+</pre>
+
+<p>Soubor <strong>go.sum</strong> bude v&nbsp;tomto případě rozsáhlejší:</p>
+
+<pre>
+github.com/go-webgpu/goffi v0.5.5 h1:xLWMhnJq+GrejlhTC3iVt3q8ozRbmYSq8kzuw6MKlgE=
+github.com/go-webgpu/goffi v0.5.5/go.mod h1:wfoxNsJkU+5RFbV1kNN1kunhc1lFHuJKK3zpgx08/uM=
+github.com/go-webgpu/goffi v0.5.6 h1:jAN4ciR63DcpU/qdX4A3wbNvcpZ6AdFK+H7OB/1+9Lc=
+github.com/go-webgpu/goffi v0.5.6/go.mod h1:wfoxNsJkU+5RFbV1kNN1kunhc1lFHuJKK3zpgx08/uM=
+github.com/go-webgpu/webgpu v0.5.2 h1:E+yKCbRw/Dgn77pb/CX3kXatwwROGX7/B4ZFbRPaRbQ=
+github.com/go-webgpu/webgpu v0.5.2/go.mod h1:d2RR3tI2kUtcMfpC+qJt46IRkDslRhftjCfQvnprGkY=
+github.com/gogpu/g3d v0.1.1 h1:aQHP5zQ0mlfYWSJUf4r+0R1cJ1dfdnOC7YLK3e3hNpU=
+github.com/gogpu/g3d v0.1.1/go.mod h1:7L7xlaG56S3FzfaMI9s/ww+OXsR+9oHsCwJHnME9TlE=
+github.com/gogpu/gogpu v0.44.1 h1:oGTO4DpKCLL5huwe6w64CNWfPBZlAueTOd5xx2xfO5c=
+github.com/gogpu/gogpu v0.44.1/go.mod h1:woyKt98CmzLTCbklx0pPNBH/rSxQVzcH1y+qABuZQtg=
+github.com/gogpu/gpucontext v0.21.0 h1:O1SnXBiednIyVP4Zx5SASh0svYiG6g/wF1igNZVo1Pc=
+github.com/gogpu/gpucontext v0.21.0/go.mod h1:6zwdmYXH5GQltoiHbb3WXVS/UJ5bFsCux0mXCVqGlzY=
+github.com/gogpu/gputypes v0.5.0 h1:i2ED/9w6m6yLxf8XJT69/NIMSNTLO2y5F1LqvugCKIE=
+github.com/gogpu/gputypes v0.5.0/go.mod h1:cnXrDMwTpWTvJLW1Vreop3PcT6a2YP/i3s91rPaOavw=
+github.com/gogpu/gputypes v0.5.1 h1:X38OPcP6umQqqubzzJYL6Nm1tXHSNQj6TRSAoxdAJmg=
+github.com/gogpu/gputypes v0.5.1/go.mod h1:cnXrDMwTpWTvJLW1Vreop3PcT6a2YP/i3s91rPaOavw=
+github.com/gogpu/naga v0.17.15 h1:uyy4bc8wYlvDaYOpmCBYrJ+d+e7ZqP2BN36csmRVs7o=
+github.com/gogpu/naga v0.17.15/go.mod h1:15sQaHKkbqXcwTN+hHYGLsA0WBBnkmYzne/eF5p5WEg=
+github.com/gogpu/wgpu v0.30.2 h1:7csTEfCvQnrQHMxZaUB6ulxgsCmrg2eVJSU4demI1hQ=
+github.com/gogpu/wgpu v0.30.2/go.mod h1:Ih63YKckUGtNXnXT6LjkHcH6FUfib0TjCwDR5615gPI=
+github.com/gogpu/wgpu v0.30.10 h1:KWQOo2RR8d+uNFYYD5WGCG0f4AiX8IOHH8kWi2w6Eec=
+github.com/gogpu/wgpu v0.30.10/go.mod h1:9TDtAhJmIhh1RfxcLySWEtkwfFMVf0Y7X7TLtVqvTBE=
+golang.org/x/sys v0.46.0 h1:noSf2Fq6F8DBgS+LysIkx7rIExoNHJsxOAtPp4rthXw=
+golang.org/x/sys v0.46.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+</pre>
+
+<p>V&nbsp;adresáři s&nbsp;projektem si můžeme zobrazit nápovědu k&nbsp;právě
+nainstalovanému balíčku <strong>gogpu/gg</strong>:</p>
+
+<pre>
+$ <strong>go doc gogpu/gg</strong>
+&nbsp;
+package gg // import "github.com/gogpu/gg"
+&nbsp;
+Package gg provides a simple 2D graphics library for Go.
+&nbsp;
+# Overview
+&nbsp;
+gg is a Pure Go 2D graphics library inspired by fogleman/gg and designed to
+integrate with the GoGPU ecosystem. It provides an immediate-mode drawing API
+similar to HTML Canvas, with both software and GPU rendering backends.
+&nbsp;
+# Quick Start
+&nbsp;
+    import "github.com/gogpu/gg"
+&nbsp;
+    // Create a drawing context (dc = drawing context convention)
+    dc := gg.NewContext(512, 512)
+&nbsp;
+    // Draw shapes
+    dc.SetRGB(1, 0, 0)
+    dc.DrawCircle(256, 256, 100)
+    dc.Fill()
+&nbsp;
+    // Save to PNG
+    dc.SavePNG("output.png")
+&nbsp;
+# API Compatibility
+&nbsp;
+The API is designed to be compatible with fogleman/gg for easy migration.
+Most fogleman/gg code should work with minimal changes.
+</pre>
+
+
+
+<h2 id="k04">Inicializace grafického kontextu a smazání kreslicí plochy</h2>
+
+<p>V&nbsp;knihovně <strong>gg</strong> se při vykreslování 2D scény pracuje
+s&nbsp;takzvaným grafickým <i>kontextem</i>, jenž se získá konstruktorem
+<strong>NewContext</strong>. Kontext je datová struktura obsahující reference
+jak na vznikající rastrový obrázek, tak i na parametry vykreslování.
+Z&nbsp;hlavičky konstruktoru je patrné, že je mu nutné předat alespoň rozměry
+kreslicí plochy (<i>canvasu</i>), které budou v&nbsp;případě rasterizace
+výsledků odpovídat rozlišení (v&nbsp;pixelech) :</p>
+
+<pre>
+func <strong>NewContext</strong>(width, height int, opts ...ContextOption) *Context
+</pre>
+
+<p>Ve výchozím nastavení jsou všechny pixely rastrového obrázku průhledné,
+ovšem celý obraz můžeme vyplnit jakoukoli jinou barvou. Vymazání lze
+(v&nbsp;libovolný okamžik) zajistit metodou nazvanou příznačně
+<strong>Clear</strong>:</p>
+
+<pre>
+func (c *Context) <strong>Clear</strong>()
+    <i>Clear resets the entire context to transparent (zero alpha). To fill with a</i>
+    <i>specific background color, use [ClearWithColor].</i>
+</pre>
+
+<p>Výsledný rastrový obrázek po jeho smazání necháme uložit do souboru ve
+formátu PNG metodou <strong>SavePNG</strong>:</p>
+
+<pre>
+func (c *Context) <strong>SavePNG</strong>(path string) error
+    <i>SavePNG saves the context to a PNG file.</i>
+</pre>
+
+<p>Dnešní první demonstrační příklad po svém spuštění vytvoří soubor
+<strong>01.png</strong> s&nbsp;následujícím (přímo neviditelným) obsahem:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312953" data-alignment="center" data-link-type="modal">Obrázek #1312953 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312953">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312953" src="https://i.iinfo.cz/images/16/go-gg-1-1.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-1.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-1.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 1: Obrázek s průhlednými pixely (výchozí stav).</p>
+</div>
+</div>
+
+<p>Následuje výpis úplného zdrojového kódu prvního demonstračního příkladu,
+který tento obrázek vytvoří:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 1:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vymazání obsahu rastrového obrázku.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "01.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// smazání obsahu obrázku s využitím kontextu</i>
+        dc.Clear()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Ve druhém příkladu je realizováno vymazání celého obrázku bílou barvou.
+Musíme použít tři metody. První z&nbsp;nich &bdquo;zaregistruje&ldquo;
+vykreslení obdélníka. Sice poněkud předbíháme, ale povšimněte si, že souřadnice
+i rozměry nejsou celými čísly:</p>
+
+<pre>
+func (c *Context) <strong>DrawRectangle</strong>(x, y, w, h float64)
+    <i>DrawRectangle draws a rectangle.</i>
+</pre>
+
+<p>Další metoda <strong>SetRGB</strong> slouží pro nastavení barvy kreslení či
+výplně:</p>
+
+<pre>
+func (c *Context) <strong>SetRGB</strong>(r, g, b float64)
+    <i>SetRGB sets the current color using RGB values (0-1).</i>
+</pre>
+
+<p>A konečně metoda <strong>Fill</strong> vyplní uzavřený tvar (což obdélník
+je) zvolenou barvou:</p>
+
+<pre>
+func (c *Context) <strong>Fill</strong>() error
+    <i>Fill fills the current path and clears it. If a GPU accelerator is</i>
+    <i>registered and supports the path, it is used first. Otherwise, the software</i>
+    <i>renderer handles the operation. The RasterizerMode set via SetRasterizerMode</i>
+    <i>controls algorithm selection. Returns an error if the rendering operation</i>
+    <i>fails.</i>
+</pre>
+
+<p>Výsledkem je bílý obrázek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312956" data-alignment="center" data-link-type="modal">Obrázek #1312956 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312956">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312956" src="https://i.iinfo.cz/images/16/go-gg-1-2.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-2.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-2.png" data-large-width="320" data-large-height="240">
+<p class="description"> Obrázek 2: Obrázek s&nbsp;bílými pixely s&nbsp;explicitně nastavenou průhledností.</p>
+</div>
+</div>
+
+<p>Následuje výpis úplného zdrojového kódu druhého demonstračního příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 2:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vymazání obrázku vykreslením vyplněného obdélníku.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "02.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// vykreslování s využitím kontextu</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+</pre>
+
+
+
+<h2 id="k05">Vymazání plochy obrázku se specifikací použité barvy</h2>
+
+<p>Pokusme se nyní nastavit barvu vykreslování či výplně a poté zavolat metodu
+<strong>Clear</strong>:</p>
+
+<pre>
+<i>// vykreslování s využitím kontextu</i>
+dc.SetRGB(1.0, 1.0, 1.0)
+dc.Clear()
+</pre>
+
+<p>Výsledkem bude &ndash; možná poněkud překvapivě &ndash; obrázek
+s&nbsp;průhlednými pixely:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312959" data-alignment="center" data-link-type="modal">Obrázek #1312959 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312959">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312959" src="https://i.iinfo.cz/images/16/go-gg-1-3.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-3.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-3.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 3: Obrázek s&nbsp;průhlednými pixely (nejsou ovlivněny nastavenou barvou).</p>
+</div>
+</div>
+
+<p>Opět si pochopitelně uvedeme úplný zdrojový kód:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 3:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vymazání obrazovky (lepší varianta).</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "03.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// vykreslování s využitím kontextu</i>
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Clear()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Aby byla plocha obrázky vymazána zvolenu barvou, musí se namísto metody
+<strong>Context.Clear</strong> zavolat metoda se jménem
+<strong>Context.ClearWithColor</strong>:</p>
+
+<pre>
+func (c *Context) <strong>ClearWithColor</strong>(col RGBA)
+    <i>ClearWithColor fills the entire context with the specified color. This is</i>
+    <i>the recommended way to set a background color before drawing.</i>
+</pre>
+
+<p>Korektní postup může využívat barvu reprezentovanou strukturou
+<strong>gg.RGBA</strong>:</p>
+
+<pre>
+type <strong>RGBA</strong> struct {
+        R, G, B, A float64
+}
+    <i>RGBA represents a color with red, green, blue, and alpha components.</i>
+    <i>Each component is in the range [0, 1].</i>
+</pre>
+
+<p>To si pochopitelně můžeme velmi snadno otestovat:</p>
+
+<pre>
+<i>// vykreslování s využitím kontextu</i>
+color := gg.RGBA{R: 0.5, G: 0.9, B: 0.0, A: 0.5}
+dc.ClearWithColor(color)
+</pre>
+
+<p>Výsledek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312962" data-alignment="center" data-link-type="modal">Obrázek #1312962 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312962">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312962" src="https://i.iinfo.cz/images/16/go-gg-1-4.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-4.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-4.png" data-large-width="320" data-large-height="240">
+<p class="description"> Obrázek 4: Explicitně nastavená barva pixelů při smazání plochy obrázku.</p>
+</div>
+</div>
+
+<p>Následuje výpis úplného zdrojového kódu příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 4:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vymazání obrazovky (varianta se specifikací barvy).</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "04.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// vykreslování s využitím kontextu</i>
+        color := gg.RGBA{R: 0.5, G: 0.9, B: 0.0, A: 0.5}
+        dc.ClearWithColor(color)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Nastavení barvy a následné vymazání celé plochy obrázku lze zkrátit na
+jediný řádek:</p>
+
+<pre>
+<i>// vykreslování s využitím kontextu</i>
+dc.ClearWithColor(gg.RGBA{R: 0.5, G: 0.9, B: 0.0, A: 0.5})
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312965" data-alignment="center" data-link-type="modal">Obrázek #1312965 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312965">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312965" src="https://i.iinfo.cz/images/16/go-gg-1-5.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-5.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-5.png" data-large-width="320" data-large-height="240">
+<p class="description"> Obrázek 5: Explicitně nastavená barva pixelů při smazání plochy obrázku.</p>
+</div>
+</div>
+
+<p>Zdrojový kód v&nbsp;pořadí již pátého demonstračního příkladu vypadá
+takto:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 5:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vymazání obrazovky (varianta se specifikací barvy).</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "05.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// vykreslování s využitím kontextu</i>
+        dc.ClearWithColor(gg.RGBA{R: 0.5, G: 0.9, B: 0.0, A: 0.5})
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k06">Nastavení barvy kreslení bez specifikace průhlednosti i se specifikací průhlednosti</h2>
+
+<p>Barva použitá pro vykreslování a/nebo pro výplně je reprezentována
+v&nbsp;barvovém prostoru RGB, ovšem navíc je k&nbsp;ní přidána i informace o
+alfa kanálu (tedy průhlednost). Změna aktuálně nastavené barvy se v&nbsp;tom
+nejjednodušším případě (pokud nepotřebujeme například využít HSL) provádí
+metodou <strong>Context.SetRGB</strong> (tu jsme již použili) nebo
+<strong>Context.SetRGBA</strong>. Barvové složky i průhlednost jsou
+reprezentovány hodnotami se znaménkem s&nbsp;rozsahem 0,0 až 1,0:</p>
+
+<pre>
+func (c *Context) <strong>SetRGB</strong>(r, g, b float64)
+    <i>SetRGB sets the current color using RGB values (0-1).</i>
+</pre>
+
+<p>a:</p>
+
+<pre>
+func (c *Context) <strong>SetRGBA</strong>(r, g, b, a float64)
+    <i>SetRGBA sets the current color using RGBA values (0-1).</i>
+</pre>
+
+<p>Další demonstrační příklad vykreslí vzorník barev, u nichž se mění jejich
+červená a modrá složka, zatímco složka zelená je nastavená na 50%:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312968" data-alignment="center" data-link-type="modal">Obrázek #1312968 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312968">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312968" src="https://i.iinfo.cz/images/16/go-gg-1-6.png" width="256" height="256" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-6.png" data-prev-width="256" data-prev-height="256" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-6.png" data-large-width="256" data-large-height="256">
+<p class="description">Obrázek 6: Specifikace barvy vykreslování a výplně.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 6:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Práce s barvami.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 256
+        const height = 256
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "06.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        for y := range 16 {
+                for x := range 16 {
+                        <i>// nastavení barvy kreslení</i>
+                        dc.SetRGB(float64(x)/16.0, 0.5, float64(y)/16.0)
+                        <i>// vykreslení vyplněného obdélníka</i>
+                        dc.DrawRectangle(float64(x*16)+3, float64(y*16)+3, 10, 10)
+                        dc.Fill()
+                }
+        }
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Zajímavé bude zjistit, jakým způsobem se vykreslí černé čtverce, u kterých
+se postupně mění alfa složka od 0,0 do 1,0. Přesně tuto operaci provádíme
+v&nbsp;pořadí již sedmém demonstračním příkladu:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312971" data-alignment="center" data-link-type="modal">Obrázek #1312971 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312971">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312971" src="https://i.iinfo.cz/images/16/go-gg-1-7.png" width="256" height="256" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-7.png" data-prev-width="256" data-prev-height="256" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-7.png" data-large-width="256" data-large-height="256">
+<p class="description">Obrázek 7: Specifikace průhlednosti barvy vykreslování a výplně.</p>
+</div>
+</div>
+
+<p>Zdrojový kód tohoto příkladu má následující tvar:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 7:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Práce s barvami.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 256
+        const height = 256
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "07.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        for y := range 16 {
+                for x := range 16 {
+                        <i>// nastavení barvy kreslení</i>
+                        dc.SetRGBA(0.0, 0.0, 0.0, float64(x)/32.0+float64(y)/32.0)
+                        <i>// vykreslení vyplněného obdélníka</i>
+                        dc.DrawRectangle(float64(x*16)+3, float64(y*16)+3, 10, 10)
+                        dc.Fill()
+                }
+        }
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k07">Barvový prostor RGB a RGBA</h2>
+
+<p>Nastavení průhlednosti (alfa složky) na hodnotu 1,0 znamená, že barva bude
+při vykreslování zcela <strong>ne</strong>průhledná:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312974" data-alignment="center" data-link-type="modal">Obrázek #1312974 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312974">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312974" src="https://i.iinfo.cz/images/16/go-gg-1-8.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-8.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-8.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 8: Specifikace alfa složky barvy při vykreslování.</p>
+</div>
+</div>
+
+<p>V&nbsp;dnešním osmém demonstračním příkladu, je použita programová smyčka,
+která po svém spuštění vykreslí tři řady úseček, pokaždé s&nbsp;odlišnou
+barvou:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 8:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Barvový prostor RGB a RGBA.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "08.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 4 {
+                x := float64(i + 32)
+&nbsp;
+                <i>// barvové složky jsou hodnoty v rozsahu 0.0 až 1.0</i>
+                r := float64(i) / 256.0
+                dc.SetRGBA(r, 0.0, 0.0, 1.0)
+                dc.DrawLine(x, 20, x, 75)
+                dc.Stroke()
+&nbsp;
+                g := float64(i) / 256.0
+                dc.SetRGBA(0.0, g, 0.0, 1.0)
+                dc.DrawLine(x, 92, x, height-92)
+                dc.Stroke()
+&nbsp;
+                b := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, b, 1.0)
+                dc.DrawLine(x, height-75, x, height-20)
+                dc.Stroke()
+        }
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>V&nbsp;případě, že se namísto metody <strong>SetRGB</strong> použije pro
+nastavení barvy vykreslování metoda nazvaná <strong>SetRGBA</strong>, je možné,
+jak již víme, specifikovat i průhlednost vykreslovaných pixelů. I hodnota
+průhlednosti (<i>alfa kanál</i>) většinou leží v&nbsp;rozsahu od 0,0 do 1,0,
+takže je možné použít například následující úryvek kódu určený pro vykreslení
+třiceti dvou svislých úseček, každou se stejnou barvou (v&nbsp;tomto případě
+černou barvou), ale s&nbsp;odlišnou průhledností. Úsečka zcela nalevo je na
+100% průhledná, zatímco úsečka napravo je neprůhledná:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 8 {
+        x := float64(i + 32)
+        <i>// průhlednost je hodnota v rozsahu 0.0 až 1.0</i>
+        alpha := float64(i) / 256.0
+        dc.<strong>SetRGBA</strong>(0.0, 0.0, 0.0, alpha)
+&nbsp;
+        dc.DrawLine(x, 20, x, height/2-20)
+        dc.Stroke()
+}
+</pre>
+
+<p>Ve skutečnosti ovšem bude demonstrační příklad, na němž bude ukázána práce
+s&nbsp;průhledností, nepatrně složitější, neboť si ukážeme, jaký vliv má
+hodnota <i>alfa</i> pro černé úsečky kreslené na bílém pozadí i pro bílé úsečky
+kreslené na pozadí černém. Pozadí má přitom v&nbsp;obou případech (bez ohledu
+na barvu) nastavenou průhlednost na nulu, takže by měl výsledek vypadat
+následovně:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312977" data-alignment="center" data-link-type="modal">Obrázek #1312977 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312977">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312977" src="https://i.iinfo.cz/images/16/go-gg-1-9.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-9.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-9.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 9: Specifikace alfa složky barvy při vykreslování.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 9:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Barvový prostor RGB a RGBA.</i>
+<i>//    Alfa kanál v barvovém prostoru RGBA.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "09.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height/2)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, height/2, width, height)
+        dc.SetRGB(0.0, 0.0, 0.0)
+        dc.Fill()
+&nbsp;
+        for i := 0; i &lt; 256; i += 8 {
+                x := float64(i + 32)
+&nbsp;
+                <i>// průhlednost je hodnota v rozsahu 0.0 až 1.0</i>
+                alpha := float64(i) / 256.0
+                dc.SetRGBA(0.0, 0.0, 0.0, alpha)
+&nbsp;
+                dc.DrawLine(x, 20, x, height/2-20)
+&nbsp;
+                dc.Stroke()
+&nbsp;
+                dc.SetRGBA(1.0, 1.0, 1.0, alpha)
+                dc.DrawLine(x, height/2+20, x, height-20)
+                dc.Stroke()
+        }
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k08">Specifikace šířky vykreslovaných obrysů</h2>
+
+<p>Při vykreslování obrysů popř.&nbsp;i jednotlivých úseček (či oblouků, cest
+atd.) je možné modifikovat i šířku stopy použité při rasterizaci a renderingu.
+Ta se udává &ndash; ostatně podobně jako naprostá většina ostatních numerických
+hodnot v&nbsp;knihovně GG &ndash; datovým typem <strong>float64</strong>,
+protože je použita subpixelová přesnost a navíc může být šířka modifikována
+nastavením měřítka odlišného od hodnoty 1,00. Pro nastavení šířky obrysů se
+nejčastěji používá metoda nazvaná <strong>SetLineWidth</strong>:</p>
+
+<pre>
+func (c *Context) <strong>SetLineWidth</strong>(width float64)
+    <i>SetLineWidth sets the line width for stroking.</i>
+</pre>
+
+<p>Použití této metody je přímočaré:</p>
+
+<pre>
+for i := 0; i &lt; 256; i += 16 {
+        width := float64(i) / 20
+        dc.<strong>SetLineWidth</strong>(width)
+&nbsp;
+        x := float64(i + 32)
+        dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+        dc.Stroke()
+}
+</pre>
+
+<p>Samozřejmě si opět ukážeme, jakým způsobem se tato metoda použije
+v&nbsp;uceleném příkladu, který po svém spuštění vykreslí následující
+obrázek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312980" data-alignment="center" data-link-type="modal">Obrázek #1312980 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312980">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312980" src="https://i.iinfo.cz/images/16/go-gg-1-10.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-10.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-10.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 10: Modifikace šířky stopy.</p>
+</div>
+</div>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, jakým způsobem jsou stopy
+úseček ukončeny i toho, že u širších úseček stopa končí až za zadaným koncovým
+bodem (vrcholem).</div></p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 9:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Nastavení šířky vykreslovaných úseček a křivek.</i>
+<i>//</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "10.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        for i := 0; i &lt; 256; i += 16 {
+                width := float64(i) / 20
+                dc.SetLineWidth(width)
+&nbsp;
+                x := float64(i + 32)
+                dc.DrawLine(x, 20, x, height-20)
+&nbsp;
+                dc.Stroke()
+        }
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k09">Styl ukončení křivek i úseček, styl vykreslování (čárkované a čerchované stopy)</h2>
+
+<p>U otevřených geometrických tvarů, tj.&nbsp;především u cest a lomených čar,
+je možné specifikovat i způsob jejich zakončení. Uzavřené tvary,
+tj.&nbsp;kružnice, elipsy, obdélníky či obecné mnohoúhelníky žádný jasně
+definovaný konec nemají, proto na ně nebude mít nastavení stylu ukončení žádný
+význam. V&nbsp;knihovně GG, podobně jako v&nbsp;mnoha dalších podobně
+koncipovaných knihovnách (ostatně i v&nbsp;SVG) je možné specifikovat tři
+způsoby ukončení <i>stopy</i> otevřených tvarů, které jsou specifikovány
+datovým typem <strong>LineCap</strong> odvozeného od základního celočíselného
+datového typu <strong>int</strong>:</p>
+
+<table>
+<tr><th>Hodnota</th><th>Význam</th></tr>
+<tr><td>LineCapRound</td><td>ukončení obrysu či cesty kruhovým obloukem (obecně dochází k&nbsp;prodloužení tvaru)</td></tr>
+<tr><td>LineCapButt</td><td>ukončení obrysu či cesty kolmým řezem v místě koncových bodů (tvar končí přesně na koncovém bodu/vrcholu)</td></tr>
+<tr><td>LineCapSquare</td><td>ukončení obrysu či cesty kolmým řezem vzdáleným od koncových bodů o 1/2 šířky cesty (dochází tak opět k&nbsp;prodloužení tvaru)</td></tr>
+</table>
+
+<p>Pro nastavení stylu ukončení je možné použít buď metodu nazvanou jednoduše
+<strong>SetLineCap</strong>, které se potřebný styl předá v&nbsp;parametru:</p>
+
+<pre>
+func (dc *Context) <strong>SetLineCap</strong>(lineCap LineCap)
+</pre>
+
+<p>V&nbsp;dalším demonstračním příkladu je vliv nastaveného stylu ukončení
+ukázán na úsečkách s&nbsp;rozdílnou šířkou stopy. Povšimněte si vodorovných
+úseček, které naznačují, na kterém místě leží koncové body (vrcholy) &ndash; je
+patrné, že v&nbsp;některých případech je tvar úsečky skutečně přetažen přes
+koncový bod:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312983" data-alignment="center" data-link-type="modal">Obrázek #1312983 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312983">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312983" src="https://i.iinfo.cz/images/16/go-gg-1-11.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-11.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-11.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 11: Modifikace stylu zakončení kreslené stopy.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 11:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Nastavení stylu konců úseček.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "11.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+&nbsp;
+        dc.SetLineWidth(10.0)
+&nbsp;
+        for i := 0; i &lt; 256; i += 16 {
+                x := float64(i + 32)
+&nbsp;
+                width := float64(i) / 20
+                dc.SetLineWidth(width)
+&nbsp;
+                <i>// nastavení stylů obou konců úsečky</i>
+                dc.SetLineCap(gg.LineCapRound)
+                dc.DrawLine(x, 20, x, 75)
+                dc.Stroke()
+&nbsp;
+                <i>// nastavení stylů obou konců úsečky</i>
+                dc.SetLineCap(gg.LineCapButt)
+                dc.DrawLine(x, 92, x, height-92)
+                dc.Stroke()
+&nbsp;
+                <i>// nastavení stylů obou konců úsečky</i>
+                dc.SetLineCap(gg.LineCapSquare)
+                dc.DrawLine(x, height-75, x, height-20)
+                dc.Stroke()
+        }
+&nbsp;
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.SetLineWidth(1.0)
+&nbsp;
+        dc.DrawLine(32, 20, width-32, 20)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, 75, width-32, 75)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, 92, width-32, 92)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-92, width-32, height-92)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-75, width-32, height-75)
+        dc.Stroke()
+&nbsp;
+        dc.DrawLine(32, height-20, width-32, height-20)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Při kresbě liniových obrazců nebo okrajů plošných obrazců je možné zvolit
+vzorek (styl) úseček &ndash; plná (výchozí nastavení), čárkovaná, čerchovaná,
+střídavá apod. K&nbsp;nastavení vzorku vykreslení úsečky slouží metoda se
+jménem <strong>SetDash</strong>. Parametrem této metody je seznam délek
+vykreslených segmentů prokládaných délkami segmentů nevykreslených:</p>
+
+<pre>
+func (dc *Context) <strong>SetDash</strong>(dashes ...float64)
+</pre>
+
+<p>Nastavit je možné i posun (<i>offset</i>) celého vzorku, a to konkrétně
+metodou <strong>SetDashOffset</strong>:</p>
+
+<pre>
+func (dc *Context) <strong>SetDashOffset</strong>(offset float64)
+</pre>
+
+<p>Podívejme se na několik jednoduchých příkladů.</p>
+
+<p>Čárkovaná čára s&nbsp;délkami úseček deset jednotek (při standardním měřítku
+pixelů):</p>
+
+<pre>
+dc.SetDash(10)
+dc.DrawLine(32, 40, 288, 40)
+dc.Stroke()
+</pre>
+
+<p>Má stejný význam &ndash; délka čárek je stejná jako šířka mezer:</p>
+
+<pre>
+dc.SetDash(10, 10)
+dc.DrawLine(32, 60, 288, 60)
+dc.Stroke()
+</pre>
+
+<p>Čerchovaná úsečka &ndash; čárky mají délku deseti jednotek, mezery pět
+jednotek a tečka je dlouhá dvě jednotky:</p>
+
+<pre>
+dc.SetDash(10, 5, 2, 5)
+dc.DrawLine(32, 220, 288, 220)
+dc.Stroke()
+</pre>
+
+<p>Opět si pochopitelně ukážeme příklad, který vykreslí tento obrázek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312986" data-alignment="center" data-link-type="modal">Obrázek #1312986 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312986">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312986" src="https://i.iinfo.cz/images/16/go-gg-1-12.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-12.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-12.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 12: Změna stylu vykreslování stop.</p>
+</div>
+</div>
+
+<p>Zdrojový kód tohoto demonstračního příkladu vypadá takto:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 12:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Nastavení stylu vykreslovaných úseček.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "12.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        <i>// šířka vykreslení úsečky</i>
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        <i>// styl vykreslení úsečky</i>
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k10">Práce s&nbsp;cestami (<i>paths</i>)</h2>
+
+<p>V&nbsp;této kapitole se zmíníme i o důležitém konceptu takzvaných cest
+(<i>paths</i>), protože z&nbsp;cest jsou složeny prakticky všechny složitěji
+tvarované dvourozměrné objekty, ať již se jedná o objekty otevřené či naopak o
+objekty uzavřené. Každá cesta se skládá z&nbsp;prakticky libovolného množství
+takzvaných segmentů (<i>segments</i>), přičemž je zajímavé, že jednotlivé
+segmenty na sebe mohou, ale také nemusí navazovat (cesta tedy může
+v&nbsp;případě potřeby obsahovat i &bdquo;skoky&ldquo;). Použití cest v&nbsp;2D
+grafice samozřejmě není nic nového; spíš by se dalo říci, že se jedná o dlouhým
+časem prověřenou technologii použitou například <a
+href="http://www.root.cz/clanky/vytvarime-krivky-v-postscriptu/">v&nbsp;PostScriptu</a>
+či ve vektorovém formátu <a
+href="http://www.root.cz/clanky/vlastnosti-cest-a-zakladnich-geometrickych-tvaru-v-svg/">SVG</a>
+(PostScript lze přitom chápat jako souborový formát, grafický metaformát,
+programovací jazyk a současně i vykreslovací či možná lépe řečeno renderovací
+knihovnu).</p>
+
+<p>Datový typ <strong>gg.Context</strong> programátorům nabízí poměrně velké
+množství příkazů určených pro definici segmentů cest. Jednotlivé typy segmentů
+budou podrobněji popsány v&nbsp;navazujících kapitolách, proto si zde pouze
+uveďme jednotlivé metody a jejich význam:</p>
+
+<table>
+<tr><th>#</th><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>ClosePath</td><td>uzavření cesty nakreslením úsečky do jejího počátečního vrcholu</td></tr>
+<tr><td>2</td><td>MoveTo</td><td>přesun aktivního bodu bez kreslení</td></tr>
+<tr><td>3</td><td>LineTo</td><td>lineární segment (úsečka), aktivní bod se přesune na konec úsečky</td></tr>
+<tr><td>4</td><td>QuadraticTo</td><td>kvadratická Bézierova křivka (jeden segment), aktivní bod se přesune na konec křivky</td></tr>
+<tr><td>5</td><td>CubicTo</td><td>kubická Bézierova křivka (jeden segment), aktivní bod se opět přesune na konec křivky</td></tr>
+</table>
+
+<p>Hlavičky těchto metod lze pochopitelně najít v&nbsp;nápovědě:</p>
+
+<pre>
+func (c *Context) <strong>ClosePath</strong>()
+    <i>ClosePath closes the current subpath.</i>
+&nbsp;
+func (c *Context) <strong>MoveTo</strong>(x, y float64)
+    <i>MoveTo starts a new subpath at the given point.</i>
+&nbsp;
+func (c *Context) <strong>LineTo</strong>(x, y float64)
+    <i>LineTo adds a line to the current path.</i>
+&nbsp;
+func (c *Context) <strong>QuadraticTo</strong>(cx, cy, x, y float64)
+    <i>QuadraticTo adds a quadratic Bezier curve to the current path.</i>
+&nbsp;
+func (c *Context) <strong>CubicTo</strong>(c1x, c1y, c2x, c2y, x, y float64)
+    <i>CubicTo adds a cubic Bezier curve to the current path.</i>
+</pre>
+
+<p>Ukažme si nyní relativně jednoduchý demonstrační příklad, který po svém
+spuštění vykreslí domek jedním tahem. Pro tento účel nám poslouží metody
+nazvané <strong>MoveTo</strong> (přesun do počátečního bodu kreslení) a
+<strong>LineTo</strong> (kreslení úsečkového segmentu):</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312989" data-alignment="center" data-link-type="modal">Obrázek #1312989 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312989">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312989" src="https://i.iinfo.cz/images/16/go-gg-1-13.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-13.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-13.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 13: Domek vykreslený jedním tahem je složený z&nbsp;liniových segmentů (úseček).</p>
+</div>
+</div>
+
+<p>Následuje výpis zdrojového kódu tohoto příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 13:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Práce s cestou (path).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "13.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(100, 200)
+        dc.LineTo(200, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(100, 200)
+        dc.LineTo(200, 100)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+&nbsp;
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k11">Otevřené a uzavřené cesty</h2>
+
+<p>Předchozí příklad si nepatrně upravíme takovým způsobem, že vykreslíme pouze
+obrys domku. Celá cesta reprezentující obrys tedy může být zapsána takto:</p>
+
+<pre>
+dc.MoveTo(100, 200)
+dc.LineTo(100, 100)
+dc.LineTo(150, 50)
+dc.LineTo(200, 100)
+dc.LineTo(200, 200)
+dc.LineTo(100, 200)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312992" data-alignment="center" data-link-type="modal">Obrázek #1312992 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312992">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312992" src="https://i.iinfo.cz/images/16/go-gg-1-14.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-14.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-14.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 14: Pět lineárních segmentů (úseček) ve skutečnosti tvoří otevřenou cestu.</p>
+</div>
+</div>
+
+<p>Celý příklad:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 14:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Otevřená cesta (open path).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "14.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(100, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+        dc.LineTo(100, 200)
+&nbsp;
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Ve skutečnosti však můžeme cestu uzavřít korektně pomocí metody
+<strong>ClosePath</strong>. Samotná deklarace cesty se tedy změní takto:</p>
+
+<pre>
+dc.MoveTo(100, 200)
+dc.LineTo(100, 100)
+dc.LineTo(150, 50)
+dc.LineTo(200, 100)
+dc.LineTo(200, 200)
+dc.ClosePath()
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312995" data-alignment="center" data-link-type="modal">Obrázek #1312995 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312995">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312995" src="https://i.iinfo.cz/images/16/go-gg-1-15.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-15.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-15.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 15: Uzavřená cesta.</p>
+</div>
+</div>
+
+<p>Upravená varianta zdrojového kódu příkladu nyní vypadá takto:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 15:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Uzavřená cesta (closed path).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "15.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(100, 200)
+        dc.LineTo(100, 100)
+        dc.LineTo(150, 50)
+        dc.LineTo(200, 100)
+        dc.LineTo(200, 200)
+        dc.ClosePath()
+&nbsp;
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k12">Složitější cesty založené na kvadratických a kubických Bézierových křivkách</h2>
+
+<p>Při tvorbě cest jsou podporovány jak kvadratické, tak i kubické Bézierovy
+křivky, což je jen dobře, protože kvadratické křivky jsou často používány
+například při definici fontů zatímco křivky kubické najdeme například
+v&nbsp;mnoha vektorových grafických editorech a tím pádem i v&nbsp;souborech
+exportovaných z&nbsp;těchto nástrojů. Bézierovy kvadratické křivky jsou určeny
+pouze jedním řídicím bodem a dvojicí bodů kotvicích (koncových). Křivka vždy
+prochází prvním a třetím bodem (kotvicí body), druhý bod (řídicí) určuje
+současně oba tečné vektory. Ukázka Bézierovy kvadratické křivky spolu
+s&nbsp;jejími určujícími body je zobrazena na následujícím obrázku:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1312998" data-alignment="center" data-link-type="modal">Obrázek #1312998 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1312998">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1312998" src="https://i.iinfo.cz/images/16/go-gg-1-16.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-16.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-16.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 16: Bézierovy kvadratické křivky.</p>
+</div>
+</div>
+
+<p>Následuje příklad cesty vytvořené jedinou Bézierovou kvadratickou křivkou.
+Povšimněte si nutnosti použít metody <strong>MoveTo</strong> pro specifikaci
+počátečního bodu křivky, protože v&nbsp;metodě <strong>QuadraticTo</strong> se
+uvádí pouze dvojice bodů:</p>
+
+<pre>
+dc.MoveTo(10, 150)
+dc.QuadraticTo(50, 10, 90, 150)
+dc.Stroke()
+</pre>
+
+<p>Hladké napojení Bézierových kvadratických křivek lze zajistit zadáním
+identického koncového bodu první křivky a počátečního bodu křivky druhé.
+Současně musí být shodné tečné vektory v&nbsp;těchto bodech,
+tj.&nbsp;prostřední (řídicí) body musí být středově symetrické okolo společného
+bodu obou křivek.</p>
+
+<p>Kubické Bézierovy křivky většina uživatelů používajících vektorové grafické
+editory již pravděpodobně velmi dobře zná (ale nalezneme je i v&nbsp;rastrových
+grafických editorech). Připomeňme si tedy, že tyto křivky jsou definovány
+počátečním bodem, koncovým bodem a dvojicí řídicích bodů (těmi křivka sice
+obecně neprochází, tyto body však ovlivňují její tvar). Větší množství řídicích
+bodů dává uživatelům i větší možnosti tvarování křivky, protože je možné
+vytvořit i esíčko, smyčku atd.</p>
+
+<p>Ve&nbsp;knihovně GG se tyto křivky (resp.&nbsp;přesněji řečeno segmenty
+složené z&nbsp;kubických Bézierových křivek) přidávají do cesty s&nbsp;využitím
+metody <strong>CubicTo</strong>, přičemž tato metoda očekává tři body (přesněji
+šestici souřadnic), protože počáteční bod již známe &ndash; je jím dočasný
+poslední bod aktuálně vytvářené cesty.</p>
+
+
+
+<h2 id="k13">Vykreslení kvadratických Bézierových křivek</h2>
+
+<p>Další demonstrační příklad, který si dnes ukážeme, vykreslí trojici
+Bézierových kvadratických křivek:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 16:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Kvadratická Bézierova křivka.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "16.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(10, 150)
+        dc.QuadraticTo(50, 10, 90, 150)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(0.0, 1.0, 0.0, 1.0)
+        dc.MoveTo(110, 100)
+        dc.QuadraticTo(190, 100, 150, 190)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(0.0, 0.0, 1.0, 1.0)
+        dc.MoveTo(250, 150)
+        dc.QuadraticTo(210, 60, 290, 150)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Předchozí příklad je možné snadno upravit takovým způsobem, aby se
+vykreslila nejenom samotná Bézierova křivka, ale současně se zobrazily i její
+řídicí body a tečné vektory:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313001" data-alignment="center" data-link-type="modal">Obrázek #1313001 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313001">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313001" src="https://i.iinfo.cz/images/16/go-gg-1-17.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-17.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-17.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 17: Bézierovy kvadratické křivky i se svými řídicími body.</p>
+</div>
+</div>
+
+<p>Toto vylepšení je implementováno ve funkci
+<strong>drawQuadraticBezier</strong>, kterou nalezneme v&nbsp;dalším
+příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 17:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Kvadratická Bézierova křivka s řídicími body.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>drawQuadraticBezier</strong>(dc *gg.Context, x0 float64, y0 float64, x1 float64, y1 float64, x2 float64, y2 float64) {
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.QuadraticTo(x1, y1, x2, y2)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+&nbsp;
+        dc.DrawCircle(x0, y0, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "17.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawQuadraticBezier(dc, 10, 150, 50, 10, 90, 150)
+        drawQuadraticBezier(dc, 110, 100, 190, 100, 150, 190)
+        drawQuadraticBezier(dc, 250, 150, 210, 60, 290, 150)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k14">Vykreslení kubických Bézierových křivek</h2>
+
+<p>Kubickou Bézierovu křivku (pokud nebude navazovat na další segmenty) lze
+vykreslit snadno. Nejdříve se samostatně zadá první kotvicí bod a následně
+trojice bodů (jeden kotvicí a dva řídicí):</p>
+
+<pre>
+<i>// cesta</i>
+dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+dc.MoveTo(10, 180)
+dc.CubicTo(10, 10, 120, 180, 120, 10)
+<i>// vlastní vykreslení cesty</i>
+dc.Stroke()
+</pre>
+
+<p>V&nbsp;dalším demonstračním příkladu se vykreslí trojice Bézierových
+křivek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313004" data-alignment="center" data-link-type="modal">Obrázek #1313004 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313004">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313004" src="https://i.iinfo.cz/images/16/go-gg-1-18.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-18.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-18.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 18: Bézierovy kubické křivky.</p>
+</div>
+</div>
+
+<p>Zdrojový kód takto upraveného příkladu se příliš neliší od příkladů
+z&nbsp;předchozí kapitoly:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 18:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Kubická Bézierova křivka.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "18.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        <i>// pozadí obrázku</i>
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(1.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(10, 180)
+        dc.CubicTo(10, 10, 120, 180, 120, 10)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(0.0, 1.0, 0.0, 1.0)
+        dc.MoveTo(110, 180)
+        dc.CubicTo(190, 100, 80, 100, 160, 180)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// cesta</i>
+        dc.SetRGBA(0.0, 0.0, 1.0, 1.0)
+        dc.MoveTo(230, 180)
+        dc.CubicTo(280, 60, 230, 60, 280, 180)
+        <i>// vlastní vykreslení cesty</i>
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Na závěr této části si ukažme, jak se provede úprava příkladu tak, aby se
+vykreslily řídicí body i tečné vektory kubických Bézierových křivek:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313007" data-alignment="center" data-link-type="modal">Obrázek #1313007 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313007">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313007" src="https://i.iinfo.cz/images/16/go-gg-1-19.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-19.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-19.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 19: Řídicí body a tečné vektory Bézierových kubických křivek.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313010" data-alignment="center" data-link-type="modal">Obrázek #1313010 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313010">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313010" src="https://i.iinfo.cz/images/16/go-gg-1-20.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-20.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-20.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 20: Řídicí body a tečné vektory Bézierovy kubické křivky.</p>
+</div>
+</div>
+
+<p>Zdrojový kód demonstračního příkladu se v&nbsp;tomto případě změní
+následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 19:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Kubická Bézierova křivka s řídicími body.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import "github.com/gogpu/gg"
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+&nbsp;
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName1 = "19_1.png"
+        const fileName2 = "19_2.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+        <i>// vymazání obrázku</i>
+        clearCanvas(dc, width, height)
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawCubicBezier(dc, 10, 180, 10, 10, 120, 180, 120, 10)
+        drawCubicBezier(dc, 230, 180, 280, 60, 230, 60, 280, 180)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName1)
+&nbsp;
+        <i>// vymazání obrázku</i>
+        clearCanvas(dc, width, height)
+&nbsp;
+        <i>// vykreslení cesty</i>
+        drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName2)
+}
+</pre>
+
+
+
+<h2 id="k15">Rotace Bézierových křivek s&nbsp;využitím transformace zadané metodou <strong>RotateAbout</strong></h2>
+
+<p>Řídicí body Bézierovy křivky (ale i všechny další vykreslované tvary) je
+možné podrobit afinní transformaci (posun, rotace, změna měřítka). Výsledkem
+aplikace transformace <i>pouze na řídicí body</i> bude po vykreslení zcela
+korektně transformovaná Bézierova křivka, což je samozřejmě výhodné, protože je
+rychlejší transformovat tři nebo čtyři body a nikoli všechny body, z&nbsp;nichž
+se skládají segmenty křivky:</p>
+
+<pre>
+func (c *Context) <strong>RotateAbout</strong>(angle, x, y float64)
+    <i>RotateAbout rotates around a specific point.</i>
+</pre>
+
+<p>Jednotlivé transformace se skládají (což si ukážeme v&nbsp;dalším textu),
+takže v&nbsp;případě, že má být realizováno otočení o absolutní úhel, musí se
+před natočením uložit poslední stav grafického kontextu na zásobník a po
+provedení transformace a vykreslení opět tento stav obnovit. K&nbsp;těmto
+operacím se používají metody <strong>Push</strong> a <strong>Pop</strong>.
+Povšimněte si, že se neukládá pouze aktuálně vypočtená transformace, ale i
+další stav vykreslovacího řetězce:</p>
+
+<pre>
+func (c *Context) <strong>Push</strong>()
+    Push saves the current state (transform, paint, clip, and mask).
+&nbsp;
+func (c *Context) <strong>Pop</strong>()
+    Pop restores the last saved state.
+</pre>
+
+<p>V&nbsp;příkladu je navíc použita i pomocná funkce pro převod úhlů na
+radiány:</p>
+
+<pre>
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+</pre>
+
+<p>Další demonstrační příklad po svém spuštění vytvoří několik snímků
+s&nbsp;různě natočenou Bézierovou kubikou. Význam metody
+<strong>RotateAbout</strong> je vysvětlen v&nbsp;navazujícím textu:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313016" data-alignment="center" data-link-type="modal">Obrázek #1313016 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313016">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313016" src="https://i.iinfo.cz/images/16/go-gg-1-22.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-22.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-22.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 21: Rotace Bézierovy křivky, jejích koncových bodů, obalové křivky atd.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313019" data-alignment="center" data-link-type="modal">Obrázek #1313019 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313019">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313019" src="https://i.iinfo.cz/images/16/go-gg-1-23.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-23.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-23.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 22: Rotace Bézierovy křivky, jejích koncových bodů, obalové křivky atd.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313022" data-alignment="center" data-link-type="modal">Obrázek #1313022 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313022">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313022" src="https://i.iinfo.cz/images/16/go-gg-1-24.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-24.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-24.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 23: Rotace Bézierovy křivky, jejích koncových bodů, obalové křivky atd.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313025" data-alignment="center" data-link-type="modal">Obrázek #1313025 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313025">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313025" src="https://i.iinfo.cz/images/16/go-gg-1-25.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-25.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-25.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 24: Rotace Bézierovy křivky, jejích koncových bodů, obalové křivky atd.</p>
+</div>
+</div>
+
+<p>Výše zobrazené Bézierovy křivky byly vykresleny tímto příkladem:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 20:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Rotace vykreslovaných objektů.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        for alpha := 0; alpha &lt; 360; alpha += 30 {
+                clearCanvas(dc, width, height)
+                <i>// transformace a vykreslení</i>
+                dc.Push()
+                dc.RotateAbout(Radians(float64(alpha)), width/2, height/2)
+                drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+                dc.Pop()
+                filename := fmt.Sprintf("20_%03d.png", alpha)
+                dc.SavePNG(filename)
+        }
+&nbsp;
+}
+</pre>
+
+
+
+<h2 id="k16">Převod sekvence snímků na animaci ve formátu GIF</h2>
+
+<p>V&nbsp;této kapitole si vysvětlíme, jakým způsobem vznikla následující
+jednoduchá animace:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313250" data-alignment="center" data-link-type="modal">Obrázek #1313250 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313250">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313250" src="https://i.iinfo.cz/images/34/go-gg-1-anim.gif" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/34/go-gg-1-anim.gif" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/34/go-gg-1-anim.gif" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 25: Rotace Bézierovy křivky.</p>
+</div>
+</div>
+
+<p>Využijeme zde kombinaci technik implementovaných ve standardních knihovnách
+<strong>image/draw</strong> a <strong>image/gif</strong> s&nbsp;knihovnou
+<strong>gogpu/gg</strong>.</p>
+
+<p>V&nbsp;animaci se používá rotace okolo zadaného bodu. Používáme zde metody
+<strong>Push</strong> a <strong>Pop</strong> pro uložení a pro následné
+obnovení tvaru transformační matice:</p>
+
+<pre>
+for alpha := 0; alpha &lt; 360; alpha += 5 {
+        clearCanvas(dc, width, height)
+        dc.Push()
+        dc.RotateAbout(Radians(float64(alpha)), width/2, height/2)
+        ...
+        <i>vykreslení</i>
+        ...
+        dc.Pop()
+}
+</pre>
+
+<p>Po vykreslení získáme z&nbsp;kontextu knihovny GG vlastní rastrový obrázek,
+převedeme ho na obrázek s&nbsp;barvovou paletou (pomocí nám již známé funkce
+<strong>Draw</strong> ze standardní knihovny <strong>image/draw</strong>) a
+uložíme ho do pole obrázků:</p>
+
+<pre>
+package draw <i>// import "image/draw"</i>
+&nbsp;
+func <strong>Draw</strong>(dst Image, r image.Rectangle, src image.Image, sp image.Point, op Op)
+    <i>Draw calls DrawMask with a nil mask.</i>
+</pre>
+
+<p>Současně inicializujeme i pole s&nbsp;časy přechodu mezi jednotlivými
+snímky:</p>
+
+<pre>
+sourceImage := dc.Image()
+palettedImage := image.NewPaletted(image.Rect(0, 0, width, height), palette.Plan9)
+draw.Draw(palettedImage, palettedImage.Rect, sourceImage, image.ZP, draw.Over)
+images = append(images, palettedImage)
+delays = append(delays, 10)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;našem demonstračním příkladu se
+ve skutečnosti nepracuje přímo s&nbsp;poli, ale s&nbsp;řezy (<i>slice</i>),
+které ovšem interně pole používají.</div></p>
+
+<p>A nakonec je nutné všechny snímky vyexportovat do formátu GIF, a to
+konkrétně pomocí funkce <strong>EncodeAll</strong> ze standardní knihovny
+<strong>image/gif</strong>:</p>
+
+<pre>
+package gif <i>// import "image/gif"</i>
+&nbsp;
+func <strong>EncodeAll</strong>(w io.Writer, g *GIF) error
+    <i>EncodeAll writes the images in g to w in GIF format with the given loop</i>
+    <i>count and delay between frames.</i>
+</pre>
+
+<p>Realizace je uložení celé animace snadná:</p>
+
+<pre>
+<i>// uložení sekvence obrázků</i>
+outfile, err := os.Create(fileName)
+if err != nil {
+        panic(err)
+}
+defer outfile.Close()
+&nbsp;
+gif.EncodeAll(outfile, &amp;gif.GIF{
+        Image: images,
+        Delay: delays,
+})
+</pre>
+
+<p>Následuje výpis celého zdrojového kódu tohoto demonstračního příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 21:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Rasterizace do zvoleného rastrového formátu.</i>
+<i>//    Výsledkem bude animovaný GIF.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "image"
+        "image/color/palette"
+        "image/draw"
+        "image/gif"
+        "math"
+        "os"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        dc.Stroke()
+}
+&nbsp;
+func <strong>clearCanvas</strong>(dc *gg.Context, width float64, height float64) {
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+}
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "21.gif"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        var images []*image.Paletted
+        var delays []int
+&nbsp;
+        for alpha := 0; alpha &lt; 360; alpha += 5 {
+                clearCanvas(dc, width, height)
+                dc.Push()
+                dc.RotateAbout(Radians(float64(alpha)), width/2, height/2)
+                drawCubicBezier(dc, 130, 180, 210, 100, 100, 100, 180, 180)
+                dc.Pop()
+                sourceImage := dc.Image()
+                palettedImage := image.NewPaletted(image.Rect(0, 0, width, height), palette.Plan9)
+                draw.Draw(palettedImage, palettedImage.Rect, sourceImage, image.ZP, draw.Over)
+                images = append(images, palettedImage)
+                delays = append(delays, 10)
+                fmt.Println(alpha, "of", 360)
+        }
+&nbsp;
+        <i>// uložení sekvence obrázků</i>
+        outfile, err := os.Create(fileName)
+        if err != nil {
+                panic(err)
+        }
+        defer outfile.Close()
+&nbsp;
+        gif.EncodeAll(outfile, &amp;gif.GIF{
+                Image: images,
+                Delay: delays,
+        })
+}
+</pre>
+
+
+
+<h2 id="k17">Lineární transformace aplikované při vykreslování 2D tvarů</h2>
+
+<p>Všechny vykreslované úsečky a cesty jsou před vlastním renderingem podrobeny
+afinní transformaci: rotaci, změně měřítka, posunu, popř.&nbsp;libovolné
+kombinaci transformací (zkosení atd.). První metodou pro zadání transformace je
+metoda nazvaná <strong>Rotate</strong>, která provádí rotaci okolo počátku
+souřadné soustavy (to je důležité):</p>
+
+<pre>
+func (c *Context) <strong>Rotate</strong>(angle float64)
+    Rotate applies a rotation (angle in radians).
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313049" data-alignment="center" data-link-type="modal">Obrázek #1313049 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313049">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313049" src="https://i.iinfo.cz/images/16/go-gg-1-33.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-33.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-33.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 26: Rotace okolo počátku souřadné soustavy.</p>
+</div>
+</div>
+
+<p>V&nbsp;dalším demonstračním příkladu si povšimněte toho, že pro převod
+radiánů na stupně můžeme použít funkci <strong>Radians</strong>:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 22:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Transformace (rotace).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "22.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.Rotate(Radians(15.0))
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Mnohem častější bývá požadavek na rotaci okolo zvoleného bodu, nejenom okolo
+počátku souřadné soustavy. Zde využijeme metodu pojmenovanou příhodně
+<strong>RotateAbout</strong>:</p>
+
+<pre>
+func (c *Context) <strong>RotateAbout</strong>(angle, x, y float64)
+    <i>RotateAbout rotates around a specific point.</i>
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313052" data-alignment="center" data-link-type="modal">Obrázek #1313052 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313052">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313052" src="https://i.iinfo.cz/images/16/go-gg-1-34.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-34.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-34.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 27: Rotace okolo zvoleného bodu.</p>
+</div>
+</div>
+
+<p>Příklad, který tuto metodu používá, vypadá následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 23:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Transformace (rotace okolo zvoleného bodu).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "23.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.RotateAbout(Radians(15.0), width/2.0, height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Pro změnu měřítka se používá metoda pojmenovaná <strong>Scale</strong>
+(druhá metoda <strong>ScaleAbout</strong> prozatím chybí). Změnu měřítka
+většinou potřebujeme vztáhnout k&nbsp;jakémukoli bodu v&nbsp;ploše, nejenom
+tedy k&nbsp;počátku souřadné soustavy. V&nbsp;takovém případě lze použít
+<i>skládání transformací</i> &ndash; provede se posun do počátku souřadné
+soustavy, změní se měřítko a následně se provede zpětný posun:</p>
+
+<pre>
+        dc.Translate(width/2.0, height/2.0)
+        dc.Scale(2.0, 2.0)
+        dc.Translate(-width/2.0, -height/2.0)
+</pre>
+
+<p>Výsledek bude v&nbsp;tomto případě následující:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313055" data-alignment="center" data-link-type="modal">Obrázek #1313055 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313055">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313055" src="https://i.iinfo.cz/images/16/go-gg-1-35.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-35.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-35.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 28: Změna měřítka se projeví i na šířce kreslených stop.</p>
+</div>
+</div>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 24:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Transformace (změna měřítka okolo zvoleného bodu).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "24.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.Translate(width/2.0, height/2.0)
+        dc.Scale(2.0, 2.0)
+        dc.Translate(-width/2.0, -height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Nic nám samozřejmě nebrání v&nbsp;tom provést složení transformací ručně.
+Rotace o 15&deg; okolo zadaného bodu [width/2, height/2] se může naprogramovat
+i tímto způsobem:</p>
+
+<pre>
+        dc.Translate(width/2.0, height/2.0)
+        dc.Rotate(Radians(15))
+        dc.Translate(-width/2.0, -height/2.0)
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313058" data-alignment="center" data-link-type="modal">Obrázek #1313058 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313058">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313058" src="https://i.iinfo.cz/images/16/go-gg-1-36.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-36.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-36.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 29: Ruční složení několika transformací.</p>
+</div>
+</div>
+
+<p>Jen pro doplnění následuje úplný zdrojový kód příkladu:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 25:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Transformace (posun).</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "25.png"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.Translate(width/2.0, height/2.0)
+        dc.Rotate(Radians(15))
+        dc.Translate(-width/2.0, -height/2.0)
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        dc.DrawLine(32, 20, 288, 20)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 40, 288, 40)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 60, 288, 60)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 80, 288, 80)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 100, 288, 100)
+        dc.Stroke()
+&nbsp;
+        dc.SetLineWidth(4.0)
+        dc.SetLineCap(gg.LineCapButt)
+&nbsp;
+        dc.DrawLine(32, 140, 288, 140)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10)
+        dc.DrawLine(32, 160, 288, 160)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 10)
+        dc.DrawLine(32, 180, 288, 180)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5)
+        dc.DrawLine(32, 200, 288, 200)
+        dc.Stroke()
+&nbsp;
+        dc.SetDash(10, 5, 2, 5)
+        dc.DrawLine(32, 220, 288, 220)
+        dc.Stroke()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k18">Práce s&nbsp;fonty, vykreslení textu</h2>
+
+<p>Knihovna <strong>gogpu/gg</strong> podporuje i vykreslování textu. Používají
+se přitom fonty typu <i>TrueType</i>, které je nejdříve nutné načíst metodou
+<strong>LoadFontFace</strong>, jíž se předá jak jméno souboru s&nbsp;fontem,
+tak i požadovaná velikost písma:</p>
+
+<pre>
+func (c *Context) <strong>LoadFontFace</strong>(path string, points float64) error
+    <i>LoadFontFace loads a font from a file and sets it as the current font.</i>
+    <i>The size is specified in points.</i>
+&nbsp;
+    <i>Deprecated: Use text.NewFontSourceFromFile and SetFont instead. This method</i>
+    <i>is provided for convenience and backward compatibility.</i>
+&nbsp;
+    <i>Example (new way):</i>
+&nbsp;
+        source, err := text.NewFontSourceFromFile("font.ttf")
+        if err != nil {
+            return err
+        }
+        face := source.Face(12.0)
+        ctx.SetFont(face)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nápověda má pravdu &ndash; měla by se
+použít knihovna <strong>gogpu/gg/text</strong> a v&nbsp;ní definovaná funkce
+<strong>NewFontSourceFromFile</strong>:</div></p>
+
+<pre>
+func <strong>NewFontSourceFromFile</strong>(path string, opts ...SourceOption) (*FontSource, error)
+    <i>NewFontSourceFromFile loads a FontSource from a font file path.</i>
+</pre>
+
+<p>Pro vykreslení lze použít metodu <strong>DrawString</strong>, které se
+předává souřadnice levého dolního rohu pomyslného obdélníku, do něhož se text
+vykreslí:</p>
+
+<pre>
+func (c *Context) <strong>DrawString</strong>(s string, x, y float64)
+    <i>DrawString draws text at position (x, y) where y is the baseline. If no font</i>
+    <i>has been set with SetFont, this function does nothing.</i>
+&nbsp;
+    <i>If a GPU accelerator is registered and supports text rendering (implements</i>
+    <i>GPUTextAccelerator), the text is rendered via the GPU MSDF pipeline. The</i>
+    <i>CTM (Current Transform Matrix) is passed to the GPU so that Scale, Rotate,</i>
+    <i>and Skew transforms affect text rendering, not just position. Otherwise,</i>
+    <i>the CPU text pipeline is used with transform-aware rendering:</i>
+      <i>- Translation-only: bitmap fast path (zero quality loss)</i>
+      <i>- Uniform scale ≤256px: bitmap at device size (Strategy A, Skia pattern)</i>
+      <i>- Everything else: glyph outlines as vector paths (Strategy B, Vello</i>
+        <i>pattern)</i>
+&nbsp;
+    <i>The baseline is the line on which most letters sit. Characters with</i>
+    <i>descenders (like 'g', 'j', 'p', 'q', 'y') extend below the baseline.</i>
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313061" data-alignment="center" data-link-type="modal">Obrázek #1313061 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313061">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313061" src="https://i.iinfo.cz/images/16/go-gg-1-37.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-37.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-37.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 30: Vykreslení textu do počátku souřadné soustavy.</p>
+</div>
+</div>
+
+<p>Podívejme se na příklad, který po svém spuštění vytvoří obrázek
+s&nbsp;textem &bdquo;Hello, world!&ldquo; (font je uložen do repositáře se
+všemi demonstračními příklady):</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 26:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vykreslení textu.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "26.png"
+&nbsp;
+        <i>// jméno souboru s fontem</i>
+        const fontFileName = "fonts/FreeSans.ttf"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// pokus o načtení fontu</i>
+        if err := dc.LoadFontFace(fontFileName, 36); err != nil {
+                fmt.Println("Cannot load font")
+                panic(err)
+        }
+        dc.DrawString("Hello, world!", 0, height)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>V&nbsp;případě, že je nutné text vycentrovat, můžeme namísto metody
+<strong>DrawString</strong> použít metodu <strong>DrawStringAnchored</strong>,
+které se kromě vlastního textu předají i souřadnice vztažného bodu
+(<i>anchor</i>) a taktéž dvojice vah udávajících relativní pozici textu
+k&nbsp;tomuto bodu:</p>
+
+<pre>
+func (c *Context) <strong>DrawStringAnchored</strong>(s string, x, y, ax, ay float64)
+    <i>DrawStringAnchored draws text with an anchor point. The anchor point is</i>
+    <i>specified by ax and ay, which are in the range [0, 1].</i>
+&nbsp;
+        <i>(0, 0) = top-left</i>
+        <i>(0.5, 0.5) = center</i>
+        <i>(1, 1) = bottom-right</i>
+&nbsp;
+    <i>The text is positioned so that the anchor point is at (x, y).</i>
+</pre>
+
+<p>Pro vycentrování použijte hodnoty 0,5:</p>
+
+<pre>
+dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313064" data-alignment="center" data-link-type="modal">Obrázek #1313064 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313064">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313064" src="https://i.iinfo.cz/images/16/go-gg-1-38.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-38.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-38.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 31: Vykreslení vycentrovaného textu.</p>
+</div>
+</div>
+
+<p>Tento obrázek byl vykreslen následujícím příkladem:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 27:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vykreslení vycentrovaného textu.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "27.png"
+&nbsp;
+        <i>// jméno souboru s fontem</i>
+        const fontFileName = "fonts/FreeSans.ttf"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// pokus o načtení fontu</i>
+        if err := dc.LoadFontFace(fontFileName, 36); err != nil {
+                fmt.Println("Cannot load font")
+                panic(err)
+        }
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>Můžeme si samozřejmě vyzkoušet, jak se projeví různé hodnoty předané do
+předposledního parametru metody <strong>DrawStringAnchored</strong>. Tento
+parametr určuje, kterou část textu má vztažný bod určovat. Parametry budeme
+měnit od hodnoty -1,0 do 1,0:</p>
+
+<pre>
+var h float64 = 20
+weight := -1.0
+&nbsp;
+for i := 0; i &lt; 11; i++ {
+        dc.DrawStringAnchored("Hello, world!", width/2, h, weight, 0.5)
+        h += 20
+        weight += 0.2
+}
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313067" data-alignment="center" data-link-type="modal">Obrázek #1313067 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313067">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313067" src="https://i.iinfo.cz/images/16/go-gg-1-39.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-39.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-39.png" data-large-width="320" data-large-height="240">
+<p class="description">Obrázek 32: Vliv změny polohy vztažného bodu při vykreslování textu.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód tohoto příkladu vypadá následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 28:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vykreslení vycentrovaného textu.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "28.png"
+&nbsp;
+        <i>// jméno souboru s fontem</i>
+        const fontFileName = "fonts/FreeSans.ttf"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// pokus o načtení fontu</i>
+        if err := dc.LoadFontFace(fontFileName, 24); err != nil {
+                fmt.Println("Cannot load font")
+                panic(err)
+        }
+&nbsp;
+        var h float64 = 20
+        weight := -1.0
+&nbsp;
+        for i := 0; i &lt; 11; i++ {
+                dc.DrawStringAnchored("Hello, world!", width/2, h, weight, 0.5)
+                h += 20
+                weight += 0.2
+        }
+&nbsp;
+        dc.SavePNG(fileName)
+}
+</pre>
+
+<p>A v&nbsp;dnešním posledním demonstračním příkladu si ukážeme vykreslení
+textu, který je orotován okolo specifikovaného bodu:</p>
+
+<pre>
+        <i>// transformace a vykreslení</i>
+        dc.Push()
+        dc.RotateAbout(Radians(0.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.RotateAbout(Radians(120.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.RotateAbout(Radians(120.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.Pop()
+</pre>
+
+<p>Výsledek &ndash; trojice textů &ndash; bude vypadat následovně:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1313070" data-alignment="center" data-link-type="modal">Obrázek #1313070 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1313070">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1313070" src="https://i.iinfo.cz/images/16/go-gg-1-40.png" width="320" height="240" data-prev-filename="https://i.iinfo.cz/images/16/go-gg-1-40.png" data-prev-width="320" data-prev-height="240" data-large-filename="https://i.iinfo.cz/images/16/go-gg-1-40.png" data-large-width="320" data-large-height="240">
+<p class="description"> Obrázek 33: Rotace textu okolo specifikovaného bodu.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód dnešního posledního demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+<i>// Seriál "Programovací jazyk Go"</i>
+<i>//    https://www.root.cz/serialy/programovaci-jazyk-go/</i>
+<i>//</i>
+<i>// Demonstrační příklad číslo 29:</i>
+<i>//    Balíček gogpu/gg.</i>
+<i>//    Vykreslení vycentrovaného textu.</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+)
+&nbsp;
+func <strong>Radians</strong>(angle float64) float64 {
+        return float64(angle / 180.0 * math.Pi)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry rastrového obrázku</i>
+        const width = 320
+        const height = 240
+&nbsp;
+        <i>// jméno souboru s výsledným obrázkem</i>
+        const fileName = "29.png"
+&nbsp;
+        <i>// jméno souboru s fontem</i>
+        const fontFileName = "fonts/FreeSans.ttf"
+&nbsp;
+        <i>// vytvoření kontextu</i>
+        dc := gg.NewContext(width, height)
+&nbsp;
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetRGB(1.0, 1.0, 1.0)
+        dc.Fill()
+&nbsp;
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// pokus o načtení fontu</i>
+        if err := dc.LoadFontFace(fontFileName, 36); err != nil {
+                fmt.Println("Cannot load font")
+                panic(err)
+        }
+        <i>// transformace a vykreslení</i>
+        dc.Push()
+        dc.RotateAbout(Radians(0.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.RotateAbout(Radians(120.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.RotateAbout(Radians(120.0), width/2, height/2)
+        dc.DrawStringAnchored("Hello, world!", width/2, height/2, 0.5, 0.5)
+        dc.Pop()
+&nbsp;
+        <i>// uložení výsledného rastrového obrázku</i>
+        dc.SavePNG(fileName)
+}
+</pre>
+
+
+
+<h2 id="k19">Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář (ten je ovšem
+&ndash; alespoň prozatím &ndash; relativně malý, dnes má přibližně šest až sedm
+megabajtů), můžete namísto toho použít odkazy na jednotlivé demonstrační
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_clear_screen.go</td><td>vymazání obsahu rastrového obrázku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/01_clear_screen.go">https://github.com/tisnik/go-root/blob/master/article_AF/01_clear_screen.go</a></td></tr>
+<tr><td> 2</td><td>02_fill_rectangle.go</td><td>vymazání obrázku vykreslením vyplněného obdélníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/02_fill_rectangle.go">https://github.com/tisnik/go-root/blob/master/article_AF/02_fill_rectangle.go</a></td></tr>
+<tr><td> 3</td><td>03_clear_screen_color.go</td><td>vymazání obrazovky (lepší varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/03_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/03_clear_screen_color.go</a></td></tr>
+<tr><td> 4</td><td>04_clear_screen_color.go</td><td>vymazání obrazovky (varianta se specifikací barvy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/04_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/04_clear_screen_color.go</a></td></tr>
+<tr><td> 5</td><td>05_clear_screen_color.go</td><td>vymazání obrazovky (varianta se specifikací barvy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/05_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/05_clear_screen_color.go</a></td></tr>
+<tr><td> 6</td><td>06_colors.go</td><td>práce s barvami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/06_colors.go">https://github.com/tisnik/go-root/blob/master/article_AF/06_colors.go</a></td></tr>
+<tr><td> 7</td><td>07_color_alpha.go</td><td>práce s barvami, alfa složka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/07_color_alpha.go">https://github.com/tisnik/go-root/blob/master/article_AF/07_color_alpha.go</a></td></tr>
+<tr><td> 8</td><td>08_rgba_color.go</td><td>barvový prostor RGB a RGBA</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/08_rgba_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/08_rgba_color.go</a></td></tr>
+<tr><td> 9</td><td>09_alpha_component.go</td><td>barvový prostor RGB a RGBA. Alfa kanál v barvovém prostoru RGBA</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/09_alpha_component.go">https://github.com/tisnik/go-root/blob/master/article_AF/09_alpha_component.go</a></td></tr>
+<tr><td>10</td><td>10_line_width.go</td><td>nastavení šířky vykreslovaných úseček a křivek</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/10_line_width.go">https://github.com/tisnik/go-root/blob/master/article_AF/10_line_width.go</a></td></tr>
+<tr><td>11</td><td>11_line_caps.go</td><td>nastavení stylu konců úseček</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/11_line_caps.go">https://github.com/tisnik/go-root/blob/master/article_AF/11_line_caps.go</a></td></tr>
+<tr><td>12</td><td>12_dash.go</td><td>nastavení stylu vykreslovaných úseček</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/12_dash.go">https://github.com/tisnik/go-root/blob/master/article_AF/12_dash.go</a></td></tr>
+<tr><td>13</td><td>13_simple_path.go</td><td>práce s cestou (path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/13_simple_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/13_simple_path.go</a></td></tr>
+<tr><td>14</td><td>14_open_path.go</td><td>otevřená cesta (open path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/14_open_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/14_open_path.go</a></td></tr>
+<tr><td>15</td><td>15_closed_path.go</td><td>uzavřená cesta (closed path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/15_closed_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/15_closed_path.go</a></td></tr>
+<tr><td>16</td><td>16_quadratic_bezier.go</td><td>kvadratická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/16_quadratic_bezier.go">https://github.com/tisnik/go-root/blob/master/article_AF/16_quadratic_bezier.go</a></td></tr>
+<tr><td>17</td><td>17_quadratic_bezier_control_points.go</td><td>kvadratická Bézierova křivka s řídicími body</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/17_quadratic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_AF/17_quadratic_bezier_control_points.go</a></td></tr>
+<tr><td>18</td><td>18_cubic_bezier.go</td><td>kubická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/18_cubic_bezier.go">https://github.com/tisnik/go-root/blob/master/article_AF/18_cubic_bezier.go</a></td></tr>
+<tr><td>19</td><td>19_cubic_bezier_control_points.go</td><td>kubická Bézierova křivka s řídicími body</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/19_cubic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_AF/19_cubic_bezier_control_points.go</a></td></tr>
+<tr><td>20</td><td>20_rotation.go</td><td>rotace vykreslovaných objektů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/20_rotation.go">https://github.com/tisnik/go-root/blob/master/article_AF/20_rotation.go</a></td></tr>
+<tr><td>21</td><td>21_to_image.go</td><td>rasterizace do zvoleného rastrového formátu. Výsledkem bude animovaný GIF</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/21_to_image.go">https://github.com/tisnik/go-root/blob/master/article_AF/21_to_image.go</a></td></tr>
+<tr><td>22</td><td>22_transformation_rotate.go</td><td>transformace (rotace)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/22_transformation_rotate.go">https://github.com/tisnik/go-root/blob/master/article_AF/22_transformation_rotate.go</a></td></tr>
+<tr><td>23</td><td>23_transformation_rotate_about.go</td><td>transformace (rotace okolo zvoleného bodu)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/23_transformation_rotate_about.go">https://github.com/tisnik/go-root/blob/master/article_AF/23_transformation_rotate_about.go</a></td></tr>
+<tr><td>24</td><td>24_scale_about.go</td><td>transformace (změna měřítka okolo zvoleného bodu)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/24_scale_about.go">https://github.com/tisnik/go-root/blob/master/article_AF/24_scale_about.go</a></td></tr>
+<tr><td>25</td><td>25_translate_rotate.go</td><td>transformace (posun)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/25_translate_rotate.go">https://github.com/tisnik/go-root/blob/master/article_AF/25_translate_rotate.go</a></td></tr>
+<tr><td>26</td><td>26_text.go</td><td>vykreslení textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/26_text.go">https://github.com/tisnik/go-root/blob/master/article_AF/26_text.go</a></td></tr>
+<tr><td>27</td><td>27_text_centered.go</td><td>vykreslení vycentrovaného textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/27_text_centered.go">https://github.com/tisnik/go-root/blob/master/article_AF/27_text_centered.go</a></td></tr>
+<tr><td>28</td><td>28_text_centered.go</td><td>vykreslení vycentrovaného textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/28_text_centered.go">https://github.com/tisnik/go-root/blob/master/article_AF/28_text_centered.go</a></td></tr>
+<tr><td>29</td><td>29_text_rotated.go</td><td>vykreslení vycentrovaného textu, který je rotován</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/29_text_rotated.go">https://github.com/tisnik/go-root/blob/master/article_AF/29_text_rotated.go</a></td></tr>
+<tr><td>30</td><td>go.mod</td><td></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/go.mod">https://github.com/tisnik/go-root/blob/master/article_AF/go.mod</a></td></tr>
+</table>
+
+
+
+<h2 id="k20">Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Projekt GoGPU na GitHubu<br />
+<a href="https://github.com/orgs/gogpu/repositories">https://github.com/orgs/gogpu/repositories</a>
+</li>
+
+<li>Balíček gogpu/gg<br />
+<a href="https://github.com/gogpu/gg">https://github.com/gogpu/gg</a>
+</li>
+
+<li>Balíček gogpu/gg-svg<br />
+<a href="https://github.com/gogpu/gg-svg">https://github.com/gogpu/gg-svg</a>
+</li>
+
+<li>Balíček gogpu/gg-pdf<br />
+<a href="https://github.com/gogpu/gg-pdf">https://github.com/gogpu/gg-pdf</a>
+</li>
+
+<li>package gg (což je jiná varianta <strong>gg</strong>)<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>Immediate mode (computer graphics)<br />
+<a href="https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)">https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)</a>
+</li>
+
+<li>Retained mode<br />
+<a href="https://en.wikipedia.org/wiki/Retained_mode">https://en.wikipedia.org/wiki/Retained_mode</a>
+</li>
+
+<li>Lecture 11: Linear Interpolation Again - Bézier Curves<br />
+<a href="http://www.math.kent.edu/~reichel/courses/intr.num.comp.1/fall09/lecture12/bez.pdf">http://www.math.kent.edu/~reichel/courses/intr.num.comp.1/fall09/lecture12/bez.pdf</a>
+</li>
+
+<li>Geometrie/Úvod do křivek<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/%C3%9Avod_do_k%C5%99ivek">https://cs.wikibooks.org/wiki/Geometrie/%C3%9Avod_do_k%C5%99ivek</a>
+</li>
+
+<li>Seriál Grafická knihovna OpenGL<br />
+<a href="https://www.root.cz/serialy/graficka-knihovna-opengl/">https://www.root.cz/serialy/graficka-knihovna-opengl/</a>
+</li>
+
+<li>Seriál Tvorba přenositelných grafických aplikací využívajících knihovnu GLUT<br />
+<a href="https://www.root.cz/serialy/tvorba-prenositelnych-grafickych-aplikaci-vyuzivajicich-knihovnu-glut/">https://www.root.cz/serialy/tvorba-prenositelnych-grafickych-aplikaci-vyuzivajicich-knihovnu-glut/</a>
+</li>
+
+<li>Seriál OpenGL a nadstavbová knihovna GLU<br />
+<a href="https://www.root.cz/serialy/opengl-a-nadstavbova-knihovna-glu/">https://www.root.cz/serialy/opengl-a-nadstavbova-knihovna-glu/</a>
+</li>
+
+<li>Seriál OpenGL evaluátory<br />
+<a href="https://www.root.cz/serialy/opengl-evaluatory/">https://www.root.cz/serialy/opengl-evaluatory/</a>
+</li>
+
+<li>Khronos Group<br />
+<a href="https://www.khronos.org/">https://www.khronos.org/</a>
+</li>
+
+<li>Khronos Group (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Khronos_Group">https://en.wikipedia.org/wiki/Khronos_Group</a>
+</li>
+
+<li>OpenVG (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/OpenVG">https://en.wikipedia.org/wiki/OpenVG</a>
+</li>
+
+<li>OpenVG Quick Reference Card<br />
+<a href="https://www.khronos.org/files/openvg-quick-reference-card.pdf">https://www.khronos.org/files/openvg-quick-reference-card.pdf</a>
+</li>
+
+<li>OpenVG on the Raspberry Pi<br />
+<a href="http://mindchunk.blogspot.cz/2012/09/openvg-on-raspberry-pi.html">http://mindchunk.blogspot.cz/2012/09/openvg-on-raspberry-pi.html</a>
+</li>
+
+<li>ShivaVG: open-source ANSI C OpenVG <br />
+<a href="http://ivanleben.blogspot.cz/2007/07/shivavg-open-source-ansi-c-openvg.html">http://ivanleben.blogspot.cz/2007/07/shivavg-open-source-ansi-c-openvg.html</a>
+</li>
+
+<li>Testbed for exploring OpenVG on the Raspberry Pi<br />
+<a href="https://github.com/ajstarks/openvg">https://github.com/ajstarks/openvg</a>
+</li>
+
+<li>Seriál Grafické karty a grafické akcelerátory<br />
+<a href="http://www.root.cz/serialy/graficke-karty-a-graficke-akceleratory/">http://www.root.cz/serialy/graficke-karty-a-graficke-akceleratory/</a>
+</li>
+
+<li>(Linux) Framebuffer<br />
+<a href="http://wiki.linuxquestions.org/wiki/Framebuffer">http://wiki.linuxquestions.org/wiki/Framebuffer</a>
+</li>
+
+<li>(Linux) Framebuffer HOWTO<br />
+<a href="http://tldp.org/HOWTO/Framebuffer-HOWTO/">http://tldp.org/HOWTO/Framebuffer-HOWTO/</a>
+</li>
+
+<li>Linux framebuffer (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Linux_framebuffer">https://en.wikipedia.org/wiki/Linux_framebuffer</a>
+</li>
+
+<li>Seriál Grafické formáty<br />
+<a href="http://www.root.cz/serialy/graficke-formaty/">http://www.root.cz/serialy/graficke-formaty/</a>
+</li>
+
+<li>Seriál Grafický formát GIF<br />
+<a href="https://www.root.cz/serialy/graficky-format-gif/">https://www.root.cz/serialy/graficky-format-gif/</a>
+</li>
+
+<li>PNG is Not GIF<br />
+<a href="https://www.root.cz/clanky/png-is-not-gif/">https://www.root.cz/clanky/png-is-not-gif/</a>
+</li>
+
+</ol>
