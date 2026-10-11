@@ -1,0 +1,1605 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem (dokončení)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem (dokončení)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Dnes dokončíme téma, kterému jsme se věnovali minulý týden. Ukážeme si předávání objektů, polí a funkcí z JavaScriptu do jazyka Go, pochopitelně včetně zpracování těchto datových typů. A jak je v této oblasti tradicí: nic není tak jednoduché, jak by mohlo být.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem (dokončení)</a></p>
+<p><a href="#k02">2. Předání řetězce z&nbsp;JavaScriptu do Go</a></p>
+<p><a href="#k03">3. Otestování předání řetězce z&nbsp;JavaScriptu do Go</a></p>
+<p><a href="#k04">4. Předání objektu z&nbsp;JavaScriptu do Go</a></p>
+<p><a href="#k05">5. Demonstrační příklad: předání JavaScriptového objektu do funkce naprogramované v&nbsp;Go</a></p>
+<p><a href="#k06">6. Přístup k&nbsp;atributům JavaScriptového objektu z&nbsp;Go</a></p>
+<p><a href="#k07">7. Demonstrační příklad: přečtení vybraných atributů předaného JavaScriptového objektu</a></p>
+<p><a href="#k08">8. Konverze atributů předaného objektu do nativních typů Go</a></p>
+<p><a href="#k09">9. Demonstrační příklad: konverze všech atributů objektů do nativních typů jazyka Go</a></p>
+<p><a href="#k10">10. Předání pole, získání počtu prvků pole</a></p>
+<p><a href="#k11">11. Demonstrační příklad: předání pole do Go funkce se zjištěním jeho délky</a></p>
+<p><a href="#k12">12. Přístup k&nbsp;prvkům JavaScriptového pole z&nbsp;Go</a></p>
+<p><a href="#k13">13. Demonstrační příklad: výpis typů a hodnot všech prvků JavaScriptového pole</a></p>
+<p><a href="#k14">14. Součet prvků předaného pole</a></p>
+<p><a href="#k15">15. Demonstrační příklad: součet všech prvků pole předaného z&nbsp;JavaScriptu do Go</a></p>
+<p><a href="#k16">16. Předání funkce naprogramované v&nbsp;JavaScriptu do Go</a></p>
+<p><a href="#k17">17. Zavolání JavaScriptové funkce</a></p>
+<p><a href="#k18">18. Demonstrační příklad: zavolání JavaScriptové funkce z&nbsp;jazyka Go</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem (dokončení)</h2>
+
+<p>Připomeňme si, že v&nbsp;jazyce JavaScript můžeme pracovat s&nbsp;hodnotami
+různých typů. Ukázali jsme si i tabulku se základními datovými typy
+JavaScriptu:</p>
+
+<table>
+<tr><th>#</th><th>Datový typ</th><th>Stručný popis</th></tr>
+<tr><td>1</td><td>Boolean</td><td>datový typ se dvěma možnými hodnotami <strong>true</strong> a <strong>false</strong></td></tr>
+<tr><td>2</td><td>String</td><td>sekvence znaků (jediný znak je taktéž považován za řetězec)</td></tr>
+<tr><td>3</td><td>Number</td><td>reprezentuje hodnoty typu <i>double</i> podle IEEE 754; řada celých čísel je tedy omezena mezní hodnotou 2<sup>53</sup>-1 (vlastně šířkou mantisy, i když skutečnost je nepatrně složitější, dtto pro zápornou mezní hodnotu)</td></tr>
+<tr><td>4</td><td>Bigint</td><td>speciální typ celočíselných numerických hodnot používaných v&nbsp;případě, že se ukládají hodnoty větší než 2<sup>53</sup>-1</td> (totéž platí i pro zápornou mezní hodnotu).</tr>
+<tr><td>5</td><td>Null</td><td>typ s&nbsp;jedinou hodnotou <strong>null</strong></td></tr>
+<tr><td>6</td><td>Undefined</td><td>specialita JavaScriptu (a bolehlav), představuje ještě nepřiřazenou hodnotu (pozor: rozdílné od Null)</td></tr>
+<tr><td>7</td><td>Symbol</td><td>unikátní identifikátor</td></tr>
+<tr><td>8</td><td>Object</td><td>objekty (je to na první pohled zvláštní, ale sem spadají například i funkce)</td></tr>
+</table>
+
+<p>Ve skutečnosti ovšem nesmíme zapomenout ještě na jeden datový typ, se kterým
+se později setkáme. Tímto datovým typem je funkce (<i>function</i>), která je
+v&nbsp;JavaScriptu (ostatně podobně jako i v&nbsp;některých dalších
+programovacích jazycích) považována za plnohodnotný datový typ.</p>
+
+<p><a
+href="https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem/">Minule</a>
+jsme si na několika příkladech ukázali, jakým způsobem lze do funkce
+naprogramované v&nbsp;jazyku Go předat argumenty typu <i>Number</i>. Ty bylo
+možné zkonvertovat na typ <strong>int</strong> a <strong>float64</strong>,
+s&nbsp;nimiž je možné v&nbsp;Go běžně pracovat (až na problém týkající se
+potenciálního menšího rozsahu typu <strong>int</strong> na 32bitových
+systémech). Naprosto stejným způsobem lze pracovat s&nbsp;pravdivostními
+hodnotami, které se zkonvertují na typ <strong>boolean</strong>.</p>
+
+<p>U hodnot typu <strong>Null</strong> a <strong>Undefined</strong> se
+neprovádí skutečná konverze, ale pouze test, zda je zvolený argument typu
+<strong>Null</strong> či <strong>Undefined</strong> (samotný typ přímo určuje i
+hodnotu). Tyto testy se provádí metodami <strong>Value.IsNull()</strong> a
+<strong>Value.IsUndefined</strong>.</p>
+
+<p>Zbývají nám tedy řetězce, objekty a v&nbsp;neposlední řadě taktéž funkce. A
+právě těmito typy a jejich konverzemi se budeme zabývat v&nbsp;dnešním
+článku.</p>
+
+<p><div class="rs-tip-major">Poznámka: zdánlivě chybí pole a mapy (slovníky). I
+ty jsou však předávány jakoby se jednalo o objekty.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Předání řetězce z&nbsp;JavaScriptu do Go</h2>
+
+<p>S&nbsp;řetězci se jak v&nbsp;JavaScriptu, tak i v&nbsp;jazyce Go pracuje
+obdobným způsobem, i když interně se může způsob ukládání řetězů lišit.
+V&nbsp;obou případech se však jedná o sekvenci Unicode znaků se známou délkou;
+navíc je tato sekvence v&nbsp;obou jazycích neměnitelná (<i>immutable</i>).</p>
+
+<p>Pro převod JavaScriptového argumentu typu řetězec na plnohodnotný řetězec
+(z&nbsp;pohledu jazyka Go) se používá metoda <strong>Value.String()</strong>.
+Na rozdíl od ostatních metod pro konverzi hodnoty, s&nbsp;nimiž jsme se až
+doposud setkali (<strong>Value.Bool()</strong>, <strong>Value.Int()</strong> a
+<strong>Value.Float()</strong>) však metoda <strong>Value.String()</strong>
+&bdquo;nezpanikaří&ldquo; ani v&nbsp;případě, kdy je předávaný argument
+odlišného typu. V&nbsp;takovém případě se provede konverze (libovolného) typu
+na řetězec &bdquo;T:V&ldquo;, kde za <strong>T</strong> se dosadí jméno typu a
+za <strong>V</strong> je dosazena hodnota v&nbsp;řetězcové podobě (a u typů
+<strong>Null</strong> a <strong>Undefined</strong> se uvádí pouze typ, protože
+ten přímo definuje i hodnotu).</p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Otestování předání řetězce z&nbsp;JavaScriptu do Go</h2>
+
+<p>V&nbsp;dnešním prvním demonstračním příkladu je ukázán způsob předání
+řetězce z&nbsp;JavaScriptu (tj.&nbsp;z&nbsp;libovolného kódu naprogramovaného
+v&nbsp;JavaScriptu) do funkce naprogramované v&nbsp;jazyku Go. V&nbsp;této
+funkci zkontrolujeme počet předaných argumentů (to již dobře známe, takže se
+již nebudu opakovat) a taktéž to, zda je typ prvního (a jediného) argumentu
+skutečně řetězcem:</p>
+
+<pre>
+<i>// kontrola typu předaného argumentu</i>
+typ := args[0].Type()
+<strong>if</strong> typ != js.TypeString {
+        fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+        <strong>return</strong> nil
+}
+</pre>
+
+<p>V&nbsp;případě, že je skutečně předán řetězec, provedeme konverzi
+z&nbsp;JavaScriptového řetězce na Go řetězec:</p>
+
+<pre>
+<i>// provést konverzi</i>
+message := args[0].String()
+</pre>
+
+<p>Dále je již možné s&nbsp;proměnnou <strong>message</strong> pracovat stejně,
+jako s&nbsp;jakýmkoli jiným řetězcem v&nbsp;Go.</p>
+
+<p>Úplný zdrojový kód takto vytvořeného demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů předaných funkci PrintMessage</i>
+<i>// - kontrola typu argumentů předaných funkci PrintMessage</i>
+<i>// - provedení konverze na nativní typy jazyka Go</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintMessage(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        <strong>if</strong> len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := args[0].Type()
+        <strong>if</strong> typ != js.TypeString {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// provést konverzi</i>
+        message := args[0].String()
+&nbsp;
+        <i>// zobrazit zprávu</i>
+        fmt.Println(message)
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintMessage tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printMessage", js.FuncOf(PrintMessage))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>HTML stránka, ve které je funkce <strong>printMessage</strong> volána
+s&nbsp;různým typem i počty argumentů, vypadá takto:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: with string argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: with string argument&lt;/h2&gt;
+        &lt;script src="func_call_string.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// korektní argumenty</i>
+            <strong>printMessage("");</strong>
+            <strong>printMessage("Hello, world!");</strong>
+            <strong>printMessage("příliš žluťoučký kůň");</strong>
+&nbsp;
+            <i>// špatný počet argumentů</i>
+            <strong>printMessage("foo", "bar")</strong>
+            <strong>printMessage();</strong>
+&nbsp;
+            <i>// špatný typ argumentu</i>
+            <strong>printMessage(2);</strong>
+            <strong>printMessage(null);</strong>
+            <strong>printMessage(undefined);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>A pochopitelně se podíváme i na výsledek volání funkce
+<strong>printMessage</strong> zobrazený v&nbsp;konzoli prohlížeče:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-1.webp" class="image-1166754" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 1: Výsledek volání funkce <strong>printMessage</strong>
+z&nbsp;JavaScriptu s&nbsp;různými typy a počty předávaných argumentů.</i></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Předání objektu z&nbsp;JavaScriptu do Go</h2>
+
+<p>Objekty jsou v&nbsp;JavaScriptu používány pro mnoho účelů; navíc do této
+kategorie spadají například i pole, slovníky atd. Přímo v&nbsp;JavaScriptu lze
+objekty vytvářet (konstruovat) různými způsoby, například jako instance třídy,
+funkcionálním stylem atd. Ukažme si tu pravděpodobně nejjednodušší možnost
+konstrukce objektu, která vypadá následovně:</p>
+
+<pre>
+<i>// konstrukce objektu</i>
+<strong>const person = new Object();</strong>
+&nbsp;
+<i>// přidání atributů</i>
+<strong>person.firstName = "John";</strong>
+<strong>person.lastName = "Doe";</strong>
+<strong>person.age = 42;</strong>
+<strong>person.eyeColor = "blue";</strong>
+</pre>
+
+<p>Takový objekt lze předat do jazyka Go v&nbsp;argumentu volané funkce.
+V&nbsp;Go bude představován hodnotou typu <strong>js.Value</strong>. Bude možné
+zjistit, zda se skutečně jedná o hodnotu typu objekt a navíc lze i přistoupit
+k&nbsp;atributům tohoto objektu s&nbsp;využitím metody
+<strong>Value.Get</strong> (a jak uvidíme dále, existují i další podporované
+operace).</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Demonstrační příklad: předání JavaScriptového objektu do funkce naprogramované v&nbsp;Go</h2>
+
+<p>Opět si prakticky ukažme, jakým způsobem je možné předat JavaScriptový
+objekt do funkce, která je naprogramovaná v&nbsp;jazyce Go. V&nbsp;této funkci
+opět nejprve zkontrolujeme počet předaných argumentů (postup již dobře známe) a
+následně pak typ předaného argumentu:</p>
+
+<pre>
+object := args[0]
+&nbsp;
+<i>// kontrola typu předaného argumentu</i>
+typ := object.Type()
+<strong>if</strong> typ != js.TypeObject {
+        fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+        <strong>return</strong> nil
+}
+</pre>
+
+<p>V&nbsp;případě, že je předán korektní hodnota typu &bdquo;objekt&ldquo;, je
+textová reprezentace takového objektu vypsána na webovou konzoli.</p>
+
+<p>Implementace části napsané v&nbsp;Go (včetně registrace funkce) může vypadat
+takto:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů předaných funkci PrintObject</i>
+<i>// - kontrola typu argumentů předaných funkci PrintObject</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintObject(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        <strong>if</strong> len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        object := args[0]
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := object.Type()
+        <strong>if</strong> typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// zobrazit objekt</i>
+        fmt.Println(object)
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintObject tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printObject", js.FuncOf(PrintObject))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Ve zdrojovém kódu webové stránky nejdříve vytvoříme nový objekt i
+s&nbsp;atributy. Tento objekt následně předáme do funkce naprogramované
+v&nbsp;Go:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: with object argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: with object argument&lt;/h2&gt;
+        &lt;script src="func_call_object_1.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// konstrukce objektu</i>
+            <strong>const person = new Object();</strong>
+&nbsp;
+            <i>// přidání atributů</i>
+            <strong>person.firstName = "John";</strong>
+            <strong>person.lastName = "Doe";</strong>
+            <strong>person.age = 42;</strong>
+            <strong>person.eyeColor = "blue";</strong>
+&nbsp;
+            <i>// zavolání funkce naprogramované v Go s předáním objektu</i>
+            <strong>printObject(person);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Výsledek zobrazený na webové konzoli by měl vypadat následovně:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-2.webp" class="image-1166757" width="480" height="300" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 2: Výsledek volání funkce <strong>printObject</strong>
+z&nbsp;JavaScriptu s&nbsp;předáním skutečného objektu.</i></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Přístup k&nbsp;atributům JavaScriptového objektu z&nbsp;Go</h2>
+
+<p>Předpokládejme, že v&nbsp;prvním argumentu Go funkce volané
+z&nbsp;JavaScriptu je uložena hodnota typu <i>Object</i>. Pro zjednodušení
+programového kódu si tento objekt uložíme do pomocné proměnné nazvané taktéž
+<strong>object</strong> (v&nbsp;jazyce Go se nejedná o rezervované klíčové
+slovo):</p>
+
+<pre>
+object := args[0]
+</pre>
+
+<p>Nyní můžeme s&nbsp;využitím metody <strong>Value.Get()</strong> získat
+libovolný atribut objektu. Pokud atribut neexistuje, je vrácena hodnota typu
+<strong>undefined</strong>:</p>
+
+<pre>
+object.Get("firstName")
+object.Get("lastName")
+object.Get("age")
+object.Get("eyeColor")
+object.Get("somethingElse")
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výsledkem je opět hodnota typu
+<strong>js.Value</strong>, nikoli nativní typ programovacího jazyka
+Go!</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Demonstrační příklad: přečtení vybraných atributů předaného JavaScriptového objektu</h2>
+
+<p>V&nbsp;dnešním třetím demonstračním příkladu je ukázáno, jakým způsobem lze
+přečíst atributy (s&nbsp;předem známými jmény) z&nbsp;JavaScriptového objektu,
+který je předán do Go funkce. Go funkce nejdříve provede všechny testy, které
+jsme již viděli (počty a typy předaných argumentů) a následně pomocí metody
+<strong>Get()</strong> přečte hodnoty atributů:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní­ mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů předaných funkci PrintObject</i>
+<i>// - kontrola typu argumentu předaného funkci PrintObject</i>
+<i>// - přečtení atributů z&nbsp;předaného objektu</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintObject(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        object := args[0]
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := object.Type()
+        if typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// přečíst a zobrazit atributy objektu</i>
+        fmt.Printf("First name: %v\n", object.Get("firstName"))
+        fmt.Printf("Last name:  %v\n", object.Get("lastName"))
+        fmt.Printf("Age:        %v\n", object.Get("age"))
+        fmt.Printf("Eye color:  %v\n", object.Get("eyeColor"))
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintObject tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printObject", js.FuncOf(PrintObject))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Příslušná HTML stránka, z&nbsp;níž je Go funkce zavolána a je jí předán
+objekt:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: with object argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: with object argument&lt;/h2&gt;
+        &lt;script src="func_call_object_2.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// konstrukce objektu</i>
+            <strong>const person = new Object();</strong>
+&nbsp;
+            <i>// přidání atributů</i>
+            <strong>person.firstName = "John";</strong>
+            <strong>person.lastName = "Doe";</strong>
+            <strong>person.age = 42;</strong>
+            <strong>person.eyeColor = "blue";</strong>
+&nbsp;
+            <i>// zavolání funkce naprogramované v Go s předáním objektu</i>
+            <strong>printObject(person);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>A takto by měly vypadat výsledky vypsané do konzole webového prolížeče:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-3.webp" class="image-1166760" width="650" height="215" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 3: Výsledek volání funkce <strong>printObject</strong>
+z&nbsp;JavaScriptu s&nbsp;předáním skutečného objektu.</i></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Konverze atributů předaného objektu do nativních typů Go</h2>
+
+<p>Opět nyní předpokládejme, že do Go funkce byl předán JavaScriptový objekt
+v&nbsp;prvním argumentu. Můžeme si ho tedy uložit do pomocné proměnné:</p>
+
+<pre>
+object := args[0]
+</pre>
+
+<p>Atribut <strong>firstName</strong> by měl obsahovat řetězec, takže můžeme
+přímo provést jeho konverzi z&nbsp;<strong>js.Value</strong> na typ
+<strong>string</strong>. V&nbsp;tomto případě můžeme nejdříve provést i test,
+zda je atribut správného typu, popř.&nbsp;lze tento test vynechat a přímo
+psát:</p>
+
+<pre>
+firstName := object.Get("firstName").String()
+</pre>
+
+<p>Podobně je možné získat obsah atributu <strong>age</strong> ve formě celého
+čísla:</p>
+
+<pre>
+age := object.Get("age").Int()
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě již může konverzní
+funkce &bdquo;zpanikařit&ldquo;, takže by bylo vhodnější nejdříve typ atributu
+explicitně otestovat:</div></p>
+
+<pre>
+typ := object.Get("age").Type()
+if typ != js.TypeInt {
+        ...
+        ...
+        ...
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Demonstrační příklad: konverze všech atributů objektů do nativních typů jazyka Go</h2>
+
+<p>Ukažme si nyní, jakým způsobem se načtou všechny (předem známé) atributy
+objektu předaného do Go s&nbsp;následnou konverzí těchto atributů na nativní
+datové typy Go:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů funkci PrintObject</i>
+<i>// - kontrola typu argumentů předaných funkci PrintObject</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintObject(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        object := args[0]
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := object.Type()
+        if typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// převést atributy do nativních typů jazyka Go</i>
+        firstName := object.Get("firstName").String()
+        lastName := object.Get("lastName").String()
+        age := object.Get("age").Int()
+        eyeColor := object.Get("eyeColor").String()
+&nbsp;
+        <i>// zobrazit atributy objektu</i>
+        fmt.Printf("First name: %s (%T)\n", firstName, firstName)
+        fmt.Printf("Last name:  %s (%T)\n", lastName, lastName)
+        fmt.Printf("Age:        %d (%T)\n", age, age)
+        fmt.Printf("Eye color:  %s (%T)\n", eyeColor, eyeColor)
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintObject tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printObject", js.FuncOf(PrintObject))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>HTML stránka, ze které se volá zaregistrovaná Go funkce, vypadá takto:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: with object argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: with object argument&lt;/h2&gt;
+        &lt;script src="func_call_object_3.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// konstrukce objektu</i>
+            <strong>const person = new Object();</strong>
+&nbsp;
+            <i>// přidání atributů</i>
+            <strong>person.firstName = "John";</strong>
+            <strong>person.lastName = "Doe";</strong>
+            <strong>person.age = 42;</strong>
+            <strong>person.eyeColor = "blue";</strong>
+&nbsp;
+            <i>// zavolání funkce naprogramované v Go s předáním objektu</i>
+            <strong>printObject(person);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Po načtení výše uvedené HTML stránky do webového prohlížeče by se
+v&nbsp;jeho konzoli měly zobrazit tyto řádky s&nbsp;atributy předaného
+objektu:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-4.webp" class="image-1166763" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 4: Výpis typů a hodnot atributů předaných do Go funkce
+z&nbsp;JavaScriptového kódu.</i></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Předání pole, získání počtu prvků pole</h2>
+
+<p>V&nbsp;JavaScriptu lze vytvářet i pole, která se chovají jako měnitelné
+heterogenní kontejnery. Pole jsou měnitelná z&nbsp;toho důvodu, že prvky
+v&nbsp;poli je možné modifikovat a navíc lze do pole přidávat další prvky,
+popř.&nbsp;prvky odebírat (například metodami <strong>push</strong>,
+<strong>pop</strong>, <strong>shift</strong> a když víte, co děláte, tak i
+metodou <strong>delete</strong>). Pole jsou heterogenní proto, že každý prvek
+pole může být jakéhokoli typu. Nejjednodušší způsob konstrukce pole spočívá
+v&nbsp;použití <i>literálu</i>, který v&nbsp;případě polí znamená zápis hodnot
+prvků mezi hranaté závorky:</p>
+
+<pre>
+[]
+[1]
+[1, 2, 3]
+["foo", "bar", "baz"]
+[true, false]
+</pre>
+
+<p>V&nbsp;případě heterogenního pole pak i:</p>
+
+<pre>
+[42, "is", true, "answer"]
+</pre>
+
+<p>Z&nbsp;pohledu typového systému programovacího jazyka JavaScript jsou pole
+objekty, které mají definovaných cca patnáct standardních metod a taktéž
+atribut <strong>length</strong> vracející délku pole. To znamená, že i
+v&nbsp;příslušné Go funkci budeme s&nbsp;takovým polem muset pracovat jako
+s&nbsp;objektem.</p>
+
+<p>Jen pro úplnost si atribut i standardní metody pole vypišme:</p>
+
+<table>
+<tr><th>Atribut/metoda</th></tr>
+<tr><td>Array length</td></tr>
+<tr><td>Array toString()</td></tr>
+<tr><td>Array at()</td></tr>
+<tr><td>Array join()</td></tr>
+<tr><td>Array pop()</td></tr>
+<tr><td>Array push()</td></tr>
+<tr><td>Array shift()</td></tr>
+<tr><td>Array unshift()</td></tr>
+<tr><td>Array delete()</td></tr>
+<tr><td>Array concat()</td></tr>
+<tr><td>Array copyWithin()</td></tr>
+<tr><td>Array flat()</td></tr>
+<tr><td>Array splice()</td></tr>
+<tr><td>Array toSpliced()</td></tr>
+<tr><td>Array slice()</td></tr>
+</table>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Demonstrační příklad: předání pole do Go funkce se zjištěním jeho délky</h2>
+
+<p>Pro datovou strukturu <strong>js.Value</strong> je definována i metoda
+nazvaná <strong>Length</strong>, která v&nbsp;případě polí vrací jejich délku a
+v&nbsp;případě objektů jiných typů hodnotu vlastnosti <strong>length</strong>
+(samozřejmě v&nbsp;případě, pokud tato vlastnost existuje, mimochodem existuje
+i u řetězců). To znamená, že délku pole je možné v&nbsp;jazyce Go zjistit
+následujícím způsobem:</p>
+
+<pre>
+<i>// získat atribut s délkou pole</i>
+array := args[0]
+length := array.Length()
+</pre>
+
+<p>V&nbsp;demonstračním příkladu se zjistí délka pole, která se následně vypíše
+do webové konzole:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů funkci PrintArrayLength</i>
+<i>// - kontrola typu argumentů předaných funkci ArrayLength</i>
+<i>// - výpočet délky pole předaného do Go funkce</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintArrayLength(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// kontrola typu typu předaného argumentu</i>
+        typ := args[0].Type()
+        if typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// získat atribut s délkou pole</i>
+        array := args[0]
+        length := array.Length()
+&nbsp;
+        <i>// zobrazit zprávu</i>
+        fmt.Printf("Array length = %d\n", length)
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce printArrayLength tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printArrayLength", js.FuncOf(PrintArrayLength))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>HTML stránka pro otestování chování:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: array as argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: array as argument&lt;/h2&gt;
+        &lt;script src="func_call_array_1.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// korektní argumenty</i>
+            <strong>printArrayLength([]);</strong>
+            <strong>printArrayLength([1]);</strong>
+            <strong>printArrayLength([1, 2, 3]);</strong>
+            <strong>printArrayLength(["foo", "bar", "baz"])</strong>
+            <strong>printArrayLength([true, false]);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-5.webp" class="image-1166766" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 5: Výpis délek polí jištěných ve funkci naprogramované
+v&nbsp;jazyce Go.</i></p>
+
+<p>Pozor ovšem na &bdquo;děravé&ldquo; pole, které bude vracet počet prvků
+včetně &bdquo;děr&ldquo; (tedy prvků s&nbsp;nespecifikovanou hodnotou):</p>
+
+<pre>
+arr = [1, 2, 3, 4];
+delete arr[2];
+printArrayLength(arr);
+</pre>
+
+<p>V&nbsp;tomto případě se zjistí a vypíše hodnota <strong>4</strong>.</p>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Přístup k&nbsp;prvkům JavaScriptového pole z&nbsp;Go</h2>
+
+<p>V&nbsp;případě, že je nutné v&nbsp;jazyce Go pracovat s&nbsp;prvky (obsahem)
+polí předaných z&nbsp;JavaScriptu, je nutné tyto prvky konvertovat postupně. To
+znamená, že nemáme k&nbsp;dispozici žádnou univerzální konverzní funkci (nebo
+sadu funkcí), která by například dokázala vrátit Go pole s&nbsp;prvky typu
+<strong>int</strong> nebo <strong>string</strong>. Takové konverzní funkce
+neexistují z&nbsp;toho důvodu, že pole mohou být v&nbsp;JavaScriptu
+heterogenní.</p>
+
+<p>Přístup k&nbsp;prvkům polí tedy musí být proveden postupně, k&nbsp;čemuž
+použijeme metodu <strong>Index</strong>, která pro zadaný index (celé číslo)
+vrátí n-tý prvek pole typu <strong>js.Value</strong>. S&nbsp;tímto prvkem
+následně pracujeme jako s&nbsp;jakoukoli jinou JavaScriptovou hodnotou: můžeme
+zjistit jeho typ, provést konverzi atd.</p>
+
+<p>Nejprve (po příslušných kontrolách, které již známe) získáme hodnotu
+argumentu předaného do Go funkce:</p>
+
+<pre>
+array := args[0]
+</pre>
+
+<p>Jedná se přitom o pole, takže přečteme jeho délku metodou
+<strong>Value.Length()</strong>:</p>
+
+<pre>
+length := array.Length()
+&nbsp;
+<i>// zobrazit zprávu</i>
+fmt.Printf("Array length = %d\n", length)
+</pre>
+
+<p>Následně explicitně projdeme všemi prvky pole a zjistíme typ a hodnotu
+těchto prvků (a to včetně případných &bdquo;děr&ldquo;, které pole mohou
+obsahovat):</p>
+
+<pre>
+<i>// projít prvky pole</i>
+for i := 0; i &lt; length; i++ {
+        item := array.Index(i)
+        fmt.Printf("Item #%d has type = %s and value %v\n",
+                i,
+                item.Type(),
+                item)
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Demonstrační příklad: výpis typů a hodnot všech prvků JavaScriptového pole</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu je ukázán průchod všemi prvky pole
+předaného z&nbsp;JavaScriptu do Go, přičemž pro každý prvek je vypsán jeho typ
+i hodnota:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů předaných funkci PrintArray</i>
+<i>// - kontrola typu argumentů předaných funkci PrintArray</i>
+<i>// - výpočet délky pole</i>
+<i>// - výpis prvků pole</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintArray(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := args[0].Type()
+        if typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// získat atribut s délkou pole</i>
+        array := args[0]
+        length := array.Length()
+&nbsp;
+        <i>// zobrazit zprávu</i>
+        fmt.Printf("Array length = %d\n", length)
+&nbsp;
+        <i>// projít prvky pole</i>
+        for i := 0; i &lt; length; i++ {
+                item := array.Index(i)
+                fmt.Printf("Item #%d has type = %s and value %v\n",
+                        i,
+                        item.Type(),
+                        item)
+        }
+&nbsp;
+        fmt.Println()
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce printArray tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printArray", js.FuncOf(PrintArray))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>HTML stránka, ze které výše deklarovanou funkci <strong>printArray</strong>
+(resp.&nbsp;přesněji řečeno <strong>PrintArray</strong>) voláme, vypadá
+takto:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: array as argument&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: array as argument&lt;/h2&gt;
+        &lt;script src="func_call_array_2.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// korektní argumenty</i>
+            <strong>printArray([]);</strong>
+            <strong>printArray([1]);</strong>
+            <strong>printArray([1, 2, 3]);</strong>
+            <strong>printArray(["foo", "bar", "baz"])</strong>
+            <strong>printArray([true, false]);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Podívejme se na výsledky vypsané do konzole webového prohlížeče:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-6.webp" class="image-1166769" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 6: Výpis prvků polí z&nbsp;jazyka Go.</i></p>
+
+<p>Pro &bdquo;děravé pole&ldquo;, v&nbsp;níž chybí prvek s&nbsp;indexem 2, se
+vypíše:</p>
+
+<pre>
+Array length = 4 func_call_array_2.js:45:25
+Item #0 has type = number and value &lt;number: 1&gt; func_call_array_2.js:45:25
+Item #1 has type = number and value &lt;number: 2&gt; func_call_array_2.js:45:25
+Item #2 has type = undefined and value &lt;undefined&gt; func_call_array_2.js:45:25
+Item #3 has type = number and value &lt;number: 4&gt; func_call_array_2.js:45:25
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Součet prvků předaného pole</h2>
+
+<p>Předpokládejme, že JavaScriptové pole předávané do funkce naprogramované
+v&nbsp;jazyku Go obsahuje pouze číselné hodnoty (a je jedno, zda celá čísla
+nebo čísla s&nbsp;plovoucí řádovou čárkou). Například:</p>
+
+<pre>
+arr = [1, 1.5, 2, 100, -10]
+</pre>
+
+<p>V&nbsp;případě, že budeme chtít sečíst všechny prvky tohoto pole, lze
+postupovat následujícím způsobem. Nejdříve získáme argument s&nbsp;polem a
+zjistíme počet prvků pole (ještě předtím je ovšem vhodné zkontrolovat typ
+argumentu):</p>
+
+<pre>
+<i>// získat atribut s délkou pole</i>
+array := args[0]
+length := array.Length()
+</pre>
+
+<p>Následně můžeme využít sekvenci operací <strong>array.Index(i)</strong>,
+která získá jeden z&nbsp;prvků pole (typu <strong>js.Value</strong>), za níž
+následuje operace <strong>Value.Int()</strong>, jež hodnotu převede na nativní
+celočíselnou hodnotu jazyka Go (pozor na 32bitové platformy!). Mezitím je více
+než vhodné zkontrolovat typ prvku, protože již víme, že JavaScriptová pole
+mohou být heterogenní. Výpočet sumy je pak snadný:</p>
+
+<pre>
+<strong>for</strong> i := 0; i &lt; length; i++ {
+        item := array.Index(i)
+        typ := item.Type()
+        <strong>if</strong> typ != js.TypeNumber {
+                fmt.Printf("Item #%d has incorrect type %s\n", i, typ.String())
+                <strong>return</strong> nil
+        }
+        value := item.Int()
+        sum += value
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Demonstrační příklad: součet všech prvků pole předaného z&nbsp;JavaScriptu do Go</h2>
+
+<p><a href="#k14">Výše uvedený postup pro výpočet součtu všech prvků pole</a>
+je prakticky ukázán na následujícím demonstračním příkladu. Je část
+naprogramovaná v&nbsp;jazyce Go vypadá následovně:</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - kontrola počtu argumentů předaných funkci arraySum</i>
+<i>// - kontrola typu argumentů předaných funkci arraySum</i>
+<i>// - výpočet délky pole</i>
+<i>// - výpočet součtu prvků pole</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> ArraySum(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := args[0].Type()
+        if typ != js.TypeObject {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// získat atribut s délkou pole</i>
+        array := args[0]
+        length := array.Length()
+&nbsp;
+        <i>// zobrazit zprávu</i>
+        fmt.Printf("Array length = %d\n", length)
+&nbsp;
+        <i>// projít prvky pole a vypočítat sumu</i>
+        sum := 0
+&nbsp;
+        <strong>for</strong> i := 0; i &lt; length; i++ {
+                item := array.Index(i)
+                typ := item.Type()
+                <strong>if</strong> typ != js.TypeNumber {
+                        fmt.Printf("Item #%d has incorrect type %s\n", i, typ.String())
+                        <strong>return</strong> nil
+                }
+                value := item.Int()
+                sum += value
+        }
+        fmt.Printf("Sum = %d\n", sum)
+        fmt.Println()
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce arraySum tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("arraySum", js.FuncOf(ArraySum))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>V&nbsp;JavaScriptu se pokusíme funkci <strong>arraySum</strong> zavolat
+s&nbsp;prázdným polem, s&nbsp;polem obsahujícím celočíselné hodnoty, ale taktéž
+s&nbsp;polem, které obsahuje hodnoty jiného typu:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Function call: array sum&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Function call: array sum&lt;/h2&gt;
+        &lt;script src="func_call_array_sum.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            <i>// korektní argumenty</i>
+            <strong>arraySum([]);</strong>
+            <strong>arraySum([1]);</strong>
+            <strong>arraySum([1, 2, 3]);</strong>
+            <strong>arraySum([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);</strong>
+&nbsp;
+            <i>// nekorektní argumenty</i>
+            <strong>arraySum(["foo", "bar", "baz"])</strong>
+            <strong>arraySum([true, false]);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Výsledek by měl po spuštění ve webovém prohlížeči vypadat následovně:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-7.webp" class="image-1166772" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 7: Součty prvků polí s&nbsp;celočíselnými prvky popř.&nbsp;chyby
+u polí, které obsahují prvky odlišného typu.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Předání funkce naprogramované v&nbsp;JavaScriptu do Go</h2>
+
+<p>V&nbsp;úvodní kapitole jsme si řekli, že funkce jsou v&nbsp;JavaScriptu (ale
+i v&nbsp;jazyce Go) plnohodnotným datovým typem, takže je možné funkci předat
+jako argument do jiné funkce popř.&nbsp;naopak získat funkci jako návratovou
+hodnotu z&nbsp;jiné volané funkce. V&nbsp;takovém případě mluvíme o funkcích
+vyššího řádu, to je však téma přesahující tento článek. Ukážeme si namísto
+toho, jakým způsobem lze do jazyka Go předat JavaScriptovou funkci
+(resp.&nbsp;referenci na ni) a jak tuto funkci z&nbsp;Go zavolat.</p>
+
+<p>Ze strany JavaScriptu může celý problém vypadat následovně &ndash;
+nadeklarujeme funkci nazvanou <strong>foo</strong> a tu předáme do funkce
+nazvané <strong>callFunction</strong>. Přitom nevíme a ani nás nemusí zajímat,
+zda se jedná o JavaScriptovou funkci nebo o funkci naprogramovanou v&nbsp;Go a
+transpilovanou do JavaScriptu nebo spuštěnou v&nbsp;rámci WebAssembly:</p>
+
+<pre>
+&lt;script type="text/javascript"&gt;
+function foo(message) {
+    window.alert(message);
+}
+&nbsp;
+<strong>callFunction(foo);</strong>
+&lt;/script&gt;
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Zavolání JavaScriptové funkce</h2>
+
+<p>Na straně Go tedy máme argument, který by měl být typu
+<strong>js.TypeFunction</strong>. To si můžeme velmi snadno ověřit:</p>
+
+<pre>
+<i>// kontrola typu předaného argumentu</i>
+typ := args[0].Type()
+<strong>if</strong> typ != js.TypeFunction {
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Pokud je argument skutečně typu &bdquo;javascriptová funkce&ldquo;, můžeme
+tuto funkci zavolat a předat jí libovolné argumenty. Pro tento účel se používá
+metoda <strong>Invoke</strong> s&nbsp;hlavičkou:</p>
+
+<pre>
+func (v Value) Invoke(args ...any) Value
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že můžeme předat
+libovolný počet (a typ) argumentů, které jsou automaticky převedeny z&nbsp;Go
+do JavaScriptové obdoby. Výsledkem je opět hodnota typu
+<strong>js.Value</strong>, se kterou můžeme dále pracovat.</div></p>
+
+<p>Příklad zavolání funkce, jejíž referenci jsme získali, a předání řetězce do
+této funkce:</p>
+
+<pre>
+function := args[0]
+&nbsp;
+function.Invoke("Called from Go!")
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Demonstrační příklad: zavolání JavaScriptové funkce z&nbsp;jazyka Go</h2>
+
+<p>V&nbsp;dnešním posledním demonstračním příkladu je ukázán postup popsaný
+v&nbsp;předchozích dvou kapitolách. V&nbsp;Go části aplikace otestujeme, zda je
+předán argument typu &bdquo;javascriptová funkce&ldquo; a pokud tomu tak je,
+tuto funkci zavoláme a předáme jí řetězec (ten je automaticky
+zkonvertován):</p>
+
+<pre>
+<i>// Technologie WebAssembly a GopherJS</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+<i>// - zavolání callback funkce</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<strong>func</strong> CallFunction(this js.Value, args []js.Value) any {
+        <i>// kontrola počtu předaných argumentů</i>
+        if len(args) != 1 {
+                fmt.Printf("incorrect number of arguments %d, but exactly one is accepted\n", len(args))
+                <strong>return</strong> nil
+        }
+&nbsp;
+        <i>// kontrola typu předaného argumentu</i>
+        typ := args[0].Type()
+        <strong>if</strong> typ != js.TypeFunction {
+                fmt.Printf("Argument #0 has incorrect type %s\n", typ.String())
+                <strong>return</strong> nil
+        }
+&nbsp;
+        function := args[0]
+&nbsp;
+        function.Invoke("Called from Go!")
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        js.Global().Set("callFunction", js.FuncOf(CallFunction))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        <i>// (nutno provést při překladu do WebAssembly, ktežto</i>
+        <i>// v případě použití GopherJS je možné hlavní funkci ukončit)</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Na HTML stránce je nejdříve nadeklarována nová JavaScriptová funkce. Ta je
+následně předána do kódu naprogramovaného v&nbsp;Go:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Callback&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;Callback&lt;/h2&gt;
+        &lt;script src="callback.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+        <strong>function foo(message) {</strong>
+            <strong>window.alert(message);</strong>
+        <strong>}</strong>
+&nbsp;
+        <strong>callFunction(foo);</strong>
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Po zobrazení HTML stránky se nejprve vytvoří funkce <strong>foo</strong>,
+následně je předána do Go a poté je odsud spuštěna. Výsledkem by měl být dialog
+zobrazený voláním <strong>window.alert</strong>, přičemž zprávou je řetězec
+předaný v&nbsp;Go:</p>
+
+<img src="https://i.iinfo.cz/images/221/gopherjs-3-8.webp" class="image-1166775" width="653" height="477" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" />
+<p><i>Obrázek 8: Dialog vyvolaný nepřímo z&nbsp;jazyka Go.</i></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Demonstrační příklady napsané v&nbsp;jazyce Go, které jsou určené pro
+transpřeklad do JavaScriptu s&nbsp;využitím nástroje <strong>GopherJS</strong>,
+byly uloženy do Git repositáře, jenž je dostupný na adrese <a
+href="https://github.com/RedHatOfficial/GoCourse">https://github.com/RedHatOfficial/GoCourse</a>.
+Jednotlivé demonstrační příklady si můžete v&nbsp;případě potřeby stáhnout i
+jednotlivě bez nutnosti klonovat celý (dnes již poměrně rozsáhlý)
+repositář:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td> 1</td><td>func_call_no_arguments.go</td><td>první demonstrační příklad: zavolání Go funkce bez předání argumentů</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_no_arguments.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_no_arguments.go</a></td></tr>
+<tr><td> 2</td><td>func_call_no_arguments.html</td><td>HTML stránka s&nbsp;kódem pro načtení prvního demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_no_arguments.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_no_arguments.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>func_call_with_arguments.go</td><td>druhý demonstrační příklad: výpis všech argumentů předaných funkci volané z&nbsp;JavaScriptu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_with_arguments.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_with_arguments.go</a></td></tr>
+<tr><td> 4</td><td>func_call_with_arguments.html</td><td>HTML stránka s&nbsp;kódem pro načtení druhého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_with_arguments.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_with_arguments.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>func_call_argument_types_1.go</td><td>třetí demonstrační příklad: výpis typu argumentů, které jsou obaleny strukturou <strong>js.Value</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_1.go</a></td></tr>
+<tr><td> 6</td><td>func_call_argument_types_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení třetího demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>func_call_argument_types_2.go</td><td>čtvrtý demonstrační příklad: vylepšené řešení tisku argumentů funkce volané z&nbsp;JavaScriptu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_2.go</a></td></tr>
+<tr><td> 8</td><td>func_call_argument_types_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení čtvrtého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_argument_types_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>func_call_two_ints.go</td><td>pátý demonstrační příklad: realizace předání a konverze dvou argumentů typu <i>celé číslo</i></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_ints.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_ints.go</a></td></tr>
+<tr><td>10</td><td>func_call_two_ints.html</td><td>HTML stránka s&nbsp;kódem pro načtení pátého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_ints.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_ints.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>func_call_two_floats.go</td><td>šestý demonstrační příklad: realizace předání a konverze dvou argumentů typu <i>double</i></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_floats.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_floats.go</a></td></tr>
+<tr><td>12</td><td>func_call_two_floats.html</td><td>HTML stránka s&nbsp;kódem pro načtení šestého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_floats.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_two_floats.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>func_call_return_int_1.go</td><td>sedmý demonstrační příklad: vrácení hodnoty typu <i>int</i> do JavaScriptu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_1.go</a></td></tr>
+<tr><td>14</td><td>func_call_return_int_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení sedmého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>15</td><td>func_call_return_int_2.go</td><td>osmý demonstrační příklad: vrácení hodnoty typu <i>int</i> do JavaScriptu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_2.go</a></td></tr>
+<tr><td>16</td><td>func_call_return_int_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení osmého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_return_int_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>17</td><td>func_call_string.go</td><td>devátý demonstrační příklad: předání řetězce z&nbsp;JavaScriptu do Go</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_string.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_string.go</a></td></tr>
+<tr><td>18</td><td>func_call_string.html</td><td>HTML stránka s&nbsp;kódem pro načtení devátého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_string.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_string.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>func_call_object_1.go</td><td>desátý demonstrační příklad: předání objektu z&nbsp;JavaScriptu do Go</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_1.go</a></td></tr>
+<tr><td>20</td><td>func_call_object_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení desátého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>21</td><td>func_call_object_2.go</td><td>jedenáctý demonstrační příklad: přístup k&nbsp;atributům předaného objektu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_2.go</a></td></tr>
+<tr><td>22</td><td>func_call_object_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení jedenáctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>23</td><td>func_call_object_3.go</td><td>dvanáctý demonstrační příklad: konverze atributů předaného objektu do nativních typů Go</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_3.go</a></td></tr>
+<tr><td>24</td><td>func_call_object_3.html</td><td>HTML stránka s&nbsp;kódem pro načtení dvanáctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_3.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_object_3.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>25</td><td>func_call_array_1.go</td><td>třináctý demonstrační příklad: předání pole se získáním počtu prvků</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_1.go</a></td></tr>
+<tr><td>26</td><td>func_call_array_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení třináctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>27</td><td>func_call_array_2.go</td><td>čtrnáctý demonstrační příklad: výpis prvků předaného pole</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_2.go</a></td></tr>
+<tr><td>28</td><td>func_call_array_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení čtrnáctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>29</td><td>func_call_array_sum.go</td><td>patnáctý demonstrační příklad: součet prvků předaného pole</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_sum.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_sum.go</a></td></tr>
+<tr><td>30</td><td>func_call_array_sum.html</td><td>HTML stránka s&nbsp;kódem pro načtení patnáctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_sum.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/func_call_array_sum.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>31</td><td>callback.go</td><td>šestnáctý demonstrační příklad: předání funkce s&nbsp;jejím zavoláním</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/callback.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/callback.go</a></td></tr>
+<tr><td>32</td><td>callback.html</td><td>HTML stránka s&nbsp;kódem pro načtení šestnáctého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/callback.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/callback.html</a></td></tr>
+</table>
+
+<p>Pro úplnost si uveďme i odkazy na ukázkové příklady použité <a
+href="https://www.root.cz/clanky/gopherjs-transprekladac-z-jazyka-go-do-javascriptu/">minule</a>:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td>1</td><td>hello_world.go</td><td>zdrojový kód prvního demonstračního příkladu: výpis zprávy na konzoli webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.go</a></td></tr>
+<tr><td>1</td><td>hello_world.html</td><td>HTML stránka s&nbsp;kódem pro načtení prvního demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>2</td><td>dom_manipulation.go</td><td>zdrojový kód druhého demonstračního příkladu: manipulace s&nbsp;DOMem webové stránky</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.go</a></td></tr>
+<tr><td>2</td><td>dom_manipulation.html</td><td>HTML stránka s&nbsp;kódem pro načtení druhého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>3</td><td>dom_add_element.go</td><td>zdrojový kód třetího demonstračního příkladu: přidání elementů do DOMu webové stránky</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.go</a></td></tr>
+<tr><td>3</td><td>dom_add_element.html</td><td>HTML stránka s&nbsp;kódem pro načtení třetího demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>4</td><td>draw_into_canvas.go</td><td>zdrojový kód čtvrtého demonstračního příkladu: kreslení do canvasu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.go</a></td></tr>
+<tr><td>4</td><td>draw_into_canvas.html</td><td>HTML stránka s&nbsp;kódem pro načtení čtvrtého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>5</td><td>js_interop_1.go</td><td>zdrojový kód pátého demonstračního příkladu: komunikace s&nbsp;JavaScriptem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.go</a></td></tr>
+<tr><td>5</td><td>js_interop_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení pátého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>6</td><td>js_interop_2.go</td><td>zdrojový kód šestého demonstračního příkladu: komunikace s&nbsp;JavaScriptem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.go</a></td></tr>
+<tr><td>6</td><td>js_interop_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení šestého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>7</td><td>http_server.go</td><td>implementace HTTP serveru, který dokáže webovému prohlížeči předávat obsah požadovaných souborů</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/http_server.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/http_server.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>8</td><td>hello_world_2.go</td><td>varianta programu typu &bdquo;Hello, world!&ldquo;, která volá pouze funkci <strong>println()</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world_2.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>go2js<br />
+<a href="https://github.com/tredoe/go2js">https://github.com/tredoe/go2js</a>
+</li>
+
+<li>GitHub repositář projektu GopherJS<br />
+<a href="https://github.com/gopherjs/gopherjs">https://github.com/gopherjs/gopherjs</a>
+</li>
+
+<li>How to use GopherJS to turn Go code into a JavaScript library<br />
+<a href="https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a">https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a</a>
+</li>
+
+<li>Source to source compiler<br />
+<a href="https://en.wikipedia.org/wiki/Source-to-source_compiler">https://en.wikipedia.org/wiki/Source-to-source_compiler</a>
+</li>
+
+<li>Binary recompiler<br />
+<a href="https://en.wikipedia.org/wiki/Binary_recompiler">https://en.wikipedia.org/wiki/Binary_recompiler</a>
+</li>
+
+<li>py2many na GitHubu<br />
+<a href="https://github.com/py2many/py2many">https://github.com/py2many/py2many</a>
+</li>
+
+<li>py2many na PyPi<br />
+<a href="https://pypi.org/project/py2many/">https://pypi.org/project/py2many/</a>
+</li>
+
+<li>Awesome Transpilers<br />
+<a href="https://github.com/milahu/awesome-transpilers">https://github.com/milahu/awesome-transpilers</a>
+</li>
+
+<li>WebAssembly<br />
+<a href="https://webassembly.org/">https://webassembly.org/</a>
+</li>
+
+<li>WebAssembly na Wiki Golangu<br />
+<a href="https://github.com/golang/go/wiki/WebAssembly">https://github.com/golang/go/wiki/WebAssembly</a>
+</li>
+
+<li>The future of WebAssembly - A look at upcoming features and proposals<br />
+<a href="https://blog.scottlogic.com/2018/07/20/wasm-future.html">https://blog.scottlogic.com/2018/07/20/wasm-future.html</a>
+</li>
+
+<li>Writing WebAssembly By Hand<br />
+<a href="https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html">https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html</a>
+</li>
+
+<li>WebAssembly Specification<br />
+<a href="https://webassembly.github.io/spec/core/index.html">https://webassembly.github.io/spec/core/index.html</a>
+</li>
+
+<li>Index of Instructions<br />
+<a href="https://webassembly.github.io/spec/core/appendix/index-instructions.html">https://webassembly.github.io/spec/core/appendix/index-instructions.html</a>
+</li>
+
+<li>The WebAssembly Binary Toolkit<br />
+<a href="https://github.com/WebAssembly/wabt">https://github.com/WebAssembly/wabt</a>
+</li>
+
+<li>Will WebAssembly replace JavaScript? Or Will WASM Make JavaScript More Valuable in Future?<br />
+<a href="https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e">https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e</a>
+</li>
+
+<li>Roadmap (pro WebAssemly)<br />
+<a href="https://webassembly.org/roadmap/">https://webassembly.org/roadmap/</a>
+</li>
+
+<li>Transcrypt<br />
+<a href="https://transcrypt.org/">https://transcrypt.org/</a>
+</li>
+
+<li>JavaScript Data Types<br />
+<a href="https://www.geeksforgeeks.org/javascript-data-types/">https://www.geeksforgeeks.org/javascript-data-types/</a>
+</li>
+
+<li>Standardní balíček <strong>syscall/js</strong><br />
+<a href="https://pkg.go.dev/syscall/js">https://pkg.go.dev/syscall/js</a>
+</li>
+
+<li>Data types<br />
+<a href="https://javascript.info/types">https://javascript.info/types</a>
+</li>
+
+<li>Datové typy (napsáno poněkud zjednodušeně)<br />
+<a href="https://naucme.it/chapter/qa-04">https://naucme.it/chapter/qa-04</a>
+</li>
+
+<li>Primitive (JavaScript)<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/Primitive">https://developer.mozilla.org/en-US/docs/Glossary/Primitive</a>
+</li>
+
+<li>JavaScript type: String<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/String">https://developer.mozilla.org/en-US/docs/Glossary/String</a>
+</li>
+
+<li>JavaScript type: Number<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/Number">https://developer.mozilla.org/en-US/docs/Glossary/Number</a>
+</li>
+
+<li>JavaScript type: Boolean<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/Boolean">https://developer.mozilla.org/en-US/docs/Glossary/Boolean</a>
+</li>
+
+<li>JavaScript type: Undefined<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/Undefined">https://developer.mozilla.org/en-US/docs/Glossary/Undefined</a>
+</li>
+
+<li>JavaScript type: Null<br />
+<a href="https://developer.mozilla.org/en-US/docs/Glossary/Null">https://developer.mozilla.org/en-US/docs/Glossary/Null</a>
+</li>
+
+<li>JavaScript type: Symbol<br />
+<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol</a>
+</li>
+
+<li>JavaScript type: BigInt<br />
+<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="https://github.com/tisnik/">Pavel Tišnovský</a> &nbsp; 2024</small></p>
+</body>
+</html>
+
