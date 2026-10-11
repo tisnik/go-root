@@ -288,7 +288,7 @@ var StaticStylesheets embed.FS
 
 // Scripts
 //
-//go:embed scripts/*.js
+//go:embed *.js
 var Scripts embed.FS
 
 // ---------------------------------------------------------------------------
@@ -392,7 +392,7 @@ func (s ServerImpl) serveFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Write(Favicon)
 }
 
-// serveScripts serves a JavaScript file from the embedded scripts directory.
+// serveScripts serves a JavaScript file containing the frontend.
 //
 // It maps the request path to an embedded file, returns the file contents,
 // and responds with 404 if the script does not exist.
