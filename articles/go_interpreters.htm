@@ -1,0 +1,1855 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Go v roli skriptovacího programovacího jazyka</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Go v roli skriptovacího programovacího jazyka</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Jazyk Go je kompilovaný programovací jazyk. Ovšem i přesto vzniklo několik interpretrů tohoto jazyka, což umožňuje Go použít v interaktivní smyčce REPL i v Jupyter Notebooku. Navíc je možné interpret Go zabudovat do jiných aplikací a rozšířit tak jejich možnosti.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Go v&nbsp;roli skriptovacího programovacího jazyka</a></p>
+<p><a href="#k02">2. Skriptovací jazyky v&nbsp;současnosti</a></p>
+<p><a href="#k03">3. Projekt <i>Gore</i></a></p>
+<p><a href="#k04">4. Instalace projektu <i>Gore</i> a spuštění interaktivní smyčky REPL</a></p>
+<p><a href="#k05">5. První kroky s&nbsp;interpretrem Gore</a></p>
+<p><a href="#k06">6. Speciální pseudopříkazy používané v&nbsp;REPL projektu Gore</a></p>
+<p><a href="#k07">7. Získání typu výrazu a omezené možnosti této techniky</a></p>
+<p><a href="#k08">8. Automatický import balíčků</a></p>
+<p><a href="#k09">9. Způsob generování zdrojových kódů interpretrem Gore</a></p>
+<p><a href="#k10">10. Interpet <i>Yaegi</i></a></p>
+<p><a href="#k11">11. REPL interpretru <i>Yaegi</i></a></p>
+<p><a href="#k12">12. Interpret <i>Yaegi</i> zabudovaný do aplikace</a></p>
+<p><a href="#k13">13. Interpret <i>Gomacro</i></a></p>
+<p><a href="#k14">14. Instalace <i>Gomacra</i> s&nbsp;jeho spuštěním</a></p>
+<p><a href="#k15">15. Interní příkazy interpretru <i>Gomacro</i></a></p>
+<p><a href="#k16">16. Inspektor v&nbsp;interpretru <i>Gomacro</i></a></p>
+<p><a href="#k17">17. Debugger integrovaný do Gomacra</a></p>
+<p><a href="#k18">18. Interpret Gomacro zabudovaný do aplikace</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Go v&nbsp;roli skriptovacího programovacího jazyka</h2>
+
+<p>Pro čtenáře <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">seriálu o
+programovacím jazyce Go</a> pravděpodobně nebude tvrzení, že Go je překládaný
+(kompilovaný) programovací jazyk, žádným překvapením. Zdrojové kódy psané
+v&nbsp;jazyce Go se skutečně před svým spuštěním nejdříve překládají, a to buď
+do nativního kódu zvolené platformy (x86, x86-64, ARM 32bit, Aarch64, RISC-V
+atd.), nebo do bajtkódu WebAssembly. Alternativně je možné použít
+transpřekladač (transpiler) <i>GopherJS</i>, který dokáže zdrojové kódy psané
+v&nbsp;jazyce Go transformovat do JavaScriptu. Touto technologií jsme se
+zabývali v&nbsp;[<a
+href="https://www.root.cz/clanky/gopherjs-transprekladac-z-jazyka-go-do-javascriptu/">1</a>],
+[<a
+href="https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem/">2</a>]
+a [<a
+href="https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem-dokonceni/">3</a>].</p>
+
+<p>Výhody překladače, resp.&nbsp;přesněji řečeno překladače programovacího
+jazyka se silným typovým systémem, jsou pravděpodobně většině vývojářů zřejmé
+&ndash; vyšší rychlost běhu aplikací, obecně menší paměťové nároky procesů, na
+cílovém počítači nemusí být nainstalován žádný interpret a v&nbsp;neposlední
+řadě je poměrně velká část chyb (bohužel spíše těch triviálních) objevena již
+překladačem. Navíc je programovací jazyk Go známý tím, že jeho překladač je
+velmi rychlý &ndash; mnohdy tak rychlý, že je fáze překladu prakticky
+&bdquo;neviditelná&ldquo; (v&nbsp;závislosti na velikosti projektu se může
+jednat například o 200 ms atd. &ndash; což je z&nbsp;pohledu lidského vývojáře
+prakticky okamžitě a cyklus <i>edit-compile-run</i> se tak de facto zkracuje na
+<i>edit-run</i>). Ostatně příkaz <strong>go run</strong> se skrytím procesu
+překladu a následným odstraněním spustitelného souboru snaží tvářit jako
+interpretovaný jazyk.</p>
+
+<p>Nicméně existují oblasti, v&nbsp;nichž se prosadil dosti odlišný způsob
+vývoje, který je založen na přímé interakci (resp.&nbsp;dialogu) mezi
+uživatelem a počítačem. V&nbsp;tom nejjednodušším případě se jedná o systémy
+vybavené interaktivní smyčkou REPL (<i>Read Eval Print Loop</i>), jejichž
+poněkud primitivní podobu si někteří mohou pamatovat z&nbsp;dob osmibitových
+mikropočítačů a interpretrů jazyka BASIC. Nicméně klasický REPL najdeme
+například i v&nbsp;Pythonu a dalších moderních skriptovacích jazycích (pro
+Python navíc existují různá jeho rozšíření, například v&nbsp;podobě
+<i>IPythonu</i>). V&nbsp;současnosti se mnohdy původní REPL nahrazuje spíše
+rozhraním ve stylu diáře (<i>notebooku</i>). Příkladem je projekt <a
+href="https://www.root.cz/clanky/jupyter-notebook-nastroj-pro-programatory-vyzkumniky-i-lektory/">Jupyter
+Notebook</a>, který v&nbsp;současnosti podporuje velké množství skriptovacích
+jazyků.</p>
+
+<p>Kromě existence REPLu je důležitá i další technologie &ndash; rozšíření
+nějaké aplikace o možnost jejího ovládání pomocí skriptů. Tato technologie
+dokáže dosti podstatným způsobem rozšířit možnosti takové aplikace, a to klidně
+o řád nebo i několik řádů. Možnosti skriptování je vybavena relativně velká
+část aplikací, ať již se to týká programátorských textových editorů, nástrojů
+typu <i>office</i>, CADů a 3D modelovacích programů, ale například i takové
+&bdquo;maličkosti&ldquo;, jakou jsou prohlížeče HTML stránek (zde je zvětšení
+možností o několik řádů asi nejvíce patrné). To znamená, že bychom uvítali,
+kdyby i námi vyvíjené aplikace tuto možnost nabízely.</p>
+
+<p>Go jakožto překládaný jazyk do této kategorie nepatří, ovšem i přesto
+vzniklo hned několik projektů, které se snaží o využití Go jakožto
+interaktivního skriptovacího jazyka. A právě některé z&nbsp;těchto projektů si
+představíme v&nbsp;dnešním článku.</p>
+
+<p><div class="rs-tip-major">Poznámka: už na tomto místě je vhodné upozornit na
+to, že některé dále zmíněné projekty se stále nachází ve fázi vývoje a není tak
+praktické na nich postavit aplikace určené do produkčního nasazení. Na druhou
+stranu například integrace jazyka Go do <i>Jupyter Notebooku</i> je již dosti
+stabilní a užitečná i v&nbsp;praxi.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Skriptovací jazyky v&nbsp;současnosti</h2>
+
+<p>V&nbsp;současnosti se v&nbsp;praxi používá poměrně velké množství různých
+skriptovacích jazyků. A nutno dodat, že se v&nbsp;některých případech jedná o
+velmi populární jazyky, o čemž se ostatně můžeme snadno přesvědčit například na
+stránkách <a href="https://www.tiobe.com/tiobe-index/">indexu Tiobe</a> nebo je
+to ještě více patrné na stránce <a href="https://pypl.github.io/PYPL.html">PYPL
+PopularitY of Programming Language</a>. V&nbsp;tabulce zobrazené pod tímto
+odstavcem jsou vypsány některé populární (či v&nbsp;minulosti populární &ndash;
+příkladem je <i>ActionScript</i>) skriptovací jazyky. Ty jsou seřazeny podle
+svého jména, ovšem nechybí zde ani Python, JavaScript či jazyk R (ten je ovšem
+používán spíše mimo profesionální IT komunitu; můžeme ho pokládat za doménově
+specifický jazyk):</p>
+
+<table>
+<tr><th>Skriptovací jazyk</th></tr>
+<tr><td>AppleScript</td></tr>
+<tr><td>AWK</td></tr>
+<tr><td>BeanShell</td></tr>
+<tr><td>Bash</td></tr>
+<tr><td>Ch</td></tr>
+<tr><td>ActionScript</td></tr>
+<tr><td>JavaScript</td></tr>
+<tr><td>Game Maker Language</td></tr>
+<tr><td>Julia</td></tr>
+<tr><td>Groovy</td></tr>
+<tr><td>Korn shell</td></tr>
+<tr><td>Lua</td></tr>
+<tr><td>Perl</td></tr>
+<tr><td>PHP</td></tr>
+<tr><td>PowerShell</td></tr>
+<tr><td>Python</td></tr>
+<tr><td>R</td></tr>
+<tr><td>Rebol</td></tr>
+<tr><td>Rexx</td></tr>
+<tr><td>S-lang</td></tr>
+<tr><td>Tcl</td></tr>
+<tr><td>VBScript</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je vhodné doplnit, že pro
+některé výše zmíněné skriptovací jazyky existují i (plnohodnotné) překladače.
+Takový programovací jazyk je tedy možné použít podle přání a potřeb vývojáře
+jak pro tvorbu přímo spouštěných skriptů, tak i pro překlad do nativního kódu.
+Příkladem takového programovacího jazyka je <i>Julia</i>, kterému jsme se již
+na stránkách Roota věnovali <a
+href="https://www.root.cz/serialy/programovaci-jazyk-julia/">v&nbsp;samostatném
+seriálu</a>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Projekt <i>Gore</i></h2>
+
+<p>Prvním interpretrem programovacího jazyka Go, se kterým se dnes seznámíme,
+je interpret nazvaný <strong>Gore</strong>. S&nbsp;tímto projektem jsme se již
+<a href="https://www.root.cz/serialy/programovaci-jazyk-go/">v&nbsp;seriálu o
+programovacím jazyce Go</a> jednou setkali. Připomeňme si, že tento projekt
+nabízí (z&nbsp;pohledu uživatele &ndash; programátora) interpret plnohodnotného
+jazyka Go, který je navíc vybaven interaktivní smyčkou REPL. Ta nabízí základní
+editační příkazy, historii zadaných příkazů, hledání v&nbsp;historii příkazů
+atd.  &ndash; tedy dnes již standardní a očekávané vlastnosti.</p>
+
+<p>Díky využití projektu <strong>gocode</strong> nabízí interaktivní smyčka
+REPL i automatické doplňování příkazů, což je samozřejmě velmi užitečná
+technologie (a opět &ndash; dnes již očekávaná jako standard). Projekt
+<i>Gore</i> je dostupný na adrese <a
+href="https://github.com/x-motemen/gore">https://github.com/x-motemen/gore</a>.
+Interně je řešen vlastně dosti triviálním způsobem: používá totiž příkaz
+<strong>go run</strong> pro překlad a spuštění zadávaného kódu po zápisu
+každého příkazu nebo bloku. Díky rychlosti překladače jazyka Go je sice toto
+zdržení nepatrné a pravděpodobně si ho v&nbsp;případě menších skriptů ani
+nevšimnete, nicméně se nejedná o standardní chování, které se od interpretrů
+očekává a taktéž se některé příkazy a knihovní funkce mohou chovat
+&bdquo;divně&ldquo;, protože se ztrácí kontext. Například se může jednat o
+přečtení času, vygenerování náhodného čísla, přístup do databáze atd.</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Instalace projektu <i>Gore</i> a spuštění interaktivní smyčky REPL</h2>
+
+<p>Ještě před samotnou instalací projektu <i>Gore</i> je nutné nainstalovat
+nástroj <strong>gocode</strong>, o němž jsme se zmínili již <a
+href="#k03">v&nbsp;předchozí kapitole</a>. Je dosti pravděpodobné, že pokud
+vyvíjíte programy v&nbsp;jazyce Go, máte již <strong>gocode</strong>
+nainstalován, což lze velmi snadno otestovat:</p>
+
+<pre>
+$ <strong>whereis gocode</strong>
+&nbsp;
+gocode: /home/ptisnovs/go/bin/gocode
+</pre>
+
+<p>V&nbsp;případě, že <strong>gocode</strong> nainstalován není, použijte
+následující příkaz, který nainstaluje jeho poslední dostupnou verzi:</p>
+
+<pre>
+$ <strong>go install github.com/mdempsky/gocode@latest</strong>
+&nbsp;
+go: downloading github.com/mdempsky/gocode v0.0.0-20200405233807-4acdcbdea79d
+go: finding module for package golang.org/x/tools/go/gcexportdata
+go: downloading golang.org/x/tools v0.28.0
+go: found golang.org/x/tools/go/gcexportdata in golang.org/x/tools v0.28.0
+</pre>
+
+<p>Ověříme si, že <strong>gocode</strong> lze spustit</p>
+
+<pre>
+$ <strong>gocode -help</strong>
+&nbsp;
+Usage: gocode [-s] [-f=<format>] [-in=<path>] [-sock=<type>] [-addr=<addr>]
+       <command> [<args>]
+&nbsp;
+Flags:
+  -addr string
+        address for tcp socket (default "127.0.0.1:37373")
+  -builtin
+        propose completions for built-in functions and types
+  -cache
+        use the cache importer
+  -debug
+        enable server-side debug mode
+  -f string
+        output format (vim | emacs | sexp | nice | csv | json) (default "nice")
+  -fallback-to-source
+        if importing a package fails, fallback to the source importer
+  -ignore-case
+        do case-insensitive matching
+  -in string
+        use this file instead of stdin input
+  -s    run a server instead of a client
+  -sock string
+        socket type (unix | tcp | none) (default "unix")
+  -source
+        use source importer
+  -unimported-packages
+        propose completions for standard library packages not explicitly imported
+&nbsp;
+Commands:
+  autocomplete [<path>] <offset>     main autocompletion command
+  exit                               terminate the gocode daemon
+</pre>
+
+<p>Ve druhém kroku již nainstalujeme samotný projekt <strong>Gore</strong>;
+opět jeho poslední verzi:</p>
+
+<pre>
+$ <strong>go install github.com/x-motemen/gore/cmd/gore@latest</strong>
+&nbsp;
+go: downloading github.com/x-motemen/gore v0.5.7
+go: downloading github.com/peterh/liner v1.2.2
+go: downloading golang.org/x/tools v0.13.0
+go: downloading github.com/motemen/go-quickfix v0.0.0-20230925231438-5cf0001766ff
+go: downloading golang.org/x/text v0.13.0
+go: downloading github.com/mattn/go-runewidth v0.0.15
+go: downloading golang.org/x/sys v0.12.0
+go: downloading golang.org/x/mod v0.12.0
+go: downloading github.com/rivo/uniseg v0.4.4
+</pre>
+
+<p>Ověříme, že je příkaz <strong>gore</strong> dostupný z&nbsp;shellu:</p>
+
+<pre>
+$ <strong>whereis gore</strong>
+&nbsp;
+gore: /home/ptisnovs/go/bin/gore
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: mělo by tomu tak být, protože
+v&nbsp;opačném případě (špatně nastavená <strong>$PATH</strong>) nebudou
+správně pracovat ani další nástroje pro jazyk Go.</p></div></p>
+
+<p>Nakonec <strong>gore</strong> spustíme, resp.&nbsp;si necháme zobrazit
+nápovědu:</p>
+
+<pre>
+$ <strong>gore --help</strong>
+&nbsp;
+gore - A Go REPL
+&nbsp;
+Version: 0.5.7 (rev: HEAD/go1.22.1)
+&nbsp;
+Synopsis:
+    % gore
+&nbsp;
+Options:
+  -autoimport
+        formats and adjusts imports automatically
+  -context string
+        import packages, functions, variables and constants from external golang source files
+  -pkg string
+        the package where the session will be run inside
+  -version
+        print gore version
+</pre>
+
+<p>Samotný interpret se spouští bez přepínačů:</p>
+
+<pre>
+$ <strong>gore</strong>
+&nbsp;
+:gore version 0.5.7  :help for help
+</pre>
+
+<p>Po spuštění interpretru by se měla zobrazit jednořádková nápověda (viz
+předchozí výpis) a <strong>gore</strong> očekává uživatelské příkazy. Například
+si můžeme zobrazit jeho krátkou nápovědu zadáním <strong>:help</strong> (včetně
+dvojtečky na začátku):</p>
+
+<pre>
+gore&gt; <strong>:help</strong>
+&nbsp;
+    :import &lt;package&gt;     import a package
+    :type &lt;expr&gt;          print the type of expression
+    :print                print current source
+    :write [&lt;file&gt;]       write out current source
+    :clear                clear the codes
+    :doc &lt;expr or pkg&gt;    show documentation
+    :help                 show this help
+    :quit                 quit the session
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. První kroky s&nbsp;interpretrem Gore</h2>
+
+<p>V&nbsp;projektu Gore je možné, ostatně podobně jako v&nbsp;klasických
+interpretrech, zadávat jednotlivé příkazy, které se ihned vykonají a vypíše se
+jejich návratová hodnota. Pokud se jedná o běžné výrazy, je to snadné, což si
+můžeme ukázat na několika příkladech:</p>
+
+<pre>
+gore&gt; <strong>1+2</strong>
+3
+&nbsp;
+gore&gt; <strong>nil</strong>
+nil
+&nbsp;
+gore&gt; <strong>"foo" + "bar"</strong>
+"foobar"
+&nbsp;
+gore&gt; <strong>"foobar"[2:6]</strong>
+"obar"
+</pre>
+
+<p>Pracovat je možné i s&nbsp;proměnnými, u kterých se dá s&nbsp;výhodou využít
+speciální operátor pro jejich deklaraci s&nbsp;přiřazením a s&nbsp;odvozením
+datového typu:</p>
+
+<pre>
+gore&gt; <strong>x:=6</strong>
+6
+&nbsp;
+gore&gt; <strong>y:=7</strong>
+7
+&nbsp;
+gore&gt; <strong>x*y</strong>
+42
+&nbsp;
+gore&gt; <strong>x&lt;y</strong>
+true
+</pre>
+
+<p>Samotné výrazy jsou vždy pouze vyhodnoceny a poté interpretr
+&bdquo;zapomene&ldquo;, že byly vyhodnocovány. Naproti tomu deklarace
+proměnných se stává součástí interně vytvářeného programu (zdrojového kódu).
+Ten si můžeme zobrazit pseudopříkazem <strong>:print</strong>:</p>
+
+<pre>
+gore&gt; <strong>:print</strong>
+&nbsp;
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 6; y := 7 }
+</pre>
+
+<p>Povšimněte si, že se v&nbsp;postupně doplňované funkci <strong>main</strong>
+skutečně nachází deklarace proměnných. A interpret Gore nás odstíní od chyb
+typu &bdquo;proměnná X je deklarovaná, ale nepoužívá se&ldquo; (což je dobrá
+detekce pro překladač, ale nikoli pro interaktivní interpret).</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Speciální pseudopříkazy používané v&nbsp;REPL projektu Gore</h2>
+
+<p>S&nbsp;takzvanými pseudopříkazy jsme se již částečně setkali
+v&nbsp;předchozích dvou kapitolách. Tyto pseudopříkazy začínají znakem
+dvojtečky a můžeme je použít například pro získání dokumentace. Následující
+pseudopříkaz například vypíše dokumentaci k&nbsp;zabudované funkci
+<strong>println</strong>:</p>
+
+<pre>
+gore&gt; <strong>:doc println</strong>
+&nbsp;
+func println(args ...Type)
+    The println built-in function formats its arguments in an
+    implementation-specific way and writes the result to standard error. Spaces
+    are always added between arguments and a newline is appended. Println is
+    useful for bootstrapping and debugging; it is not guaranteed to stay in the
+    language.
+</pre>
+
+<p>Dalším často používaným pseudopříkazem je příkaz <strong>:import</strong>,
+který je v&nbsp;Gore možné použít kdykoli, nikoli jen na začátku balíčku (pojem
+balíček je ovšem v&nbsp;rámci REPLu poněkud mlhavý):</p>
+
+<pre>
+gore&gt; <strong>:import fmt</strong>
+</pre>
+
+<p>Ihned po importu balíčku je možné získat nápovědu k&nbsp;jeho funkcím,
+konstantám, typům a metodám:</p>
+
+<pre>
+gore&gt; <strong>:doc fmt.Println</strong>
+&nbsp;
+func Println(a ...interface{}) (n int, err error)
+    Println formats using the default formats for its operands and writes to
+    standard output. Spaces are always added between operands and a newline is
+    appended. It returns the number of bytes written and any write error
+    encountered.
+</pre>
+
+<p>Totéž například platí i pro další standardní balíček <strong>time</strong> a
+jeho funkci <strong>Sleep</strong>:</p>
+
+<pre>
+gore&gt; :import time
+gore&gt; :doc time.Sleep
+func Sleep(d Duration)
+    Sleep pauses the current goroutine for at least the duration d. A negative
+    or zero duration causes Sleep to return immediately.
+</pre>
+
+<p>Velmi užitečný je i pseudopříkaz <strong>:write jméno_souboru</strong>,
+který zapíše zapsané definice do specifikovaného souboru, který by měl být
+později přeložitelný překladačem jazyka Go (viz též seznam demonstračních
+příkladů, které vznikly právě tímto způsobem).</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Získání typu výrazu a omezené možnosti této techniky</h2>
+
+<p>Pseudopříkazem <strong>:type</strong> můžeme zjistit typ výrazu
+resp.&nbsp;přesněji řečeno typ vypočtené hodnoty. Jedná se o operaci, ke které
+se interpretry velmi dobře hodí (možná ještě lépe než debuggery):</p>
+
+<pre>
+gore&gt; <strong>:type 42</strong>
+int
+</pre>
+
+<p>Nemusíme zjišťovat jen typ konstanty (konstantního výrazu), ale i výrazů
+poněkud složitějších:</p>
+
+<pre>
+gore&gt; <strong>:type 6*7</strong>
+int
+</pre>
+
+<p>Pravdivostní výraz:</p>
+
+<pre>
+gore&gt; <strong>:type 1==2</strong>
+bool
+</pre>
+
+<p>Totéž platí i pro řetězce:</p>
+
+<pre>
+gore&gt; <strong>:type "foo"</strong>
+string
+</pre>
+
+<p>Řezy</p>
+
+<pre>
+gore&gt; <strong>:type []int{1,2,3}</strong>
+[]int
+</pre>
+
+<p>Pole (mimochodem lze takto velmi dobře pochopit rozdíl mezi řezy a
+poli):</p>
+
+<pre>
+gore&gt; <strong>:type [...]int{1,2,3}</strong>
+[3]int
+</pre>
+
+<p>Ovšem pozor je nutné si dát na to, abychom nezjišťovali typy proměnných (i
+když by to bylo velmi užitečné). V&nbsp;tomto ohledu je projekt Gore dosti
+omezený:</p>
+
+<pre>
+gore&gt; <strong>x:=6*7</strong>
+42
+</pre>
+
+<p>Pokus o zjištění typu proměnné <strong>x</strong> skončí s&nbsp;chybou:</p>
+
+<pre>
+gore&gt; <strong>:type x</strong>
+panic: file not found for pos = 1 (gore_session.go:1:1) [recovered]
+        panic: file not found for pos = 1 (gore_session.go:1:1)
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Automatický import balíčků</h2>
+
+<p>V&nbsp;interpretru <i>Gore</i> pochopitelně můžeme přímo volat libovolnou
+funkci z&nbsp;implicitního balíčku. Takové funkce totiž není zapotřebí
+importovat. Pro úplnost &ndash; jedná se o následující funkce (jejich seznam
+lze nalézt například ve specifikaci jazyka Go, ale většinu pravděpodobně dobře
+znáte a používáte):</p>
+
+<pre>
+append cap clear close complex copy delete imag len
+make max min new panic print println real recover
+</pre>
+
+<p>To v&nbsp;praxi znamená, že si například můžeme nechat vypsat výsledek
+nějakého výrazu funkcí <strong>println</strong>:</p>
+
+<pre>
+gore&gt; <strong>println(6*7)</strong>
+42
+</pre>
+
+<p>Popř.&nbsp;si můžeme vypsat obsah proměnné:</p>
+
+<pre>
+gore&gt; <strong>x:=10</strong>
+10
+gore&gt; <strong>println(x)</strong>
+10
+</pre>
+
+<p>Vypisovat hodnoty pochopitelně můžeme i z&nbsp;programové smyčky (spustí se
+automaticky po zápisu uzavírací závorky a odeslání řádku klávesou
+<strong>Enter</strong>):</p>
+
+<pre>
+gore&gt; <strong>for i := range 10 {</strong>
+.....     <strong>println(i)</strong>
+..... <strong>}</strong>
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre>
+
+<p>Ovšem co se stane ve chvíli, kdy například budeme chtít namísto funkce
+<strong>println</strong> zavolat například <strong>fmt.Println</strong> nebo
+<strong>fmt.Printf</strong>? Můžeme si to vyzkoušet:</p>
+
+<pre>
+gore&gt; <strong>fmt.Println("foo")</strong>
+undefined: fmt
+</pre>
+
+<p>Interpret v&nbsp;tomto případě (korektně) napsal, že nezná identifikátor
+<strong>fmt</strong>.</p>
+
+<p>Import balíčku můžeme kdykoli provést pseudopříkazem
+<strong>:import</strong>, například takto:</p>
+
+<pre>
+gore&gt; <strong>:import fmt</strong>
+gore&gt; <strong>fmt.Printf("%5.3f", 1/3.)</strong>
+0.3335
+nil
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: užitečné je, že import lze provést
+skutečně kdykoli, na rozdíl od překládaného Go, v&nbsp;němž se importované
+balíčky definují na začátku a nelze je poté měnit (což dává pro staticky
+překládaný jazyk smysl).</div></p>
+
+<p>Ovšem interpret Gore nám dokáže práci ještě více zjednodušit, a to
+v&nbsp;případě, že povolíme takzvaný automatický import balíčků. K&nbsp;tomuto
+účelu je nutné použít přepínač <strong>--autoimport</strong>:</p>
+
+<pre>
+$ <strong>gore --autoimport</strong>
+</pre>
+
+<p>Můžeme si to velmi snadno otestovat spuštěním nové seance interpretru:</p>
+
+<pre>
+gore version 0.5.7  :help for help
+gore&gt; <strong>x:=6*7</strong>
+42
+&nbsp;
+gore&gt; <strong>fmt.Println(x)</strong>
+42
+3
+nil
+</pre>
+
+<p>Poslední volání vypsalo tři hodnoty:</p>
+
+<pre>
+42
+3
+nil
+</pre>
+
+<p>První hodnota byla vypsána přímo volanou funkcí a je v&nbsp;okně interpretru
+zvýrazněna odlišnou barvou. A další dvě hodnoty označují počet zapsaných bajtů
+a případnou chybu &ndash; viz hlavičku této funkce:</p>
+
+<pre>
+func Println(a ...any) (n int, err error)
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Způsob generování zdrojových kódů interpretrem Gore</h2>
+
+<p>Díky tomu, že interpret <i>Gore</i> obsahuje i podporu pro pseudopříkaz
+<strong>:print</strong>, si můžeme nechat vypsat zdrojový kód v&nbsp;jazyce Go,
+který je generovaný na pozadí &ndash; a to po odeslání každého příkazu, ať již
+jednořádkového či víceřádkového. Ukažme si, jak může vypadat celé
+&bdquo;sezení&ldquo; v&nbsp;němž uživatel postupně do interpretru zadává
+příkazy a deklarace a posléze si nechá vypsat vygenerovaný zdrojový kód
+pseudopříkazem <strong>:print</strong>:</p>
+
+<pre>
+gore version 0.5.7  :help for help
+gore&gt; <strong>x:=42</strong>
+42
+gore&gt; <strong>:print</strong>
+</pre>
+
+<p>Vypíše se:</p>
+
+<pre>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 42 }
+</pre>
+
+<p>Doplníme další deklaraci a opět si necháme vypsat zdrojový kód:</p>
+
+<pre>
+gore&gt; <strong>y:=10</strong>
+10
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 42; y := 10 }
+</pre>
+
+<p>Do zdrojového kódu se doplní i přímo vykonané příkazy:</p>
+
+<pre>
+gore&gt; <strong>println(x)</strong>
+42
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 42; y := 10; println(x) }
+</pre>
+
+<p>Dtto pro další příkaz:</p>
+
+<pre>
+gore&gt; <strong>println(y)</strong>
+42
+10
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 42; y := 10; println(x); println(y) }
+</pre>
+
+<p>Chování interpretru při povolení automatického importu balíčků:</p>
+
+<pre>
+$ <strong>gore --autoimport</strong>
+&nbsp;
+gore version 0.5.7  :help for help
+gore&gt; <strong>x:=6*7</strong>
+42
+gore&gt; <strong>fmt.Println(x)</strong>
+42
+3
+nil
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import (
+    "fmt"
+&nbsp;
+    "github.com/k0kubun/pp/v3"
+)
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { x := 6 * 7; _, _ = fmt.Println(x) }
+</pre>
+
+<p>Do kódu lze přidávat i funkce, datové typy atd.:</p>
+
+<pre>
+gore&gt; <strong>func add(x, y int) int {</strong>
+.....     return x+y
+..... }
+gore&gt; <strong>add(3,7)</strong>
+10
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { _ = add(3, 7) }
+&nbsp;
+func add(x, y int) int {
+    return x + y
+}
+</pre>
+
+<p>Datové typy:</p>
+
+<pre>
+gore&gt; <strong>type User struct {</strong>
+.....     Name string
+.....     Surname string
+..... }
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() {}
+&nbsp;
+type User struct {
+    Name    string
+    Surname string
+}
+</pre>
+
+<p>Použití uživatelského datového typu:</p>
+
+<pre>
+gore&gt; <strong>u:=User{"John", "Doe"}</strong>
+main.User{
+  Name:    "John",
+  Surname: "Doe",
+}
+gore&gt; <strong>:print</strong>
+package main
+&nbsp;
+import "github.com/k0kubun/pp/v3"
+&nbsp;
+func __gore_p(xs ...any) {
+    for _, x := range xs {
+        pp.Println(x)
+    }
+}
+func main() { u := User{"John", "Doe"} }
+&nbsp;
+type User struct {
+    Name    string
+    Surname string
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Interpet <i>Yaegi</i></h2>
+
+<p>Druhý interpret, s&nbsp;nímž se v&nbsp;dnešním článku seznámíme, se jmenuje
+<i>Yaegi</i>. Tento interpret pracuje běžným způsobem (tj.&nbsp;bez
+automatického generování Go kódu) a je určen především pro vložení
+(<i>embedding</i>) do dalších aplikací. Interaktivní smyčka REPL je sice taktéž
+implementována, ale nenabízí příliš mnoho vlastností, které jsou dnes
+očekávány: automatické doplňování příkazů, editace vstupního řádku, historie
+příkazů atd.</p>
+
+<p>Instalace tohoto interpretru je snadná a rychlá (nemá další závislosti):</p>
+
+<pre>
+$ <strong>go install github.com/traefik/yaegi/cmd/yaegi@latest</strong>
+&nbsp;
+go: downloading github.com/traefik/yaegi v0.16.1
+</pre>
+
+<p>Po instalaci si ověříme, zda je interpret dostupný:</p>
+
+<pre>
+$ <strong>yaegi --help</strong>
+&nbsp;
+Yaegi is a Go interpreter.
+&nbsp;
+Usage:
+&nbsp;
+    yaegi [command] [arguments]
+&nbsp;
+The commands are:
+&nbsp;
+    extract     generate a wrapper file from a source package
+    help        print usage information
+    run         execute a Go program from source
+    test        execute test functions in a Go package
+    version     print version
+&nbsp;
+Use "yaegi help &lt;command&gt;" for more information about a command.
+&nbsp;
+If no command is given or if the first argument is not a command, then
+the run command is assumed.
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že i nabídka dostupných
+příkazů je dosti omezená.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. REPL interpretru <i>Yaegi</i></h2>
+
+<p>Interaktivní smyčka interpretru <i>Yaegi</i> je v&nbsp;porovnání
+s&nbsp;ostatními dvěma interpretry spíše dosti primitivní. Nenajdeme zde ani
+historii příkazů ani jejich vyhledávání v&nbsp;historii. Dokonce tento
+interpret nenabízí ani žádné pseudopříkazy; pouze akceptuje vstupní výrazy a
+příkazy a ihned je vyhodnocuje. Je tomu tak z&nbsp;toho důvodu, že se Yaegi má
+používat spíše jako interpret vestavěný do aplikací a nikoli přímo
+z&nbsp;REPLu.</p>
+
+<p>I přesto se v&nbsp;krátkosti podívejme na to, jak může vypadat interaktivní
+&bdquo;sezení&ldquo; s&nbsp;interpretem Yaegi. Pracujeme v&nbsp;něm
+s&nbsp;výrazy, deklaracemi proměnných, funkcemi z&nbsp;jiných balíčků i
+s&nbsp;deklaracemi vlastních funkcí:</p>
+
+<pre>
+&gt; <strong>1+2</strong>
+: 3
+&nbsp;
+&gt; <strong>x:=6</strong>
+: 6
+&nbsp;
+&gt; <strong>y:=7</strong>
+: 7
+&nbsp;
+&gt; <strong>x*y</strong>
+: 42
+&nbsp;
+&gt; <strong>z:=x*y</strong>
+: 42
+&nbsp;
+&gt; <strong>z</strong>
+: 42
+&nbsp;
+&gt; <strong>import "fmt"</strong>
+: 0xc00019dca0
+&nbsp;
+&gt; <strong>fmt.Printf("%T\n", z)</strong>
+int
+: 4
+&nbsp;
+&gt; <strong>func add(a, b int) int {</strong>
+return a+b
+}
+: 0xc00058f5a0
+&nbsp;
+&gt; <strong>add(1, 2)</strong>
+: 3
+&gt; <strong></strong>
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Interpret <i>Yaegi</i> zabudovaný do aplikace</h2>
+
+<p>Interpret <i>Yaegi</i> je možné, podobně jako dále popsaný interpret
+<i>Gomacro</i>, zabudovat do vyvíjené aplikace. Ve stručnosti se podívejme,
+jakým způsobem to může být realizováno.</p>
+
+<p>Inicializace interpretru pomocí <strong>New</strong> a spuštění skriptu
+metodou <strong>Eval</strong>. Vypíše se výsledek skriptu, tedy hodnota 42:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/traefik/yaegi/interp"
+        "github.com/traefik/yaegi/stdlib"
+)
+&nbsp;
+<strong>func</strong> RunYaegi(script string) any {
+        interpreter := interp.New(interp.Options{})
+&nbsp;
+        interpreter.Use(stdlib.Symbols)
+&nbsp;
+        ret, err := interpreter.Eval(script)
+        <strong>if</strong> err != nil {
+                panic(err)
+        }
+&nbsp;
+        <strong>return</strong> ret
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunYaegi("<u>6*7</u>"))
+}
+</pre>
+
+<p>Složitější skript s&nbsp;deklaracemi proměnných a využitím jejich hodnot.
+Tento skript vrací hodnotu poslední deklarované proměnné (v&nbsp;Gomacru tomu
+ovšem bude jinak!):</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/traefik/yaegi/interp"
+        "github.com/traefik/yaegi/stdlib"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>x:=6</u>
+<u>y:=7</u>
+<u>z:=x*y</u>
+`
+&nbsp;
+<strong>func</strong> RunYaegi(script string) any {
+        interpreter := interp.New(interp.Options{})
+&nbsp;
+        interpreter.Use(stdlib.Symbols)
+&nbsp;
+        ret, err := interpreter.Eval(script)
+        <strong>if</strong> err != nil {
+                panic(err)
+        }
+&nbsp;
+        <strong>return</strong> ret
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunYaegi(script))
+}
+</pre>
+
+<p>Úprava předchozího skriptu tak, že se v&nbsp;něm bude explicitně vracet
+hodnota nějakého výrazu. Toto chování je kompatibilní s&nbsp;dále popsaným
+Gomacrem:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/traefik/yaegi/interp"
+        "github.com/traefik/yaegi/stdlib"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>x:=6</u>
+<u>y:=7</u>
+<u>z:=x*y</u>
+<u>z</u>
+`
+&nbsp;
+<strong>func</strong> RunYaegi(script string) any {
+        interpreter := interp.New(interp.Options{})
+&nbsp;
+        interpreter.Use(stdlib.Symbols)
+&nbsp;
+        ret, err := interpreter.Eval(script)
+        <strong>if</strong> err != nil {
+                panic(err)
+        }
+&nbsp;
+        <strong>return</strong> ret
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunYaegi(script))
+}
+</pre>
+
+<p>Deklarace funkce, kterou bude možné později zavolat přes reflexi. Na rozdíl
+od Gomacra však není možné tuto funkci zavolat z&nbsp;toho samého skriptu:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/traefik/yaegi/interp"
+        "github.com/traefik/yaegi/stdlib"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>func multiply(a, b int) int {</u>
+<u>    return a*b</u>
+<u>}</u>
+`
+&nbsp;
+<strong>func</strong> RunYaegi(script string) any {
+        interpreter := interp.New(interp.Options{})
+&nbsp;
+        interpreter.Use(stdlib.Symbols)
+&nbsp;
+        ret, err := interpreter.Eval(script)
+        <strong>if</strong> err != nil {
+                panic(err)
+        }
+&nbsp;
+        <strong>return</strong> ret
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunYaegi(script))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;praxi se mi spíše osvědčil
+interpret Gomacro popsaný v&nbsp;navazujících kapitolách.</div></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Interpret <i>Gomacro</i></h2>
+
+<p>Další interpret programovacího jazyka Go, se kterým se v&nbsp;dnešním článku
+setkáme, se jmenuje <i>Gomacro</i>. S&nbsp;tímto interpretrem jsme se již dříve
+setkali v&nbsp;článku <a
+href="https://www.root.cz/clanky/gophernotes-kombinace-interaktivniho-prostredi-jupyteru-s-jazykem-go/">Gophernotes:
+kombinace interaktivního prostředí Jupyteru s&nbsp;jazykem Go</a>, protože
+jazyk Go je do prostředí Jupyter Notebooku integrován právě s&nbsp;využitím
+tohoto interpretru. Ovšem Gomacro není navázáno na Jupyter Notebook a lze ho
+použít samostatně (ovládá se tedy z&nbsp;terminálu s&nbsp;využitím REPLu, jak
+je dobrým zvykem). Podobně, jako tomu bylo u výše uvedených interpretrů, i zde
+jsou možnosti programovacího jazyka Go rozšířeny o další pseudopříkazy. A
+zapomenout nesmíme ani na debugger, který je součástí tohoto interpretru a
+s&nbsp;nímž se blíže seznámíme v&nbsp;samostatné kapitole.</p>
+
+<p>Samotný název projektu <i>Gomacro</i> vychází z&nbsp;toho, že je podporována
+i tvorba a expanze maker. Ovšem pod pojmem <i>makro</i> si musíme představit
+LISPovská makra (resp.&nbsp;makra pojatá tak, jak je tomu v&nbsp;LISPovských
+programovacích jazycích) a nikoli primitivní makra jazyka C. S&nbsp;koncepcí
+maker se podrobněji seznámíme v&nbsp;samostatném článku, protože se vyžaduje
+znalost AST (abstraktního syntaktického stromu) a způsobu jeho zpracování
+v&nbsp;jazyce Go.</p>
+
+<p><div class="rs-tip-major">Poznámka: ovšem samotný jazyk Go makra nepodporuje
+a pravděpodobně nikdy podporovat nebude, protože to jde proti filozofii tohoto
+programovacího jazyka.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Instalace <i>Gomacra</i> s&nbsp;jeho spuštěním</h2>
+
+<p>Instalace tohoto projektu se opět provede, jak je ve světě jazyka Go zvykem,
+příkazem &bdquo;go get&ldquo;:</p>
+
+<pre>
+$ go install github.com/cosmos72/gomacro@latest
+&nbsp;
+go: downloading github.com/cosmos72/gomacro v0.0.0-20240506194242-2ff796e3da10
+go: downloading github.com/peterh/liner v1.2.2
+go: downloading golang.org/x/tools v0.14.0
+go: downloading github.com/mattn/go-runewidth v0.0.15
+go: downloading github.com/rivo/uniseg v0.2.0
+go: downloading golang.org/x/sys v0.13.0
+go: downloading golang.org/x/mod v0.13.0
+</pre>
+
+<p>Dále je vhodné se přesvědčit o tom, že je adresář
+<strong>$HOME/go/bin</strong> zařazen do proměnné prostředí
+<strong>PATH</strong> (což platí pro všechny tři zmíněné interpretry).
+V&nbsp;opačném případě by totiž nebylo možné příkaz <strong>gomacro</strong>
+volat odkudkoli (což platí i pro další nástroje naprogramované v&nbsp;jazyku Go
+a instalované příkazem &bdquo;go get&ldquo;).</p>
+
+<p>Pokud je <strong>$HOME/go/bin</strong> vložen do proměnné prostředí
+<strong>PATH</strong>, bude možné Gomacro spustit, například s&nbsp;přepínačem
+<strong>--help</strong>:</p>
+
+<pre>
+$ <strong>gomacro --help</strong>
+&nbsp;
+usage: gomacro [OPTIONS] [files-and-dirs]
+
+  Recognized options:
+    -c,   --collect          collect declarations and statements, to print them later
+    -e,   --expr EXPR        evaluate expression
+    -f,   --force-overwrite  option -w will overwrite existing files
+    -g,   --genimport [PATH] write x_package.go bindings for specified import path and exit.
+                             Use "gomacro -g ." or omit path to import the current dir.
+                             Used in "//go:generate gomacro -g ." directives.
+    -h,   --help             show this help and exit
+    -i,   --repl             interactive. start a REPL after evaluating expression, files and dirs.
+                             default: start a REPL only if no expressions, files or dirs are specified
+    -m,   --macro-only       do not execute code, only parse and macroexpand it.
+                             useful to run gomacro as a Go preprocessor
+    -n,   --no-trap          do not trap panics in the interpreter
+    -t,   --trap             trap panics in the interpreter (default)
+    -s,   --silent           silent. do NOT show startup message, prompt, and expressions results.
+                             default when executing files and dirs.
+    -v,   --verbose          verbose. show startup message, prompt, and expressions results.
+                             default when executing an expression.
+    -vv,  --very-verbose     as -v, and in addition show the type of expressions results.
+                             default when executing a REPL
+    -w,   --write-decls      write collected declarations and statements to *.go files.
+                             implies -c
+    -x,   --exec             execute parsed code (default). disabled by -m
+
+    Options are processed in order, except for -i that is always processed as last.
+
+    Collected declarations and statements can be also written to standard output
+    or to a file with the REPL command :write
+</pre>
+
+<p>Spuštění interpretru:</p>
+
+<pre>
+$ <strong>gomacro</strong>
+&nbsp;
+// Welcome to gomacro. Type :help for help, :copy for copyright and license.
+// This is free software with ABSOLUTELY NO WARRANTY.
+gomacro&gt; 
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: případné hlášení zobrazené níže znamená,
+že byly smazány zdrojové kódy <i>Gomacra</i>, což však jeho práci nijak zásadně
+neovlivní:</div></p>
+
+<pre>
+// warning: could not find package "github.com/cosmos72/gomacro" in $GOPATH = "/home/tester/go/", assuming package is located in "/home/tester/go/src/github.com/cosmos72/gomacro"
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Interní příkazy interpretru <i>Gomacro</i></h2>
+
+<p>I interpret Gomacro má svůj vlastní repertoár interních příkazů (či
+pseudopříkazů). Ty začínají dvojtečkou, takže se zde používá stejný formát
+zápisu, jako v&nbsp;případě projektu Gore. Všechny tyto pseudopříkazy si můžeme
+vypsat pseudopříkazem <strong>:help</strong>:</p>
+
+<pre>
+gomacro&gt; <strong>:help</strong>
+// type Go code to execute it. example: func add(x, y int) int { return x + y }
+&nbsp;
+// interpreter commands:
+:copyright         show copyright and license
+:debug EXPR        debug expression or statement interactively
+:env [NAME]        show available functions, variables and constants
+                   in current package, or from imported package NAME
+:help              show this help
+:inspect EXPR|TYPE inspect expression or type interactively
+:options [OPTS]    show or toggle interpreter options
+:package "PKGPATH" switch to package PKGPATH, importing it if possible
+:quit              quit the interpreter
+:unload "PKGPATH"  remove package PKGPATH from the list of known packages.
+                   later attempts to import it will trigger a recompile
+:write [FILE]      write collected declarations and/or statements to standard output or to FILE
+                   use :opt Declarations and/or :opt Statements to start collecting them
+</pre>
+
+<p>V&nbsp;dalších kapitolách se seznámíme zejména s&nbsp;pseudopříkazy
+<strong>:inspect</strong> (inspektor) a <strong>:debug</strong> (debugger).
+Ovšem zajímavý je i způsob manipulace s&nbsp;balíčky s&nbsp;využitím
+<strong>:package</strong> a <strong>:unload</strong>. Protože se zde přímo
+nepracuje s&nbsp;postupně vytvářeným zdrojovým kódem v&nbsp;jazyce Go, nelze
+použít příkaz <strong>:print</strong>, ovšem můžeme si nechat vypsat všechny
+zadané příkazy a deklarace pseudopříkazem <strong>:write</strong>.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Inspektor v&nbsp;interpretru <i>Gomacro</i></h2>
+
+<p>Jedním z&nbsp;nejužitečnějších nástrojů Gomacra je takzvaný
+<i>inspector</i>. Ten nám umožňuje například prozkoumat výrazy:</p>
+
+<pre>
+gomacro&gt; <strong>:inspect 1*(2+3)</strong>
+&nbsp;
+1*(2+3) = {int 5}       // untyped.Lit
+    0. Kind     = int   // untyped.Kind
+    1. Val      = 5     // constant.Value
+    2. basicTypes       = [&lt;nil&gt; 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 0x11060b0 &lt;nil&gt; &lt;nil&gt; &lt;nil&gt; &lt;nil&gt; &lt;nil&gt; &lt;nil&gt; &lt;nil&gt; 0x11060b0 &lt;nil&gt; 0x11060b0]  // *[]xreflect.Type
+// type ? for inspector help
+</pre>
+
+<p>Prozkoumat lze i volání funkcí, kdy se mj.&nbsp;zobrazí jejich výsledek:</p>
+
+<pre>
+gomacro&gt; <strong>import "fmt"</strong>
+&nbsp;
+gomacro&gt; <strong>:inspect fmt.Printf("%d\n", 42)</strong>
+&nbsp;
+// warning: expression returns 2 values, using only the first one: [int error]
+42
+fmt.Printf("%d\n", 42)  = 3     // int
+// type ? for inspector help
+</pre>
+
+<p>Popř.&nbsp;lze vypsat metody aplikovatelné pro zvoleného příjemce
+(<i>receiver</i>). Pro numerické výrazy jsou to metody datového typu
+<strong>int</strong> (ty se nevolají jménem, ale typicky nějakým
+operátorem):</p>
+
+<pre>
+inspect fmt.Printf("%d\n", 42)&gt; <strong>methods</strong>
+&nbsp;
+methods of int:
+    m0. func (int).Add(int, int) int
+    m1. func (int).And(int, int) int
+    m2. func (int).AndNot(int, int) int
+    m3. func (int).Cmp(int) int
+    m4. func (int).Equal(int) bool
+    m5. func (int).Less(int) bool
+    m6. func (int).Lsh(int, uint8) int
+    m7. func (int).Mul(int, int) int
+    m8. func (int).Neg(int) int
+    m9. func (int).Not(int) int
+    m10. func (int).Or(int, int) int
+    m11. func (int).Quo(int, int) int
+    m12. func (int).Rem(int, int) int
+    m13. func (int).Rsh(int, uint8) int
+    m14. func (int).Sub(int, int) int
+    m15. func (int).Xor(int, int) int
+</pre>
+
+<p>Výpis takzvaného prostředí, tj.&nbsp;dostupných funkcí a datových typů:</p>
+
+<pre>
+gomacro&gt; <strong>:env</strong>
+&nbsp;
+// ----- builtin binds -----
+Eval            = {0x1213270 func(interface{}, interface{}) interface{}}        // fast.Function
+EvalKeepUntyped = {0x1213320 func(interface{}, interface{}) interface{}}        // fast.Function
+EvalType        = {0x1213660 func(interface{}, interface{}) reflect.Type}       // fast.Function
+Interp          = {0x1213240 func(interface{}) interface{}}     // fast.Function
+MacroExpand     = {0x1214310 func(interface{}, interface{}) (go/ast.Node, bool)}        // fast.Function
+MacroExpand1    = {0x1214400 func(interface{}, interface{}) (go/ast.Node, bool)}        // fast.Function
+MacroExpandCodeWalk             = {0x12144f0 func(interface{}, interface{}) (go/ast.Node, bool)}        // fast.Function
+Parse           = {0x1216310 func(string, interface{}) interface{}}     // fast.Function
+append          = 0x120efd0     // fast.Builtin
+cap             = 0x120fb30     // fast.Builtin
+close           = 0x1210290     // fast.Builtin
+complex         = 0x1210880     // fast.Builtin
+copy            = 0x1211f00     // fast.Builtin
+delete          = 0x1212ae0     // fast.Builtin
+false           = {bool false}  // untyped.Lit
+imag            = 0x1216e30     // fast.Builtin
+len             = 0x1213960     // fast.Builtin
+make            = 0x1214bd0     // fast.Builtin
+new             = 0x1215bb0     // fast.Builtin
+nil             = nil   // &lt;nil&gt;
+panic           = 0x1216020     // fast.Builtin
+print           = 0x1216a60     // fast.Builtin
+println         = 0x1216a60     // fast.Builtin
+real            = 0x1216e30     // fast.Builtin
+recover         = 0x12180e0     // fast.Builtin
+true            = {bool true}   // untyped.Lit
+&nbsp;
+// ----- builtin types -----
+Pointer         = unsafe.Pointer        // unsafe.Pointer
+bool            = bool  // bool
+byte            = uint8 // uint8
+complex128      = complex128    // complex128
+complex64       = complex64     // complex64
+error           = error // interface
+float32         = float32       // float32
+float64         = float64       // float64
+int             = int   // int
+int16           = int16 // int16
+int32           = int32 // int32
+int64           = int64 // int64
+int8            = int8  // int8
+rune            = int32 // int32
+string          = string        // string
+uint            = uint  // uint
+uint16          = uint16        // uint16
+uint32          = uint32        // uint32
+uint64          = uint64        // uint64
+uint8           = uint8 // uint8
+uintptr         = uintptr       // uintptr
+&nbsp;
+// ----- main binds -----
+fmt             = {fmt "fmt", 19 binds, 6 types}        // *fast.Import
+</pre>
+
+<p>Prozkoumání vlastností zvoleného datového typu:</p>
+
+<pre>
+gomacro&gt; <strong>:inspect bool</strong>
+bool    = false // bool
+// type ? for inspector help
+inspect bool&gt; <strong>methods</strong>
+methods of bool:
+    m0. func (bool).Equal(bool) bool
+    m1. func (bool).Not(bool) bool
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Debugger integrovaný do Gomacra</h2>
+
+<p>Již v&nbsp;předchozích kapitolách jsme se zmínili o interním příkazu
+<strong>:debug</strong>, kterým se spouští debugger zabudovaný do nástroje
+Gomacro. Ukažme si použití tohoto nástroje na několika příkladech.</p>
+
+<p>Nejprve si nadeklarujeme jednoduchou funkci pro součet dvou celých
+čísel:</p>
+
+<pre>
+gomacro&gt; <strong>func add(x, y int) int {</strong>
+. . . .    z := x
+. . . .    z += y
+. . . .    return z
+. . . .    }
+</pre>
+
+<p>Tuto funkci pochopitelně můžeme přímo zavolat a získáme její výsledek:</p>
+
+<pre>
+gomacro&gt; <strong>add(1,2)</strong>
+3       // int
+</pre>
+
+<p>Ovšem můžeme ji zavolat i v&nbsp;rámci debuggeru, a to následujícím
+způsobem:</p>
+
+<pre>
+gomacro&gt; <strong>:debug add(1,2)</strong>
+// stopped at repl.go:1:1 IP=0, call depth=1. type ? for debugger help
+func add(x, y int) int {
+^^^
+</pre>
+
+<p>V&nbsp;debuggeru (změní se výzva) lze používat několik nových příkazů, které
+se píšou bez dvojtečky a lze je typicky zkrátit na jediný znak (n=next
+atd.):</p>
+
+<pre>
+// debugger commands:
+backtrace       show call stack
+env [NAME]      show available functions, variables and constants
+                in current scope, or from imported package NAME
+?               show this help
+help            show this help
+inspect EXPR    inspect expression interactively
+kill   [EXPR]   terminate execution with panic(EXPR)
+print   EXPR    print expression, statement or declaration
+list            show current source code
+continue        resume normal execution
+finish          run until the end of current function
+next            execute a single statement, skipping functions
+step            execute a single statement, entering functions
+vars            show local variables
+</pre>
+
+<p>Nejčastějším příkazem bude <strong>s</strong> (<i>step</i>) a
+<strong>n</strong> (<i>next</i>). Tyto příkazy jsou určeny pro krokování:</p>
+
+<pre>
+debug&gt; <strong>n</strong>
+// stopped at repl.go:2:1 IP=1, call depth=1. type ? for debugger help
+z := x
+^^^
+debug&gt; <strong>n</strong>
+// stopped at repl.go:3:1 IP=2, call depth=1. type ? for debugger help
+z += y
+^^^
+debug&gt; <strong>n</strong>
+// stopped at repl.go:4:8 IP=3, call depth=1. type ? for debugger help
+return z
+       ^^^
+debug&gt; <strong>n</strong>
+3       // int
+</pre>
+
+<p>Zobrazit si můžeme i všechny v&nbsp;danou chvíli dostupné symboly. Lokální
+proměnné jsou zobrazeny na konci:</p>
+
+<pre>
+debug&gt; <strong>env</strong>
+&nbsp;
+...
+...
+...
+// -----  binds -----
+x               = 1     // int
+y               = 2     // int
+z               = 3     // int
+</pre>
+
+<p>Příkazem <strong>print</strong> se vypíše obsah téměř jakéhokoli výrazu, což
+je při ladění velmi užitečné:</p>
+
+<pre>
+debug&gt; <strong>print z</strong>
+3       // int
+debug&gt; <strong>n</strong>
+// stopped at repl.go:3:1 IP=2, call depth=1. type ? for debugger help
+z += y
+^^^
+debug&gt; <strong>print z</strong>
+1       // int
+</pre>
+
+<p>Ve druhé ukázce použijeme složitější funkci, konkrétně funkci pro výpočet
+faktoriálu:</p>
+
+<pre>
+gomacro&gt; <strong>import "math/big"</strong>
+gomacro&gt; <strong>func factorial(n *big.Int) *big.Int {</strong>
+. . . .    one := big.NewInt(1)
+. . . .    if n.Cmp(big.NewInt(0)) &lt;= 0 {
+. . . .      return one
+. . . .      }
+. . . .    return one.Mul(n, factorial(one.Sub(n, one)))
+. . . .    }
+gomacro&gt; <strong></strong>
+</pre>
+
+<p>Základní otestování funkcionality:</p>
+
+<pre>
+gomacro&gt; <strong>factorial(big.NewInt(10))</strong>
+3628800 // *math/big.Int
+</pre>
+
+<p>Ladění / krokování této funkce:</p>
+
+<pre>
+gomacro&gt; <strong>:debug factorial(big.NewInt(10))</strong>
+// stopped at repl.go:1:1 IP=0, call depth=1. type ? for debugger help
+func factorial(n *big.Int) *big.Int {
+^^^
+</pre>
+
+<p>Jedná se o rekurzivní funkci, takže se bude hodit příkaz
+<strong>backtrace</strong> resp.&nbsp;jen <strong>b</strong> pro zobrazení
+jejího volání (adres a argumentů uložených na zásobníku):</p>
+
+<pre>
+debug&gt; <strong>backtrace</strong>
+&nbsp;
+0xc000472000    func factorial(n=&lt;*big.Int Value&gt; &lt;*math/big.Int&gt;) &lt;*big.Int Value&gt; &lt;*math/big.Int&gt;
+0xc0004720a0    func factorial(n=&lt;*big.Int Value&gt; &lt;*math/big.Int&gt;) &lt;*big.Int Value&gt; &lt;*math/big.Int&gt;
+0xc000472140    func factorial(n=&lt;*big.Int Value&gt; &lt;*math/big.Int&gt;) &lt;*big.Int Value&gt; &lt;*math/big.Int&gt;
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Interpret Gomacro zabudovaný do aplikace</h2>
+
+<p>I Gomacro je možné zabudovat přímo do vyvíjené aplikace a tak rozšířit její
+možnosti (typicky o řád, jak jsme si řekli v&nbsp;úvodní kapitole). Podívejme
+se na čtyři demonstrační příklady, které tyto možnosti ukazují.</p>
+
+<p>Spuštění triviálního skriptu s&nbsp;výrazem &bdquo;6*7&ldquo; a výpisem
+výsledku tohoto výrazu (opět se zde používá klasická funkce
+<strong>New</strong> následovaná voláním metody <strong>Eval</strong>):</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/cosmos72/gomacro/fast"
+)
+&nbsp;
+<strong>func</strong> RunGomacro(script string) any {
+        interp := fast.New()
+        vals, _ := interp.Eval(script)
+        <strong>return</strong> vals[0].ReflectValue()
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunGomacro("<u>6*7</u>"))
+}
+</pre>
+
+<p>Složitější víceřádkový skript s&nbsp;deklarací proměnných. Tento skript
+nevrací žádnou hodnotu, takže do kódu je doplněn test, zda skript vrací hodnotu
+(hodnoty) či nikoli:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/cosmos72/gomacro/fast"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>x:=6</u>
+<u>y:=7</u>
+<u>z:=x*y</u>
+`
+&nbsp;
+<strong>func</strong> RunGomacro(script string) any {
+        interp := fast.New()
+        vals, _ := interp.Eval(script)
+        <strong>if</strong> len(vals) &lt; 1 {
+                return "no value"
+        }
+        <strong>return</strong> vals[0].ReflectValue()
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunGomacro(script))
+}
+</pre>
+
+<p>Doplnění skriptu o výraz &bdquo;z&ldquo;, který způsobí, že se vrátí hodnota
+proměnné s&nbsp;tímto jménem:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/cosmos72/gomacro/fast"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>x:=6</i>
+<u>y:=7</u>
+<u>z:=x*y</u>
+<u>z</u>
+`
+&nbsp;
+<strong>func</strong> RunGomacro(script string) any {
+        interp := fast.New()
+        vals, _ := interp.Eval(script)
+        <strong>if</strong> len(vals) &lt; 1 {
+                return "no value"
+        }
+        <strong>return</strong> vals[0].ReflectValue()
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunGomacro(script))
+}
+</pre>
+
+<p>A konečně deklarace funkce uvnitř skriptu s&nbsp;voláním této funkce:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+&nbsp;
+        "github.com/cosmos72/gomacro/fast"
+)
+&nbsp;
+<strong>const</strong> script = `
+<u>func multiply(a, b int) int {</u>
+<u>    return a*b</u>
+<u>}</u>
+&nbsp;
+<u>x:=6</u>
+<u>y:=7</u>
+<u>multiply(x, y)</u>
+`
+&nbsp;
+<strong>func</strong> RunGomacro(script string) any {
+        interp := fast.New()
+        vals, _ := interp.Eval(script)
+        <strong>if</strong> len(vals) &lt; 1 {
+                return "no value"
+        }
+        <strong>return</strong> vals[0].ReflectValue()
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println(RunGomacro(script))
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si použití základního balíčku
+pro reflexi.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy interně vygenerované interpretrem Gore byly uloženy do Git
+repositáře, jenž je dostupný na adrese <a
+href="https://github.com/RedHatOfficial/GoCourse">https://github.com/RedHatOfficial/GoCourse</a>.
+Jednotlivé demonstrační příklady si můžete v&nbsp;případě potřeby stáhnout i
+jednotlivě bez nutnosti klonovat celý (dnes již poměrně rozsáhlý)
+repositář:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td>1</td><td>gore_init.go</td><td>zdrojový kód vygenerovaný interpretrem Gore ihned po inicializaci</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/gore_init.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/gore_init.go</a></td></tr>
+<tr><td>2</td><td>variables.go</td><td>deklarace proměnných v&nbsp;interpretru</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/variables.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/variables.go</a></td></tr>
+<tr><td>3</td><td>after_println.go</td><td>zavolání základní funkce <strong>println</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_println.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_println.go</a></td></tr>
+<tr><td>4</td><td>after_println_2.go</td><td>další zavolání základní funkce <strong>println</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_println_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_println_2.go</a></td></tr>
+<tr><td>5</td><td>after_import.go</td><td>zdrojový kód po explicitním importu balíčku</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_import.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/after_import.go</a></td></tr>
+<tr><td>6</td><td>autoimport.go</td><td>zdrojový kód po automatickém importu balíčku při zavolání jeho funkce</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/autoimport.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/autoimport.go</a></td></tr>
+<tr><td>7</td><td>function_declaration.go</td><td>deklarace funkce</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/function_declaration.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/function_declaration.go</a></td></tr>
+<tr><td>8</td><td>type_declaration.go</td><td>deklarace datového typu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/type_declaration.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/type_declaration.go</a></td></tr>
+<tr><td>9</td><td>type_usage.go</td><td>použití uživatelem definovaného datového typu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/type_usage.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gore/type_usage.go</a></td></tr>
+</table>
+
+<p>Další čtveřice příkladů ukazuje použití Gomacra pro spuštění skriptů přímo
+z&nbsp;aplikace psané v&nbsp;jazyku Go:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td>1</td><td>gomacro_eval_1.go</td><td>spuštění jednoduchého skriptu s&nbsp;jediným výrazem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_1.go</a></td></tr>
+<tr><td>2</td><td>gomacro_eval_2.go</td><td>skript s&nbsp;deklaracemi proměnných, který nevrací žádnou hodnotu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_2.go</a></td></tr>
+<tr><td>3</td><td>gomacro_eval_3.go</td><td>skript s&nbsp;deklaracemi proměnných, který vrací hodnotu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_3.go</a></td></tr>
+<tr><td>4</td><td>gomacro_eval_4.go</td><td>skript obsahující deklaraci funkce, která je posléze zavolána</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_4.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/gomacro/gomacro_eval_4.go</a></td></tr>
+<table>
+
+<p>Poslední čtveřice příkladů ukazuje použití Yaegi pro spuštění skriptů přímo
+z&nbsp;aplikace psané v&nbsp;jazyku Go:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td>1</td><td>yaegi_eval_1.go</td><td>spuštění jednoduchého skriptu s&nbsp;jediným výrazem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_1.go</a></td></tr>
+<tr><td>2</td><td>yaegi_eval_2.go</td><td>skript s&nbsp;deklaracemi proměnných, který nevrací žádnou hodnotu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_2.go</a></td></tr>
+<tr><td>3</td><td>yaegi_eval_3.go</td><td>skript s&nbsp;deklaracemi proměnných, který vrací hodnotu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_3.go</a></td></tr>
+<tr><td>4</td><td>yaegi_eval_4.go</td><td>skript obsahující deklaraci funkce</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_4.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson13/yaegi/yaegi_eval_4.go</a></td></tr>
+<table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>yaegi<br />
+<a href="https://github.com/traefik/yaegi">https://github.com/traefik/yaegi</a>
+</li>
+
+<li>gore<br />
+<a href="https://github.com/x-motemen/gore">https://github.com/x-motemen/gore</a>
+</li>
+
+<li>gomacro<br />
+<a href="https://github.com/cosmos72/gomacro">https://github.com/cosmos72/gomacro</a>
+</li>
+
+<li>Stránky jazyka Go<br />
+<a href="https://go.dev/">https://go.dev/</a>
+</li>
+
+<li>Package names<br />
+<a href="https://go.dev/blog/package-names">https://go.dev/blog/package-names</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://go.dev/ref/spec">https://go.dev/ref/spec</a>
+</li>
+
+<li>GoDoc: dokumentace k balíčkům<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly (dnes již v některých ohledech zastaralé)<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Interpreter (computing)<br />
+<a href="https://en.wikipedia.org/wiki/Interpreter_(computing)">https://en.wikipedia.org/wiki/Interpreter_(computing)</a>
+</li>
+
+<li>Scripting language<br />
+<a href="https://en.wikipedia.org/wiki/Scripting_language">https://en.wikipedia.org/wiki/Scripting_language</a>
+</li>
+
+<li>Scripting languages<br />
+<a href="https://en.wikipedia.org/wiki/List_of_programming_languages_by_type#Scripting_languages">https://en.wikipedia.org/wiki/List_of_programming_languages_by_type#Scripting_languages</a>
+</li>
+
+<li>PYPL PopularitY of Programming Language<br />
+<a href="https://pypl.github.io/PYPL.html">https://pypl.github.io/PYPL.html</a>
+</li>
+
+<li>Tiobe index<br />
+<a href="https://www.tiobe.com/tiobe-index/">https://www.tiobe.com/tiobe-index/</a>
+</li>
+
+<li>GopherJS: transpřekladač z jazyka Go do JavaScriptu<br />
+<a href="https://www.root.cz/clanky/gopherjs-transprekladac-z-jazyka-go-do-javascriptu/">https://www.root.cz/clanky/gopherjs-transprekladac-z-jazyka-go-do-javascriptu/</a>
+</li>
+
+<li>Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem<br />
+<a href="https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem/">https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem/</a>
+</li>
+
+<li>Technologie WebAssembly a GopherJS: předávání argumentů mezi Go a JavaScriptem (dokončení)<br />
+<a href="https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem-dokonceni/">https://www.root.cz/clanky/technologie-webassembly-a-gopherjs-predavani-argumentu-mezi-go-a-javascriptem-dokonceni/</a>
+</li>
+
+<li>Gophernotes<br />
+<a href="https://github.com/gopherdata/gophernotes">https://github.com/gopherdata/gophernotes</a>
+</li>
+
+<li>Jupyter Notebook – nástroj pro programátory, výzkumníky i lektory <br />
+<a href="https://www.root.cz/clanky/jupyter-notebook-nastroj-pro-programatory-vyzkumniky-i-lektory/">https://www.root.cz/clanky/jupyter-notebook-nastroj-pro-programatory-vyzkumniky-i-lektory/</a>
+</li>
+
+<li>Difference Between Compiler and Interpreter<br />
+<a href="https://www.geeksforgeeks.org/difference-between-compiler-and-interpreter/">https://www.geeksforgeeks.org/difference-between-compiler-and-interpreter/</a>
+</li>
+
+<li>What are the best interpreted programming languages?<br />
+<a href="https://www.slant.co/topics/15913/~interpreted-programming-languages">https://www.slant.co/topics/15913/~interpreted-programming-languages</a>
+</li>
+
+<li>Top 13 Scripting Languages You Should Pay Attention To<br />
+<a href="https://kinsta.com/blog/scripting-languages/">https://kinsta.com/blog/scripting-languages/</a>
+</li>
+
+<li>Go Interpreter<br />
+<a href="https://github.com/go-interpreter/">https://github.com/go-interpreter/</a>
+</li>
+
+<li>Compiler vs Interpreter: A Detailed Comparison<br />
+<a href="https://www.theknowledgeacademy.com/blog/compiler-vs-interpreter/">https://www.theknowledgeacademy.com/blog/compiler-vs-interpreter/</a>
+</li>
+
+<li>Gomacro: code generation made easy and fun<br />
+<a href="https://github.com/cosmos72/gomacro/blob/master/doc/code_generation.pdf">https://github.com/cosmos72/gomacro/blob/master/doc/code_generation.pdf</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2024</small></p>
+</body>
+</html>
+
