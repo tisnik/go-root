@@ -1,0 +1,1947 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Užitečná novinka v Go 1.22: vylepšení směrování v knihovně net/http</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Užitečná novinka v Go 1.22: vylepšení směrování v knihovně net/http</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Součástí standardní knihovny jazyka Go je mj. i balíček net/http, který umožňuje tvorbu HTTP klientů i serverů. V rámci Go verze 1.22 došlo k vylepšení možností tohoto balíčku, přičemž nové vlastnosti umožňují tvořit webové služby s REST API pouze s využitím této knihovny.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Užitečná novinka v&nbsp;Go 1.22: vylepšení směrování v&nbsp;knihovně net/http</a></p>
+<p><a href="#k02">2. Jednoduchý HTTP server využívající rozhraní <strong>ResponseWriter</strong> a strukturu <strong>Request</strong></a></p>
+<p><a href="#k03">3. HTTP server využívající knihovnu <strong>gorilla/mux</strong></a></p>
+<p><a href="#k04">4. Specifikace HTTP metody pro jednotlivé handlery</a></p>
+<p><a href="#k05">5. Kostra webové služby pro správu osob</a></p>
+<p><a href="#k06">6. Nové možnosti při směrování dotazů v&nbsp;Go 1.22</a></p>
+<p><a href="#k07">7. Webová služba umožňující manipulace se seznamem uživatelů</a></p>
+<p><a href="#k08">8. Realizace handleru pro výpis seznamu uživatelů</a></p>
+<p><a href="#k09">9. Úplný zdrojový kód první verze webové služby</a></p>
+<p><a href="#k10">10. Otestování webové služby</a></p>
+<p><a href="#k11">11. Úplný zdrojový kód druhé verze webové služby</a></p>
+<p><a href="#k12">12. Otestování chování upravené varianty webové služby</a></p>
+<p><a href="#k13">13. Kontrola, zda je při volání endpointu použita očekávaná metoda</a></p>
+<p><a href="#k14">14. Úplný zdrojový kód třetí verze webové služby</a></p>
+<p><a href="#k15">15. Otestování, jak webová služba kontroluje HTTP metody požadavků</a></p>
+<p><a href="#k16">16. Nedostatky webové služby a jejich náprava v&nbsp;Go 1.22</a></p>
+<p><a href="#k17">17. Úplný zdrojový kód čtvrté verze webové služby</a></p>
+<p><a href="#k18">18. Otestování základních funkcí poslední varianty webové služby</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Užitečná novinka v&nbsp;Go 1.22: vylepšení směrování v&nbsp;knihovně net/http</h2>
+
+<p>Programovací jazyk Go je mezi vývojáři oblíbený mj.&nbsp;i z&nbsp;toho
+důvodu, že jeho standardní knihovny obsahují množství rozhraní, datových
+struktur a funkcí, které lze přímo využít při tvorbě aplikací pracujících
+s&nbsp;různými síťovými protokoly. Nalezneme zde například knihovnu
+<strong>net/http</strong> určenou pro komunikaci s&nbsp;využitím známého HTTP
+protokolu. Standardní knihovna <strong>net/http</strong> umožňuje tvořit jak
+HTTP klienty, tak i servery.</p>
+
+<p>Ovšem právě v&nbsp;oblasti HTTP serverů standardní knihovně jazyka Go
+&bdquo;něco&ldquo; chybělo k&nbsp;tomu, aby ji bylo možné samostatně,
+plnohodnotně a bezproblémově využít. Jednalo se o nedostatečné možnosti při
+směrování požadavků (tedy pro mapování mezi adresami koncových bodů a handlery,
+které zpracovávají příslušné požadavky) a taktéž o problematické určení, které
+HTTP metody je možné pro dané koncové body využít. To se změnilo v&nbsp;Go
+verze 1.22, kde došlo ke dvěma vylepšením právě v&nbsp;těchto oblastech. Od Go
+1.22 se tedy můžeme (alespoň v&nbsp;některých situacích) obejít bez knihoven
+třetích stran, například bez knihovny Gorilla/mux atd.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Jednoduchý HTTP server využívající rozhraní <strong>ResponseWriter</strong> a strukturu <strong>Request</strong></h2>
+
+<p>Nejprve si připomeňme, jakým způsobem je vlastně možné s&nbsp;využitím výše
+uvedeného standardního balíčku <strong>net/http</strong> vytvořit jednoduchý
+HTTP server. Pravděpodobně nejjednodušší podoba takového serveru má
+zaregistrován pouze jediný <i>handler</i>, tedy funkci, která je volána při
+zadání adresy <strong>localhost:8080</strong> nebo
+<strong>localhost:8080/</strong> (nebo v&nbsp;tomto případě prakticky
+jakéhokoli jiného koncového bodu). Odpověď serveru bude vždy stejná &ndash;
+HTTP 200 OK a zpráva bude znít &bdquo;Hello world!&ldquo;:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "io"
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Zajímavější a vlastně i mnohem užitečnější je ovšem pochopitelně
+implementace HTTP serveru, která bude generovat dynamický obsah. Ten lze tvořit
+buď přímo &bdquo;ručně&ldquo; v&nbsp;programu, nebo můžeme využít některé
+balíčky ze standardní knihovny programovacího jazyka Go pro generování dat ve
+formátu JSON, XML, popř.&nbsp;knihovny s&nbsp;implementací šablon
+(<i>templates</i>). Dnes nás ovšem bude primárně zajímat první způsob,
+tj.&nbsp;&bdquo;ruční&ldquo; generování odpovědi, která je serverem posílána
+klientovi na základě jeho dotazu (<i>request</i>). Jedna z&nbsp;nejjednodušších
+implementací takového HTTP serveru může vypadat například následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "net/http"
+)
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        response := "Hello world!\n"
+        writer.Write([]byte(response))
+}
+&nbsp;
+func <strong>main</strong>() {
+        http.HandleFunc("/", mainEndpoint)
+        http.ListenAndServe(":8000", nil)
+}
+</pre>
+
+<p>Funkci takového serveru si můžeme snadno otestovat, například
+s&nbsp;využitím nástroje <strong>wget</strong> nebo ještě lépe
+<strong>curl</strong>. Vzhledem k&nbsp;tomu, že víme, na jakém portu server
+běží a jaký <i>endpoint</i> máme zavolat, sestavíme příkaz pro
+<strong>curl</strong> tímto způsobem:</p>
+
+<pre>
+$ <strong>curl -v localhost:8000</strong>
+</pre>
+
+<p>Výstup bude obsahovat i ladicí informace vyžádané přepínačem
+<strong>-v</strong>:</p>
+
+<pre>
+* Rebuilt URL to: localhost:8000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8000 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8000
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Mon, 06 May 2019 18:14:06 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+<strong>Hello world!</strong>
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Ve zdrojovém kódu si povšimněte především funkce, v&nbsp;níž je
+implementováno generování a posílání odpovědi. Této funkci jsou předány dvě
+hodnoty, přičemž první je typu rozhraní <strong>http.ResponseWriter</strong> a
+druhá je typu ukazatel na <strong>http.Request</strong>:</p>
+
+<pre>
+type <strong>Request</strong> struct {
+        Method string
+        URL *url.URL
+        Proto      string // "HTTP/1.0"
+        ProtoMajor int    // 1
+        ProtoMinor int    // 0
+        Header Header
+        Body io.ReadCloser
+        GetBody func() (io.ReadCloser, error)
+        ContentLength int64
+        TransferEncoding []string
+        Close bool
+        Host string
+        Form url.Values
+        PostForm url.Values
+        MultipartForm *multipart.Form
+        Trailer Header
+        RemoteAddr string
+        RequestURI string
+        TLS *tls.ConnectionState
+        Cancel &lt;-chan struct{}
+        Response *Response
+        Pattern string
+}
+</pre>
+
+<p>a:</p>
+
+<pre>
+type <strong>ResponseWriter</strong> interface {
+        Header() Header
+        Write([]byte) (int, error)
+        WriteHeader(statusCode int)
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. HTTP server využívající knihovnu <strong>gorilla/mux</strong></h2>
+
+<p>Nyní se podívejme na způsob realizace jednoduchého HTTP serveru, který bude
+mj.&nbsp;používat i (nestandardní) balíček <strong>gorilla/mux</strong>
+pocházející z&nbsp;Gorilla Toolkitu. Základní služby poskytované serverem budou
+stejné, ovšem navíc budeme implementovat koncový bod, který vrátí obsah čítače
+(interně se zvyšuje při každém přístupu). Požadované změny nastanou náhradou
+následujících dvou řádků s&nbsp;registrací handlerů, které bychom použili
+v&nbsp;<strong>net/http</strong>:</p>
+
+<pre>
+http.HandleFunc("/", mainEndpoint)
+http.HandleFunc("/counter", counterEndpoint)
+</pre>
+
+<p>V&nbsp;upraveném zdrojovém kódu demonstračního příkladu použijeme takzvaný
+<i>směrovač</i> neboli <i>router</i> poskytovaný právě knihovnou
+<strong>gorilla/mux</strong>. Jeho konstrukce může vypadat následovně:</p>
+
+<pre>
+router := mux.NewRouter()
+</pre>
+
+<p>Popř.&nbsp;můžeme explicitně specifikovat, zda se budou URI typu
+<strong>/cesta</strong> a <strong>/cesta/</strong> považovat za shodné či
+nikoli:</p>
+
+<pre>
+router := mux.NewRouter().StrictSlash(true)
+</pre>
+
+<p>Dále zaregistrujeme oba výše zmíněné <i>handlery</i>, ovšem nyní použijeme
+metodu <strong>router.HandleFunc</strong> a nikoli funkci
+<strong>http.HandleFunc</strong> (z&nbsp;balíčku
+<strong>net/http</strong>):</p>
+
+<pre>
+router.HandleFunc("/", mainEndpoint)
+router.HandleFunc("/counter", counterEndpoint)
+</pre>
+
+<p>Nakonec je pochopitelně nutné náš nově upravený HTTP server spustit.
+Povšimněte si, že se v&nbsp;tomto případě využije druhý parametr funkce
+<strong>http.ListenAndServe</strong> &ndash; již se zde nepředává hodnota
+<strong>nil</strong>, ale instance právě nakonfigurovaného směrovače:</p>
+
+<pre>
+err := http.ListenAndServe(ADDRESS, router)
+</pre>
+
+<p>Úplný zdrojový kód upraveného příkladu, který naleznete na adrese <a
+href="https://github.com/tisnik/go-root/blob/master/article_38/02_http_server_with_mux.go">https://github.com/tisnik/go-root/blob/master/article_38/02_http_server_with_mux.go</a>,
+vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/gorilla/mux"
+        "io"
+        "log"
+        "net/http"
+        "os"
+        "sync"
+)
+&nbsp;
+const ADDRESS = ":8080"
+&nbsp;
+var counter int
+var mutex = &amp;sync.Mutex{}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        mutex.Lock()
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+        mutex.Unlock()
+}
+&nbsp;
+func <strong>main</strong>() {
+        router := mux.NewRouter().StrictSlash(true)
+&nbsp;
+        router.HandleFunc("/", mainEndpoint)
+        router.HandleFunc("/counter", counterEndpoint)
+&nbsp;
+        log.Println("Starting HTTP server at address", ADDRESS)
+        err := http.ListenAndServe(ADDRESS, router)
+        if err != nil {
+                log.Fatal("Unable to initialize HTTP server", err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Funkcionalitu tohoto příkladu snadno otestujeme, a to opět s&nbsp;využitím
+nástroje <strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080</strong>
+&nbsp;
+* Rebuilt URL to: localhost:8080/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 13 Oct 2019 16:25:33 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Otestování funkce čítače:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/counter</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /counter HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 13 Oct 2019 16:25:48 GMT
+&lt; Content-Length: 11
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Counter: 1
+* Connection #0 to host localhost left intact
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Specifikace HTTP metody pro jednotlivé handlery</h2>
+
+<p>V&nbsp;případě, že při volání demonstračního příkladu <a
+href="#k03">z&nbsp;předchozí kapitoly</a> použijeme jinou HTTP metodu než GET
+(což je pro nástroj <strong>curl</strong> výchozí metoda, pokud ovšem nebudeme
+na server posílat data), bude například čítač stále přístupný. O tom se ostatně
+můžeme velmi snadno přesvědčit, pokud budeme explicitně specifikovat metodu
+<strong>POST</strong>, <strong>PUT</strong> či dokonce
+<strong>DELETE</strong>:</p>
+
+<pre>
+$ <strong>curl -v -X POST localhost:8080/counter</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; POST /counter HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 13 Oct 2019 16:31:50 GMT
+&lt; Content-Length: 11
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Counter: 2
+* Connection #0 to host localhost left intact
+&nbsp;
+$ <strong>curl -v -X DELETE localhost:8080/counter</strong>
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; DELETE /counter HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Date: Sun, 13 Oct 2019 16:31:56 GMT
+&lt; Content-Length: 11
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Counter: 3
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Takové chování ovšem většinou u služeb postavených nad REST API není
+ideální, protože s&nbsp;prostředky, které jsou přes API obsluhovány, se provádí
+různé operace typu CRUD. Samozřejmě je možné i při použití základního balíčku
+<strong>net/http</strong> získat jméno použité metody, ovšem nejedná se o
+ideální řešení. To nám nabízí již zmíněný balíček <strong>gorilla/mux</strong>,
+v&nbsp;němž můžeme omezit volání handleru pouze pro danou metodu. V&nbsp;našem
+demonstračním příkladu prozatím pouze čteme hodnoty (prostředků) a neměníme je,
+takže nám postačuje použít metodu GET omezit použití ostatních metod:</p>
+
+<pre>
+router := mux.NewRouter().StrictSlash(true)
+&nbsp;
+router.HandleFunc("/", mainEndpoint).Methods("GET")
+router.HandleFunc("/counter", counterEndpoint).Methods("GET")
+</pre>
+
+<p>Upravený zdrojový kód demonstračního příkladu bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "github.com/gorilla/mux"
+        "io"
+        "log"
+        "net/http"
+        "os"
+        "sync"
+)
+&nbsp;
+const ADDRESS = ":8080"
+&nbsp;
+var counter int
+var mutex = &amp;sync.Mutex{}
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>counterEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        mutex.Lock()
+        counter++
+        fmt.Fprintf(writer, "Counter: %d\n", counter)
+        mutex.Unlock()
+}
+&nbsp;
+func <strong>main</strong>() {
+        router := mux.NewRouter().StrictSlash(true)
+&nbsp;
+        router.HandleFunc("/", mainEndpoint).Methods("GET")
+        router.HandleFunc("/counter", counterEndpoint).Methods("GET")
+&nbsp;
+        log.Println("Starting HTTP server at address", ADDRESS)
+        err := http.ListenAndServe(ADDRESS, router)
+        if err != nil {
+                log.Fatal("Unable to initialize HTTP server", err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p>Můžeme si ihned otestovat, jak se bude nová služba chovat při použití
+různých HTTP metod.</p>
+
+<p>Výchozí metoda <strong>GET</strong>:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; <strong>HTTP/1.1 200 OK</strong>
+&lt; Date: Sun, 13 Oct 2019 18:45:33 GMT
+&lt; Content-Length: 13
+&lt; Content-Type: text/plain; charset=utf-8
+&lt; 
+Hello world!
+</pre>
+
+<p>Metoda <strong>PUT</strong>:</p>
+
+<pre>
+$ <strong>curl -v -X PUT localhost:8080/</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; PUT / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; <strong>HTTP/1.1 405 Method Not Allowed</strong>
+&lt; Date: Sun, 13 Oct 2019 18:45:37 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Metoda <strong>POST</strong>:</p>
+
+<pre>
+$ <strong>curl -v -X POST localhost:8080/</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; POST / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; <strong>HTTP/1.1 405 Method Not Allowed</strong>
+&lt; Date: Sun, 13 Oct 2019 18:45:42 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Metoda <strong>DELETE</strong>:</p>
+
+<pre>
+$ <strong>curl -v -X DELETE localhost:8080/</strong>
+&nbsp;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; DELETE / HTTP/1.1
+&gt; User-Agent: curl/7.35.0
+&gt; Host: localhost:8080
+&gt; Accept: */*
+&gt; 
+&lt; <strong>HTTP/1.1 405 Method Not Allowed</strong>
+&lt; Date: Sun, 13 Oct 2019 18:45:45 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že se hodnota čítače
+vrátila pouze při použití metody <strong>GET</strong>. Snaha o použití jiných
+metod vede k&nbsp;chybovému stavu <strong>HTTP/1.1 405 Method Not
+Allowed</strong>, viz též <a
+href="https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#4xx_Client_errors">4xx
+Client errors</a> (chyba na straně klienta &ndash; poslal špatný
+dotaz).</div></p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Kostra webové služby pro správu osob</h2>
+
+<p>Ukažme si ještě, jak by mohla vypadat kostra webové služby pro správu osob.
+K&nbsp;dispozici budou tyto operace:</p>
+
+<table>
+<tr><th>#</th><th>Operace</th><th>Volání</th><th>Metoda</th></tr>
+<tr><td>1</td><td>výpis celé databáze</td><td>/users</td><td>GET</td></tr>
+<tr><td>2</td><td>informace o zvolené osobě</td><td>/user/ID_OSOBY</td><td>GET</td></tr>
+<tr><td>3</td><td>přidání nové osoby do databáze</td><td>/user/ID_OSOBY</td><td>POST</td></tr>
+<tr><td>4</td><td>změna údajů v databázi</td><td>/user/ID_OSOBY</td><td>PUT</td></tr>
+<tr><td>5</td><td>vymazání osoby</td><td>/user/ID_OSOBY</td><td>DELETE</td></tr>
+</table>
+
+<p>Nejprve použijeme Gorilla/mux. Při specifikaci handlerů využijeme toho, že
+(proměnné) jméno prostředku lze uzavřít do složených závorek:</p>
+
+<pre>
+router.HandleFunc("/user", listAllUsersEndpoint).Methods("GET")
+router.HandleFunc("/user/{id}", getUserEndpoint).Methods("GET")
+router.HandleFunc("/user/{id}", createUserEndpoint).Methods("POST")
+router.HandleFunc("/user/{id}", updateUserEndpoint).Methods("PUT")
+router.HandleFunc("/user/{id}", deleteUserEndpoint).Methods("DELETE")
+</pre>
+
+<p>Kostra této služby, pro stručnost bez implementace jednotlivých operací
+v&nbsp;handlerech, může vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "github.com/gorilla/mux"
+        "io"
+        "log"
+        "net/http"
+        "os"
+)
+&nbsp;
+const ADDRESS = ":8080"
+&nbsp;
+func <strong>mainEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "Hello world!\n")
+}
+&nbsp;
+func <strong>listAllUsersEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        io.WriteString(writer, "LIST ALL PERSONS\n")
+}
+&nbsp;
+func <strong>getUserEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        id := mux.Vars(request)["id"]
+        person, found := persons[id]
+        ...
+        ...
+        ...
+&nbsp;
+        io.WriteString(writer, "GET PERSON\n")
+}
+&nbsp;
+func <strong>createUserEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        id := mux.Vars(request)["id"]
+        person, found := persons[id]
+        ...
+        ...
+        ...
+&nbsp;
+        io.WriteString(writer, "CREATE PERSON\n")
+}
+&nbsp;
+func <strong>updateUserEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        id := mux.Vars(request)["id"]
+        person, found := persons[id]
+        ...
+        ...
+        ...
+&nbsp;
+        io.WriteString(writer, "UPDATE PERSON\n")
+}
+&nbsp;
+func <strong>deleteUserEndpoint</strong>(writer http.ResponseWriter, request *http.Request) {
+        id := mux.Vars(request)["id"]
+        person, found := persons[id]
+        ...
+        ...
+        ...
+&nbsp;
+        io.WriteString(writer, "DELETE PERSON\n")
+}
+&nbsp;
+func <strong>main</strong>() {
+        router := mux.NewRouter().StrictSlash(true)
+&nbsp;
+        router.HandleFunc("/", mainEndpoint).Methods("GET")
+        router.HandleFunc("/person", listAllUsersEndpoint).Methods("GET")
+        router.HandleFunc("/person/{id}", getUserEndpoint).Methods("GET")
+        router.HandleFunc("/person/{id}", createUserEndpoint).Methods("POST")
+        router.HandleFunc("/person/{id}", updateUserEndpoint).Methods("PUT")
+        router.HandleFunc("/person/{id}", deleteUserEndpoint).Methods("DELETE")
+&nbsp;
+        log.Println("Starting HTTP server at address", ADDRESS)
+        err := http.ListenAndServe(ADDRESS, router)
+        if err != nil {
+                log.Fatal("Unable to initialize HTTP server", err)
+                os.Exit(2)
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si způsobu přečtení ID, který
+je součástí adresy.</div></p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Nové možnosti při směrování dotazů v&nbsp;Go 1.22</h2>
+
+<p>V&nbsp;základním balíčku programovacího jazyka Go, konkrétně v&nbsp;balíčku
+<strong>net/http</strong>, se rozšířily možnosti specifikace vazby mezi adresou
+endpointu a příslušným handlerem. Nově je možné přímo při registraci handleru
+definovat, která HTTP metoda se bude používat. A navíc je možné, aby se při
+specifikaci endpointu určily i proměnné části, což jsou typicky identifikátory
+zdrojů (<i>resources</i>), například ID uživatelů atd. Tyto proměnné části jsou
+nejenom korektně rozpoznány, ale navíc je možné snadno získat i jejich
+konkrétní hodnoty, tedy například o jaké konkrétní ID uživatele se jedná.</p>
+
+<p>To ovšem znamená, že vlastně byla implementována nejdůležitější
+funkcionalita z&nbsp;Gorilla/mux. To poměrně dobře odpovídá filozofii jazyka
+Go, který se snaží minimálně v&nbsp;oblasti síťových aplikací nabízet již ve
+standardní knihovně většinu potřebné funkcionality, čímž se omezí nutnost
+instalace a importu dalších knihoven (čemuž se ovšem obecně stejně nedokážeme
+vyhnout, což má většinou i nepříjemné důsledky v&nbsp;praxi).</p>
+
+<p><div class="rs-tip-major">Poznámka: na tomto místě je nutné poznamenat, že
+se konkrétní implementace mezi <strong>net/http</strong> a
+<strong>gorilla/mux</strong> liší.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Webová služba umožňující manipulace se seznamem uživatelů</h2>
+
+<p>V&nbsp;rámci navazujících kapitol si ukážeme realizaci webové služby určené
+pro správu osob, resp.&nbsp;přesněji řečeno její značně zjednodušenou variantu,
+kterou je ovšem možné snadno rozšířit o chybějící funkce. Informace o jedné
+osobě je tvořena touto datovou strukturou:</p>
+
+<pre>
+<i>// Datova struktura predstavujici uzivatele</i>
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+}
+</pre>
+
+<p>Pro práci s&nbsp;databází osob nám bude stačit několik metod, které jsou
+předepsány v&nbsp;rozhraní <strong>UserStorage</strong>:</p>
+
+<pre>
+<i>// Rozhrani s predpisem metod pro manipulace s databazi uzivatelu</i>
+type <strong>UserStorage</strong> interface {
+        ReadListOfUsers() []User
+        ReadUser(ID int) (User, bool)
+        DeleteUser(ID int)
+}
+</pre>
+
+<p>Vlastní <i>implementace</i> databáze osob bude velmi jednoduchá, protože
+namísto reálné relační či objektové databáze použijeme seznam osob uložených
+jen v&nbsp;operační paměti. Každá osoba bude uložena do mapy obsahující
+následující datové struktury (klíčem bude ID):</p>
+
+<pre>
+<i>// Implementace databaze uzivatelu v operacni pameti</i>
+type <strong>MemoryStorage</strong> struct {
+        users map[int]User
+}
+&nbsp;
+<i>// Inicializace databaze uzivatelu</i>
+func <strong>NewMemoryStorage</strong>() MemoryStorage {
+        users := make(map[int]User)
+        users[1] = User{
+                Name:    "Linus",
+                Surname: "Torvalds",
+        }
+        users[2] = User{
+                Name:    "Rob",
+                Surname: "Pike",
+        }
+        users[3] = User{
+                Name:    "Ken",
+                Surname: "Iverson",
+        }
+
+        return MemoryStorage{
+                users: users,
+        }
+}
+&nbsp;
+<i>// Implementace vsech metod predepsanych rozhranim UserStorage</i>
+&nbsp;
+func (s MemoryStorage) <strong>ReadListOfUsers</strong>() []User {
+        users := make([]User, 0, len(s.users))
+        for _, user := range s.users {
+                users = append(users, user)
+        }
+        return users
+}
+&nbsp;
+func (s MemoryStorage) <strong>ReadUser</strong>(ID int) (User, bool) {
+        user, found := s.users[ID]
+        return user, found
+}
+&nbsp;
+func (s MemoryStorage) <strong>DeleteUser</strong>(ID int) {
+        delete(s.users, ID)
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: přidání další realizace databáze
+(například reálné relační databáze) je již snadné &ndash; pouze je nutné
+<i>splnit</i> (<i>satisfy</i>) rozhraní <strong>UserStorage</strong>.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Realizace handleru pro výpis seznamu uživatelů</h2>
+
+<p>Podívejme se nyní na to, jak by mohla vypadat realizace <i>handleru</i>,
+který bude zavolán při přístupu na koncový bod <strong>/users</strong>.
+V&nbsp;takovém případě by se měl vrátit JSON se všemi uživateli
+v&nbsp;databázi. Registrace příslušného handleru je následující:</p>
+
+<pre>
+        <i>// REST API endpoints</i>
+        http.HandleFunc("/users", s.returnListOfUsers)
+</pre>
+
+<p>Samotný handler nejprve přečte informace o všech uživatelích uložených
+v&nbsp;databázi a následně seznam serializuje do JSONu, který je poslán zpět
+klientovi. Vše lze tedy realizovat jen na několika řádcích zdrojového kódu
+(ovšem bez kontroly chyb!):</p>
+
+<pre>
+<i>// REST API handlery</i>
+&nbsp;
+func (s ServerImpl) <strong>returnListOfUsers</strong>(writer http.ResponseWriter, r *http.Request) {
+        users := s.storage.ReadListOfUsers()
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(users)
+}
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Úplný zdrojový kód první verze webové služby</h2>
+
+<p>Následuje výpis celého zdrojového kódu první verze naší webové služby:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "log"
+        "net/http"
+)
+&nbsp;
+<i>// Datova struktura predstavujici uzivatele</i>
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+}
+&nbsp;
+<i>// Rozhrani s predpisem metod pro manipulace s databazi uzivatelu</i>
+type <strong>UserStorage</strong> interface {
+        ReadListOfUsers() []User
+        ReadUser(ID int) (User, bool)
+        DeleteUser(ID int)
+}
+&nbsp;
+<i>// Implementace databaze uzivatelu v operacni pameti</i>
+type <strong>MemoryStorage</strong> struct {
+        users map[int]User
+}
+&nbsp;
+<i>// Inicializace databaze uzivatelu</i>
+func <strong>NewMemoryStorage</strong>() MemoryStorage {
+        users := make(map[int]User)
+        users[1] = User{
+                Name:    "Linus",
+                Surname: "Torvalds",
+        }
+        users[2] = User{
+                Name:    "Rob",
+                Surname: "Pike",
+        }
+        users[3] = User{
+                Name:    "Ken",
+                Surname: "Iverson",
+        }
+
+        return MemoryStorage{
+                users: users,
+        }
+}
+&nbsp;
+<i>// Implementace vsech metod predepsanych rozhranim UserStorage</i>
+&nbsp;
+func (s MemoryStorage) <strong>ReadListOfUsers</strong>() []User {
+        users := make([]User, 0, len(s.users))
+        for _, user := range s.users {
+                users = append(users, user)
+        }
+        return users
+}
+&nbsp;
+func (s MemoryStorage) <strong>ReadUser</strong>(ID int) (User, bool) {
+        user, found := s.users[ID]
+        return user, found
+}
+&nbsp;
+func (s MemoryStorage) <strong>DeleteUser</strong>(ID int) {
+        delete(s.users, ID)
+}
+&nbsp;
+<i>// Rozhrani predepisujici metody serveru</i>
+type <strong>Server</strong> interface {
+        Serve(port uint)
+}
+&nbsp;
+<i>// Implementace HTTPServeru</i>
+type <strong>ServerImpl</strong> struct {
+        storage UserStorage
+}
+&nbsp;
+<i>// Inicialiace serveru, predani kontextu</i>
+func <strong>NewServer</strong>(storage UserStorage) Server {
+        return ServerImpl{
+                storage: storage,
+        }
+}
+&nbsp;
+func (s ServerImpl) <strong>Serve</strong>(port uint) {
+        log.Printf("Starting server on port 8080")
+&nbsp;
+        <i>// REST API endpoints</i>
+        http.HandleFunc("/users", s.returnListOfUsers)
+&nbsp;
+        <i>// start the server</i>
+        http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+}
+&nbsp;
+<i>// REST API handlery</i>
+&nbsp;
+func (s ServerImpl) <strong>returnListOfUsers</strong>(writer http.ResponseWriter, r *http.Request) {
+        users := s.storage.ReadListOfUsers()
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(users)
+}
+&nbsp;
+func <strong>main</strong>() {
+        storage := NewMemoryStorage()
+        server := NewServer(storage)
+        server.Serve(8080)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Otestování webové služby</h2>
+
+<p>Otestování této primitivní webové služby je snadné &ndash; postačuje nám
+použít nástroj <strong>curl</strong>:</p>
+
+<pre>
+$ <strong>curl localhost:8080/users | jq .</strong>
+</pre>
+
+<p>S&nbsp;výsledkem:</p>
+
+<pre>
+[
+  {
+    "Name": "Linus",
+    "Surname": "Torvalds"
+  },
+  {
+    "Name": "Rob",
+    "Surname": "Pike"
+  },
+  {
+    "Name": "Ken",
+    "Surname": "Iverson"
+  }
+]
+</pre>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Úplný zdrojový kód druhé verze webové služby</h2>
+
+<p>Druhá varianta webové služby obsahující handlery určené pro výpis
+konkrétního uživatele popř.&nbsp;pro smazání uživatele identifikovaného svým
+ID, vypadá následovně. Povšimněte si určitých problémů, například opakujícího
+se kódu, použití &bdquo;sloves&ldquo; v&nbsp;koncových bodech atd.:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "log"
+        "net/http"
+        "strconv"
+)
+&nbsp;
+<i>// Datova struktura predstavujici uzivatele</i>
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+}
+&nbsp;
+<i>// Rozhrani s predpisem metod pro manipulace s databazi uzivatelu</i>
+type <strong>UserStorage</strong> interface {
+        ReadListOfUsers() []User
+        ReadUser(ID int) (User, bool)
+        DeleteUser(ID int)
+}
+&nbsp;
+<i>// Implementace databaze uzivatelu v operacni pameti</i>
+type <strong>MemoryStorage</strong> struct {
+        users map[int]User
+}
+&nbsp;
+<i>// Inicializace databaze uzivatelu</i>
+func NewMemoryStorage() <strong>MemoryStorage </strong>{
+        users := make(map[int]User)
+        users[1] = User{
+                Name:    "Linus",
+                Surname: "Torvalds",
+        }
+        users[2] = User{
+                Name:    "Rob",
+                Surname: "Pike",
+        }
+        users[3] = User{
+                Name:    "Ken",
+                Surname: "Iverson",
+        }
+
+        return MemoryStorage{
+                users: users,
+        }
+}
+&nbsp;
+<i>// Implementace vsech metod predepsanych rozhranim UserStorage</i>
+&nbsp;
+func (s MemoryStorage) <strong>ReadListOfUsers</strong>() []User {
+        users := make([]User, 0, len(s.users))
+        for _, user := range s.users {
+                users = append(users, user)
+        }
+        return users
+}
+&nbsp;
+func (s MemoryStorage) <strong>ReadUser</strong>(ID int) (User, bool) {
+        user, found := s.users[ID]
+        return user, found
+}
+&nbsp;
+func (s MemoryStorage) <strong>DeleteUser</strong>(ID int) {
+        delete(s.users, ID)
+}
+&nbsp;
+<i>// Rozhrani predepisujici metody serveru</i>
+type <strong>Server</strong> interface {
+        Serve(port uint)
+}
+&nbsp;
+<i>// Implementace HTTPServeru</i>
+type <strong>ServerImpl</strong> struct {
+        storage UserStorage
+}
+&nbsp;
+<i>// Inicialiace serveru, predani kontextu</i>
+func <strong>NewServer</strong>(storage UserStorage) Server {
+        return ServerImpl{
+                storage: storage,
+        }
+}
+&nbsp;
+func (s ServerImpl) <strong>Serve</strong>(port uint) {
+        log.Printf("Starting server on port 8080")
+&nbsp;
+        <i>// REST API endpoints</i>
+        http.HandleFunc("/users", s.returnListOfUsers)
+        http.HandleFunc("/user", s.returnOneUser)
+        http.HandleFunc("/delete-user", s.deleteOneUser)
+&nbsp;
+        <i>// start the server</i>
+        http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+}
+&nbsp;
+<i>// REST API handlery</i>
+&nbsp;
+func (s ServerImpl) <strong>returnListOfUsers</strong>(writer http.ResponseWriter, r *http.Request) {
+        users := s.storage.ReadListOfUsers()
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(users)
+}
+&nbsp;
+func (s ServerImpl) <strong>returnOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        params := r.URL.Query()
+        IDs, found := params["ID"]
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        ID, err := strconv.Atoi(IDs[0])
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        user, found := s.storage.ReadUser(ID)
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusNotFound)
+                return
+        }
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(user)
+}
+&nbsp;
+func (s ServerImpl) <strong>deleteOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        params := r.URL.Query()
+        IDs, found := params["ID"]
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        ID, err := strconv.Atoi(IDs[0])
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        s.storage.DeleteUser(ID)
+&nbsp;
+        writer.Header().Set("Content-Type", "application/json")
+        status := struct {
+                Status string
+                ID     int
+        }{"deleted", ID}
+        json.NewEncoder(writer).Encode(status)
+}
+&nbsp;
+func <strong>main</strong>() {
+        storage := NewMemoryStorage()
+        server := NewServer(storage)
+        server.Serve(8080)
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Otestování chování upravené varianty webové služby</h2>
+
+<p>Po spuštění webové služby si otestujeme chování všech tří koncových bodů,
+které jsme implementovali:</p>
+
+<pre>
+$ <strong>curl localhost:8080/users | jq .</strong>
+&nbsp;
+[
+  {
+    "Name": "Linus",
+    "Surname": "Torvalds"
+  },
+  {
+    "Name": "Rob",
+    "Surname": "Pike"
+  },
+  {
+    "Name": "Ken",
+    "Surname": "Iverson"
+  }
+]
+&nbsp;
+&nbsp;
+&nbsp;
+$ <strong>curl localhost:8080/user?ID=1 | jq .</strong>
+&nbsp;
+{
+  "Name": "Linus",
+  "Surname": "Torvalds"
+}
+&nbsp;
+&nbsp;
+&nbsp;
+$ <strong>curl localhost:8080/delete-user?ID=1</strong>
+&nbsp;
+{"Status":"deleted","ID":1}
+</pre>
+
+<p>Otestovat si můžeme i chování při chybných vstupech:</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/delete-user</strong>
+&nbsp;
+*   Trying 127.0.0.1:8080...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /delete-user HTTP/1.1
+&gt; Host: localhost:8080
+&gt; User-Agent: curl/8.0.1
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 400 Bad Request
+&lt; Content-Type: text/plain
+&lt; Date: Wed, 30 Oct 2024 10:13:17 GMT
+&lt; Content-Length: 0
+&lt;
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Navíc můžeme použít i HTTP metody, které nejsou v&nbsp;daném kontextu
+očekávány (což je implementační nedostatek):</p>
+
+<pre>
+$ <strong>curl -X DELETE localhost:8080/users</strong>
+&nbsp;
+[{"Name":"Rob","Surname":"Pike"},{"Name":"Ken","Surname":"Iverson"}]
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Kontrola, zda je při volání endpointu použita očekávaná metoda</h2>
+
+<p>Abychom zabránili tomu, že bude nějaký endpoint volán nekorektní HTTP
+metodou, můžeme i ve starších verzích ekosystému jazyka Go explicitně
+zkontrolovat, jaká metoda byla použita. K&nbsp;tomu slouží atribut
+<strong>request.Method</strong>, který přímo obsahuje konstantu
+<strong>http.MethodGet</strong>, <strong>http.MethodPut</strong> atd. Kontrolu
+je tedy možné provést například následujícím způsobem:</p>
+
+<pre>
+func (s ServerImpl) returnListOfUsers(writer http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Popř.&nbsp;test, zda je pro smazání uživatele skutečně použita HTTP metoda
+DELETE:</p>
+
+<pre>
+func (s ServerImpl) deleteOneUser(writer http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodDelete {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Tyto kontroly sice nejsou ideální, ale v&nbsp;předchozích verzích Go nám nic
+jiného nezbývalo, pokud jsme nechtěli využít gorilla/mux a podobné knihovny
+třetích stran.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Úplný zdrojový kód třetí verze webové služby</h2>
+
+<p>Po <a href="#k13">výše zmíněných</a> úpravách bude naše webová služba
+vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "log"
+        "net/http"
+        "strconv"
+)
+&nbsp;
+<i>// Datova struktura predstavujici uzivatele</i>
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+}
+&nbsp;
+<i>// Rozhrani s predpisem metod pro manipulace s databazi uzivatelu</i>
+type <strong>UserStorage</strong> interface {
+        ReadListOfUsers() []User
+        ReadUser(ID int) (User, bool)
+        DeleteUser(ID int)
+}
+&nbsp;
+<i>// Implementace databaze uzivatelu v operacni pameti</i>
+type <strong>MemoryStorage</strong> struct {
+        users map[int]User
+}
+&nbsp;
+<i>// Inicializace databaze uzivatelu</i>
+func <strong>NewMemoryStorage</strong>() MemoryStorage {
+        users := make(map[int]User)
+        users[1] = User{
+                Name:    "Linus",
+                Surname: "Torvalds",
+        }
+        users[2] = User{
+                Name:    "Rob",
+                Surname: "Pike",
+        }
+        users[3] = User{
+                Name:    "Ken",
+                Surname: "Iverson",
+        }
+
+        return MemoryStorage{
+                users: users,
+        }
+}
+&nbsp;
+<i>// Implementace vsech metod predepsanych rozhranim UserStorage</i>
+&nbsp;
+func (s MemoryStorage) <strong>ReadListOfUsers</strong>() []User {
+        users := make([]User, 0, len(s.users))
+        for _, user := range s.users {
+                users = append(users, user)
+        }
+        return users
+}
+&nbsp;
+func (s MemoryStorage) <strong>ReadUser</strong>(ID int) (User, bool) {
+        user, found := s.users[ID]
+        return user, found
+}
+&nbsp;
+func (s MemoryStorage) <strong>DeleteUser</strong>(ID int) {
+        delete(s.users, ID)
+}
+&nbsp;
+<i>// Rozhrani predepisujici metody serveru</i>
+type <strong>Server</strong> interface {
+        Serve(port uint)
+}
+&nbsp;
+<i>// Implementace HTTPServeru</i>
+type <strong>ServerImpl</strong> struct {
+        storage UserStorage
+}
+&nbsp;
+<i>// Inicialiace serveru, predani kontextu</i>
+func <strong>NewServer</strong>(storage UserStorage) Server {
+        return ServerImpl{
+                storage: storage,
+        }
+}
+&nbsp;
+func (s ServerImpl) <strong>Serve</strong>(port uint) {
+        log.Printf("Starting server on port 8080")
+&nbsp;
+        <i>// REST API endpoints</i>
+        http.HandleFunc("/users", s.returnListOfUsers)
+        http.HandleFunc("/user", s.returnOneUser)
+        http.HandleFunc("/delete-user", s.deleteOneUser)
+&nbsp;
+        <i>// start the server</i>
+        http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+}
+&nbsp;
+<i>// REST API handlery</i>
+&nbsp;
+func (s ServerImpl) <strong>returnListOfUsers</strong>(writer http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        users := s.storage.ReadListOfUsers()
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(users)
+}
+&nbsp;
+func (s ServerImpl) <strong>returnOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        params := r.URL.Query()
+        IDs, found := params["ID"]
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        ID, err := strconv.Atoi(IDs[0])
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        user, found := s.storage.ReadUser(ID)
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusNotFound)
+                return
+        }
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(user)
+}
+&nbsp;
+func (s ServerImpl) <strong>deleteOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodDelete {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        params := r.URL.Query()
+        IDs, found := params["ID"]
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        ID, err := strconv.Atoi(IDs[0])
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        s.storage.DeleteUser(ID)
+&nbsp;
+        writer.Header().Set("Content-Type", "application/json")
+        status := struct {
+                Status string
+                ID     int
+        }{"deleted", ID}
+        json.NewEncoder(writer).Encode(status)
+}
+&nbsp;
+func <strong>main</strong>() {
+        storage := NewMemoryStorage()
+        server := NewServer(storage)
+        server.Serve(8080)
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Otestování, jak webová služba kontroluje HTTP metody požadavků</h2>
+
+<p>Pokusme se nyní zavolat koncové body upravené webové služby tak, že vždy
+použijeme HTTP metody, které neodpovídají daným koncovým bodům:</p>
+
+<pre>
+$ <strong>curl -v -X DELETE localhost:8080/users</strong>
+&nbsp;
+*   Trying 127.0.0.1:8080...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; DELETE /users HTTP/1.1
+&gt; Host: localhost:8080
+&gt; User-Agent: curl/8.0.1
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 400 Bad Request
+&lt; Content-Type: text/plain
+&lt; Date: Wed, 30 Oct 2024 12:49:30 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<pre>
+$ <strong>curl -v -X GET localhost:8080/delete-user?ID=1</strong>
+&nbsp;
+*   Trying 127.0.0.1:8080...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; GET /delete-user?ID=1 HTTP/1.1
+&gt; Host: localhost:8080
+&gt; User-Agent: curl/8.0.1
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 400 Bad Request
+&lt; Content-Type: text/plain
+&lt; Date: Wed, 30 Oct 2024 12:50:02 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<pre>
+$ <strong>curl -v -X POST localhost:8080/user?ID=1</strong>
+&nbsp;
+*   Trying 127.0.0.1:8080...
+* Connected to localhost (127.0.0.1) port 8080 (#0)
+&gt; POST /user?ID=1 HTTP/1.1
+&gt; Host: localhost:8080
+&gt; User-Agent: curl/8.0.1
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 400 Bad Request
+&lt; Content-Type: text/plain
+&lt; Date: Wed, 30 Oct 2024 12:50:24 GMT
+&lt; Content-Length: 0
+&lt; 
+* Connection #0 to host localhost left intact
+</pre>
+
+<p>Webová služba tedy pracuje &ndash; minimálně z&nbsp;tohoto pohledu &ndash;
+korektně.</p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Nedostatky webové služby a jejich náprava v&nbsp;Go 1.22</h2>
+
+<p>I přes nepatrná vylepšení má naše webová služba mnoho nedostatků. Zejména se
+používá špatné pojmenování koncových bodů a taktéž při &bdquo;adresování&ldquo;
+zdrojů (což jsou v&nbsp;našem případě osoby) se spíše používá zápis zdroje
+přímo do URL, tedy například ve stylu <strong>/users/1</strong>,
+<strong>/users/42</strong> atd. Všechny tyto nedostatky je možné relativně
+snadno opravit právě v&nbsp;Go verze 1.22 nebo pochopitelně v&nbsp;jakékoli
+novější verzi Go. Při registraci handlerů je totiž možné specifikovat
+používanou HTTP metodu a navíc může adresa obsahovat měnitelné části, které se
+při konkrétním volání nahradí například právě ID konkrétní osoby. Konkrétně to
+znamená, že registraci handlerů můžeme zjednodušit na pouhé:</p>
+
+<pre>
+<i>// REST API endpoints</i>
+http.HandleFunc("GET /users", s.returnListOfUsers)
+http.HandleFunc("GET /users/{id}", s.returnOneUser)
+http.HandleFunc("DELETE /users/{id}", s.deleteOneUser)
+</pre>
+
+<p>Pokud tedy webovou službu voláme a používáme zdánlivě stejný koncový bod
+<strong>/users</strong>, bude náš HTTP server nejdříve rozlišovat použitou
+metodu (tím především rozliší druhý a třetí handler). Taktéž se bude snažit
+zjistit, která adresa je nejvíce konkrétní, čímž odliší první handler od
+ostatních dvou. Výsledkem bude webová služba s&nbsp;korektně pojmenovanými
+koncovými body (i když je samozřejmě na delší diskusi, zda použít singulár či
+plurál; zde jsem zvolil druhou možnost).</p>
+
+<p>To však ještě není vše, protože potřebujeme získat ID osoby, což bylo
+v&nbsp;předchozích dvou variantách relativně zdlouhavé. Nyní je situace mnohem
+lepší, protože můžeme zavolat metodu <strong>PathValue</strong> rozhraní
+<strong>http.Request</strong>. Tato metoda vrátí příslušnou proměnnou část
+adresy, a to formou řetězce (jeden řetězec, nikoli řez ani pole). Je tedy stále
+nutné provést konverzi řetězce na celé číslo, například tak, jak je to
+naznačeno v&nbsp;ukázkovém kódu:</p>
+
+<pre>
+func (s ServerImpl) <strong>returnOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        IDs := r.PathValue("id")
+&nbsp;
+        ID, err := strconv.Atoi(IDs)
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+        ...
+        ...
+        ...
+&nbsp;
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: proměnných části může být specifikováno
+více, ale musí mít unikátní jména:</div></p>
+
+<pre>
+        http.HandleFunc("GET /users", s.returnListOfUsers)
+        http.HandleFunc("GET /users/{id}", s.returnOneUser)
+        http.HandleFunc("DELETE /users/{id}", s.deleteOneUser)
+        http.HandleFunc("GET /users/{id}/name/{name}/surname/{surname}", s.returnOneUserByNameSurname)
+        http.HandleFunc("GET /users/{id}/name/{id}", s.returnOneUserByID)
+</pre>
+
+<p>Takto upravená služba sice bude přeložitelná, ale v&nbsp;čase běhu (runtime)
+zhavaruje kvůli poslednímu registrovanému handleru:</p>
+
+<pre>
+panic: parsing "GET /users/{id}/name/{id}": at offset 21: duplicate wildcard name "id"
+&nbsp;
+goroutine 1 [running]:
+net/http.(*ServeMux).register(...)
+	/usr/local/go/src/net/http/server.go:2733
+net/http.HandleFunc({0x6af8a5?, 0x0?}, 0x2?)
+	/usr/local/go/src/net/http/server.go:2727 +0x86
+main.ServerImpl.Serve({{0x722ef8?, 0xc00011c960?}}, 0x1f90)
+	/home/ptisnovs/xy/api_service_5.go:94 +0x259
+main.main()
+	/home/ptisnovs/xy/api_service_5.go:151 +0x151
+exit status 2
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Úplný zdrojový kód čtvrté verze webové služby</h2>
+
+<p>Čtvrtá a současně i poslední varianta naší webové služby je již mnohem
+čitelnější a kratší, než varianty předchozí. Navíc mají koncové body korektní
+sémantiku:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "encoding/json"
+        "fmt"
+        "log"
+        "net/http"
+        "strconv"
+)
+&nbsp;
+<i>// Datova struktura predstavujici uzivatele</i>
+type <strong>User</strong> struct {
+        Name    string
+        Surname string
+}
+&nbsp;
+<i>// Rozhrani s predpisem metod pro manipulace s databazi uzivatelu</i>
+type <strong>UserStorage</strong> interface {
+        ReadListOfUsers() []User
+        ReadUser(ID int) (User, bool)
+        DeleteUser(ID int)
+}
+&nbsp;
+<i>// Implementace databaze uzivatelu v operacni pameti</i>
+type <strong>MemoryStorage</strong> struct {
+        users map[int]User
+}
+&nbsp;
+<i>// Inicializace databaze uzivatelu</i>
+func <strong>NewMemoryStorage</strong>() MemoryStorage {
+        users := make(map[int]User)
+        users[1] = User{
+                Name:    "Linus",
+                Surname: "Torvalds",
+        }
+        users[2] = User{
+                Name:    "Rob",
+                Surname: "Pike",
+        }
+        users[3] = User{
+                Name:    "Ken",
+                Surname: "Iverson",
+        }
+
+        return MemoryStorage{
+                users: users,
+        }
+}
+&nbsp;
+<i>// Implementace vsech metod predepsanych rozhranim UserStorage</i>
+&nbsp;
+func (s MemoryStorage) <strong>ReadListOfUsers</strong>() []User {
+        users := make([]User, 0, len(s.users))
+        for _, user := range s.users {
+                users = append(users, user)
+        }
+        return users
+}
+&nbsp;
+func (s MemoryStorage) <strong>ReadUser</strong>(ID int) (User, bool) {
+        user, found := s.users[ID]
+        return user, found
+}
+&nbsp;
+func (s MemoryStorage) <strong>DeleteUser</strong>(ID int) {
+        delete(s.users, ID)
+}
+&nbsp;
+<i>// Rozhrani predepisujici metody serveru</i>
+type <strong>Server</strong> interface {
+        Serve(port uint)
+}
+&nbsp;
+<i>// Implementace HTTPServeru</i>
+type <strong>ServerImpl</strong> struct {
+        storage UserStorage
+}
+&nbsp;
+<i>// Inicialiace serveru, predani kontextu</i>
+func <strong>NewServer</strong>(storage UserStorage) Server {
+        return ServerImpl{
+                storage: storage,
+        }
+}
+&nbsp;
+func (s ServerImpl) <strong>Serve</strong>(port uint) {
+        log.Printf("Starting server on port 8080")
+&nbsp;
+        <i>// REST API endpoints</i>
+        http.HandleFunc("GET /users", s.returnListOfUsers)
+        http.HandleFunc("GET /users/{id}", s.returnOneUser)
+        http.HandleFunc("DELETE /users/{id}", s.deleteOneUser)
+&nbsp;
+        <i>// start the server</i>
+        http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+}
+&nbsp;
+<i>// REST API handlery</i>
+&nbsp;
+func (s ServerImpl) <strong>returnListOfUsers</strong>(writer http.ResponseWriter, r *http.Request) {
+        users := s.storage.ReadListOfUsers()
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(users)
+}
+&nbsp;
+func (s ServerImpl) <strong>returnOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        IDs := r.PathValue("id")
+&nbsp;
+        ID, err := strconv.Atoi(IDs)
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        user, found := s.storage.ReadUser(ID)
+        if !found {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusNotFound)
+                return
+        }
+        writer.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(writer).Encode(user)
+}
+&nbsp;
+func (s ServerImpl) <strong>deleteOneUser</strong>(writer http.ResponseWriter, r *http.Request) {
+        IDs := r.PathValue("id")
+&nbsp;
+        ID, err := strconv.Atoi(IDs)
+        if err != nil {
+                writer.Header().Set("Content-Type", "text/plain")
+                writer.WriteHeader(http.StatusBadRequest)
+                return
+        }
+&nbsp;
+        s.storage.DeleteUser(ID)
+&nbsp;
+        writer.Header().Set("Content-Type", "application/json")
+        status := struct {
+                Status string
+                ID     int
+        }{"deleted", ID}
+        json.NewEncoder(writer).Encode(status)
+}
+&nbsp;
+func <strong>main</strong>() {
+        storage := NewMemoryStorage()
+        server := NewServer(storage)
+        server.Serve(8080)
+}
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Otestování základních funkcí poslední varianty webové služby</h2>
+
+<p>Nyní si již můžeme ověřit, jak pracuje (či naopak nepracuje) naše poslední
+varianta webové služby. Získání seznamu všech osob:</p>
+
+<pre>
+$ <strong>curl localhost:8080/users | jq .</strong>
+&nbsp;
+[
+  {
+    "Name": "Linus",
+    "Surname": "Torvalds"
+  },
+  {
+    "Name": "Rob",
+    "Surname": "Pike"
+  },
+  {
+    "Name": "Ken",
+    "Surname": "Iverson"
+  }
+]
+</pre>
+
+<p>Výběr (selekce) osoby na základě jejího ID a použití HTTP metody GET:</p>
+
+<pre>
+$ <strong>curl localhost:8080/users/1 | jq .</strong>
+&nbsp;
+{
+  "Name": "Linus",
+  "Surname": "Torvalds"
+}
+</pre>
+
+<p>Vymazání osoby na základě jejího ID a použití HTTP metody DELETE:</p>
+
+<pre>
+$ <strong>curl -X DELETE localhost:8080/users/1 </strong>
+&nbsp;
+{"Status":"deleted","ID":1}
+</pre>
+
+<p>Seznam osob, nyní již obsahující pouze dva záznamy:</p>
+
+<pre>
+$ <strong>curl localhost:8080/users | jq .</strong>
+&nbsp;
+[
+  {
+    "Name": "Rob",
+    "Surname": "Pike"
+  },
+  {
+    "Name": "Ken",
+    "Surname": "Iverson"
+  }
+]
+</pre>
+
+<p>Pokusy o použití nekorektní HTTP metody:</p>
+
+<pre>
+$ <strong>curl -X PUT localhost:8080/users</strong>
+&nbsp;
+Method Not Allowed
+&nbsp;
+&nbsp;
+$ <strong>curl -X POST localhost:8080/users</strong>
+&nbsp;
+Method Not Allowed
+&nbsp;
+&nbsp;
+$ <strong>curl -X DELETE localhost:8080/users</strong>
+&nbsp;
+Method Not Allowed
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes popsaných demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář, můžete namísto toho použít odkazy na jednotlivé příklady, které
+naleznete v&nbsp;následujících tabulkách.</p>
+
+<h3>Klasická implementace HTTP serverů založených pouze na základních knihovnách jazyka Go</h3>
+
+<table>
+<tr><th>#</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>01_server.go</td><td>jednoduchý HTTP server posílající dynamicky generovaný obsah</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/01_server.go">https://github.com/tisnik/go-root/blob/master/article_24/01_server.go</a></td></tr>
+<tr><td>2</td><td>02_slow_server.go</td><td>zpomalení generování jednotlivých bloků generovaného obsahu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/02_slow_server.go">https://github.com/tisnik/go-root/blob/master/article_24/02_slow_server.go</a></td></tr>
+<tr><td>3</td><td>03_flushing_server.go</td><td>využití metody <strong>Flush</strong> z&nbsp;rozhraní <strong>Flusher</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go">https://github.com/tisnik/go-root/blob/master/article_24/03_flushing_server.go</a></td></tr>
+<tr><td>4</td><td>04_close_detector.go</td><td>test, zda klient neukončil spojení</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go">https://github.com/tisnik/go-root/blob/master/article_24/04_close_detector.go</a></td></tr>
+</table>
+
+<h3>HTTP servery založené na knihovně Gorilla mux</h3>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_simple_http_server.go</td><td>jednoduchý HTTP server založený na standardním balíčku <strong>net/http</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/01_simple_http_server.go">https://github.com/tisnik/go-root/blob/master/article_38/01_simple_http_server.go</a></td></tr>
+<tr><td> 2</td><td>02_http_server_with_mux.go</td><td>HTTP server používající balíček <strong>gorilla/mux</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/02_http_server_with_mux.go">https://github.com/tisnik/go-root/blob/master/article_38/02_http_server_with_mux.go</a></td></tr>
+<tr><td> 3</td><td>03_method_specification.go</td><td>specifikace HTTP metod použitých při volání REST API</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/03_method_specification.go">https://github.com/tisnik/go-root/blob/master/article_38/03_method_specification.go</a></td></tr>
+<tr><td> 4</td><td>04_method_specification.go</td><td>rozšíření a vylepšení předchozího příkladu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/04_method_specification.go">https://github.com/tisnik/go-root/blob/master/article_38/04_method_specification.go</a></td></tr>
+<tr><td> 5</td><td>05_resource_handling.go</td><td>vylepšená správa zdrojů (<i>resources</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/05_resource_handling.go">https://github.com/tisnik/go-root/blob/master/article_38/05_resource_handling.go</a></td></tr>
+<tr><td> 6</td><td>06_resource_handling.go</td><td>práce se jménem zdroje</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/06_resource_handling.go">https://github.com/tisnik/go-root/blob/master/article_38/06_resource_handling.go</a></td></tr>
+<tr><td> 7</td><td>07_resource_handling_id.go</td><td>omezení znaků, které může být použito ve jménu zdroje</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/07_resource_handling_id.go">https://github.com/tisnik/go-root/blob/master/article_38/07_resource_handling_id.go</a></td></tr>
+<tr><td> 8</td><td>08_headers.go</td><td>specifikace hlaviček, které musí být poslány společně s&nbsp;požadavkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/08_headers.go">https://github.com/tisnik/go-root/blob/master/article_38/08_headers.go</a></td></tr>
+<tr><td> 9</td><td>09_subroutes.go</td><td>vytvoření a konfigurace podsměrovačů (<i>subroutes</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/09_subroutes.go">https://github.com/tisnik/go-root/blob/master/article_38/09_subroutes.go</a></td></tr>
+<tr><td>10</td><td>10_simple_middleware.go</td><td>dvě middleware funkce použité při zpracování dotazů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_38/10_simple_middleware.go">https://github.com/tisnik/go-root/blob/master/article_38/10_simple_middleware.go</a></td></tr>
+</table>
+
+<h3>HTTP servery založené na základních knihovnách jazyka Go verze 1.22 a vyšších</h3>
+
+<table>
+<tr><th>#</th><th>Soubor</th><th>Popis</th><th>Cesta</th></tr>
+<tr><td>1</td><td>api_service_1.go</td><td>základní struktura webové služby, zde jen s&nbsp;jediným koncovým bodem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AE/api_service_1.go">https://github.com/tisnik/go-root/blob/master/article_AE/api_service_1.go</a></td></tr>
+<tr><td>2</td><td>api_service_2.go</td><td>přidání handlerů pro další koncové body (ovšem bez korektní sémantiky)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AE/api_service_2.go">https://github.com/tisnik/go-root/blob/master/article_AE/api_service_2.go</a></td></tr>
+<tr><td>3</td><td>api_service_3.go</td><td>test, zda je použita korektní HTTP metoda</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AE/api_service_3.go">https://github.com/tisnik/go-root/blob/master/article_AE/api_service_3.go</a></td></tr>
+<tr><td>4</td><td>api_service_4.go</td><td>korektní sémantika koncových bodů i jejich handlerů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AE/api_service_4.go">https://github.com/tisnik/go-root/blob/master/article_AE/api_service_4.go</a></td></tr>
+<tr><td>5</td><td>api_service_5.go</td><td>duplikátní proměnné části při registraci koncových bodů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AE/api_service_5.go">https://github.com/tisnik/go-root/blob/master/article_AE/api_service_5.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go 1.22 Release Notes<br />
+<a href="https://go.dev/doc/go1.22#enhanced_routing_patterns">https://go.dev/doc/go1.22#enhanced_routing_patterns</a>
+</li>
+
+<li>Dokumentace k&nbsp;balíčku <strong>gorilla/mux</strong><br />
+<a href="https://godoc.org/github.com/gorilla/mux">https://godoc.org/github.com/gorilla/mux</a>
+</li>
+
+<li>Gorilla web toolkitk<br />
+<a href="http://www.gorillatoolkit.org/">http://www.gorillatoolkit.org/</a>
+</li>
+
+<li>Metric types<br />
+<a href="https://prometheus.io/docs/concepts/metric_types/">https://prometheus.io/docs/concepts/metric_types/</a>
+</li>
+
+<li>Histograms with Prometheus: A Tale of Woe<br />
+<a href="http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/">http://linuxczar.net/blog/2017/06/15/prometheus-histogram-2/</a>
+</li>
+
+<li>Instrumenting Golang server in 5 min<br />
+<a href="https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3">https://medium.com/@gsisimogang/instrumenting-golang-server-in-5-min-c1c32489add3</a>
+</li>
+
+<li>Routing Enhancements for Go 1.22<br />
+<a href="https://go.dev/blog/routing-enhancements">https://go.dev/blog/routing-enhancements</a>
+</li>
+
+<li>net/http: enhanced ServeMux routing #61410<br />
+<a href="https://github.com/golang/go/issues/61410">https://github.com/golang/go/issues/61410</a>
+</li>
+
+<li>net/http: add methods and path variables to ServeMux patterns #60227<br />
+<a href="https://github.com/golang/go/discussions/60227">https://github.com/golang/go/discussions/60227</a>
+</li>
+
+<li>curl man page<br />
+<a href="https://curl.se/docs/manpage.html">https://curl.se/docs/manpage.html</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2024</small></p>
+</body>
+</html>
