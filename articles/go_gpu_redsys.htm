@@ -1,0 +1,2281 @@
+<h2 id="k01">Tvorba interaktivních aplikací s&nbsp;GUI s&nbsp;využitím projektu GoGPU</h2>
+
+<p>Na předchozí dvojici článků o knihovně <strong>gg</strong> [<a
+href="https://www.root.cz/clanky/tvorba-2d-i-3d-grafiky-a-animaci-v-go-s-vyuzitim-projektu-gogpu/">1</a>]
+[<a
+href="https://www.root.cz/clanky/tvorba-2d-i-3d-grafiky-a-animaci-v-go-s-vyuzitim-projektu-gogpu-2-cast/">2</a>]
+dnes navážeme. Ukážeme si totiž, jakým způsobem lze otevřít okno a přes
+<strong>gg</strong> provést vykreslení celé 2D scény do plochy tohoto okna.
+Samotná knihovna <strong>gg</strong> takové operace sice nepodporuje, ovšem to
+ve skutečnosti nevadí, protože dokáže spolupracovat s&nbsp;knihovnou
+<strong>gogpu</strong> patřící do stejně pojmenovaného projektu. To znamená, že
+ve všech demonstračních příkladech, které si dnes ukážeme, bude importována
+mj.&nbsp;i tato knihovna:</p>
+
+<pre>
+        "github.com/gogpu/gogpu"
+</pre>
+
+<p>Aplikaci s&nbsp;grafickým uživatelským rozhraním je možné v&nbsp;tom
+nejjednodušším případě inicializovat konstruktorem <strong>NewApp</strong>,
+kterému se předává struktura s&nbsp;konfigurací aplikace:</p>
+
+<pre>
+func <strong>NewApp</strong>(config Config) *App
+    <i>NewApp creates a new application with the given configuration.</i>
+</pre>
+
+<p>Při inicializaci struktury <strong>Config</strong> můžeme využít konstruktor
+<strong>DefaultConfig</strong> vracející, jak název napovídá, výchozí
+konfiguraci:</p>
+
+<pre>
+func <strong>DefaultConfig</strong>() Config
+    <i>DefaultConfig returns a sensible default configuration. By default,</i>
+    <i>uses event-driven rendering (0% CPU when idle). For game loops, use</i>
+    <i>WithContinuousRender(true).</i>
+</pre>
+
+<p>V&nbsp;tom nejjednodušším případě tedy může inicializace aplikace vypadat
+takto:</p>
+
+<pre>
+<i>// inicializace aplikace s GUI</i>
+app := gogpu.NewApp(gogpu.DefaultConfig())
+</pre>
+
+<p>Samotné spuštění aplikace (což vede k&nbsp;zobrazení okna atd.) pak vypadá
+následovně:</p>
+
+<pre>
+<i>// spuštění aplikace</i>
+app.Run()
+</pre>
+
+<p>Pro úpravu výchozí konfigurace slouží řada metod objektu
+<strong>Config</strong>, které vrací upravenou podobu tohoto objektu. To
+umožňuje řetězit volání těchto metod, což si ihned ukážeme:</p>
+
+<pre>
+func (c Config) <strong>WithAppName</strong>(name string) Config
+func (c Config) <strong>WithBackend</strong>(backend types.BackendType) Config
+func (c Config) <strong>WithContinuousRender</strong>(continuous bool) Config
+func (c Config) <strong>WithFrameless</strong>(frameless bool) Config
+func (c Config) <strong>WithFullscreen</strong>() Config
+func (c Config) <strong>WithGraphicsAPI</strong>(api types.GraphicsAPI) Config
+func (c Config) <strong>WithHeaderAlignment</strong>(alignment HeaderAlignment) Config
+func (c Config) <strong>WithIcon</strong>(img image.Image) Config
+func (c Config) <strong>WithMaxSize</strong>(width, height int) Config
+func (c Config) <strong>WithMinSize</strong>(width, height int) Config
+func (c Config) <strong>WithPowerPreference</strong>(pref gputypes.PowerPreference) Config
+func (c Config) <strong>WithRenderMode</strong>(mode RenderMode) Config
+func (c Config) <strong>WithResizable</strong>(resizable bool) Config
+func (c Config) <strong>WithSize</strong>(width, height int) Config
+func (c Config) <strong>WithTabbingIdentifier</strong>(id string) Config
+func (c Config) <strong>WithTabbingMode</strong>(mode TabbingMode) Config
+func (c Config) <strong>WithTitle</strong>(title string) Config
+func (c Config) <strong>WithVSync</strong>(vsync bool) Config
+</pre>
+
+<p>Příkladem může být inicializace aplikace s&nbsp;oknem o rozměrech
+400&times;300 pixelů a s&nbsp;nastaveným titulkem:</p>
+
+<pre>
+<i>// rozměry okna</i>
+const width = 400
+const height = 300
+&nbsp;
+<i>// inicializace aplikace s GUI</i>
+app := gogpu.NewApp(gogpu.DefaultConfig().
+        WithTitle("GoGPU + gg").
+        WithSize(width, height))
+</pre>
+
+
+<h2 id="k02">Události a callback funkce, které na ně reagují</h2>
+
+<p>Vývoj aplikací s&nbsp;interaktivním grafickým uživatelským rozhraním
+z&nbsp;pochopitelných důvodů vyžaduje použití odlišných technik, než je tomu u
+vývoje dávkových souborů či jednoduchých skriptů. V&nbsp;mnoha frameworcích
+určených pro tvorbu grafického uživatelského rozhraní se z&nbsp;tohoto důvodu
+setkáme s&nbsp;konceptem <i>událostí</i> (<i>event</i>) a reakcí na vznik
+těchto událostí. V&nbsp;případě knihovny <strong>gogpu</strong> se na událost
+(určitého typu) reaguje tak, že se zavolá nějaká <i>callback funkce</i>.
+Příslušné funkce musí být nejdříve zaregistrovány, a to konkrétně
+v&nbsp;metodách struktury získané výše zmíněným konstruktorem
+<strong>gogpu.NewApp</strong>.</p>
+
+<p><div class="rs-tip-major">Poznámka: některé frameworky vyžadují, aby
+programátor události explicitně načítal z&nbsp;fronty událostí (<i>event
+queue</i>). Tuto operaci za nás provádí přímo knihovna <strong>gogpu</strong>,
+pokud neurčíme jinak (pro hry je možná výhodnější pracovat přímo s&nbsp;frontou
+událostí).</div></p>
+
+
+
+<h2 id="k03">Události <i>Draw</i> a <i>Close</i></h2>
+
+<p>V&nbsp;první sadě demonstračních příkladů si vystačíme se dvěma typy
+událostí:</p>
+
+<ol>
+<li><i>Draw</i> &ndash; požadavek na překreslení obsahu okna aplikace</li>
+<li><i>Close</i> &ndash; požadavek na ukončení aplikace</li>
+</ol>
+
+<p>Na tyto události můžeme (vhodným způsobem) reagovat ve funkcích, které jsou
+zaregistrovány metodami nazvanými <strong>OnDraw</strong> a
+<strong>OnClose</strong>:</p>
+
+<pre>
+func (a *App) <strong>OnDraw</strong>(fn func(*Context)) *App
+    <i>OnDraw sets the callback for rendering each frame. The Context is only</i>
+    <i>valid during the callback. If the primary window has been created (after Run</i>
+    <i>starts), its draw callback is also updated to stay in sync.</i>
+&nbsp;
+&nbsp;
+&nbsp;
+func (a *App) <strong>OnClose</strong>(fn func()) *App
+    <i>OnClose sets the callback invoked when the application is shutting down,</i>
+    <i>before the GPU renderer is destroyed. Use this to release GPU resources</i>
+    <i>(e.g., ggcanvas.Canvas) that depend on the renderer being alive.</i>
+&nbsp;
+    <i>The callback runs on the render thread.</i>
+</pre>
+
+<p>Jednodušší z&nbsp;těchto metod je <strong>OnClose</strong>, protože se této
+metodě předává callback funkce bez parametrů i bez návratové hodnoty.
+V&nbsp;tom nejjednodušším případě příslušná callback funkce pouze zavolá metodu
+<strong>CloseAccelerator</strong> (což je asi v&nbsp;tomto případě výhodnější,
+než se spoléhat na <strong>defer</strong>). Registrace příslušné callback
+funkce může vypadat takto:</p>
+
+<pre>
+<i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+app.OnClose(func() {
+        gg.CloseAccelerator()
+})
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: připomeňme si, že jsme ve výše uvedeném
+fragmentu zdrojového kódu vytvořili anonymní funkci, která je ovšem současně i
+uzávěrem (<i>closure</i>). To je důležité a užitečné, neboť takový uzávěr může
+přistupovat k&nbsp;proměnným definovaným na stejné či vyšší úrovni, než samotný
+uzávěr &ndash; v&nbsp;našem případě tedy může přistupovat k&nbsp;lokálním
+proměnným funkce <strong>main</strong>. Stav aplikace tedy můžeme modifikovat
+přes tyto proměnné, což popravdě není příliš čisté, ovšem výsledné kódy budou
+poměrně krátké a snadno pochopitelné.</div></p>
+
+<p>Callback funkci volané v&nbsp;případě, že je nutné překreslit okno, se
+předává parametr typu <strong>gogpu.Context</strong>, který &ndash; jak dále
+uvidíme &ndash; můžeme využít podobně jako grafický kontext v&nbsp;knihovně
+<strong>gg</strong>:</p>
+
+<pre>
+type <strong>Context</strong> struct {
+        <i>// Has unexported fields.</i>
+}
+    <i>Context provides drawing operations for a single frame. It is only valid</i>
+    <i>during the OnDraw callback and should not be stored.</i>
+&nbsp;
+    <i>In multi-window mode, each Context targets a specific window surface.</i>
+    <i>The surface field points to the target RenderTarget; if nil, the renderer's</i>
+    <i>primary surface is used (single-window backward compat).</i>
+</pre>
+
+<p>I když to není zcela korektní, je možné ponechat tělo této callback funkce
+prázdné popř.&nbsp;do něj pouze přidat výpis nějaké zprávy na standardní
+výstup:</p>
+
+<pre>
+<i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+app.OnDraw(func(dc *gogpu.Context) {
+        fmt.Println("Redraw....")
+})
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: aplikace se ovšem nemusí v&nbsp;takovém
+případě chovat zcela podle očekávání (někteří správci oken ji mohou odmítnout
+zavřít). Toto chování opravíme v&nbsp;dnešním druhém demonstračním
+příkladu</div></p>
+
+
+
+<h2 id="k04">První demonstrační příklad: aplikace s&nbsp;prázdným oknem</h2>
+
+<p>Konečně se dostáváme ke zdrojovému kódu dnešního prvního demonstračního
+příkladu. Po jeho překladu a spuštění by se mělo vykreslit okno, jehož plocha
+může mít v&nbsp;podstatě libovolný obsah (není totiž překreslena). Typicky je
+možné v&nbsp;ploše okna vidět původní obsah obrazovky:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317924" data-alignment="center" data-link-type="modal">Obrázek #1317924 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317924">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317924" src="https://i.iinfo.cz/images/690/go-gogpu-1-1-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-1-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-1.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 1: Plocha okna se nepřekresluje a proto vidíme původní obsah desktopu pod oknem.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že jsme importovali
+balíček <strong>github.com/gogpu/gg/gpu</strong>, který ovšem není ve zdrojovém
+kódu explicitně využit (a proto je nutné ho importovat s&nbsp;využitím
+zástupného symbolu <strong>_</strong>). Je tomu tak z&nbsp;toho důvodu, že
+musíme do výsledného binárního souboru nějakým důvodem &bdquo;nacpat&ldquo;
+ovladače použité pro vykreslování. Prozatím si vystačíme se SW renderingem,
+ovšem později si ukážeme, že lze využít i vykreslování akcelerované přes
+GPU.</div></p>
+
+
+
+<h2 id="k05">Vykreslení pozadí zvolené barvy v&nbsp;ploše okna</h2>
+
+<p>Aby se aplikace chovala zcela korektně, musí při požadavku na překreslení
+okna skutečně toto překreslení provést. K&nbsp;tomuto účelu si připravíme
+pomocnou funkci nazvanou <strong>renderFrame</strong> (protože vlastně vždy
+vykreslíme jeden snímek okna). Této funkci se bude předávat grafický kontext a
+taktéž šířka a výška plochy, která se má překreslit:</p>
+
+<pre>
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+     ...
+     ...
+     ...
+}
+</pre>
+
+<p>Grafický kontext již dobře známe z&nbsp;popisu knihovny <strong>gg</strong>.
+Můžeme tedy v&nbsp;kontextu nastavit barvu vykreslování (RGB=000) a vykreslit
+vyplněný obdélník o stejných rozměrech, jaké má plocha okna:</p>
+
+<pre>
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: rozměry okna jsou předávány formou
+celých čísel, kdežto při vykreslování do grafického kontextu jsou souřadnice
+zadávány hodnotami s&nbsp;plovoucí řádovou čárkou. Z&nbsp;tohoto důvodu se
+v&nbsp;dnešních demonstračních příkladech často setkáme s&nbsp;nutností
+explicitního přetypování.</div></p>
+
+<p>Zbývá nám funkci <strong>renderFrame</strong> zavolat ve chvíli, kdy vznikne
+událost typu <i>Draw</i>. Teoreticky může celý kód vypadat následovně &ndash;
+získáme rozměry kreslicího plátna, zavoláme metodu <strong>Draw</strong>, které
+se předá reference na naši funkci <strong>renderFrame</strong> a nakonec se
+zavolá druhá metoda <strong>Render</strong>, která vykreslení dokončí:</p>
+
+<pre>
+<i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+app.OnDraw(func(dc *gogpu.Context) {
+        cw, ch := canvas.Size()
+&nbsp;
+        canvas.Draw(func(cc *gg.Context) {
+                renderFrame(cc, cw, ch)
+        })
+&nbsp;
+        canvas.Render(dc.RenderTarget())
+})
+</pre>
+
+<p>Ovšem ve skutečnosti to zase tak jednoduché není, protože musíme nějakým
+způsobem získat objekt typu <strong>ggcanvas.Canvas</strong>. Teoreticky je
+možné neustále, tedy při každém překreslení okna, canvas získávat tímto
+kódem:</p>
+
+<pre>
+provider := app.GPUContextProvider()
+w, h := dc.Width(), dc.Height()
+canvas, _ = ggcanvas.New(provider, w, h)
+</pre>
+
+<p>To ovšem znamená neustálé inicializace objektu, zatížení GC atd. Proto je
+výhodnější mít ve funkci <strong>main</strong> připravenou proměnnou typu
+<strong>ggcanvas.Canvas</strong>, která se naplní před prvním překreslením okna
+a poté již není nutné opakovat její inicializaci:</p>
+
+<pre>
+var canvas *ggcanvas.Canvas
+</pre>
+
+<p>Callback funkce zaregistrovaná přes <strong>app.OnDraw</strong> je tedy
+v&nbsp;praxi poněkud komplikovaná (ovšem již nebude nutné ji později
+měnit):</p>
+
+<pre>
+<i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+app.OnDraw(func(dc *gogpu.Context) {
+        if canvas == nil {
+                provider := app.GPUContextProvider()
+                w, h := dc.Width(), dc.Height()
+                canvas, _ = ggcanvas.New(provider, w, h)
+        }
+&nbsp;
+        cw, ch := canvas.Size()
+&nbsp;
+        canvas.Draw(func(cc *gg.Context) {
+                renderFrame(cc, cw, ch)
+        })
+&nbsp;
+        canvas.Render(dc.RenderTarget())
+})
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317927" data-alignment="center" data-link-type="modal">Obrázek #1317927 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317927">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317927" src="https://i.iinfo.cz/images/690/go-gogpu-1-2-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-2-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-2.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 2: Plocha okna se korektně překresluje černou barvou.</p>
+</div>
+</div>
+
+
+
+<h2 id="k06">Úplný zdrojový kód demonstračního příkladu, který inicializuje pozadí okna</h2>
+
+<p>Úplný zdrojový kód dnešního druhého demonstračního příkladu, který korektně
+inicializuje pozadí okna (a samozřejmě provede i jeho překreslení, pokud je to
+nutné), vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+}
+</pre>
+
+
+
+<h2 id="k07">Povolení kontinuálního překreslování okna</h2>
+
+<p>Při inicializaci aplikace s&nbsp;grafickým uživatelským rozhraním jsme
+prozatím postupovali následovně:</p>
+
+<pre>
+app := gogpu.NewApp(gogpu.DefaultConfig().
+        WithTitle("GoGPU + gg").
+        WithSize(width, height))
+</pre>
+
+<p>Takto inicializovaná aplikace vyvolávala událost typu <i>Draw</i> jen tehdy,
+pokud bylo skutečně nutné provést překreslení okna (nebo jeho části). Ovšem
+existují situace, ve kterých je například vyžadováno zobrazení animace,
+obnovení obsahu nějakého dashboardu atd. V&nbsp;takových případech může být
+výhodnější vynutit si kontinuální překreslování okna. To je zajištěno zavoláním
+metody <strong>WithContinuousRender</strong>:</p>
+
+<pre>
+<i>// inicializace aplikace s GUI</i>
+app := gogpu.NewApp(gogpu.DefaultConfig().
+        WithTitle("GoGPU + gg").
+        WithSize(width, height).
+        WithContinuousRender(true))
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317930" data-alignment="center" data-link-type="modal">Obrázek #1317930 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317930">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317930" src="https://i.iinfo.cz/images/690/go-gogpu-1-3-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-3-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-3.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 3: Plocha okna se periodicky překresluje černou barvou.</p>
+</div>
+</div>
+
+<p>Pokud si přeložíte a spustíte následující demonstrační příklad s&nbsp;výše
+uvedenou úpravou, bude sice obsah okna zdánlivě stále stejný, ale při pohledu
+na terminál lze snadno zjistit, že se neustále vypisuje zpráva
+&bdquo;Redraw...&ldquo; a tudíž se neustále volá obslužná callback funkce pro
+událost typu <i>Draw</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height).
+                WithContinuousRender(true))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGBA(0.0, 0.0, 0.0, 1)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+}
+</pre>
+
+
+
+<h2 id="k08">Využití canvasu při kreslení do okna: vykreslení obrysu obrazce zvolenou barvou</h2>
+
+<p>Vzhledem k&nbsp;tomu, že je kreslení do plochy okna prováděno přes canvas,
+můžeme upravit všechny demonstrační příklady z&nbsp;úvodního článku o knihovně
+<strong>gg</strong> do podoby, ve které se obrázek namísto uložení na disk
+vykreslí do okna. Pochopitelně zde všechny tyto příklady nebudou přepsány, ale
+ukážeme si alespoň tři z&nbsp;nich (protože na ně navážeme v&nbsp;dalším
+textu).</p>
+
+<p>Nejdříve je (v&nbsp;naprosté většině případů) nutné překreslit celou plochu
+okna konstantní barvou. Posléze do plochy okna vykreslíme obrys obdélníku,
+jehož hrany budou od okrajů okna vzdáleny o čtyřicet pixelů:</p>
+
+<pre>
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        const border = 40
+        dc.DrawRectangle(border, border, float64(width)-border*2, float64(height)-border*2)
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// vykreslení obrysu</i>
+        dc.Stroke()
+}
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317933" data-alignment="center" data-link-type="modal">Obrázek #1317933 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317933">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317933" src="https://i.iinfo.cz/images/690/go-gogpu-1-4-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-4-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-4.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 4: Vykreslení grafického obrazce do plochy okna.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód takto upraveného demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        const border = 40
+        dc.DrawRectangle(border, border, float64(width)-border*2, float64(height)-border*2)
+        dc.SetRGB(0.0, 0.0, 0.0)
+&nbsp;
+        <i>// vykreslení obrysu</i>
+        dc.Stroke()
+}
+</pre>
+
+
+
+<h2 id="k09">Vykreslení hvězdy do plochy okna: základ pro navazující příklady</h2>
+
+<p>V&nbsp;dalším příkladu, který bude později rozšířen, se ve funkci
+<strong>renderFrame</strong> nejprve vyplní plocha okna a následně se do středu
+vykreslí pěticípá hvězda. Prakticky stejný příklad byl ukázán již
+v&nbsp;předchozím článku, takže si jen v&nbsp;krátkosti ukažme, jak je
+vykreslení hvězdy realizováno:</p>
+
+<pre>
+customColor := gg.Hex("44aadd")
+dc.SetFillBrush(gg.Solid(customColor))
+&nbsp;
+dc.SetFillRule(gg.FillRuleEvenOdd)
+&nbsp;
+radius := float64(height) / 3
+&nbsp;
+w := float64(width)
+h := float64(height)
+&nbsp;
+<i>// začátek vykreslování cesty</i>
+dc.MoveTo(w/2, h/2-radius)
+for i := range 4 {
+        angle := float64(i+1) * 3.0 * 360 / 5.0
+        x := radius * math.Sin(angle*math.Pi/180.0)
+        y := radius * math.Cos(angle*math.Pi/180.0)
+        dc.LineTo(w/2+x, h/2-y)
+}
+dc.ClosePath()
+&nbsp;
+<i>// vyplnění obrysu</i>
+dc.Fill()
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317936" data-alignment="center" data-link-type="modal">Obrázek #1317936 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317936">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317936" src="https://i.iinfo.cz/images/690/go-gogpu-1-5-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-5-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-5.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 5: Vykreslení grafického obrazce (s výplní) do plochy okna.</p>
+</div>
+</div>
+
+<p>Následuje výpis úplného zdrojového kódu tohoto příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        customColor := gg.Hex("44aadd")
+        dc.SetFillBrush(gg.Solid(customColor))
+&nbsp;
+        dc.SetFillRule(gg.FillRuleEvenOdd)
+&nbsp;
+        radius := float64(height) / 3
+&nbsp;
+        w := float64(width)
+        h := float64(height)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(w/2, h/2-radius)
+        for i := range 4 {
+                angle := float64(i+1) * 3.0 * 360 / 5.0
+                x := radius * math.Sin(angle*math.Pi/180.0)
+                y := radius * math.Cos(angle*math.Pi/180.0)
+                dc.LineTo(w/2+x, h/2-y)
+        }
+        dc.ClosePath()
+&nbsp;
+        <i>// vyplnění obrysu</i>
+        dc.Fill()
+
+}
+</pre>
+
+
+
+<h2 id="k10">Další základ pro další příklady: vykreslení Bézierových křivek i s&nbsp;jejich řídicími body</h2>
+
+<p>Posledním &bdquo;zahřívacím&ldquo; příkladem, který v&nbsp;rámci dalších
+kapitol rozšíříme, je příklad, který do plochy okna vykreslí dvojici
+Bézierových kubických křivek i s&nbsp;jejich řídicími body. Připomeňme si, že
+Bézierovy kubické křivky se do cesty (<i>path</i>) vloží metodou
+<strong>CubicTo</strong>. První bod křivky je již součástí cesty a tudíž se
+nezapisuje:</p>
+
+<pre>
+dc.CubicTo(x1, y1, x2, y2, x3, y3)
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317939" data-alignment="center" data-link-type="modal">Obrázek #1317939 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317939">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317939" src="https://i.iinfo.cz/images/690/go-gogpu-1-6-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-6-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-6.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 6: Vykreslení složitějšího grafického obrazce do plochy okna.   </p>
+</div>
+</div>
+
+<p>Strukturu celého příkladu již známe z&nbsp;úvodní dvojice článků, takže si
+jen v&nbsp;krátkosti uvedeme celý jeho zdrojový kód:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+)
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        x0 float64, y0 float64, x1 float64, y1 float64,
+        x2 float64, y2 float64, x3 float64, y3 float64) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(x0, y0, x1, y1)
+        dc.Stroke()
+        dc.DrawLine(x1, y1, x2, y2)
+        dc.Stroke()
+        dc.DrawLine(x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(x0, y0)
+        dc.CubicTo(x1, y1, x2, y2, x3, y3)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+&nbsp;
+        dc.DrawCircle(x0, y0, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x1, y1, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x2, y2, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(x3, y3, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawCubicBezier(dc, 50, 220, 50, 50, 160, 220, 160, 50)
+        drawCubicBezier(dc, 270, 220, 320, 100, 270, 100, 320, 220)
+}
+</pre>
+
+
+
+<h2 id="k11">Reakce aplikace na stisk klávesy či více kláves</h2>
+
+<p>Aplikace s&nbsp;grafickým uživatelským rozhraním jsou většinou interaktivní,
+tj.&nbsp;musí nějakým způsobem reagovat na stisk kláves, posun myši, stisk
+tlačítka myši apod. Nejprve se zaměříme na detekci stisku kláves. Při stisku
+klávesy (kupodivu) nevznikne událost, protože se předpokládá, že čtení stavu
+klávesnice bude probíhat v&nbsp;rámci zpracování události
+<strong>Update</strong>, tedy v&nbsp;této funkci:</p>
+
+<pre>
+app.OnUpdate(func(dt float64) {
+    ...
+    ...
+    ...
+}
+</pre>
+
+<p>Objekt (struktura) typu <strong>App</strong> poskytuje metodu
+<strong>Input</strong> vracející ukazatel na strukturu <strong>State</strong>,
+z&nbsp;níž lze vyčíst informaci a stisknutých klávesách (ale i o dalších typech
+uživatelského vstupu):</p>
+
+<pre>
+func (a *App) <strong>Input</strong>() *input.State
+    <i>Input returns the input state for Ebiten-style polling. This enables</i>
+    <i>game-loop style input handling with KeyPressed, KeyJustPressed, etc.</i>
+</pre>
+
+<p>Funkce a metody struktury <strong>Input</strong>:</p>
+
+<pre>
+package input <i>// import "github.com/gogpu/gogpu/input"</i>
+&nbsp;
+type <strong>State</strong> struct {
+        <i>// Has unexported fields.</i>
+}
+    <i>State holds the current input state. All methods are thread-safe.</i>
+&nbsp;
+func <strong>New</strong>() *State
+func (s *State) <strong>Keyboard</strong>() *KeyboardState
+func (s *State) <strong>Mouse</strong>() *MouseState
+func (s *State) <strong>Update</strong>()
+</pre>
+
+<p>Nás bude v&nbsp;této chvíli nejvíce zajímat metoda <strong>Keyboard</strong>
+vracející další strukturu <strong>KeyboardState</strong>:</p>
+
+<pre>
+package input <i>// import "github.com/gogpu/gogpu/input"</i>
+&nbsp;
+type <strong>KeyboardState</strong> struct {
+        <i>// Has unexported fields.</i>
+}
+    <i>KeyboardState holds keyboard input state. All methods are thread-safe.</i>
+&nbsp;
+func (k *KeyboardState) <strong>AnyPressed</strong>() bool
+func (k *KeyboardState) <strong>JustPressed</strong>(key Key) bool
+func (k *KeyboardState) <strong>JustReleased</strong>(key Key) bool
+func (k *KeyboardState) <strong>Modifier</strong>(mod Modifier) bool
+func (k *KeyboardState) <strong>Pressed</strong>(key Key) bool
+func (k *KeyboardState) <strong>SetKey</strong>(key Key, pressed bool)
+func (k *KeyboardState) <strong>UpdateFrame</strong>()
+</pre>
+
+<p>Z&nbsp;názvů poskytovaných metod je zřejmé, že stisk nějaké klávesy lze
+zjistit přes metodu <strong>Pressed</strong>
+popř.&nbsp;<strong>JustPressed</strong>. Záleží na tom, zda potřebujeme
+reagovat jen na událost vznikající při stisku klávesy (tedy jedenkrát), nebo
+zda již stisknutá klávesa povede k&nbsp;opakování nějaké operace.</p>
+
+
+
+<h2 id="k12">Zjištění stisku kláves použitých pro ovládání aplikace</h2>
+
+<p>Poměrně jednoduchým postupem lze zajistit, aby aplikace reagovala na stisk
+kurzorových kláves šipka doleva a šipka doprava. Pokud bude jedna z&nbsp;těchto
+kláves stlačena, bude se hvězda otáčet příslušným směrem. Povšimněte si, že
+v&nbsp;tomto případě musíme reagovat nikoli přímo na stisk klávesy (směrem
+dolů), ale na její stav &ndash; pokud totiž kurzorovou šipku podržíme, měla by
+se hvězda neustále otáčet. Z&nbsp;tohoto důvodu bude stav kurzorových šipek
+zjišťován metodami <strong>Pressed</strong> a nikoli
+<strong>JustPressed</strong>:</p>
+
+<pre>
+<i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+app.OnUpdate(func(dt float64) {
+        inp := app.Input()
+        const rotationDelta = 1.5
+&nbsp;
+        <i>// reakce na stisk šipky doleva</i>
+        if inp.Keyboard().Pressed(input.KeyLeft) {
+                rotation -= rotationDelta
+                <i>// vynucení překreslení okna</i>
+                app.RequestRedraw()
+        }
+&nbsp;
+        <i>// reakce na stisk šipky doprava</i>
+        if inp.Keyboard().Pressed(input.KeyRight) {
+                rotation += rotationDelta
+                <i>// vynucení překreslení okna</i>
+                app.RequestRedraw()
+        }
+})
+</pre>
+
+<p>Samotná programová realizace otáčení může být postavena na manipulaci
+s&nbsp;transformační maticí (<i>RotateAbout</i>) nebo nepatrnou úpravou výpočtů
+pro zjištění souřadnic vrcholů hvězdy. Pro zajímavost použijeme druhou
+možnost:</p>
+
+<pre>
+<i>// začátek vykreslování cesty</i>
+dc.MoveTo(
+        w/2+radius*math.Sin(rad(rotation)),
+        h/2-radius*math.Cos(rad(rotation)))
+&nbsp;
+<i>// další segmenty cesty</i>
+for i := range 4 {
+        angle := float64(i+1)*3.0*360/5.0 + rotation
+        x := radius * math.Sin(rad(angle))
+        y := radius * math.Cos(rad(angle))
+        dc.LineTo(w/2+x, h/2-y)
+}
+<i>// uzavření cesty</i>
+dc.ClosePath()
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317942" data-alignment="center" data-link-type="modal">Obrázek #1317942 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317942">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317942" src="https://i.iinfo.cz/images/690/go-gogpu-1-7-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-7-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-7.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 7: Rotace hvězdy stiskem kurzorových kláves.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317945" data-alignment="center" data-link-type="modal">Obrázek #1317945 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317945">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317945" src="https://i.iinfo.cz/images/690/go-gogpu-1-8-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-8-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-8.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 8: Rotace hvězdy stiskem kurzorových kláves.</p>
+</div>
+</div>
+
+
+
+<h2 id="k13">Demonstrační příklad: rotace hvězdy s&nbsp;využitím kurzorových kláves</h2>
+
+<p>Úplný zdrojový kód demonstračního příkladu, který umožní rotaci hvězdy
+umístěné do středu okna s&nbsp;využitím kurzorových kláves, vypadá následovně.
+Příklad vlastně ani není příliš dlouhý &ndash; má jen cca 115 řádků i
+s&nbsp;komentáři:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+        "github.com/gogpu/gogpu/input"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        rotation := 0.0
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                fmt.Println("Redraw....")
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch, rotation)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+        app.OnUpdate(func(dt float64) {
+                inp := app.Input()
+                const rotationDelta = 1.5
+&nbsp;
+                <i>// reakce na stisk šipky doleva</i>
+                if inp.Keyboard().Pressed(input.KeyLeft) {
+                        rotation -= rotationDelta
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk šipky doprava</i>
+                if inp.Keyboard().Pressed(input.KeyRight) {
+                        rotation += rotationDelta
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>rad</strong>(angle float64) float64 {
+        return angle * math.Pi / 180.0
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int, rotation float64) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        customColor := gg.Hex("44aadd")
+        dc.SetFillBrush(gg.Solid(customColor))
+&nbsp;
+        dc.SetFillRule(gg.FillRuleEvenOdd)
+&nbsp;
+        radius := float64(height) / 3
+&nbsp;
+        w := float64(width)
+        h := float64(height)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(
+                w/2+radius*math.Sin(rad(rotation)),
+                h/2-radius*math.Cos(rad(rotation)))
+&nbsp;
+        <i>// další segmenty cesty</i>
+        for i := range 4 {
+                angle := float64(i+1)*3.0*360/5.0 + rotation
+                x := radius * math.Sin(rad(angle))
+                y := radius * math.Cos(rad(angle))
+                dc.LineTo(w/2+x, h/2-y)
+        }
+        <i>// uzavření cesty</i>
+        dc.ClosePath()
+&nbsp;
+        <i>// vyplnění obrysu</i>
+        dc.Fill()
+}
+</pre>
+
+
+
+<h2 id="k14">Demonstrační příklad: změna barvy hvězdy dalšími klávesami</h2>
+
+<p>Příklad lze podobným postupem libovolně rozšiřovat. Například je možné
+přidat změnu barvy hvězdy s&nbsp;využitím kláves Q, W, E a A, S, D &ndash; pro
+každou barvovou složku se používá dvojice pod sebou umístěných kláves:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317948" data-alignment="center" data-link-type="modal">Obrázek #1317948 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317948">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317948" src="https://i.iinfo.cz/images/690/go-gogpu-1-9-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-9-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-9.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 9: Interaktivní modifikace barvy hvězdy.</p>
+</div>
+</div>
+
+<p>Tento příklad uvádím z&nbsp;toho důvodu, aby bylo zřejmé, jak objem
+zdrojového kódu narůstá (například v&nbsp;porovnání s&nbsp;odlišným přístupem
+použitým v&nbsp;knihovně SDL). V&nbsp;Go (a GoGPU) musíme na stisk každé
+klávesy reagovat ve zvláštním bloku:</p>
+
+<pre>
+<i>// reakce na stisk klávesy Q</i>
+if keyboard.Pressed(input.KeyQ) {
+        <i>// změna červené barvové složky</i>
+        red = math.Min(1.0, red+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+&nbsp;
+<i>// reakce na stisk klávesy W</i>
+if keyboard.Pressed(input.KeyW) {
+        <i>// změna zelené barvové složky</i>
+        green = math.Min(1.0, green+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+&nbsp;
+<i>// reakce na stisk klávesy E</i>
+if keyboard.Pressed(input.KeyE) {
+        <i>// změna modré barvové složky</i>
+        blue = math.Min(1.0, blue+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+&nbsp;
+<i>// reakce na stisk klávesy A</i>
+if keyboard.Pressed(input.KeyA) {
+        <i>// změna červené barvové složky</i>
+        red = math.Max(0.0, red-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+&nbsp;
+<i>// reakce na stisk klávesy S</i>
+if keyboard.Pressed(input.KeyS) {
+        <i>// změna zelené barvové složky</i>
+        green = math.Max(0.0, green-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+&nbsp;
+<i>// reakce na stisk klávesy D</i>
+if keyboard.Pressed(input.KeyD) {
+        <i>// změna modré barvové složky</i>
+        blue = math.Max(0.0, blue-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+</pre>
+
+<p>Přepis na konstrukci <strong>switch-case</strong> je kratší jen o několik
+řádků (ale pravděpodobně čitelnější):</p>
+
+<pre>
+switch {
+<i>// reakce na stisk šipky doleva</i>
+case keyboard.Pressed(input.KeyLeft):
+        rotation -= rotationDelta
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk šipky doprava</i>
+case keyboard.Pressed(input.KeyRight):
+        rotation += rotationDelta
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy Q</i>
+case keyboard.Pressed(input.KeyQ):
+        <i>// změna červené barvové složky</i>
+        red = math.Min(1.0, red+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy W</i>
+case keyboard.Pressed(input.KeyW):
+        <i>// změna zelené barvové složky</i>
+        green = math.Min(1.0, green+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy E</i>
+case keyboard.Pressed(input.KeyE):
+        <i>// změna modré barvové složky</i>
+        blue = math.Min(1.0, blue+colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy A</i>
+case keyboard.Pressed(input.KeyA):
+        <i>// změna červené barvové složky</i>
+        red = math.Max(0.0, red-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy S</i>
+case keyboard.Pressed(input.KeyS):
+        <i>// změna zelené barvové složky</i>
+        green = math.Max(0.0, green-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy D</i>
+case keyboard.Pressed(input.KeyD):
+        <i>// změna modré barvové složky</i>
+        blue = math.Max(0.0, blue-colorDelta)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+&nbsp;
+<i>// reakce na stisk klávesy Escape</i>
+case inp.Keyboard().Pressed(input.KeyEscape):
+        app.Quit()
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+        "github.com/gogpu/gogpu/input"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        rotation := 0.0
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+        var red = 0.3
+        var green = 0.7
+        var blue = 0.9
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch, rotation, red, green, blue)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+        app.OnUpdate(func(dt float64) {
+                inp := app.Input()
+                const rotationDelta = 1.5
+                const colorDelta = 0.02
+&nbsp;
+                keyboard := inp.Keyboard()
+&nbsp;
+                <i>// reakce na stisk šipky doleva</i>
+                if keyboard.Pressed(input.KeyLeft) {
+                        rotation -= rotationDelta
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk šipky doprava</i>
+                if keyboard.Pressed(input.KeyRight) {
+                        rotation += rotationDelta
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy Q</i>
+                if keyboard.Pressed(input.KeyQ) {
+                        <i>// změna červené barvové složky</i>
+                        red = math.Min(1.0, red+colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy W</i>
+                if keyboard.Pressed(input.KeyW) {
+                        <i>// změna zelené barvové složky</i>
+                        green = math.Min(1.0, green+colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy E</i>
+                if keyboard.Pressed(input.KeyE) {
+                        <i>// změna modré barvové složky</i>
+                        blue = math.Min(1.0, blue+colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy A</i>
+                if keyboard.Pressed(input.KeyA) {
+                        <i>// změna červené barvové složky</i>
+                        red = math.Max(0.0, red-colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy S</i>
+                if keyboard.Pressed(input.KeyS) {
+                        <i>// změna zelené barvové složky</i>
+                        green = math.Max(0.0, green-colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy D</i>
+                if keyboard.Pressed(input.KeyD) {
+                        <i>// změna modré barvové složky</i>
+                        blue = math.Max(0.0, blue-colorDelta)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+&nbsp;
+                <i>// reakce na stisk klávesy Escape</i>
+                if inp.Keyboard().Pressed(input.KeyEscape) {
+                        app.Quit()
+                }
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>rad</strong>(angle float64) float64 {
+        return angle * math.Pi / 180.0
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int, rotation, red, green, blue float64) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        <i>// výpočet barvy hvězdy</i>
+        customColor := gg.RGB(red, green, blue)
+        dc.SetFillBrush(gg.Solid(customColor))
+&nbsp;
+        dc.SetFillRule(gg.FillRuleEvenOdd)
+&nbsp;
+        radius := float64(height) / 3
+&nbsp;
+        w := float64(width)
+        h := float64(height)
+&nbsp;
+        <i>// začátek vykreslování cesty</i>
+        dc.MoveTo(
+                w/2+radius*math.Sin(rad(rotation)),
+                h/2-radius*math.Cos(rad(rotation)))
+&nbsp;
+        <i>// další segmenty cesty</i>
+        for i := range 4 {
+                angle := float64(i+1)*3.0*360/5.0 + rotation
+                x := radius * math.Sin(rad(angle))
+                y := radius * math.Cos(rad(angle))
+                dc.LineTo(w/2+x, h/2-y)
+        }
+        <i>// uzavření cesty</i>
+        dc.ClosePath()
+&nbsp;
+        <i>// vyplnění obrysu</i>
+        dc.Fill()
+}
+</pre>
+
+
+
+<h2 id="k15">Přečtení aktuální pozice kurzoru myši popř.&nbsp;detekce stisku tlačítek myši</h2>
+
+<p>Poměrně jednoduchá a přímočará je práce s&nbsp;myší. Při obsluze události
+<i>Update</i> získáme objekt (strukturu) typu <strong>MouseState</strong>
+následujícím způsobem:</p>
+
+<pre>
+inp := app.Input()
+&nbsp;
+mouseState := inp.Mouse()
+</pre>
+
+<p>Tato struktura nabízí sadu metod, které dokážou zjistit pozici kurzoru myši,
+vypočítat relativní pohyb myši, zjistit stav tlačítek myši atd. Popis struktury
+<strong>MouseState</strong> lze pochopitelně získat v&nbsp;nápovědě:</p>
+
+<pre>
+type <strong>MouseState</strong> struct {
+        <i>// Has unexported fields.</i>
+}
+    <i>MouseState holds mouse input state. All methods are thread-safe.</i>
+&nbsp;
+func (m *MouseState) <strong>Delta</strong>() (dx, dy float32)
+func (m *MouseState) <strong>JustPressed</strong>(button MouseButton) bool
+func (m *MouseState) <strong>JustReleased</strong>(button MouseButton) bool
+func (m *MouseState) <strong>Position</strong>() (x, y float32)
+func (m *MouseState) <strong>Pressed</strong>(button MouseButton) bool
+func (m *MouseState) <strong>Scroll</strong>() (x, y float32)
+func (m *MouseState) <strong>SetButton</strong>(button MouseButton, pressed bool)
+func (m *MouseState) <strong>SetPosition</strong>(x, y float32)
+func (m *MouseState) <strong>SetScroll</strong>(x, y float32)
+func (m *MouseState) <strong>UpdateFrame</strong>()
+func (m *MouseState) <strong>X</strong>() float32
+func (m *MouseState) <strong>Y</strong>() float32
+</pre>
+
+<p>V&nbsp;navazujících příkladech nám budou postačovat metody
+<strong>Pressed</strong>, <strong>X</strong> a <strong>Y</strong>.</p>
+
+
+
+<h2 id="k16">Demonstrační příklad: posun řídicích bodů Bézierových kubických křivek</h2>
+
+<p>V&nbsp;předchozích kapitolách byl ukázán příklad, který vykreslil dvojici
+Bézierových kubických křivek. Relativně snadno lze do tohoto kódu
+doimplementovat editaci těchto křivek, která se provádí posunem řídicích bodů.
+Po stisku levého tlačítka myši se získají souřadnice kurzoru myši a následně se
+nalezne nejbližší řídicí bod. Tento bod je posunut na pozici kurzoru (to je
+sice značně primitivní způsob, ovšem je ho možné realizovat poměrně přímočarým
+způsobem:</p>
+
+<pre>
+func <strong>findNearestControlPoint</strong>(controlPoints []Point, x, y float64) int {
+        nearestIndex := 0
+        nearestDistance := math.MaxFloat64
+        for i, point := range controlPoints {
+                distance := math.Hypot(point.X-x, point.Y-y)
+                if distance &lt; nearestDistance {
+                        nearestDistance = distance
+                        nearestIndex = i
+                }
+        }
+        return nearestIndex
+}
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317951" data-alignment="center" data-link-type="modal">Obrázek #1317951 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317951">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317951" src="https://i.iinfo.cz/images/690/go-gogpu-1-10-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-10-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-10.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 10: Interaktivní změna tvaru Bézierových křivek.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317954" data-alignment="center" data-link-type="modal">Obrázek #1317954 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317954">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317954" src="https://i.iinfo.cz/images/690/go-gogpu-1-11-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-11-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-11.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 11: Interaktivní změna tvaru Bézierových křivek.</p>
+</div>
+</div>
+
+<p>Opět následuje úplný výpis zdrojového kódu tohoto demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+        "github.com/gogpu/gogpu/input"
+)
+&nbsp;
+type <strong>Point</strong> struct {
+        X float64
+        Y float64
+}
+&nbsp;
+func <strong>drawCubicBezier</strong>(dc *gg.Context,
+        p0, p1, p2, p3 Point) {
+&nbsp;
+        dc.SetRGBA(1.0, 0.5, 0.5, 1.0)
+        dc.DrawLine(p0.X, p0.Y, p1.X, p1.Y)
+        dc.Stroke()
+        dc.DrawLine(p1.X, p1.Y, p2.X, p2.Y)
+        dc.Stroke()
+        dc.DrawLine(p2.X, p2.Y, p3.X, p3.Y)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+        dc.MoveTo(p0.X, p0.Y)
+        dc.CubicTo(p1.X, p1.Y, p2.X, p2.Y, p3.X, p3.Y)
+        dc.Stroke()
+&nbsp;
+        dc.SetRGBA(0.2, 0.2, 1.0, 1.0)
+&nbsp;
+        dc.DrawCircle(p0.X, p0.Y, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(p1.X, p1.Y, 3)
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(p2.X, p2.Y, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(p2.X, p2.Y, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+&nbsp;
+        dc.DrawCircle(p3.X, p3.Y, 3)
+        <i>// vykreslení</i>
+        dc.Stroke()
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// všechny řídicí body obou Bézierových kubik</i>
+        controlPoints := []Point{
+                Point{50, 220},
+                Point{50, 50},
+                Point{160, 220},
+                Point{160, 50},
+                Point{270, 220},
+                Point{320, 100},
+                Point{270, 100},
+                Point{320, 220}}
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch, controlPoints)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+        app.OnUpdate(func(dt float64) {
+                inp := app.Input()
+&nbsp;
+                <i>// reakce na stisk levého tlačítka myši</i>
+                if inp.Mouse().Pressed(input.MouseButtonLeft) {
+                        x, y := inp.Mouse().Position()
+                        i := findNearestControlPoint(controlPoints, float64(x), float64(y))
+                        <i>// nastavení nových souřadnic</i>
+                        controlPoints[i].X = float64(x)
+                        controlPoints[i].Y = float64(y)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int, cp []Point) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawCubicBezier(dc, cp[0], cp[1], cp[2], cp[3])
+        drawCubicBezier(dc, cp[4], cp[5], cp[6], cp[7])
+}
+&nbsp;
+func <strong>findNearestControlPoint</strong>(controlPoints []Point, x, y float64) int {
+        nearestIndex := 0
+        nearestDistance := math.MaxFloat64
+        for i, point := range controlPoints {
+                distance := math.Hypot(point.X-x, point.Y-y)
+                if distance &lt; nearestDistance {
+                        nearestDistance = distance
+                        nearestIndex = i
+                }
+        }
+        return nearestIndex
+}
+</pre>
+
+
+
+<h2 id="k17">Demonstrační příklad: jednoduchý kreslicí program</h2>
+
+<p>Snad ještě jednodušší je implementace jednoduchého kreslicího programu.
+Levým tlačítkem myši se postupně vytváří kresba složená z&nbsp;na sebe
+navazujících úseček. Koncové body úseček jsou ukládány do řezu:</p>
+
+<pre>
+<i>// body spojené úsečkami</i>
+points := []Point{}
+</pre>
+
+<p>Stiskem levého tlačítka myši se do řezu vloží další bod a provede se
+překreslení celé scény:</p>
+
+<pre>
+<i>// reakce na stisk levého tlačítka myši</i>
+if inp.Mouse().Pressed(input.MouseButtonLeft) {
+        x, y := inp.Mouse().Position()
+        point := Point{X: float64(x), Y: float64(y)}
+        points = append(points, point)
+        <i>// vynucení překreslení okna</i>
+        app.RequestRedraw()
+}
+</pre>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317957" data-alignment="center" data-link-type="modal">Obrázek #1317957 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317957">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317957" src="https://i.iinfo.cz/images/690/go-gogpu-1-12-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-12-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-12.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 12: Postupné kreslení domečku v grafickém editoru.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317960" data-alignment="center" data-link-type="modal">Obrázek #1317960 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317960">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317960" src="https://i.iinfo.cz/images/690/go-gogpu-1-13-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-13-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-13.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 13: Postupné kreslení domečku v grafickém editoru.</p>
+</div>
+</div>
+
+<p>Úplný zdrojový kód kreslicího programu vypadá takto:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+        "github.com/gogpu/gogpu/input"
+)
+&nbsp;
+type <strong>Point</strong> struct {
+        X float64
+        Y float64
+}
+&nbsp;
+func <strong>drawPath</strong>(dc *gg.Context,
+        points []Point) {
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+&nbsp;
+        for i := 0; i &lt; len(points)-1; i++ {
+                dc.DrawLine(
+                        points[i].X, points[i].Y,
+                        points[i+1].X, points[i+1].Y,
+                )
+        }
+        dc.Stroke()
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// body spojené úsečkami</i>
+        points := []Point{}
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch, points)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+        app.OnUpdate(func(dt float64) {
+                inp := app.Input()
+&nbsp;
+                <i>// reakce na stisk levého tlačítka myši</i>
+                if inp.Mouse().Pressed(input.MouseButtonLeft) {
+                        x, y := inp.Mouse().Position()
+                        point := Point{X: float64(x), Y: float64(y)}
+                        points = append(points, point)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int, points []Point) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawPath(dc, points)
+}
+</pre>
+
+
+
+<h2 id="k18">Vylepšení: kreslení &bdquo;gumové čáry&ldquo; sledující pohyb kurzoru</h2>
+
+<p>Většina grafických editorů při kreslení úseček zobrazuje tzv.&nbsp;gumovou
+čáru mezi naposledy nakresleným segmentem a pozicí kurzoru myši. Čára
+pochopitelně sleduje pohyb myši. Tuto funkcionalitu je velmi snadné přidat i do
+našeho editoru. Aktuální pozici kurzoru myši si zapamatujeme ve struktuře
+<strong>currentPoint</strong>:</p>
+
+<pre>
+<i>// vybrané koncové body</i>
+points := []Point{}
+&nbsp;
+<i>// aktuální bod</i>
+currentPoint := Point{X: 0, Y: 0}
+</pre>
+
+<p>Následně se ve funkci provádějící vykreslování scény tato &bdquo;gumová
+čára&ldquo; bude neustále překreslovat (odlišnou barvou), ovšem pouze za
+předpokladu, že již existuje alespoň jeden nakreslený segment. Navíc ještě na
+pozici kurzoru myši vykreslíme malé kolečko:</p>
+
+<pre>
+<i>// barva vykreslení</i>
+dc.SetRGBA(0.8, 0.0, 0.0, 1.0)
+dc.DrawCircle(currentPoint.X, currentPoint.Y, 4)
+&nbsp;
+<i>// kreslení gumové čáry</i>
+if len(points) &gt; 0 {
+        lastPointIndex := len(points) - 1
+        dc.DrawLine(
+                points[lastPointIndex].X, points[lastPointIndex].Y,
+                currentPoint.X, currentPoint.Y)
+        dc.Stroke()
+}
+</pre>
+
+<p>Výsledek vlastně ani není špatný &ndash; na program, který má jen 120 řádků
+včetně komentářů:</p>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317963" data-alignment="center" data-link-type="modal">Obrázek #1317963 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317963">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317963" src="https://i.iinfo.cz/images/690/go-gogpu-1-14-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-14-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-14.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 14: Postupné kreslení domečku v grafickém editoru. Červeně je zobrazena úsečka ovládaná myší.</p>
+</div>
+</div>
+
+<div class="rs-picture-widget-wrap">
+<div class="rs-picture-widget" data-image-id="1317966" data-alignment="center" data-link-type="modal">Obrázek #1317966 <span class="img-edit-link" data-edit-link="/redsys/images_widget_wysiwyg/edit/?primary%5Bimage_id%5D=1317966">(editovat)</span></div>
+<div class="rs-img-center"><img class="image-1317966" src="https://i.iinfo.cz/images/690/go-gogpu-1-15-prev.png" width="325" height="270" data-prev-filename="https://i.iinfo.cz/images/690/go-gogpu-1-15-prev.png" data-prev-width="325" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/690/go-gogpu-1-15.png" data-large-width="402" data-large-height="334">
+<p class="description">Obrázek 15: Postupné kreslení domečku v grafickém editoru. Červeně je zobrazena úsečka ovládaná myší.</p>
+</div>
+</div>
+
+<p>Zdrojový kód dnešního posledního demonstračního příkladu vypadá
+následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "github.com/gogpu/gg"
+        _ "github.com/gogpu/gg/gpu"
+        "github.com/gogpu/gg/integration/ggcanvas"
+        "github.com/gogpu/gogpu"
+        "github.com/gogpu/gogpu/input"
+)
+&nbsp;
+type <strong>Point</strong> struct {
+        X float64
+        Y float64
+}
+&nbsp;
+func <strong>drawPath</strong>(dc *gg.Context,
+        points []Point, currentPoint Point) {
+&nbsp;
+        dc.SetRGBA(0.0, 0.0, 0.0, 1.0)
+&nbsp;
+        for i := 0; i &lt; len(points)-1; i++ {
+                dc.DrawLine(
+                        points[i].X, points[i].Y,
+                        points[i+1].X, points[i+1].Y,
+                )
+        }
+        dc.Stroke()
+&nbsp;
+        <i>// barva vykreslení</i>
+        dc.SetRGBA(0.8, 0.0, 0.0, 1.0)
+        dc.DrawCircle(currentPoint.X, currentPoint.Y, 4)
+&nbsp;
+        <i>// kreslení gumové čáry</i>
+        if len(points) &gt; 0 {
+                lastPointIndex := len(points) - 1
+                dc.DrawLine(
+                        points[lastPointIndex].X, points[lastPointIndex].Y,
+                        currentPoint.X, currentPoint.Y)
+                dc.Stroke()
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// rozměry okna</i>
+        const width = 400
+        const height = 300
+&nbsp;
+        <i>// inicializace aplikace s GUI</i>
+        app := gogpu.NewApp(gogpu.DefaultConfig().
+                WithTitle("GoGPU + gg").
+                WithSize(width, height))
+&nbsp;
+        var canvas *ggcanvas.Canvas
+&nbsp;
+        <i>// vybrané koncové body</i>
+        points := []Point{}
+&nbsp;
+        <i>// aktuální bod</i>
+        currentPoint := Point{X: 0, Y: 0}
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se má překreslit okno</i>
+        app.OnDraw(func(dc *gogpu.Context) {
+                if canvas == nil {
+                        provider := app.GPUContextProvider()
+                        w, h := dc.Width(), dc.Height()
+                        canvas, _ = ggcanvas.New(provider, w, h)
+                }
+&nbsp;
+                cw, ch := canvas.Size()
+&nbsp;
+                canvas.Draw(func(cc *gg.Context) {
+                        renderFrame(cc, cw, ch, points, currentPoint)
+                })
+&nbsp;
+                canvas.Render(dc.RenderTarget())
+        })
+&nbsp;
+        <i>// callback metoda volaná v případě, že se má scéna překreslit</i>
+        app.OnUpdate(func(dt float64) {
+                inp := app.Input()
+&nbsp;
+                <i>// reakce na stisk levého tlačítka myši</i>
+                if inp.Mouse().Pressed(input.MouseButtonLeft) {
+                        x, y := inp.Mouse().Position()
+                        point := Point{X: float64(x), Y: float64(y)}
+                        points = append(points, point)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                } else {
+                        x, y := inp.Mouse().Position()
+                        currentPoint.X = float64(x)
+                        currentPoint.Y = float64(y)
+                        <i>// vynucení překreslení okna</i>
+                        app.RequestRedraw()
+                }
+        })
+&nbsp;
+        <i>// callback metoda zavolaná ve chvíli, kdy se okno uzavírá</i>
+        app.OnClose(func() {
+                fmt.Println("Closing")
+                gg.CloseAccelerator()
+        })
+&nbsp;
+        <i>// spuštění aplikace</i>
+        app.Run()
+}
+&nbsp;
+func <strong>renderFrame</strong>(dc *gg.Context, width, height int, points []Point, currentPoint Point) {
+        <i>// barva pozadí</i>
+        dc.SetRGB(0.9, 0.9, 0.7)
+&nbsp;
+        <i>// obdélník s plochou odpovídající oknu</i>
+        dc.DrawRectangle(0, 0, float64(width), float64(height))
+        dc.Fill()
+&nbsp;
+        <i>// vykreslení cest</i>
+        drawPath(dc, points, currentPoint)
+}
+</pre>
+
+
+
+<h2 id="k19">Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech minule i dnes použitých demonstračních
+příkladů byly uloženy do Git repositáře, který je dostupný na
+adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář (ten je
+ovšem &ndash; alespoň prozatím &ndash; relativně malý, dnes má
+přibližně šest až sedm megabajtů), můžete namísto toho použít
+odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>01_clear_screen.go</td><td>vymazání obsahu rastrového obrázku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/01_clear_screen.go">https://github.com/tisnik/go-root/blob/master/article_AF/01_clear_screen.go</a></td></tr>
+<tr><td> 2</td><td>02_fill_rectangle.go</td><td>vymazání obrázku vykreslením vyplněného obdélníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/02_fill_rectangle.go">https://github.com/tisnik/go-root/blob/master/article_AF/02_fill_rectangle.go</a></td></tr>
+<tr><td> 3</td><td>03_clear_screen_color.go</td><td>vymazání obrazovky (lepší varianta)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/03_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/03_clear_screen_color.go</a></td></tr>
+<tr><td> 4</td><td>04_clear_screen_color.go</td><td>vymazání obrazovky (varianta se specifikací barvy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/04_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/04_clear_screen_color.go</a></td></tr>
+<tr><td> 5</td><td>05_clear_screen_color.go</td><td>vymazání obrazovky (varianta se specifikací barvy)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/05_clear_screen_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/05_clear_screen_color.go</a></td></tr>
+<tr><td> 6</td><td>06_colors.go</td><td>práce s barvami</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/06_colors.go">https://github.com/tisnik/go-root/blob/master/article_AF/06_colors.go</a></td></tr>
+<tr><td> 7</td><td>07_color_alpha.go</td><td>práce s barvami, alfa složka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/07_color_alpha.go">https://github.com/tisnik/go-root/blob/master/article_AF/07_color_alpha.go</a></td></tr>
+<tr><td> 8</td><td>08_rgba_color.go</td><td>barvový prostor RGB a RGBA</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/08_rgba_color.go">https://github.com/tisnik/go-root/blob/master/article_AF/08_rgba_color.go</a></td></tr>
+<tr><td> 9</td><td>09_alpha_component.go</td><td>barvový prostor RGB a RGBA. Alfa kanál v barvovém prostoru RGBA</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/09_alpha_component.go">https://github.com/tisnik/go-root/blob/master/article_AF/09_alpha_component.go</a></td></tr>
+<tr><td>10</td><td>10_line_width.go</td><td>nastavení šířky vykreslovaných úseček a křivek</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/10_line_width.go">https://github.com/tisnik/go-root/blob/master/article_AF/10_line_width.go</a></td></tr>
+<tr><td>11</td><td>11_line_caps.go</td><td>nastavení stylu konců úseček</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/11_line_caps.go">https://github.com/tisnik/go-root/blob/master/article_AF/11_line_caps.go</a></td></tr>
+<tr><td>12</td><td>12_dash.go</td><td>nastavení stylu vykreslovaných úseček</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/12_dash.go">https://github.com/tisnik/go-root/blob/master/article_AF/12_dash.go</a></td></tr>
+<tr><td>13</td><td>13_simple_path.go</td><td>práce s cestou (path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/13_simple_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/13_simple_path.go</a></td></tr>
+<tr><td>14</td><td>14_open_path.go</td><td>otevřená cesta (open path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/14_open_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/14_open_path.go</a></td></tr>
+<tr><td>15</td><td>15_closed_path.go</td><td>uzavřená cesta (closed path)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/15_closed_path.go">https://github.com/tisnik/go-root/blob/master/article_AF/15_closed_path.go</a></td></tr>
+<tr><td>16</td><td>16_quadratic_bezier.go</td><td>kvadratická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/16_quadratic_bezier.go">https://github.com/tisnik/go-root/blob/master/article_AF/16_quadratic_bezier.go</a></td></tr>
+<tr><td>17</td><td>17_quadratic_bezier_control_points.go</td><td>kvadratická Bézierova křivka s řídicími body</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/17_quadratic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_AF/17_quadratic_bezier_control_points.go</a></td></tr>
+<tr><td>18</td><td>18_cubic_bezier.go</td><td>kubická Bézierova křivka</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/18_cubic_bezier.go">https://github.com/tisnik/go-root/blob/master/article_AF/18_cubic_bezier.go</a></td></tr>
+<tr><td>19</td><td>19_cubic_bezier_control_points.go</td><td>kubická Bézierova křivka s řídicími body</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/19_cubic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_AF/19_cubic_bezier_control_points.go</a></td></tr>
+<tr><td>20</td><td>20_rotation.go</td><td>rotace vykreslovaných objektů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/20_rotation.go">https://github.com/tisnik/go-root/blob/master/article_AF/20_rotation.go</a></td></tr>
+<tr><td>21</td><td>21_to_image.go</td><td>rasterizace do zvoleného rastrového formátu. Výsledkem bude animovaný GIF</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/21_to_image.go">https://github.com/tisnik/go-root/blob/master/article_AF/21_to_image.go</a></td></tr>
+<tr><td>22</td><td>22_transformation_rotate.go</td><td>transformace (rotace)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/22_transformation_rotate.go">https://github.com/tisnik/go-root/blob/master/article_AF/22_transformation_rotate.go</a></td></tr>
+<tr><td>23</td><td>23_transformation_rotate_about.go</td><td>transformace (rotace okolo zvoleného bodu)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/23_transformation_rotate_about.go">https://github.com/tisnik/go-root/blob/master/article_AF/23_transformation_rotate_about.go</a></td></tr>
+<tr><td>24</td><td>24_scale_about.go</td><td>transformace (změna měřítka okolo zvoleného bodu)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/24_scale_about.go">https://github.com/tisnik/go-root/blob/master/article_AF/24_scale_about.go</a></td></tr>
+<tr><td>25</td><td>25_translate_rotate.go</td><td>transformace (posun)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/25_translate_rotate.go">https://github.com/tisnik/go-root/blob/master/article_AF/25_translate_rotate.go</a></td></tr>
+<tr><td>26</td><td>26_text.go</td><td>vykreslení textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/26_text.go">https://github.com/tisnik/go-root/blob/master/article_AF/26_text.go</a></td></tr>
+<tr><td>27</td><td>27_text_centered.go</td><td>vykreslení vycentrovaného textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/27_text_centered.go">https://github.com/tisnik/go-root/blob/master/article_AF/27_text_centered.go</a></td></tr>
+<tr><td>28</td><td>28_text_centered.go</td><td>vykreslení vycentrovaného textu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/28_text_centered.go">https://github.com/tisnik/go-root/blob/master/article_AF/28_text_centered.go</a></td></tr>
+<tr><td>29</td><td>29_text_rotated.go</td><td>vykreslení vycentrovaného textu, který je rotován</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/29_text_rotated.go">https://github.com/tisnik/go-root/blob/master/article_AF/29_text_rotated.go</a></td></tr>
+<tr><td>30</td><td>go.mod</td><td></td><td><a href="https://github.com/tisnik/go-root/blob/master/article_AF/go.mod">https://github.com/tisnik/go-root/blob/master/article_AF/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td></td></tr>
+<tr><td>31</td><td>01_stroke_rectangle.go</td><td>vykreslení obrysu obdélníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/01_stroke_rectangle.go">https://github.com/tisnik/go-root/blob/master/article_B0/01_stroke_rectangle.go</a></td></tr>
+<tr><td>32</td><td>02_fill_rectangle.go</td><td>vykreslení vyplněného obdélníku</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/02_fill_rectangle.go">https://github.com/tisnik/go-root/blob/master/article_B0/02_fill_rectangle.go</a></td></tr>
+<tr><td>33</td><td>03_hex_color.go</td><td>specifikace barvy trojicí hex složek</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/03_hex_color.go">https://github.com/tisnik/go-root/blob/master/article_B0/03_hex_color.go</a></td></tr>
+<tr><td>34</td><td>04_stroke_brush.go</td><td>konfigurace štětce pro vykreslování obrysů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/04_stroke_brush.go">https://github.com/tisnik/go-root/blob/master/article_B0/04_stroke_brush.go</a></td></tr>
+<tr><td>35</td><td>05_fill_brush.go</td><td>konfigurace štětce pro výplň uzavřených obrazců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/05_fill_brush.go">https://github.com/tisnik/go-root/blob/master/article_B0/05_fill_brush.go</a></td></tr>
+<tr><td>36</td><td>06_stroke_and_fill.go</td><td>pokus o kombinaci štěte pro obrysy a výplně</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/06_stroke_and_fill.go">https://github.com/tisnik/go-root/blob/master/article_B0/06_stroke_and_fill.go</a></td></tr>
+<tr><td>37</td><td>07_blend_mode_normal.go</td><td>vykreslení překrývajících se obrazců</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/07_blend_mode_normal.go">https://github.com/tisnik/go-root/blob/master/article_B0/07_blend_mode_normal.go</a></td></tr>
+<tr><td>38</td><td>08_blend_mode_alpha.go</td><td>překrývající se obrazce a alfa složka barvy</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/08_blend_mode_alpha.go">https://github.com/tisnik/go-root/blob/master/article_B0/08_blend_mode_alpha.go</a></td></tr>
+<tr><td>39</td><td>09_blend_mode_multiply.go</td><td>režimy prolínaní</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/09_blend_mode_multiply.go">https://github.com/tisnik/go-root/blob/master/article_B0/09_blend_mode_multiply.go</a></td></tr>
+<tr><td>40</td><td>10_fill_rule_default.go</td><td>výchozí pravidlo pro vyplňování obrazců, jejichž hrany se překrývají</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/10_fill_rule_default.go">https://github.com/tisnik/go-root/blob/master/article_B0/10_fill_rule_default.go</a></td></tr>
+<tr><td>41</td><td>11_fill_rule_odd.go</td><td>pravidla &bdquo;lichý počet přetnutí paprsku&ldquo; pro vyplňování obrazců, jejichž hrany se překrývají</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/11_fill_rule_odd.go">https://github.com/tisnik/go-root/blob/master/article_B0/11_fill_rule_odd.go</a></td></tr>
+<tr><td>42</td><td>12_linear_gradient.go</td><td>lineární gradient, přechod dvou barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/12_linear_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/12_linear_gradient.go</a></td></tr>
+<tr><td>43</td><td>13_linear_gradient.go</td><td>lineární gradient, přechod dvou barev, odlišný úhel</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/13_linear_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/13_linear_gradient.go</a></td></tr>
+<tr><td>44</td><td>14_linear_gradient.go</td><td>lineární gradient, přechod tří barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/14_linear_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/14_linear_gradient.go</a></td></tr>
+<tr><td>45</td><td>15_linear_gradient.go</td><td>lineární gradient, přechod tří barev,</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/15_linear_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/15_linear_gradient.go</a></td></tr>
+<tr><td>46</td><td>16_radial_gradient.go</td><td>radiální gradient, přechod dvou barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/16_radial_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/16_radial_gradient.go</a></td></tr>
+<tr><td>47</td><td>17_radial_gradient.go</td><td>radiální gradient, přechod tří barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/17_radial_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/17_radial_gradient.go</a></td></tr>
+<tr><td>48</td><td>18_sweep_gradient.go</td><td>gradient závislý na úhlu, přechod dvou barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/18_sweep_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/18_sweep_gradient.go</a></td></tr>
+<tr><td>49</td><td>19_sweep_gradient.go</td><td>gradient závislý na úhlu, přechod tří barev</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/19_sweep_gradient.go">https://github.com/tisnik/go-root/blob/master/article_B0/19_sweep_gradient.go</a></td></tr>
+<tr><td>50</td><td>20_svg_draw.go</td><td>provedení exportu vektorové grafiky do formátu SVG</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/20_svg_draw.go">https://github.com/tisnik/go-root/blob/master/article_B0/20_svg_draw.go</a></td></tr>
+<tr><td>51</td><td>21_quadratic_bezier_control_points.go</td><td>export do SVG, výsledek vykreslení Bézierových křivek</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/21_quadratic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_B0/21_quadratic_bezier_control_points.go</a></td></tr>
+<tr><td>52</td><td>22_linear_gradient_svg.go</td><td>export do SVG, výsledek vykreslení gradientního lineárního přechodu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/22_linear_gradient_svg.go">https://github.com/tisnik/go-root/blob/master/article_B0/22_linear_gradient_svg.go</a></td></tr>
+<tr><td>53</td><td>23_radial_gradient_svg.go</td><td>export do SVG, výsledek vykreslení gradientního radiálního přechodu</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/23_radial_gradient_svg.go">https://github.com/tisnik/go-root/blob/master/article_B0/23_radial_gradient_svg.go</a></td></tr>
+<tr><td>54</td><td>24_pdf_draw.go</td><td>provedení exportu vektorové grafiky do formátu PDF</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B0/24_pdf_draw.go">https://github.com/tisnik/go-root/blob/master/article_B0/24_pdf_draw.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td></td></tr>
+<tr><td>55</td><td>01_window.go</td><td>aplikace s&nbsp;prázdným oknem</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/01_window.go">https://github.com/tisnik/go-root/blob/master/article_B1/01_window.go</a></td></tr>
+<tr><td>56</td><td>02_init_background.go</td><td>vykreslení pozadí zvolenou barvou v&nbsp;ploše okna</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/02_init_background.go">https://github.com/tisnik/go-root/blob/master/article_B1/02_init_background.go</a></td></tr>
+<tr><td>57</td><td>03_continuous_redraw.go</td><td>povolení kontinuálního překreslování okna</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/03_continuous_redraw.go">https://github.com/tisnik/go-root/blob/master/article_B1/03_continuous_redraw.go</a></td></tr>
+<tr><td>58</td><td>04_draw_rectangle.go</td><td>využití canvasu při kreslení do okna</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/04_draw_rectangle.go">https://github.com/tisnik/go-root/blob/master/article_B1/04_draw_rectangle.go</a></td></tr>
+<tr><td>59</td><td>05_fill_rule.go</td><td>vykreslení hvězdy do plochy okna</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/05_fill_rule.go">https://github.com/tisnik/go-root/blob/master/article_B1/05_fill_rule.go</a></td></tr>
+<tr><td>60</td><td>06_cubic_bezier_control_points.go</td><td>vykreslení Bézierových křivek i s&nbsp;jejich řídicími body</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/06_cubic_bezier_control_points.go">https://github.com/tisnik/go-root/blob/master/article_B1/06_cubic_bezier_control_points.go</a></td></tr>
+<tr><td>61</td><td>07_keyboard_input.go</td><td>zjištění stisku kláves použitých pro ovládání aplikace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/07_keyboard_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/07_keyboard_input.go</a></td></tr>
+<tr><td>62</td><td>08_keyboard_input.go</td><td>modifikace barvy vykreslovaného obrazce klávesnicí</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/08_keyboard_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/08_keyboard_input.go</a></td></tr>
+<tr><td>63</td><td>09_keyboard_input.go</td><td>modifikace barvy vykreslovaného obrazce klávesnicí, vylepšená varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/09_keyboard_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/09_keyboard_input.go</a></td></tr>
+<tr><td>64</td><td>10_mouse_input.go</td><td>reakce na stisk tlačítka myši, přečtení souřadnic kurzoru myši</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/10_mouse_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/10_mouse_input.go</a></td></tr>
+<tr><td>65</td><td>11_mouse_input.go</td><td>jednoduchý kreslicí program</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/11_mouse_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/11_mouse_input.go</a></td></tr>
+<tr><td>66</td><td>12_mouse_input.go</td><td>vylepšený jednoduchý kreslicí program: kreslení &bdquo;gumové čáry&ldquo;</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B1/12_mouse_input.go">https://github.com/tisnik/go-root/blob/master/article_B1/12_mouse_input.go</a></td></tr>
+</table>
+
+
+
+<h2 id="k20">Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Projekt GoGPU na GitHubu<br />
+<a href="https://github.com/orgs/gogpu/repositories">https://github.com/orgs/gogpu/repositories</a>
+</li>
+
+<li>Balíček gogpu/gg<br />
+<a href="https://github.com/gogpu/gg">https://github.com/gogpu/gg</a>
+</li>
+
+<li>Balíček gogpu/gg-svg<br />
+<a href="https://github.com/gogpu/gg-svg">https://github.com/gogpu/gg-svg</a>
+</li>
+
+<li>Balíček gogpu/gg-pdf<br />
+<a href="https://github.com/gogpu/gg-pdf">https://github.com/gogpu/gg-pdf</a>
+</li>
+
+<li>package gg (což je jiná varianta <strong>gg</strong>)<br />
+<a href="https://godoc.org/github.com/fogleman/gg">https://godoc.org/github.com/fogleman/gg</a>
+</li>
+
+<li>Generate an animated GIF with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/">http://tech.nitoyon.com/en/blog/2016/01/07/go-animated-gif-gen/</a>
+</li>
+
+<li>Generate an image programmatically with Golang<br />
+<a href="http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/">http://tech.nitoyon.com/en/blog/2015/12/31/go-image-gen/</a>
+</li>
+
+<li>The Go image package<br />
+<a href="https://blog.golang.org/go-image-package">https://blog.golang.org/go-image-package</a>
+</li>
+
+<li>Balíček draw2D: 2D rendering for different output (raster, pdf, svg)<br />
+<a href="https://github.com/llgcode/draw2d">https://github.com/llgcode/draw2d</a>
+</li>
+
+<li>Draw a rectangle in Golang?<br />
+<a href="https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang">https://stackoverflow.com/questions/28992396/draw-a-rectangle-in-golang</a>
+</li>
+
+<li>Immediate mode (computer graphics)<br />
+<a href="https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)">https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)</a>
+</li>
+
+<li>Retained mode<br />
+<a href="https://en.wikipedia.org/wiki/Retained_mode">https://en.wikipedia.org/wiki/Retained_mode</a>
+</li>
+
+<li>Lecture 11: Linear Interpolation Again - Bézier Curves<br />
+<a href="http://www.math.kent.edu/~reichel/courses/intr.num.comp.1/fall09/lecture12/bez.pdf">http://www.math.kent.edu/~reichel/courses/intr.num.comp.1/fall09/lecture12/bez.pdf</a>
+</li>
+
+<li>Geometrie/Úvod do křivek<br />
+<a href="https://cs.wikibooks.org/wiki/Geometrie/%C3%9Avod_do_k%C5%99ivek">https://cs.wikibooks.org/wiki/Geometrie/%C3%9Avod_do_k%C5%99ivek</a>
+</li>
+
+<li>Seriál Grafická knihovna OpenGL<br />
+<a href="https://www.root.cz/serialy/graficka-knihovna-opengl/">https://www.root.cz/serialy/graficka-knihovna-opengl/</a>
+</li>
+
+<li>Seriál Tvorba přenositelných grafických aplikací využívajících knihovnu GLUT<br />
+<a href="https://www.root.cz/serialy/tvorba-prenositelnych-grafickych-aplikaci-vyuzivajicich-knihovnu-glut/">https://www.root.cz/serialy/tvorba-prenositelnych-grafickych-aplikaci-vyuzivajicich-knihovnu-glut/</a>
+</li>
+
+<li>Seriál OpenGL a nadstavbová knihovna GLU<br />
+<a href="https://www.root.cz/serialy/opengl-a-nadstavbova-knihovna-glu/">https://www.root.cz/serialy/opengl-a-nadstavbova-knihovna-glu/</a>
+</li>
+
+<li>Seriál OpenGL evaluátory<br />
+<a href="https://www.root.cz/serialy/opengl-evaluatory/">https://www.root.cz/serialy/opengl-evaluatory/</a>
+</li>
+
+<li>Khronos Group<br />
+<a href="https://www.khronos.org/">https://www.khronos.org/</a>
+</li>
+
+<li>Khronos Group (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Khronos_Group">https://en.wikipedia.org/wiki/Khronos_Group</a>
+</li>
+
+<li>OpenVG (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/OpenVG">https://en.wikipedia.org/wiki/OpenVG</a>
+</li>
+
+<li>OpenVG Quick Reference Card<br />
+<a href="https://www.khronos.org/files/openvg-quick-reference-card.pdf">https://www.khronos.org/files/openvg-quick-reference-card.pdf</a>
+</li>
+
+<li>OpenVG on the Raspberry Pi<br />
+<a href="http://mindchunk.blogspot.cz/2012/09/openvg-on-raspberry-pi.html">http://mindchunk.blogspot.cz/2012/09/openvg-on-raspberry-pi.html</a>
+</li>
+
+<li>ShivaVG: open-source ANSI C OpenVG <br />
+<a href="http://ivanleben.blogspot.cz/2007/07/shivavg-open-source-ansi-c-openvg.html">http://ivanleben.blogspot.cz/2007/07/shivavg-open-source-ansi-c-openvg.html</a>
+</li>
+
+<li>Testbed for exploring OpenVG on the Raspberry Pi<br />
+<a href="https://github.com/ajstarks/openvg">https://github.com/ajstarks/openvg</a>
+</li>
+
+<li>Seriál Grafické karty a grafické akcelerátory<br />
+<a href="http://www.root.cz/serialy/graficke-karty-a-graficke-akceleratory/">http://www.root.cz/serialy/graficke-karty-a-graficke-akceleratory/</a>
+</li>
+
+<li>(Linux) Framebuffer<br />
+<a href="http://wiki.linuxquestions.org/wiki/Framebuffer">http://wiki.linuxquestions.org/wiki/Framebuffer</a>
+</li>
+
+<li>(Linux) Framebuffer HOWTO<br />
+<a href="http://tldp.org/HOWTO/Framebuffer-HOWTO/">http://tldp.org/HOWTO/Framebuffer-HOWTO/</a>
+</li>
+
+<li>Linux framebuffer (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Linux_framebuffer">https://en.wikipedia.org/wiki/Linux_framebuffer</a>
+</li>
+
+<li>Seriál Grafické formáty<br />
+<a href="http://www.root.cz/serialy/graficke-formaty/">http://www.root.cz/serialy/graficke-formaty/</a>
+</li>
+
+<li>Seriál Grafický formát GIF<br />
+<a href="https://www.root.cz/serialy/graficky-format-gif/">https://www.root.cz/serialy/graficky-format-gif/</a>
+</li>
+
+<li>PNG is Not GIF<br />
+<a href="https://www.root.cz/clanky/png-is-not-gif/">https://www.root.cz/clanky/png-is-not-gif/</a>
+</li>
+
+</ol>
