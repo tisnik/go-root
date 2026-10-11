@@ -1,0 +1,1068 @@
+<h2 id="k01">Řešení problému zpětné kompatibility v&nbsp;ekosystému jazyka Go</h2>
+
+<p>V&nbsp;perexu dnešního článku je zmíněno dilema resp.&nbsp;problém, který se
+dotýká prakticky všech existujících programovacích jazyků. Lidé, kteří tyto
+jazyky vyvíjí nebo navrhují jejich vývoj (což mohou být jednotlivci, komunita,
+nebo i celé více či méně oficiální komise), se musí prakticky s&nbsp;každou
+navrhovanou změnou rozhodovat, jestli má dojít k&nbsp;rozšíření programovacího
+jazyka takovým způsobem, jenž způsobí nekompatibilitu se staršími verzemi, nebo
+se naopak všechny změny budou navrhovat (nebo spíše zavrhovat) takovým
+způsobem, že dotčený programovací jazyk bude &bdquo;zakonzervován&ldquo; a
+vlastně se nebude dále vyvíjet. V&nbsp;určité míře se tento problém týká i
+knihoven, ovšem palčivější je právě u syntaxe a sémantiky popisující a mnohdy i
+definující programovací jazyk. Pouze malé množství v&nbsp;praxi používaných
+jazyků je totiž rigorózně definováno, takže mnohdy se za &bdquo;definici&ldquo;
+jazyka považuje jeho referenční implementace, která je typicky (v&nbsp;těch
+lepších případech) doplněna seznamem nedefinovaných chování.</p>
+
+
+
+<h2 id="k02">Kompatibilita zdrojových kódů v&nbsp;různých programovacích jazycích</h2>
+
+<p>V&nbsp;praxi můžeme vidět různé přístupy k&nbsp;řešení tohoto problému. Do
+některých programovacích jazyků se přidávají nové sémantické konstrukce bez
+toho, aby bylo nutné přidávat nová klíčová slova. Výsledek sice nemusí být
+ideální, ale na druhou stranu umožňuje další vývoj programovacího jazyka (a lze
+tvrdit, i když poněkud s&nbsp;nadsázkou, že jazyk, který se nevyvíjí, je mrtvým
+jazykem). U některých dalších jazyků se postupně přidávají nová klíčová slova,
+což může způsobit problémy v&nbsp;případě, že tato slova byla použita ve
+starších zdrojových kódech jako běžné identifikátory. Příkladem může být Java,
+do které byla postupně přidávána další klíčová slova:</p>
+
+<table>
+<tr><th>Slovo</th><th>Přidáno ve verzi</th></tr>
+<tr><td>strictfp</td><td>1.2</td></tr>
+<tr><td>assert</td><td>1.4</td></tr>
+<tr><td>enum</td><td>1.5</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: to ovšem není tak hrozné, hlavně když si
+uvědomíme, že Java již oslavila 30 let od svého vzniku.</div></p>
+
+<p>Příkladem dalšího programovacího jazyka, do kterého byly zařazeny změny,
+které způsobí problémy se staršími zdrojovými kódy, je slavné céčko.
+Následující zdrojový kód je bez problémů přeložitelný překladači ANSI C, ovšem
+překladače rozeznávající C99 (a vyšší verze) ohlásí chybu, protože v&nbsp;C99
+je <strong>inline</strong> definováno jako (nové) klíčové slovo:</p>
+
+<pre>
+int <strong>main</strong>(void) {
+    int inline = 0;
+    return inline;
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: i to je jeden z&nbsp;důvodů, proč
+naprostá většina moderních překladačů céčka podporuje přepínače pro volbu verze
+(dialektu) jazyka a taktéž symboly preprocesoru, které je možné využít ve
+zdrojových kódech.</div></p>
+
+<p>Mimochodem, v&nbsp;rámci normy C11 bylo přidáno sedm podobných slov (i když
+s&nbsp;podtržítkem na začátku), v&nbsp;C23 přibylo dokonce patnáct nových
+klíčových slov. Výsledkem je situace, ve které následující zdrojový kód bude
+přeložen jen překladačem pracujícím v&nbsp;režimu ANSI C (a teoreticky
+v&nbsp;žádném jiném překladači). Novější překladače (resp.&nbsp;ten samý
+překladač po přepnutí do vyšší verze jazyka) budou hlásit buď jednu nebo větší
+množství chyb (v&nbsp;závislosti na použité verzi jazyka!), a K&amp;R
+překladače budou mít naopak problém jak se syntaxí, tak i s&nbsp;rezervovaným
+slovem <strong>entry</strong> (které už však v&nbsp;novějších verzích céčka
+rezervovaným slovem pro změnu není; ostatně v&nbsp;praxi snad ani nikdy nebylo
+implementováno):</p>
+
+<pre>
+int <strong>main</strong>(void) {
+    int inline = 0;
+    int alignof = 1;
+    int entry = 2;
+    return inline * alignof + entry;
+}
+</pre>
+
+*** image ***
+
+<p>Jen pro zajímavost si zkusme tento zdrojový kód skutečně přeložit pro různé
+verze céčka:</p>
+
+<pre>
+$ <strong>gcc -std=c89 riddle.c</strong>
+(výborně, přeloženo bez problémů)
+&nbsp;
+$ <strong>gcc -std=c99 riddle.c</strong>
+riddle.c: In function ‘main’:
+riddle.c:2:16: error: expected identifier or ‘(’ before ‘=’ token
+    2 |     int inline = 0;
+      |                ^
+riddle.c:5:12: error: expected expression before ‘inline’
+    5 |     return inline * alignof + entry;
+      |            ^~~~~~
+(dvě chyby)
+&nbsp;
+$ <strong>gcc -std=c23 riddle.c</strong>
+riddle.c: In function ‘main’:
+riddle.c:2:16: error: expected identifier or ‘(’ before ‘=’ token
+    2 |     int inline = 0;
+      |                ^
+riddle.c:3:9: error: expected identifier or ‘(’ before ‘alignof’
+    3 |     int alignof = 1;
+      |         ^~~~~~~
+riddle.c:5:12: error: expected expression before ‘inline’
+    5 |     return inline * alignof + entry;
+      |            ^~~~~~
+(pro změnu tři chyby)
+</pre>
+
+<p>To ovšem není jen specifická vlastnost GCC, protože podobně se chová
+Clang:</p>
+
+<pre>
+$ <strong>clang -ansi riddle.c</strong>
+&nbsp;
+$ <strong>clang -std=c99 riddle.c </strong>
+riddle.c:2:16: error: expected identifier or '('
+    2 |     int inline = 0;
+      |                ^
+riddle.c:5:12: error: expected expression
+    5 |     return inline * alignof + entry;
+      |            ^
+2 errors generated.
+&nbsp;
+$ <strong>clang -std=c23 riddle.c</strong>
+riddle.c:2:16: error: expected identifier or '('
+    2 |     int inline = 0;
+      |                ^
+riddle.c:3:9: error: expected identifier or '('
+    3 |     int alignof = 1;
+      |         ^
+riddle.c:5:12: error: expected expression
+    5 |     return inline * alignof + entry;
+      |            ^
+3 errors generated.
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ještě složitější je to se slovem
+<strong>asm</strong>, které sice nebylo (podle normy) rezervováno, ovšem mnoho
+překladačů si toto slovo &bdquo;osvojilo&ldquo; pro zápis části kódu
+v&nbsp;assembleru.</div></p>
+
+<p>Zajímavý je přístup použitý v&nbsp;jazyce Python. Do tohoto programovacího
+jazyka totiž byla přidána podpora pro <i>pattern matching</i>, která vyžadovala
+přidání nových klíčových slov, konkrétně slov <strong>match</strong> a
+<strong>case</strong>. A kromě toho byla do Pythonu přidána i podpora pro
+definici nových datových typů, která si vyžádala přidání klíčového slova
+<strong>type</strong>. Ovšem označení těchto slov za rezervovaná klíčová slova
+je problematické, protože by to znamenalo, že starší zdrojové kódy nebudou
+kompatibilní s&nbsp;novou verzí interpretrů Pythonu (v&nbsp;praxi se to asi
+nejvíce týká slova <strong>type</strong>, protože si dovedu představit, že by
+bylo použito pro pojmenování parametru funkce či dokonce jako jméno
+metody).</p>
+
+<p>Z&nbsp;tohoto důvodu autoři Pythonu zvolili (zlatou?) střední cestu &ndash;
+slova <strong>match</strong>, <strong>case</strong> a <strong>type</strong>
+jsou označena termínem <i>soft keywords</i>. Starší zdrojové kódy mohou tato
+slova používat jako identifikátory, ovšem v&nbsp;novém kódu již budou použity
+jako (rezervovaná) klíčová slova. Rozlišení je dosti komplikované a je proto
+prováděno na úrovni parseru, tedy nikoli (jak by bylo obvyklé) už při
+tokenizaci zdrojového kódu &ndash; to je sice z&nbsp;pohledu návrhu interpretru
+nepěkné řešení, ovšem z&nbsp;pohledu programátora je asi nejpraktičtější.</p>
+
+<p>To tedy znamená, že následující skripty jsou oba korektní, i když jeden
+z&nbsp;nich používá <strong>type</strong> jako jméno proměnné a druhý jako
+klíčové slovo:</p>
+
+<pre>
+type = "foo"
+&nbsp;
+print(type)
+</pre>
+
+<p>a:</p>
+
+<pre>
+type text = str
+&nbsp;
+x: text = "foo"
+&nbsp;
+print(x)
+</pre>
+
+<p>A aby toho nebylo málo:</p>
+
+<pre>
+type text = str
+&nbsp;
+x: text = "foo"
+&nbsp;
+print(x)
+print(type)
+&nbsp;
+type = "bar"
+&nbsp;
+print(type)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zkuste sami (bez spuštění skriptu)
+odhadnout, co se vlastně vypíše...</div></p>
+
+<p>Problematika Python 2 vs Python 3 je dostatečně známá a snad se již podobná
+situace nebude opakovat...</p>
+
+
+
+<h2 id="k03">Jak je tomu v&nbsp;jazyce Go?</h2>
+
+<p>Tvůrci programovacího jazyka Go jsou (nebo vlastně ještě relativně nedávno
+byli) poměrně konzervativní v&nbsp;otázce přidávání nových vlastností do tohoto
+jazyka. Konkrétně se například dlouho (několik let) řešilo, jakým způsobem se
+do Go přidá podpora pro generické datové typy, přidání podpory pro práci
+s&nbsp;výjimkami je téměř nekonečné téma (neustále odsouvané z&nbsp;dobrých i
+méně dobrých důvodů) apod. Podobně konzervativní je vývoj a změny prováděné ve
+standardní knihovně jazyka Go, která je poměrně rozsáhlá a nutno říci, že i
+kvalitní (což je v&nbsp;poměrně ostrém kontrastu s&nbsp;mnoha balíčky třetích
+stran). Nicméně i tento programovací jazyk se postupně vyvíjí a jsou do něj
+přidávány nové vlastnosti &ndash; například již zmíněná podpora pro generické
+datové typy (verze 1.18), možnost zápisu smyčky <strong>for range
+integer</strong> (verze 1.22), podpora pro iterátory (verze 1.23), nová
+sémantika standardní funkce <strong>new</strong> (verze 1.26) apod. Na tomto
+místě je ovšem dobré poznamenat, že mnohé změny jsou spíše kosmetické.</p>
+
+<p>Mimochodem: následujících 25 klíčových slov bylo rezervováno již v&nbsp;Go
+1.0 před šestnácti lety. Od té doby nedošlo k&nbsp;přidání žádného nového
+slova, i když se mezitím jazyk rozšířil (a byl přidán například znak ~
+související s&nbsp;generickými typy):</p>
+
+<pre>
+break       default     func        interface   select
+case        defer       go          map         struct
+chan        else        goto        package     switch
+const       fallthrough if          range       type
+continue    for         import      return      var
+</pre>
+
+<p>Nové změny přidávané do Go jsou navrženy takovým způsobem, aby syntaxi
+jazyka rozšiřovaly, ale neměnily, takže i starší zdrojové kódy by měly být bez
+problémů přeložitelné i nejnovější verzí překladače Go. To si ostatně můžete
+relativně snadno otestovat, protože jsou k&nbsp;dispozici (například na
+GitHubu) archivy starých zdrojových kódů určených například pro Go 1.8 atd.
+Pokud už muselo dojít k&nbsp;takové změně ve specifikaci jazyka, která (obecně)
+není kompatibilní, jsou nové překladače Go vybaveny logikou, která zdrojové
+kódy přeloží <i>kompatibilním způsobem</i>. Tedy například zdrojové kódy
+balíčku určeného pro verzi 1.19 mohou být přeloženy jinak, než ty samé zdrojové
+kódy, ovšem určené pro verzi 1.26.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti taková změna jazyka
+nastala, pokud se nepletu, pouze několikrát (změna sémantiky pouze jedenkrát!).
+Touto problematikou se budeme zabývat v&nbsp;navazujících kapitolách.</div></p>
+
+
+
+<h2 id="k04">Kompatibilita z&nbsp;pohledu sémantiky</h2>
+
+<p>V&nbsp;případě, že se do programovacího jazyka přidává nějaká nová
+vlastnost, většinou to znamená změnu či spíše rozšíření syntaxe a taktéž
+sémantiky. Taková změna je většinou pro vývojáře snadno
+&bdquo;uchopitelná&ldquo;, protože každý chápe, že nová jazyková konstrukce má
+i svou (novou) sémantiku. Ovšem některé změny nemusí být na první pohled
+viditelné. Příkladem může být přesnější specifikace chování bez toho, aby došlo
+k&nbsp;modifikaci syntaxe. V&nbsp;Go 1.21 se například změnil způsob pořadí
+inicializace balíčků, což mj.&nbsp;ovlivňuje chování aplikací v&nbsp;případě,
+že balíčky mají definovanou funkci <strong>init</strong>. Dalším příkladem může
+být změna chování nějaké jazykové konstrukce &ndash; tj.&nbsp;i když se bude
+používat stejný způsob zápisu (tedy stejná syntaxe), bude chování
+v&nbsp;novější verzi jazyka jiné (odlišná sémantika). To je ovšem potenciálně
+velmi problematické, protože to znamená, že chování nějaké aplikace závisí na
+tom, jaká verze překladače bude použita.</p>
+
+<p>Taková změna v&nbsp;jazyce Go skutečně (nutno dodat, že bohužel) nastala, a
+to konkrétně ve verzi 1.22. Jedná se o odlišné chování proměnných definovaných
+v&nbsp;programové smyčce <strong>for</strong>. A právě existenci této
+nekompatibilní změny využijeme v&nbsp;dnešním článku, abychom si ukázali, jakým
+způsobem jsou nekompatibility tohoto typu v&nbsp;jazyce Go řešeny. Můžeme
+dopředu prozradit, že je tento problém uchopen poměrně dobrým způsobem
+navrženým tak, aby co nejméně zatěžovat vývojáře a aby navíc umožnil kombinaci
+balíčků a knihoven vytvořených pro různé verze jazyka Go.</p>
+
+
+
+<h2 id="k05">Kontroly prováděné překladačem jazyka Go</h2>
+
+<p>Překladač programovacího jazyka Go se při překladu zdrojových kódů ohlíží i
+na verzi jazyka specifikovanou vývojářem v&nbsp;souboru
+<strong>go.mod</strong>. Ukažme si to na prozatím velmi jednoduchém
+demonstračním příkladu, ve kterém jsou definovány dvě proměnné, a to konkrétně
+řez (<i>slice</i>) <strong>s</strong> a pole (<i>array</i>) <strong>a</strong>.
+Při inicializaci pole <strong>a</strong> se používá obsah řezu
+<strong>s</strong>, díky čemuž je možné pole inicializovat bez použití
+programové smyčky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        s := []int{1, 2, 3}
+        a := [3]int(s)
+        a[0] = 9
+        fmt.Println("slice:", s)
+        fmt.Println("array: ", a)
+}
+</pre>
+
+<p>Tento zdrojový kód je velmi dobře pochopitelný, ovšem ve skutečnosti je
+platný (resp.&nbsp;bychom mohli říci korektní) až od verze Go 1.20. Právě
+v&nbsp;této verzi jazyka Go totiž byla rozšířena sémantika konverzních operací.
+Zde konkrétně se jedná o novou konverzi z&nbsp;řezu na pole (viz též <a
+href="https://go.dev/doc/go1.20#language">https://go.dev/doc/go1.20#language</a>
+s&nbsp;podrobnostmi o vydání). Ověřme si tedy, jakým způsobem bude tento
+program přeložen v&nbsp;případě, že výše uvedený zdrojový kód je součástí
+projektu určeného pro verzi 1.19 a verzi 1.22 (libovolná verze vyšší nebo rovna
+1.20).</p>
+
+<p>Začneme projektovým souborem <strong>go.mod</strong>, který má definováno,
+že má být přeložen Go 1.19 (viz třetí řádek):</p>
+
+<pre>
+module example1
+&nbsp;
+go 1.19
+</pre>
+
+<p>V&nbsp;případě, že se pokusíme o překlad takto nakonfigurovaného modulu,
+nahlásí překladač jazyka Go chybu, protože se snaží chovat tak, jakoby se
+jednalo o překladač verze 1.19, i když ve skutečnosti používám Go 1.24.
+Překladač dokonce přesně napíše, v&nbsp;čem spočívá problém:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+# example2
+./example2.go:7:14: cannot convert s (variable of type []int) to type [3]int: conversion of slice to array requires go1.20 or later (-lang was set to go1.19; check go.mod)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to je ovšem zajímavé a vlastně i dosti
+užitečné chování. Překladač jazyka Go se totiž nijak nesnaží o
+&bdquo;odhad&ldquo; toho, jak má zdrojový kód pochopit. Jeho chování je
+založeno na tom, že je v&nbsp;projektovém souboru vývojářem explicitně
+nastavena verze 1.19 a tudíž se překladač chová (skoro) přesně tak, jakoby byl
+skutečně použit tento (dnes již ovšem notně zastaralý) překladač. Pokud vývojář
+bude chtít použít nové jazykové konstrukce (zde onu konverzi obsahu řezu na
+pole), bude muset explicitně změnit soubor <strong>go.mod</strong> a nést
+za to případné důsledky.</div></p>
+
+<p>Ve druhém kroku přeložíme naprosto stejný zdrojový kód, který ovšem nyní
+bude součástí projektu připraveného pro verzi 1.22. Projektový soubor
+<strong>go.mod</strong> bude tedy vypadat následovně (opět viz třetí
+řádek):</p>
+
+<pre>
+module example1
+&nbsp;
+go 1.22
+</pre>
+
+<p>V&nbsp;tomto kontextu bude překlad zdrojového kódu bez problémů
+dokončen:</p>
+
+<pre>
+$ <strong>go build</strong>
+</pre>
+
+<p>Samozřejmě si ještě ověříme chování přeloženého programu, abychom si ověřili
+sémantiku &ndash; pole je sice inicializováno obsahem řezu, ale jedná se o
+odlišné bloky operační paměti. Tudíž se změna obsahu pole nijak
+&bdquo;nepropíše&ldquo; do obsahu původního řezu:</p>
+
+<pre>
+$ <strong>./example1</strong>
+&nbsp;
+slice: [1 2 3]
+array:  [9 2 3]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to tedy znamená, že překladač jazyka Go
+odmítá přeložit zdrojové kódy, které jsou sice z&nbsp;pohledu novější
+specifikace jazyka zcela korektní, ovšem projektový soubor obsahuje informaci o
+tom, že tyto kódy jsou určeny pro nějakou odlišnou verzi Go. Vývojář tedy
+&ndash; obecně &ndash; nemůže naivně kopírovat části kódu získaného &bdquo;na
+internetech&ldquo; nebo z&nbsp;Gen AI, ale měl by přesně vědět, co od takového
+zdrojového kódu v&nbsp;daném kontextu očekává (to by měl vědět v&nbsp;každém
+případě, ovšem skutečný svět není dokonalý &ndash; dívám se na některé kolegy,
+kteří mi posílají na review AI slop :-).</div></p>
+
+
+
+<h2 id="k06">Chování při spuštění příkazem <strong>go run</strong></h2>
+
+<p>Chování otestované v&nbsp;předchozí kapitole, tedy kontrola, pro jakou verzi
+jazyka Go je modul určen, se projeví v&nbsp;případě, že modul překládáme
+příkazem <strong>go build</strong> (výsledkem bude staticky slinkovaný
+spustitelný soubor). Vyzkoušejme si ovšem chování v&nbsp;případě, že použijeme
+příkaz <strong>go run example1.go</strong> nebo <strong>go run
+example2.go</strong>:</p>
+
+<pre>
+$ <strong>pushd example1</strong>
+~/src/go-root/compatibility/example1 ~/src/go-root/compatibility
+&nbsp;
+$ <strong>go run example1.go</strong>
+slice: [1 2 3]
+array:  [9 2 3]
+&nbsp;
+$ <strong>popd</strong>
+~/src/go-root/compatibility
+&nbsp;
+$ <strong>pushd example2</strong>
+~/src/go-root/compatibility/example2 ~/src/go-root/compatibility
+&nbsp;
+$ <strong>go run example2.go</strong>
+slice: [1 2 3]
+array:  [9 2 3]
+</pre>
+
+<p>I když se na pozadí stále provádí překlad (typicky do adresáře
+<strong>/tmp</strong> pokud nenastavíte jinak), bude se překládat a spouštět
+pouze jeden zdrojový soubor a konfigurace modulu zapsaná do souboru
+<strong>go.mod</strong> bude ignorována. I toto chování může vývojářům přinést
+různá (nepěkná) překvapení.</p>
+
+
+
+<h2 id="k07">Změna sémantiky programové smyčky <strong>for</strong></h2>
+
+<p>Jak jsme si již naznačili v&nbsp;úvodních kapitolách, došlo &ndash; a to
+přes snahu autorů Go o velkou stabilitu &ndash; v&nbsp;Go 1.21 (oficiálně pak
+v&nbsp;Go 1.22) ke změně chování, tedy ke změně sémantiky jazyka. Tato změna
+chování se týká vlastnosti proměnných definovaných a naplňovaných při opakování
+programové smyčky <strong>for</strong> &ndash; tyto proměnné se někdy nazývají
+<i>čítače smyčky</i>, i když ve skutečnosti mohou být naplňovány obsahem řezu
+či pole. V&nbsp;případě, že je smyčka prováděna sekvenčně (v&nbsp;jediné
+gorutině) a navíc nebude obsah takové proměnné použit v&nbsp;uzávěru, bude se
+programová smyčka chovat přesně podle očekávání.</p>
+
+<p>Ukažme si program, na němž se rozdílná změna chování ukáže. V&nbsp;programu
+postupně do řezu <strong>prints</strong> vkládáme <i>uzávěry</i>,
+tj.&nbsp;(anonymní) funkce navázané na proměnnou <strong>i</strong>, která je
+použita jako počitadlo smyčky. A ve druhé programové smyčce tyto uzávěry
+postupně zavoláme, tj.&nbsp;zavolá se
+<strong>fmt.Println(<i>něco</i>)</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var prints []func()
+        for i := 1; i &lt;= 3; i++ {
+                prints = append(prints, func() { fmt.Println(i) })
+        }
+        for _, print := range prints {
+                print()
+        }
+}
+</pre>
+
+<p>Otázka bude znít &ndash; jaké hodnoty se vypíšou po spuštění tohoto
+programu. Při pohledu na zdrojový kód by se mohlo zdát, že se vždy vypíše:</p>
+
+<pre>
+1
+2
+3
+</pre>
+
+<p>Ovšem <a href="https://go.dev/doc/faq#closures_and_goroutines">zde</a> je
+popsáno, že kvůli špatně navržené sémantice starších verzí Go se ve skutečnosti
+vypíše (dokument se věnuje gorutinám, ovšem platí i pro uzávěry):</p>
+
+<pre>
+4
+4
+4
+</pre>
+
+<p>Je tomu tak z&nbsp;toho důvodu, že se program přeloží (resp.&nbsp;překládal)
+takovým způsobem, že sdílí jedinou instanci proměnné <strong>i</strong>.</p>
+
+
+
+<h2 id="k08">Při návrhu jazyka jsme udělali chybu &ndash; a co teď?</h2>
+
+<p>Z&nbsp;výše uvedeného příkladu je patrné, že si tvůrci Go uvědomili, že při
+návrhu jazyka zvolili špatnou (či ne zcela dokonalou) sémantiku chování
+proměnných v&nbsp;programových smyčkách. A stáli před rozhodnutím, které (aspoň
+jsem si jistý) museli udělat i návrháři dalších programovacích jazyků. Chování,
+které není ideální, je totiž možné &bdquo;zakonzervovat&ldquo; a tvrdit přitom,
+že primárním důvodem je snaha o zpětnou kompatibilitu. Nebo se naopak může
+chování jazyka změnit, což ovšem ovlivní starší zdrojové kódy, které (celkem
+logicky) očekávaly původní chování. Jak byl tento konkrétní problém vyřešen, už
+pravděpodobně tušíte &ndash; nové verze překladačů obsahují rozhodovací
+konstrukci, která na základě verze zapsané v&nbsp;souboru
+<strong>go.mod</strong> zvolí jednu z&nbsp;variant překladu zdrojových kódů.
+To tedy znamená, že zdrojové kódy, které počítají s&nbsp;původním chováním,
+skutečně budou funkční. A nové zdrojové kódy již mohou využívat vylepšenou (či
+možná přesněji řečeno opravenou) sémantiku.</p>
+
+<p><div class="rs-tip-major">Poznámka: to je pravděpodobně z&nbsp;pohledu
+běžného vývojáře nejlepší řešení, ovšem znamená to více práce pro autory
+překladače jazyka Go. Prozatím se jedná o jedinou takovou změnu, ale může se
+stát, že jejich počet bude narůstat (překlad se bude větvit) a tím bude růst i
+složitost překladače. Ostatně se stačí podívat na překladače céčka, o nichž
+jsme se zmínili v&nbsp;úvodní části dnešního článku.</div></p>
+
+
+
+<h2 id="k09">Otestování chování v&nbsp;režimu kompatibility s&nbsp;Go 1.20 a Go 1.22</h2>
+
+<p>Otestujme si nyní, zda a jak se bude lišit výše uvedený demonstrační
+příklad, pokud bude jeho zdrojový kód uložen v&nbsp;modulu pro verzi Go 1.20
+popř.&nbsp;naopak v&nbsp;modulu pro Go 1.22.</p>
+
+<p>Začneme modulem určeným pro Go 1.20. Obsah <strong>go.mod</strong> je
+následující:</p>
+
+<pre>
+module example4
+&nbsp;
+go 1.20
+</pre>
+
+<p>Po překladu a spuštění zjistíme, že se na standardní výstup třikrát vypíše
+hodnota 4, tj.&nbsp;program se chová &bdquo;postaru&ldquo;:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+$ <strong>./example4</strong>
+4
+4
+4
+</pre>
+
+<p>Druhá varianta příkladu se stejným zdrojovým kódem je určena pro Go 1.22,
+což je patrné z&nbsp;obsahu souboru <strong>go.mod</strong>:</p>
+
+<pre>
+module example3
+&nbsp;
+go 1.22
+</pre>
+
+<p>Chování po překladu a spuštění je nyní zcela odlišné:</p>
+
+<pre>
+$ <strong>go build</strong>
+&nbsp;
+$ <strong>./example3</strong>
+1
+2
+3
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: překladač Go tedy skutečně aktivně hlídá
+obsah souboru <strong>go.mod</strong>.</div></p>
+
+
+
+<h2 id="k10">Podobný příklad, ovšem v&nbsp;upravené podobě</h2>
+
+<p>Ukažme si ještě jeden (možná poněkud komplikovanější) příklad, jehož chování
+při překladu a především po spuštění závisí na verzi Go. V&nbsp;tomto příkladu
+opět vytváříme uzávěr (<i>closure</i>) v&nbsp;programové smyčce, přičemž
+v&nbsp;prostředí (<i>environment</i>) uzávěru je i proměnná <strong>i</strong>
+použitá jako počitadlo smyčky. Uzávěr se vytváří (a ukládá do proměnné
+<strong>f</strong>) pouze v&nbsp;první iteraci a poté se ihned zavolá:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+&nbsp;
+        var f func()
+        for i := 0; i &lt; 10; i++ {
+                if i == 0 {
+                        f = func() { fmt.Print(i) }
+                }
+                f()
+        }
+}
+</pre>
+
+<p>Otázkou opět zůstává, jaké hodnoty se vytisknou při spuštění tohoto
+příkladu. Bude se desetkrát tisknout hodnota <strong>i</strong> odpovídající
+podmínce <strong>i == 0</strong> nebo se vytiskne vždy aktuální hodnota
+proměnné <strong>i</strong>? (tisk &bdquo;nečeho&ldquo; se samozřejmě provede
+vždy, ovšem samotné volání <strong>f</strong> může být odlišné).</p>
+
+
+
+<h2 id="k11">Otestování chování v&nbsp;režimu kompatibility s&nbsp;Go 1.20 a Go 1.22</h2>
+
+<p>Opět si ověříme, jak se bude tento zdrojový kód chovat v&nbsp;případě, že
+jeho modul je určený pro různé verze jazyka Go.</p>
+
+<p>Modul nazvaný <strong>example5</strong> má následující obsah souboru
+<strong>go.mod</strong>:</p>
+
+<pre>
+module example5
+&nbsp;
+go 1.22
+</pre>
+
+<p>Naproti tomu modul <strong>example6</strong> je určen pro starší verzi
+Go:</p>
+
+<pre>
+module example6
+&nbsp;
+go 1.20
+</pre>
+
+<p>Chování první varianty ukazuje, že se do <strong>f</strong> provede
+přiřazení jen jedenkrát a uzávěr <strong>f</strong> si zapamatuje aktuální
+hodnotu <strong>i</strong>:</p>
+
+<pre>
+$ <strong>pushd example5</strong>
+~/src/go-root/compatibility/example5 ~/src/go-root/compatibility
+&nbsp;
+$ <strong>go build</strong>
+&nbsp;
+$ ./example5
+0000000000
+</pre>
+
+<p>Varianta určená pro starší verze jazyka Go se chová odlišně, protože se
+uzávěru <strong>f</strong> stále mění jeho prostředí:</p>
+
+<pre>
+$ <strong>popd</strong>
+~/src/go-root/compatibility
+&nbsp;
+$ <strong>pushd example6</strong>
+~/src/go-root/compatibility/example6 ~/src/go-root/compatibility
+&nbsp;
+$ <strong>go build</strong>
+&nbsp;
+$ ./example6
+0123456789
+</pre>
+
+
+
+<h2 id="k12">Lze sestavit aplikaci z&nbsp;modulů určených pro odlišné verze jazyka Go?</h2>
+
+<p>Prozatím jsme měli k&nbsp;dispozici dvojici modulů pro různé verze Go, které
+se překládaly a spouštěly samostatně. Ověřili jsme si, že překladač Go
+v&nbsp;takovém případě bere v&nbsp;úvahu verzi Go zapsanou v&nbsp;souboru
+<strong>go.mod</strong>. Ovšem v&nbsp;praxi je situace mnohem složitější, neboť
+se aplikace typicky skládá z&nbsp;mnoha modulů (i třetích stran), z&nbsp;nichž
+každý může být určen pro jinou verzi Go. Lze tedy očekávat situaci, kdy se
+jeden a ten samý zdrojový kód má v&nbsp;runtime chovat odlišně. Překladač Go
+resp.&nbsp;celý komplex standardních nástrojů Go je navržen takovým způsobem,
+aby tento problém řešil: každý modul je překládán ve svém &bdquo;režimu
+kompatibility&ldquo;.</p>
+
+<p>Abychom si chování překladače jazyka Go ověřili, vytvoříme následující
+souborovou strukturu, do které jsou umístěny tři moduly nazvané
+<strong>main</strong>, <strong>module1</strong> a <strong>module2</strong>:</p>
+
+<pre>
+.
+├── main
+│   ├── go.mod
+│   └── main.go
+├── module1
+│   ├── go.mod
+│   └── module1.go
+└── module2
+    ├── go.mod
+    └── module2.go
+</pre>
+
+
+
+<h2 id="k13">Obsah modulu <strong>module1</strong></h2>
+
+<p>Modul, který jsem pro jednoduchost nazval <strong>module1</strong>, obsahuje
+pouze dva soubory <strong>go.mod</strong> a <strong>module1.go</strong>.
+V&nbsp;<strong>go.mod</strong> je (v&nbsp;kontextu dnešního článku)
+nejdůležitější specifikace verze jazyka Go, konkrétně Go 1.22:</p>
+
+<pre>
+module module1
+&nbsp;
+go 1.22
+</pre>
+
+<p>Zdrojový kód <strong>module1.go</strong> obsahuje funkci
+<strong>Foo</strong> volatelnou (viditelnou) i z&nbsp;jiných modulů, protože
+začíná velkým písmenem. Tato funkce obsahuje problematické využití řídicí
+proměnné smyčky:</p>
+
+<pre>
+package <strong>module1</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>Foo</strong>() {
+&nbsp;
+        var f func()
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+                if i == 0 {
+                        f = func() { fmt.Print(i) }
+                }
+                f()
+        }
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: víme již, že chování takové funkce může
+být rozdílné: buď se vypíše řetězec &bdquo;0000000000&ldquo; nebo
+&bdquo;0123456789&ldquo;.</div></p>
+
+
+
+<h2 id="k14">Obsah modulu <strong>module2</strong></h2>
+
+<p>Druhý z&nbsp;modulů, který se jmenuje <strong>module2</strong>, má
+v&nbsp;souboru <strong>go.mod</strong> předepsáno, že je určen pro Go 1.20:</p>
+
+<pre>
+module module2
+&nbsp;
+go 1.20
+</pre>
+
+<p>Vlastní zdrojový kód tohoto modulu obsahuje naprosto stejnou funkci
+<strong>Foo</strong>, jako modul první, takže jen pro úplnost:</p>
+
+<pre>
+package <strong>module2</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>Foo</strong>() {
+&nbsp;
+        var f func()
+&nbsp;
+        for i := 0; i &lt; 10; i++ {
+                if i == 0 {
+                        f = func() { fmt.Print(i) }
+                }
+                f()
+        }
+}
+</pre>
+
+
+
+<h2 id="k15">Obsah hlavního modulu <strong>main</strong></h2>
+
+<p>Nejzajímavější je obsah hlavního modulu nazvaného (nudně)
+<strong>main</strong>. Tento modul je určen pro překlad s&nbsp;využitím Go
+1.24, ovšem důležitější je definice závislostí na obou výše popsaných modulech
+<strong>module1</strong> a <strong>module2</strong>. Abych zbytečně nevytvářel
+umělé repositáře na GitHubu či GitLabu, obsahuje soubor <strong>go.mod</strong>
+i řádky s&nbsp;klauzulemi <i>replace</i>, které zajistí
+&bdquo;přejmenování&ldquo; jmen modulů <strong>example.com/module1</strong> a
+<strong>example.com/module2</strong> na lokální moduly uložené
+v&nbsp;podadresářích <strong>module1</strong> a <strong>module2</strong> (tento
+trik se ovšem hodí i v&nbsp;dalších případech, například pro testování, rychlé
+úpravy modulů bez nutnosti vytvářet oficiální pull requesty atd.):</p>
+
+<pre>
+module main
+&nbsp;
+go 1.24.10
+&nbsp;
+require (
+    example.com/module1 v1.2.3
+    example.com/module2 v1.2.3
+)
+&nbsp;
+replace example.com/module1 =&gt; ../module1
+replace example.com/module2 =&gt; ../module2
+</pre>
+
+<p>A konečně se podívejme na zdrojový kód uložený v&nbsp;souboru se jménem
+v&nbsp;<strong>main/main.go</strong>. V&nbsp;tomto kódu voláme funkci
+<strong>Foo</strong> definovanou v&nbsp;modulu <strong>module1</strong> a
+taktéž stejně pojmenovanou funkci, ovšem z&nbsp;modulu
+<strong>module2</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+&nbsp;
+        "example.com/module1"
+        "example.com/module2"
+)
+&nbsp;
+func <strong>main</strong>() {
+        module1.Foo()
+        fmt.Println()
+        module2.Foo()
+        fmt.Println()
+}
+</pre>
+
+
+
+<h2 id="k16">Chování aplikace po překladu a spuštění</h2>
+
+<p>V&nbsp;dalším kroku provedeme překlad hlavního modulu <strong>main</strong>.
+Překladač jazyka Go zajistí, že se přeloží (a slinkují) i oba moduly
+<strong>module1</strong> a <strong>module2</strong>:</p>
+
+<pre>
+$ <strong>cd main/</strong>
+&nbsp;
+$ <strong>go build</strong>
+&nbsp;
+$ <strong>ls</strong>
+go.mod  main  main.go
+</pre>
+
+<p>Přesvědčíme se, že jsou ve výsledném binárním souboru <strong>main</strong>
+obsaženy obě varianty funkce <strong>Foo</strong>:</p>
+
+<pre>
+$ <strong>go tool nm main | grep Foo</strong>
+&nbsp;
+  491dc0 T example.com/module1.Foo
+  491e60 T example.com/module1.Foo.func1
+  491ec0 T example.com/module2.Foo
+  491f60 T example.com/module2.Foo.func1
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: dva řádky končící na
+<strong>func1</strong> naznačují, že došlo i k&nbsp;překladu uzávěru,
+tj.&nbsp;anonymní funkce, která je ve zdrojovém kódu ukládána do lokální
+proměnné <strong>f</strong>.</div></p>
+
+<p>Nyní nastává čas, kdy bude odhalena pravda, tj.&nbsp;jak se budou chovat obě
+varianty funkce <strong>Foo</strong>:</p>
+
+<pre>
+$ <strong>./main</strong>
+&nbsp;
+0000000000
+0123456789
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: vše je tedy v&nbsp;naprostém pořádku
+&ndash; překladač jazyka Go v&nbsp;jednom kroku vyvolaném příkazem <strong>go
+build</strong> přeložil každý modul takovým způsobem, jak to zamýšlel jeho
+autor. Nemuseli jsme řešit ani přepínače předávané překladači ani žádné složité
+konfigurační soubory.</div></p>
+
+
+
+<h2 id="k17">Závěr</h2>
+
+<p>Programovací jazyk Go se vyvíjí již druhé desetiletí, což je v&nbsp;IT velmi
+dlouhá doba. Stále máme k&nbsp;dispozici Go verze 1, ovšem jazyk se postupně
+rozšiřuje a došlo i k&nbsp;opravě sémantiky, která znamenala porušení zpětné
+kompatibility. Řešení je vlastně pro ekosystém jazyka Go typické: překladač byl
+bez větších fanfár a oslavných videí upraven takovým způsobem, aby překlad
+prováděl podle přání autorů jednotlivých modulů (na pozadí a přitom korektně a
+dohledatelným způsobem). To je stabilita, kterou mnohé jiné ekosystémy
+postrádají.</p>
+
+
+
+<h2 id="k18">Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+V&nbsp;případě, že nebudete chtít klonovat celý repositář, můžete namísto toho
+použít odkazy na jednotlivé příklady, které naleznete v&nbsp;následující
+tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>example1/example1.go</td><td>inicializace pole obsahem řezu (<i>slice</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example1/example1.go">https://github.com/tisnik/go-root/blob/master/compatibility/example1/example1.go</a></td></tr>
+<tr><td> 2</td><td>example1/go.mod</td><td>informace o modulu pro tento demonstrační příklad (verze Go 1.22)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example1/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example1/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>example2/example2.go</td><td>inicializace pole obsahem řezu (<i>slice</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example2/example2.go">https://github.com/tisnik/go-root/blob/master/compatibility/example2/example2.go</a></td></tr>
+<tr><td> 4</td><td>example2/go.mod</td><td>informace o modulu pro tento demonstrační příklad (verze Go 1.19)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example2/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example2/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>example3/example3.go</td><td>chování proměnných použitých ve smyčce v&nbsp;uzávěru (<i>closure</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example3/example3.go">https://github.com/tisnik/go-root/blob/master/compatibility/example3/example3.go</a></td></tr>
+<tr><td> 6</td><td>example3/go.mod</td><td>informace o modulu pro tento příklad (verze Go 1.22)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example3/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example3/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>example4/example4.go</td><td>chování proměnných použitých ve smyčce v&nbsp;uzávěru (<i>closure</i>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example4/example4.go">https://github.com/tisnik/go-root/blob/master/compatibility/example4/example4.go</a></td></tr>
+<tr><td> 8</td><td>example4/go.mod</td><td>informace o modulu pro tento příklad (verze Go 1.20)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example4/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example4/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>example5/example5.go</td><td>chování proměnných použitých ve smyčce v&nbsp;uzávěru (odlišný příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example5/example5.go">https://github.com/tisnik/go-root/blob/master/compatibility/example5/example5.go</a></td></tr>
+<tr><td>10</td><td>example5/go.mod</td><td>informace o modulu pro tento příklad (verze Go 1.22)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example5/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example5/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>example6/example6.go</td><td>chování proměnných použitých ve smyčce v&nbsp;uzávěru (odlišný příklad)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example6/example6.go">https://github.com/tisnik/go-root/blob/master/compatibility/example6/example6.go</a></td></tr>
+<tr><td>12</td><td>example6/go.mod</td><td>informace o modulu pro tento příklad (verze Go 1.20)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/example6/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/example6/go.mod</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>multiple_versions/main/main.go</td><td>kód využívající moduly <strong>module1</strong> a <strong>module2</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/main/main.go">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/main/main.go</a></td></tr>
+<tr><td>14</td><td>multiple_versions/main/go.mod</td><td>informace o hlavním modulu s&nbsp;definicemi závislostí</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/main/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/main/go.mod</a></td></tr>
+<tr><td>15</td><td>multiple_versions/module1/module1.go</td>funkce se smyčkou s&nbsp;proměnnou využitou v&nbsp;uzávěru<td></td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module1/module1.go">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module1/module1.go</a></td></tr>
+<tr><td>16</td><td>multiple_versions/module1/go.mod</td><td>informace o modulu (verze Go 1.22)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module1/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module1/go.mod</a></td></tr>
+<tr><td>17</td><td>multiple_versions/module2/module2.go</td>funkce se smyčkou s&nbsp;proměnnou využitou v&nbsp;uzávěru<td></td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module2/module2.go">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module2/module2.go</a></td></tr>
+<tr><td>18</td><td>multiple_versions/module2/go.mod</td><td>informace o modulu (verze Go 1.20)</td><td><a href="https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module2/go.mod">https://github.com/tisnik/go-root/blob/master/compatibility/multiple_versions/module2/go.mod</a></td></tr>
+</table>
+
+
+
+<h2 id="k19">Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go Wiki: LoopvarExperiment<br />
+<a href="https://go.dev/wiki/LoopvarExperiment">https://go.dev/wiki/LoopvarExperiment</a>
+</li>
+
+<li>Go, Backwards Compatibility, and GODEBUG<br />
+<a href="https://tip.golang.org/doc/godebug">https://tip.golang.org/doc/godebug</a>
+</li>
+
+<li>The Go Programming Language (home page)<br />
+<a href="https://golang.org/">https://golang.org/</a>
+</li>
+
+<li>GoDoc<br />
+<a href="https://godoc.org/">https://godoc.org/</a>
+</li>
+
+<li>Go (programming language), Wikipedia<br />
+<a href="https://en.wikipedia.org/wiki/Go_(programming_language)">https://en.wikipedia.org/wiki/Go_(programming_language)</a>
+</li>
+
+<li>Go Books (kniha o jazyku Go)<br />
+<a href="https://github.com/dariubs/GoBooks">https://github.com/dariubs/GoBooks</a>
+</li>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>All releases<br />
+<a href="https://go.dev/dl/">https://go.dev/dl/</a>
+</li>
+
+<li>Release History<br />
+<a href="https://go.dev/doc/devel/release">https://go.dev/doc/devel/release</a>
+</li>
+
+<li>go1.21.0 (released 2023-08-08)<br />
+<a href="https://go.dev/doc/devel/release#go1.21.0">https://go.dev/doc/devel/release#go1.21.0</a>
+</li>
+
+<li>go1.22.0 (released 2024-02-06)<br />
+<a href="https://go.dev/doc/devel/release#go1.22.0">https://go.dev/doc/devel/release#go1.22.0</a>
+</li>
+
+<li>go1.23.0 (released 2024-08-13)<br />
+<a href="https://go.dev/doc/devel/release#go1.23.0">https://go.dev/doc/devel/release#go1.23.0</a>
+</li>
+
+<li>go1.24.0 (released 2025-02-11)<br />
+<a href="https://go.dev/doc/devel/release#go1.24.0">https://go.dev/doc/devel/release#go1.24.0</a>
+</li>
+
+<li>go1.25.0 (released 2025-08-12)<br />
+<a href="https://go.dev/doc/devel/release#go1.25.0">https://go.dev/doc/devel/release#go1.25.0</a>
+</li>
+
+<li>go1.26.0 (released 2026-02-10)<br />
+<a href="https://go.dev/doc/devel/release#go1.26.0">https://go.dev/doc/devel/release#go1.26.0</a>
+</li>
+
+<li>Go 1.19 Release Notes<br />
+<a href="https://go.dev/doc/go1.19">https://go.dev/doc/go1.19</a>
+</li>
+
+<li>Go 1.20 Release Notes<br />
+<a href="https://go.dev/doc/go1.20">https://go.dev/doc/go1.20</a>
+</li>
+
+<li>Go 1.21 Release Notes<br />
+<a href="https://go.dev/doc/go1.21">https://go.dev/doc/go1.21</a>
+</li>
+
+<li>Go 1.22 Release Notes<br />
+<a href="https://go.dev/doc/go1.22">https://go.dev/doc/go1.22</a>
+</li>
+
+<li>Go 1.23 Release Notes<br />
+<a href="https://go.dev/doc/go1.23">https://go.dev/doc/go1.23</a>
+</li>
+
+<li>Go 1.24 Release Notes<br />
+<a href="https://go.dev/doc/go1.24">https://go.dev/doc/go1.24</a>
+</li>
+
+<li>Go 1.25 Release Notes<br />
+<a href="https://go.dev/doc/go1.25">https://go.dev/doc/go1.25</a>
+</li>
+
+<li>Go 1.26 Release Notes<br />
+<a href="https://go.dev/doc/go1.26">https://go.dev/doc/go1.26</a>
+</li>
+
+<li>Go 1.27 Release Notes<br />
+<a href="https://go.dev/doc/go1.27">https://go.dev/doc/go1.27</a>
+</li>
+
+<li>Language interoperability<br />
+<a href="https://en.wikipedia.org/wiki/Language_interoperability">https://en.wikipedia.org/wiki/Language_interoperability</a>
+</li>
+
+<li>Python: keywords<br />
+<a href="https://docs.python.org/3/reference/lexical_analysis.html#keywords">https://docs.python.org/3/reference/lexical_analysis.html#keywords</a>
+</li>
+
+<li>Python: soft keywords<br />
+<a href="https://docs.python.org/3/reference/lexical_analysis.html#soft-keywords">https://docs.python.org/3/reference/lexical_analysis.html#soft-keywords</a>
+</li>
+
+<li>gcc 3.4: Options Controlling C Dialect<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/C-Dialect-Options.html">https://gcc.gnu.org/onlinedocs/gcc/C-Dialect-Options.html</a>
+</li>
+
+<li>Has entry keyword ever been implemented in C?<br />
+<a href="https://stackoverflow.com/questions/77904431/has-entry-keyword-ever-been-implemented-in-c">https://stackoverflow.com/questions/77904431/has-entry-keyword-ever-been-implemented-in-c</a>
+</li>
+
+<li>Has the “entry” keyword ever been implemented in C?<br />
+<a href="https://retrocomputing.stackexchange.com/questions/28357/has-the-entry-keyword-ever-been-implemented-in-c">https://retrocomputing.stackexchange.com/questions/28357/has-the-entry-keyword-ever-been-implemented-in-c</a>
+</li>
+
+<li>Are C versions backwards compatible?<br />
+<a href="https://stackoverflow.com/questions/67319687/are-c-versions-backwards-compatible">https://stackoverflow.com/questions/67319687/are-c-versions-backwards-compatible</a>
+</li>
+
+<li>Go evolves in the wrong direction<br />
+<a href="https://itnext.io/go-evolves-in-the-wrong-direction-7dfda8a1a620">https://itnext.io/go-evolves-in-the-wrong-direction-7dfda8a1a620</a>
+</li>
+
+<li>Java programming language<br />
+<a href="https://en.wikipedia.org/wiki/Java_(programming_language)">https://en.wikipedia.org/wiki/Java_(programming_language)</a>
+</li>
+
+<li>Java Language Keywords<br />
+<a href="https://docs.oracle.com/javase/tutorial/java/nutsandbolts/_keywords.html">https://docs.oracle.com/javase/tutorial/java/nutsandbolts/_keywords.html</a>
+</li>
+
+<li>What happens with closures running as goroutines?<br />
+<a href="https://go.dev/doc/faq#closures_and_goroutines">https://go.dev/doc/faq#closures_and_goroutines</a>
+</li>
+
+</ol>
