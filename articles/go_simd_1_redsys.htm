@@ -1,0 +1,1837 @@
+<h2 id="k01">Dlouho očekávaná podpora SIMD operací v&nbsp;programovacím jazyku Go</h2>
+
+<p>V&nbsp;dnešním článku si popíšeme, jakým způsobem jsou v&nbsp;nových verzích
+Go (1.26 a především 1.27) podporovány SIMD operace (někdy nepřesně nazývané
+<i>vektorové instrukce</i>). Přitom SIMD/vektorové instrukce v&nbsp;současnosti
+patří ke standardní výbavě prakticky všech variant moderních mikroprocesorů
+&ndash; jedná se totiž o jednu z&nbsp;technologií umožňujících zvýšení jejich
+výpočetního výkonu.  Připomeňme si, že z&nbsp;hlediska dosahovaného výpočetního
+výkonu leží na samém &bdquo;výkonnostním dně&ldquo; klasické mikroprocesory
+s&nbsp;architekturou <i>CISC</i>, které vykonávají všechny instrukce postupně a
+dokončení jedné instrukce může v&nbsp;závislosti na jejich složitosti trvat i
+několik desítek strojových taktů.</p>
+
+<p>Předností těchto procesorů může být poměrně velká informační hustota
+instrukční sady (například i díky tomu, že operandy některých instrukcí jsou
+zadány implicitně), což mj.&nbsp;znamená, že se procesory tohoto typu po
+poměrně dlouhou dobu obešly bez nutnosti využití drahých vyrovnávacích pamětí
+první a druhé úrovně (<i>L1 cache</i>, <i>L2 cache</i>). Klasické procesory
+s&nbsp;architekturou <i>CISC</i> byly založeny na mikroprogramovém řadiči
+vybaveném pamětí mikroinstrukcí a teprve později začaly být tyto procesory
+doplňovány technologiemi získanými z&nbsp;jiných architektur &ndash; instrukční
+pipeline, prediktorem skoků, vektorovými instrukcemi (což byly oblasti
+klasických RISCových architektur) atd.</p>
+
+
+
+<h2 id="k02">Od skalárních instrukcí k&nbsp;SIMD operacím</h2>
+
+<p>Výpočetní výkon mikroprocesorů se podařilo poměrně výrazným způsobem zvýšit
+u architektury <i>RISC</i> zavedením <i>instrukční pipeline</i>. Provedení
+jedné instrukce sice stále trvalo větší počet strojových cyklů
+(v&nbsp;některých případech možná i větší počet cyklů, než při použití
+<i>CISC</i>), ovšem díky rozfázování operací v&nbsp;instrukční pipeline bylo
+umožněno překrývání většího množství instrukcí, a to bez nutnosti zavádění
+skutečné paralelizace (která vede k&nbsp;velkému nárůstu složitosti a tím i
+ceny čipu). Spolu se zavedením mikroprocesorů <i>RISC</i> do praxe se skutečně
+stalo, že reálný i špičkový výpočetní výkon mikroprocesorů vzrostl, ale
+relativně brzy bylo nutné k&nbsp;těmto čipům přidat vyrovnávací paměti
+(<i>cache</i>), jelikož rychlost procesorů (přesněji řečeno frekvence
+hodinového signálu) rostla mnohem rychleji, než vybavovací doba pamětí. Tento
+rozpor mezi rychlostmi obou nejdůležitějších součástí moderních počítačů
+ostatně trvá dodnes.</p>
+
+<p>Pro další zvýšení výpočetního výkonu však bylo nutné použít další
+technologie, například instrukční sadu <i>VLIW</i>, která však &ndash; opět
+&ndash; měla velké nároky na rychlost pamětí. Podobně jako u procesorů
+<i>RISC</i>, i u <i>VLIW</i> bylo pro zmírnění požadavků na rychlost pamětí
+možné použít Harvardskou architekturu, tj.&nbsp;oddělení paměti programu od
+paměti dat (programová paměť navíc mohla mít větší šířku datové sběrnice
+odpovídající šířce instrukčních slov). Na druhou stranu však <i>VLIW</i> klade
+velké požadavky na kvalitu překladače (nebo vývojáře v&nbsp;assembleru). Další
+zvýšení výkonu umožňují právě vektorové instrukce (SIMD), které ale mají jeden
+poměrně zásadní nedostatek &ndash; <i>sémantickou mezeru</i> mezi imperativním
+&bdquo;skalárním&ldquo; kódem psaným například v&nbsp;C (C++ atd.) a instrukční
+sadou, která je SIMD (jinými slovy &ndash; běžné programovací jazyky neumožňují
+dostatečně popsat vektorové operace). Tuto mezeru v&nbsp;případě jazyka Go do
+určité míry vyplňují balíčky <strong>simd</strong> a <strong>archsimd</strong>,
+kterým se budeme věnovat v&nbsp;dnešním článku.</p>
+
+
+
+<h2 id="k03">SIMD operace na architektuře x86-64</h2>
+
+<p>V&nbsp;současné verzi 1.27 programovací jazyk Go (experimentálně) podporuje
+SIMD operace realizované na architekturách x86-64, a nově též ARM64 (Neon) a
+WebAssembly (ovšem zde jen pro 128bitové vektory). V&nbsp;praktické části
+článku budu ukazovat způsob realizace operací na architektuře x86-64 (později
+se pravděpodobně vrátíme i k&nbsp;ARM64). Nicméně začněme právě na x86-64.</p>
+
+<p>Všechny CISCové mikroprocesory firmy Intel řady <i>80x86</i>, od ještě
+z&nbsp;poloviny osmibitového čipu <i>Intel 8088</i> (právě ten byl použit
+v&nbsp;IBM PC, které tak není čistě 16bitovou architekturou), až po model
+<i>Intel 80486</i> (včetně) byly založeny na skalární architektuře <i>SISD</i>,
+stejně jako velké množství dobových mikrořadičů či digitálních signálových
+procesorů (<i>DSP &ndash; Digital Signal Processor</i>). Nevýhodou systémů
+<strong>SISD</strong> ovšem je, že rychlost načítání a tím i zpracování
+instrukcí je shora omezena a že ani s&nbsp;využitím velmi dlouhé instrukční
+pipeline se nedá &ndash; vcelku logicky &ndash; překonat limit jedné zpracované
+instrukce za jeden takt. Příliš velké množství řezů (<i>slices</i>) pipeline má
+naopak i své zápory, především při zpracování skoků, návratů z&nbsp;podprogramů
+či odezvy na přerušení &ndash; ve všech těchto případech je nutné vyřešit
+problém, co se má udělat s&nbsp;instrukcemi, které se nachází
+v&nbsp;rozpracovaném stavu v&nbsp;pipeline (mohou se buď zahodit nebo naopak
+dokončit, podle toho, jakým způsobem byl lineární běh programu přerušen).  To
+čipy komplikuje, vyžaduje kvalitní prediktory skoků, kvalitní překladače
+atd.</p>
+
+<p>V&nbsp;současnosti se těší značné popularitě mikroprocesory patřící do
+kategorie <strong>SIMD</strong>, jejíž kořeny ovšem sahají hluboko do
+minulosti, konkrétně do šedesátých a sedmdesátých let minulého století (tato
+oblast výpočetní techniky je spojena se <i>Symourem Crayem</i> a jeho slavnými
+superpočítači &ndash; ty byly skutečně <i>vektorové</i>). Do této kategorie
+patří ty architektury procesorů, u kterých se s&nbsp;využitím jediné instrukce
+může zpracovat větší množství dat. Například u rozšířené instrukční sady
+<strong>MMX</strong> je možné s&nbsp;využitím jediné instrukce provést součet
+dvou vektorů číselných hodnot. Může se jednat o osm osmibitových hodnot
+uložených v&nbsp;jednom vektoru, čtyři šestnáctibitové hodnoty v&nbsp;jednom
+vektoru atd.</p>
+
+<p>A u rozšířeních SSE/SSE2 (ty Go podporuje prakticky od začátku, ovšem pro
+skalární operace) jsou délky vektorů ještě násobně větší, nemluvě o AVX a
+AVX-512. Této vlastnosti se dá v&nbsp;mnoha případech využít pro urychlení běhu
+programů, protože některé algoritmy (ve skutečnosti je těchto algoritmů možná
+až udivující počet) provádí velké množství stejných operací s&nbsp;rozsáhlým
+objemem dat &ndash; například se může jednat o aplikaci konvolučního filtru na
+rastrový obrázek, zpracování zvukového signálu, vynásobení matice vektorem,
+vynásobení dvou matic atd. A zapomenout nesmíme ani na algoritmy provádějící
+výpočty podobnosti vektorů &ndash; <i>similarity search</i> &ndash; které jsou
+mj.&nbsp;součástí RAGu v&nbsp;aplikacích s&nbsp;LLM (ale nejenom zde).</p>
+
+
+
+<h2 id="k04">Rozšíření původní instrukční sady x86 o SIMD operace</h2>
+
+<p>Zkusme se nyní podívat na seznam různých SIMD (neboli nesprávně řečeno
+&bdquo;vektorových&ldquo;) rozšíření původní instrukční sady x86:</p>
+
+<table>
+<tr><th>Technologie</th><th>Rok uvedení</th><th>Společnost</th><th>Poprvé použito v&nbsp;čipu</th></tr>
+<tr><td>MMX</td><td>1996</td><td>Intel</td><td>Intel Pentium P5</td></tr>
+<tr><td>3DNow!</td><td>1998</td><td>AMD</td><td>AMD K6-2</td></tr>
+<tr><td>SSE</td><td>1999</td><td>Intel</td><td>Intel Pentium III (mikroarchitektura P6)</td></tr>
+<tr><td>SSE2</td><td>2001</td><td>Intel</td><td>Intel Pentium 4 (mikroarchitektura NetBurst)</td></tr>
+<tr><td>SSE3</td><td>2004</td><td>Intel</td><td>Intel Pentium 4 (Prescott)</td></tr>
+<tr><td>SSSE3</td><td>2006</td><td>Intel</td><td>mikroarchitektura Intel Core</td></tr>
+<tr><td>SSE4</td><td>2006</td><td>Intel+AMD</td><td>AMD K10 (SSE4a) , mikroarchitektura Intel Core</td></tr>
+<tr><td>SSE5</td><td>2007</td><td>AMD</td><td>(nakonec rozděleno do menších celků), mikroarchitektura Bulldozer</td></tr>
+<tr><td>AVX</td><td>2008</td><td>Intel</td><td>mikroarchitektura Sandy Bridge</td></tr>
+<tr><td>F16C (CVT16)</td><td>2009</td><td>AMD</td><td>Jaguar, Puma, Bulldozer atd.</td></tr>
+<tr><td>XOP</td><td>2009</td><td>AMD</td><td>mikroarchitektura Bulldozer</td></tr>
+<tr><td>FMA3</td><td>2012</td><td>AMD</td><td>mikroarchitektura Piledriver, Intel: Haswell a Broadwell</td></tr>
+<tr><td>FMA4</td><td>2011</td><td>AMD</td><td>mikroarchitektura Bulldozer (pozdější architektury po Zen 1 již ne)</td></tr>
+<tr><td>AVX2</td><td>2013</td><td>Intel</td><td>mikroarchitektura Haswell</td></tr>
+<tr><td>AVX-512</td><td>2013</td><td>Intel</td><td>Knights Landing</td></tr>
+<tr><td>AMX</td><td>2020</td><td>Intel</td><td>Sapphire Rapids</td></tr>
+</table>
+
+<p>To, jaká rozšíření instrukční sady podporuje váš mikroprocesor, lze získat
+snadno:</p>
+
+<pre>
+$ <strong>cat /proc/cpuinfo</strong>
+</pre>
+
+<p>V&nbsp;mém konkrétním případě (Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+v&nbsp;Lenovu T14 po záruce a s&nbsp;totálně zničenými konektory (kvalita se
+pozná) se vypíšou následující vlastnosti CPU. Z&nbsp;těchto příznaků jsem
+zdůraznil příznaky odpovídající SIMD instrukcím:</p>
+
+<pre>
+flags           : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov
+pat pse36 clflush dts acpi <strong>mmx</strong> fxsr <strong>sse</strong> <strong>sse2</strong> ss ht tm pbe syscall nx pdpe1gb
+rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology
+nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est
+tm2 <strong>ssse3</strong> sdbg <strong>fma</strong> cx16 xtpr pdcm pcid <strong>sse4_1</strong> <strong>sse4_2</strong> x2apic movbe popcnt
+tsc_deadline_timer aes xsave <strong>avx</strong> <strong>f16c</strong> rdrand lahf_lm abm <strong>3dnowprefetch</strong>
+cpuid_fault epb invpcid_single ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow
+vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 <strong>avx2</strong> smep bmi2 erms
+invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves
+dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear
+flush_l1d arch_capabilities
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: výše uvedený výpis je ve skutečnosti
+proveden pro každé procesorové jádro, protože každé jádro může podporovat
+odlišné rozšiřující instrukce.</div></p>
+
+
+
+<h2 id="k05">A co těmito rozšířeními vlastně získáme?</h2>
+
+<p>Pro někoho může být taktéž zajímavá i informace o tom, jak velké změny
+v&nbsp;instrukční sadě mikroprocesorů byly vlastně při přidávání nových
+&bdquo;vektorových&ldquo; rozšiřujících instrukčních sad typu <i>SIMD</i>
+provedeny. To nám ukáže další tabulka. Je pouze nutné dát si pozor na to, že
+počty nových instrukcí zavedených v&nbsp;rámci těchto nových technologií, které
+jsou vypsány v&nbsp;tabulce pod odstavcem, nemusí přesně souhlasit s&nbsp;počty
+uváděnými v&nbsp;jiných informačních materiálech. Je tomu tak především
+z&nbsp;toho důvodu, že se v&nbsp;některých případech rozlišuje i datový typ,
+s&nbsp;nímž instrukce pracují (například se může jednat o součet vektoru
+s&nbsp;32 bitovými hodnotami nebo 64bitovými hodnotami reprezentovanými
+v&nbsp;obou případech ve formátu s&nbsp;plovoucí řádovou čárkou) a někdy se
+taková instrukce do celkové sumy započítává pouze jedenkrát. Nicméně údaje
+vypsané v&nbsp;níže uvedené tabulce by měly být (snad s&nbsp;výjimkou AVX512)
+konzistentní, protože se jedná o počty nově přidaných operačních kódů instrukcí
+(například u instrukční sady <i>SSE2</i> končí instrukce znakem
+<strong>D</strong>, <strong>S</strong>, <strong>I</strong> či
+<strong>Q</strong> podle typu zpracovávaných dat/operandů):</p>
+
+<table>
+<tr><th>Název technologie</th><th>Počet nových instrukcí</th></tr>
+<tr><td>MMX</td><td> 56</td></tr>
+<tr><td>3DNow!</td><td> 21</td></tr>
+<tr><td>SSE</td><td> 70</td></tr>
+<tr><td>SSE2</td><td>144</td></tr>
+<tr><td>SSE3</td><td> 13</td></tr>
+<tr><td>SSSE3</td><td> 32 (ve skutečnosti vlastně jen 16 instrukcí, ovšem pro dva datové typy)</td></tr>
+<tr><td>SSE4</td><td> 54 (z&nbsp;toho 47 v&nbsp;rámci SSE4.1, zbytek v&nbsp;rámci SSE4.2)</td></tr>
+<tr><td>SSE5</td><td>170 (z&nbsp;toho 46 základních instrukcí)</td></tr>
+<tr><td>F16C</td><td> 4</td></tr>
+<tr><td>AVX</td><td>160</td></tr>
+<tr><td>AVX2</td><td>184</td></tr>
+<tr><td>AVX512</td><td>více než 300, podle konkrétních podporovaných podmnožin (subset)</td></tr>
+</table>
+
+
+
+<h2 id="k06">Podpora SIMD operací v&nbsp;programovacím jazyku Go</h2>
+
+<p>Podpora pro SIMD operace se (postupně s&nbsp;akceptací této technologie)
+stala součástí ekosystému programovacího jazyka C. Připomeňme si, že například
+v&nbsp;GCC je možné využívat takzvané <i>intrinsics</i>, což je (zjednodušeně
+řečeno) přímé rozhraní k&nbsp;instrukcím mikroprocesoru (tj.&nbsp;jedno volání
+intrinsic může odpovídat tomu, že se instrukce vloží do výsledného strojového
+kódu). Navíc je podporováno i rozšíření pro práci s&nbsp;vektory a konečně lze
+zapnout i podporu pro <i>autovektorizaci</i>, při níž se překladač pokusí
+odhadovat ty části kódu, které by SIMD využily. V&nbsp;případě jazyka Go se
+jeho autoři poměrně dlouhou dobu bránili tomu, aby se do Go podobné koncepty
+dostaly (opět &ndash; z&nbsp;pochopitelných důvodů). Až v&nbsp;Go 1.26 (a nyní
+v&nbsp;Go 1.27 ještě ve větší míře) se objevily experimentální balíčky
+<strong>simd</strong> a <strong>simd/archsimd</strong>, které vektorové operace
+podporují. Jak přesně je tato podpora implementována si ukážeme
+v&nbsp;praktické části dnešního článku.</p>
+
+<p>I když jsou oba výše zmíněné balíčky experimentální, jsou plně
+zdokumentovány (i když se nabídka funkcí a struktur pravděpodobně bude
+měnit):</p>
+
+<ol>
+
+<li>Balíček simd<br />
+<a href="https://pkg.go.dev/simd">https://pkg.go.dev/simd</a>
+</li>
+
+<li>Balíček simd/archsimd<br />
+<a href="https://pkg.go.dev/simd/archsimd">https://pkg.go.dev/simd/archsimd</a>
+</li>
+
+</ol>
+
+
+
+<h2 id="k07">API pro SIMD operace: explicitní přístup bez využití autovektorizace</h2>
+
+<p>K&nbsp;podpoře SIMD operací je možné přistupovat různým způsobem. Například
+mohou být podporovány intrinsic. Alternativně mohou být do programovacího
+jazyka zavedeny nové datové typy odpovídající vektorům a taktéž operátory
+definované nad těmito novými typy. Nebo může být upraven překladač takovým
+způsobem, aby prováděl autovektorizaci. V&nbsp;případě programovacího jazyka Go
+se (alespoň prozatím) žádná z&nbsp;těchto technologií nepoužila, protože se
+preferuje relativně jednoduchý, ovšem rychlý překladač, opět relativně
+jednoduchý programovací jazyk bez obrovské množiny datových typů a obecně je Go
+postaveno nikoli na &bdquo;magii&ldquo; (autovektorizace), ale na explicitním
+zápisu všech vyžadovaných operací. Z&nbsp;tohoto důvodu je v&nbsp;Go nutné
+všechny SIMD operace zapisovat explicitně voláním metod na různými typy
+<i>vektor</i>. Taktéž vznikly <i>dva</i> balíčky. Jeden z&nbsp;nich je více
+nízkoúrovňový (<strong>simd/archsimd</strong>) a do jisté míry nahrazuje
+intrinsic, druhý balíček <strong>simd</strong> podporuje operace nad
+zobecněnými vektory.</p>
+
+<p>V&nbsp;dnešním článku se zaměříme na nízkoúrovňový balíček
+<strong>simd/archsimd</strong>. Možnostem poskytovaným balíčkem
+<strong>simd</strong> se budeme věnovat v&nbsp;navazujících textech.</p>
+
+
+
+<h2 id="k08">Praktická část: instalace Go 1.27 a nastavení vývojových prostředí</h2>
+
+<p>Podporu SIMD operací v&nbsp;jazyku Go je samozřejmě vhodné si otestovat.
+Vzhledem k&nbsp;tomu, že Go verze 1.27 byla vydána před necelými čtrnácti dny,
+nemusí být balíčky s&nbsp;touto verzí zařazeny do repositáře vaší distribuce
+Linuxu. To však nemusí příliš vadit, protože je možné &bdquo;paralelně&ldquo;
+provozovat větší množství verzí Go současně, tedy jak verzi nabízenou
+distribucí Linuxu, tak i verzi novou.</p>
+
+<p>V&nbsp;prvním kroku je nutné novou verzi jazyka Go přeloženou pro
+architekturu vašeho procesoru stáhnout z&nbsp;adresy <a
+href="https://go.dev/dl/">https://go.dev/dl/</a> a rozbalit ji (v&nbsp;mém
+případě do adresáře <strong>/tmp/ramdisk/go</strong>, ale může se jednat o
+libovolnou jinou cestu).</p>
+
+<p>Následně se musí nastavit proměnná prostředí <strong>GOROOT</strong>
+s&nbsp;cestou k&nbsp;rozbalenému Go:</p>
+
+<pre>
+export GOROOT=/tmp/ramdisk/go
+</pre>
+
+<p>Aby bylo možné spouštět novou verzi překladače jazyka Go bez nutnosti
+uvedení celé cesty, upravte si i proměnnou <strong>PATH</strong>:</p>
+
+<pre>
+export PATH=$GOROOT:$PATH
+</pre>
+
+<p>A konečně je nutné nastavit i proměnnou <strong>GOEXPERIMENT</strong> tak,
+aby obsahovala slovo <strong>simd</strong>:</p>
+
+<pre>
+export GOEXPERIMENT=simd
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nastavení <strong>GOROOT</strong> by
+měla respektovat i vývojová prostředí. Příkladem je GOLSP a taktéž
+Helix.</div></p>
+
+
+
+<h2 id="k09">Základní základy, na nichž je postaven experimentální balíček <strong>simd/archsimd</strong></h2>
+
+<p>Balíček <strong>simd/archsimd</strong> poskytuje operace nad vektory
+s&nbsp;pevně daným počtem a typem prvků. Každá taková operace se provádí předem
+známou instrukcí:</p>
+
+<table>
+<tr><th>Struktura</th><th>Typ vektoru, který struktura reprezentuje</th><th>Šířka vektoru (bity)</th></tr>
+<tr><td>Float32x4 </td><td>float32 &times; 4 prvky </td><td>32&times;4=128</td></tr>
+<tr><td>Float32x8 </td><td>float32 &times; 8 prvků </td><td>32&times;8=256</td></tr>
+<tr><td>Float32x16</td><td>float32 &times; 16 prvků</td><td>32&times;16=512</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Float64x2</td><td>float64 &times; 2 prvky</td><td>64&times;2=128</td></tr>
+<tr><td>Float64x4</td><td>float64 &times; 4 prvky</td><td>64&times;4=256</td></tr>
+<tr><td>Float64x8</td><td>float64 &times; 8 prvků</td><td>64&times;8=512</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Int8x16</td><td>int8 &times; 16 prvků</td><td>8&times;16=128</td></tr>
+<tr><td>Int8x32</td><td>int8 &times; 32 prvků</td><td>8&times;32=256</td></tr>
+<tr><td>Int8x64</td><td>int8 &times; 64 prvků</td><td>8&times;64=512</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Int16x8</td><td>int16 &times; 8 prvků </td><td>16&times;8=128</td></tr>
+<tr><td>Int16x16</td><td>int16 &times; 16 prvků</td><td>16&times;16=256</td></tr>
+<tr><td>Int16x32</td><td>int16 &times; 32 prvků</td><td>16&times;32=512</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Int32x4</td><td>int32 &times; 4 prvky </td><td>32&times;4=128</td></tr>
+<tr><td>Int32x8</td><td>int32 &times; 8 prvků </td><td>32&times;8=256</td></tr>
+<tr><td>Int32x16</td><td>int32 &times; 16 prvků</td><td>32&times;16=512</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Int64x2</td><td>int64 &times; 2 prvky</td><td>64&times;2=128</td></tr>
+<tr><td>Int64x4</td><td>int64 &times; 4 prvky</td><td>64&times;4=256</td></tr>
+<tr><td>Int64x8</td><td>int64 &times; 8 prvků</td><td>64&times;8=512</td></tr>
+</table>
+
+<p>Pro každou z&nbsp;těchto struktur existuje dvojice konstruktorů, protože
+strukturu představující vektor lze inicializovat z&nbsp;pole nebo z&nbsp;řezu.
+Ukažme si příklady těchto konstruktorů pro první tři typy vektorů:</p>
+
+<table>
+<tr><th>Struktura</th><th>Konstruktor z&nbsp;řezu</th><th>Konstruktor z&nbsp;pole</th></tr>
+<tr><td>Float32x4 </td><td>LoadFloat32x4</td><td>LoadFloat32x4Array</td></tr>
+<tr><td>Float32x8 </td><td>LoadFloat32x8</td><td>LoadFloat32x8Array</td></tr>
+<tr><td>Float32x16</td><td>LoadFloat32x16</td><td>LoadFloat32x16Array</td></tr>
+</table>
+
+<p>A naopak pro každou strukturu existují metody pro uložení prvků vektoru do
+řezu, který ovšem musí být inicializován a alokován:</p>
+
+<pre>
+func (x Float32x4) <strong>Store</strong>(s []float32)
+func (x Float32x4) <strong>StoreArray</strong>(y *[4]float32)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to znamená, že pro vektor
+<strong>Float32x4</strong> musí být řez alokován minimálně pro čtyři prvky typu
+<strong>float32</strong> atd.</div></p>
+
+
+
+<h2 id="k10">Zjištění, zda je podporováno konkrétní rozšíření instrukční sady o SIMD operace</h2>
+
+<p>Operace poskytované balíčkem <strong>simd/archsimd</strong> jsou
+nízkoúrovňové mj.&nbsp;i z&nbsp;toho důvodu, že jejich korektní provedení je
+řešeno přímým voláním instrukcí mikroprocesoru. Ovšem situace na všech
+moderních architekturách mikroprocesorů (AArch64, RISC-V i x86-64) je
+komplikovaná, protože kromě základní sady instrukcí mikroprocesor může, ale
+taktéž nemusí podporovat nějakou sadu či sady rozšiřujících instrukcí.
+Z&nbsp;tohoto důvodu je nutné nějakým způsobem (přímo v&nbsp;runtime) zjistit,
+které rozšiřující sady instrukcí jsou podporovány a které nikoli.</p>
+
+<p>Balíček <strong>simd/archsimd</strong> v&nbsp;současnosti primárně cílí na
+architekturu x86-64. A zjištění, které rozšiřující sady instrukcí jsou
+podporovány (pochopitelně v&nbsp;čase běhu, nikoli při překladu), lze provést
+přes strukturu nazvanou <strong>archsimd.X86</strong>. Tato struktura
+neobsahuje žádné viditelné prvky (přesněji řečeno žádné prvky viditelné mimo
+balíček <strong>archsimd</strong>), ovšem nabízí několik metod, které vrací
+pravdivostní hodnotu na základě toho, zda je zkoumané rozšíření instrukční sady
+podporovány či nikoli.</p>
+
+<p>V&nbsp;dnešním prvním demonstračním příkladu se pokusíme zjistit, jestli
+mikroprocesor podporuje rozšíření instrukční sady AVX (&bdquo;nižší&ldquo;
+rozšíření typu SSE není nutné kontrolovat &ndash; to vyžaduje i základní
+Go):</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura zpřístupňující informace o vlastnostech CPU</i>
+        features := archsimd.X86
+&nbsp;
+        <i>// samotná struktura může být prázdná, resp. může obsahovat</i>
+        <i>// nedostupné prvky (mimo svůj balíček)</i>
+        fmt.Println("Features struct:", features)
+&nbsp;
+        <i>// metoda vracející informaci o podpoře</i>
+        <i>// rozšíření instrukční sady AVX</i>
+        fmt.Println("AVX support:", features.AVX())
+}
+</pre>
+
+<p>Ukažme si, jak může vypadat výsledek:</p>
+
+<pre>
+$ <strong>go run test_avx.go</strong>
+&nbsp;
+Features struct: {}
+AVX support: true
+</pre>
+
+<p>Struktura <strong>archsimd.X86</strong> nabízí i další dvě metody, kterými
+lze zjistit podporu instrukcí AVX2 a AVX512 (tam je to pochopitelně
+komplikovanější kvůli několika podmnožinám instrukcí). Není nic snadnějšího,
+než si tyto metody otestovat:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// struktura zpřístupňující informace o vlastnostech CPU</i>
+        features := archsimd.X86
+&nbsp;
+        <i>// samotná struktura může být prázdná, resp. může obsahovat</i>
+        <i>// nedostupné prvky (mimo svůj balíček)</i>
+        fmt.Println("Features struct:", features)
+&nbsp;
+        <i>// metoda vracející informaci o podpoře</i>
+        <i>// rozšíření instrukční sady AVX</i>
+        fmt.Println("AVX support:", features.AVX())
+&nbsp;
+        <i>// metoda vracející informaci o podpoře</i>
+        <i>// rozšíření instrukční sady AVX2</i>
+        fmt.Println("AVX2 support:", features.AVX2())
+&nbsp;
+        <i>// metoda vracející informaci o podpoře</i>
+        <i>// rozšíření instrukční sady AVX512</i>
+        fmt.Println("AVX512 support:", features.AVX512())
+}
+</pre>
+
+<p>Na mém počítači (výše zmíněné Lenovo T14 s&nbsp;i7-8665U) jsou vráceny
+korektní výsledky:</p>
+
+<pre>
+$ <strong>go run test_other_variants.go</strong>
+&nbsp;
+Features struct: {}
+AVX support: true
+AVX2 support: true
+AVX512 support: false
+</pre>
+
+
+
+<h2 id="k11">Vektorová operace součtu</h2>
+
+<p>Ukažme si tedy, jakým způsobem lze realizovat vektorovou operaci součtu.
+Připomeňme si, že vektory mají pevnou délku i předem daný typ prvků. Začneme
+vektory typu <strong>float32x4</strong>, což jsou vektory o šířce 128 bitů.
+Operace s&nbsp;těmito vektory by měla být podporována na naprosté většině
+mikroprocesorů z&nbsp;rodiny x86-64.</p>
+
+<p>Vektory budou naplněny prvky získanými z&nbsp;pole nebo z&nbsp;řezů.
+Pravděpodobněji se častěji v&nbsp;praxi setkáme s&nbsp;řezy, ovšem pro
+jednoduchost začněme s&nbsp;poli (počet prvků si odvodí překladač):</p>
+
+<pre>
+<i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+a1 := [...]float32{1.0, 2.0, 3.0, 4.0}
+a2 := [...]float32{0.5, 0.5, 0.5, 0.5}
+</pre>
+
+<p>Pro převod pole na vektor se používá konstruktor
+<strong>LoadFloat32x4Array</strong> (a další konstruktory pro vektory jiných
+typů a odlišné délky):</p>
+
+<pre>
+<i>// převod pole na vektor se čtyřmi prvky</i>
+v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+v2 := archsimd.LoadFloat32x4Array(&amp;a2)
+</pre>
+
+<p>Samotná operace součtu je realizována metodou <strong>Add</strong>.
+Výsledkem je přitom nový vektor:</p>
+
+<pre>
+<i>// SIMD operace součtu prvků vektorů</i>
+v3 := v1.Add(v2)
+</pre>
+
+<p>Nyní nám již zbývá poslední operace &ndash; uložení prvků z&nbsp;vektoru
+<strong>v3</strong> zpět do pole nebo do řezu. Postup je následující:</p>
+
+<pre>
+<i>// konstrukce řezu</i>
+result := make([]float32, 4)
+&nbsp;
+<i>// zápis prvků vektoru do řezu</i>
+v3.Store(result)
+&nbsp;
+<i>// výpis obsahu řezu</i>
+fmt.Println("a1+a2", result)
+</pre>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu vypadá následovně:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0}
+        a2 := [...]float32{0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x4Array(&amp;a2)
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("a1+a2", result)
+}
+</pre>
+
+<p>Ověřme si, že výpočet proběhne v&nbsp;pořádku:</p>
+
+<pre>
+$ <strong>go run vector_add_1.go</strong>
+&nbsp;
+a1 [1 2 3 4]
+a2 [0.5 0.5 0.5 0.5]
+a1+a2 [1.5 2.5 3.5 4.5]
+</pre>
+
+<p>Samozřejmě můžeme operaci součtu vektorů &bdquo;izolovat&ldquo; do zvláštní
+funkce (důvod si ukážeme pod výpisem):</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>AddTwoVectors</strong>(v1, v2 archsimd.Float32x4, result []float32) {
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0}
+        a2 := [...]float32{0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x4Array(&amp;a2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+        AddTwoVectors(v1, v2, result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("a1+a2", result)
+}
+</pre>
+
+<p>Výsledek by měl být stejný, jako tomu bylo v&nbsp;předchozím příkladu:</p>
+
+<pre>
+$ <strong>go run vector_add_2.go</strong>
+&nbsp;
+a1 [1 2 3 4]
+a2 [0.5 0.5 0.5 0.5]
+a1+a2 [1.5 2.5 3.5 4.5]
+</pre>
+
+<p>Nás však bude zajímat, jak se vlastně funkce <strong>AddTwoVectors</strong>
+přeloží do strojového kódu. I to lze pochopitelně zjistit:</p>
+
+<pre>
+$ <strong>GOEXPERIMENT=simd ./go build -gcflags=-S vector_add_2.go</strong>
+</pre>
+
+<p>Ve výsledném výpisu assembleru Go (ten je sám o sobě zvláštní, ale lze ho
+s&nbsp;trochou snahy přečíst) vidíme použití instrukce <strong>VADDPS  X1, X0,
+X0</strong> s&nbsp;trojicí registrů <strong>Xn</strong>, což jsou
+v&nbsp;okolním světě registry <strong>XMMx</strong>::</p>
+
+<pre>
+main.AddTwoVectors STEXT nosplit size=32 align=0x0 args=0x38 locals=0x8 funcid=0x0
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    TEXT    main.AddTwoVectors(SB), NOSPLIT|ABIInternal, $8-56
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    PUSHQ   BP
+        0x0001 00001 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    MOVQ    SP, BP
+        0x0004 00004 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    MOVQ    AX, main.result+48(FP)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    FUNCDATA        $0, gclocals·yXxAkm5WuMpaq4nGL4Dxjw==(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    FUNCDATA        $1, gclocals·J26BEvPExEQhJvjp9E8Whg==(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    FUNCDATA        $5, main.AddTwoVectors.arginfo1(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    FUNCDATA        $6, main.AddTwoVectors.argliveinfo(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:8)    PCDATA  $3, $1
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_2.go:9)    VADDPS  X1, X0, X0
+        0x000d 00013 (/tmp/ramdisk/go/bin/vector_add_2.go:10)   XCHGL   AX, AX
+        0x000e 00014 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) CMPQ    BX, $4
+        0x0012 00018 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) JCS     26
+        0x0014 00020 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) VMOVDQU X0, (AX)
+        0x0018 00024 (/tmp/ramdisk/go/bin/vector_add_2.go:11)   POPQ    BP
+        0x0019 00025 (/tmp/ramdisk/go/bin/vector_add_2.go:11)   RET
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) PCDATA  $1, $1
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) PCDATA  $4, $3626
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) CALL    runtime.panicBounds(SB)
+        0x001f 00031 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:114) XCHGL   AX, AX
+        0x0000 55 48 89 e5 48 89 44 24 30 c5 f8 58 c1 90 48 83  UH..H.D$0..X..H.
+        0x0010 fb 04 72 06 c5 fa 7f 00 5d c3 e8 00 00 00 00 90  ..r.....].......
+        rel 27+4 t=R_CALL runtime.panicBounds+0
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: registry <strong>XMMx</strong> jsou
+podporovány již v&nbsp;rozšíření instrukční sady SSE (i když nebyly podporovány
+všechny typy vektorů).</div></p>
+
+
+
+<h2 id="k12">Součet provedený s&nbsp;vektory s&nbsp;větším počtem prvků</h2>
+
+<p>V&nbsp;osmé kapitole jsme si mj.&nbsp;řekli, že vektory s&nbsp;prvky typu
+<i>float32</i> mohou obsahovat čtyři, osm, nebo dokonce šestnáct prvků:</p>
+
+<table>
+<tr><th>Struktura</th><th>Typ vektoru, který struktura reprezentuje</th><th>Šířka vektoru (bity)</th></tr>
+<tr><td>Float32x4 </td><td>float32 &times; 4 prvky</td><td>128</td></tr>
+<tr><td>Float32x8 </td><td>float32 &times; 8 prvků</td><td>256</td></tr>
+<tr><td>Float32x16</td><td>float32 &times; 16 prvků</td><td>512</td></tr>
+</table>
+
+<p>Problém spočívá v&nbsp;tom, že operace nad širšími vektory musí být
+podporovány mikroprocesorem. Go přeloží i ty operace, které ve skutečnosti
+podporovány nebudou. To si ukážeme na další dvojici demonstračních příkladů.
+V&nbsp;prvním příkladu sečteme osmiprvkové vektory s&nbsp;hodnotami typu
+<i>float32</i>:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func AddTwoVectors(v1, v2 archsimd.Float32x8, result []float32) {
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        a2 := [...]float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor s osmi prvky</i>
+        v1 := archsimd.LoadFloat32x8Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x8Array(&amp;a2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 8)
+        AddTwoVectors(v1, v2, result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("a1+a2", result)
+}
+</pre>
+
+<p>Otestování funkcionality dopadne na mém počítači v&nbsp;pořádku:</p>
+
+<pre>
+$ <strong>./go run vector_add_3.go</strong>
+&nbsp;
+a1 [1 2 3 4 5 6 7 8]
+a2 [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+a1+a2 [1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5]
+</pre>
+
+<p>Zajímavé bude zjistit, jak se operace součtu přeložila do strojového
+kódu:</p>
+
+<pre>
+main.AddTwoVectors STEXT nosplit size=32 align=0x0 args=0x58 locals=0x8 funcid=0x0
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    TEXT    main.AddTwoVectors(SB), NOSPLIT|ABIInternal, $8-88
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    PUSHQ   BP
+        0x0001 00001 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    MOVQ    SP, BP
+        0x0004 00004 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    MOVQ    AX, main.result+80(FP)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    FUNCDATA        $0, gclocals·P6TvcXLOJJut7zaN2ve3yQ==(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    FUNCDATA        $1, gclocals·J26BEvPExEQhJvjp9E8Whg==(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    FUNCDATA        $5, main.AddTwoVectors.arginfo1(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    FUNCDATA        $6, main.AddTwoVectors.argliveinfo(SB)
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:8)    PCDATA  $3, $1
+        0x0009 00009 (/tmp/ramdisk/go/bin/vector_add_3.go:9)    <strong>VADDPS  Y1, Y0, Y0</strong>
+        0x000d 00013 (/tmp/ramdisk/go/bin/vector_add_3.go:10)   XCHGL   AX, AX
+        0x000e 00014 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) CMPQ    BX, $8
+        0x0012 00018 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) JCS     26
+        0x0014 00020 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) VMOVDQU Y0, (AX)
+        0x0018 00024 (/tmp/ramdisk/go/bin/vector_add_3.go:11)   POPQ    BP
+        0x0019 00025 (/tmp/ramdisk/go/bin/vector_add_3.go:11)   RET
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) PCDATA  $1, $1
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) PCDATA  $4, $3770
+        0x001a 00026 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) CALL    runtime.panicBounds(SB)
+        0x001f 00031 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:234) XCHGL   AX, AX
+        0x0000 55 48 89 e5 48 89 44 24 50 c5 fc 58 c1 90 48 83  UH..H.D$P..X..H.
+        0x0010 fb 08 72 06 c5 fe 7f 00 5d c3 e8 00 00 00 00 90  ..r.....].......
+        rel 27+4 t=R_CALL runtime.panicBounds+0
+</pre>
+
+<p>Z&nbsp;výpisu je patrné použití instrukce <strong>VADDPS</strong> (vektory
+s&nbsp;prvky typu <i>single</i>), ovšem nikoli s&nbsp;registry XMMx, ale
+s&nbsp;registry YMMx, které jsou podporovány rozšířením instrukční sady AVX (a
+vyšší).</p>
+
+<p>Pojďme o krok dále a pokusme se sečíst dvojici vektorů se šestnácti
+prvky:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func AddTwoVectors(v1, v2 archsimd.Float32x16, result []float32) {
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        a2 := [...]float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor se šestnácti prvky</i>
+        v1 := archsimd.LoadFloat32x16Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x16Array(&amp;a2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 16)
+        AddTwoVectors(v1, v2, result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("a1+a2", result)
+}
+</pre>
+
+<p>V&nbsp;přeloženém strojovém kódu je opět použita instrukce
+<strong>VADDPS</strong>, nyní ovšem pracující s&nbsp;registry ZMMX, které jsou
+podporovány v&nbsp;AVX-512. Tyto registry mají šířku 512 bitů a tedy mohou
+obsahovat 512/32=16 prvků typu <i>single/float32</i>:</p>
+
+<pre>
+main.AddTwoVectors STEXT nosplit size=39 align=0x0 args=0x98 locals=0x8 funcid=0x0
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    TEXT    main.AddTwoVectors(SB), NOSPLIT|ABIInternal, $8-152
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    PUSHQ   BP
+        0x0001 00001 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    MOVQ    SP, BP
+        0x0004 00004 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    MOVQ    AX, main.result+144(FP)
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    FUNCDATA        $0, gclocals·sqUa24CZbyx6dzelDMK6vA==(SB)
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    FUNCDATA        $1, gclocals·J26BEvPExEQhJvjp9E8Whg==(SB)
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    FUNCDATA        $5, main.AddTwoVectors.arginfo1(SB)
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    FUNCDATA        $6, main.AddTwoVectors.argliveinfo(SB)
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:8)    PCDATA  $3, $1
+        0x000c 00012 (/tmp/ramdisk/go/bin/vector_add_4.go:9)    <strong>VADDPS  Z1, Z0, Z0</strong>
+        0x0012 00018 (/tmp/ramdisk/go/bin/vector_add_4.go:10)   XCHGL   AX, AX
+        0x0013 00019 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) CMPQ    BX, $16
+        0x0017 00023 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) JCS     33
+        0x0019 00025 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) VMOVDQU64       Z0, (AX)
+        0x001f 00031 (/tmp/ramdisk/go/bin/vector_add_4.go:11)   POPQ    BP
+        0x0020 00032 (/tmp/ramdisk/go/bin/vector_add_4.go:11)   RET
+        0x0021 00033 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) PCDATA  $1, $1
+        0x0021 00033 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) PCDATA  $4, $4058
+        0x0021 00033 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) CALL    runtime.panicBounds(SB)
+        0x0026 00038 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:354) XCHGL   AX, AX
+        0x0000 55 48 89 e5 48 89 84 24 90 00 00 00 62 f1 7c 48  UH..H..$....b.|H
+        0x0010 58 c1 90 48 83 fb 10 72 08 62 f1 fe 48 7f 00 5d  X..H...r.b..H..]
+        0x0020 c3 e8 00 00 00 00 90                             .......
+        rel 34+4 t=R_CALL runtime.panicBounds+0
+</pre>
+
+<p>Pokud o spuštění <i>v&nbsp;mém případě</i> ovšem dopadne neslavně, protože
+mikroprocesor v&nbsp;mém počítači AVX-512 nepodporuje (je totiž určen pro
+běžnou práci, nikoli pro vytápění domácnosti):</p>
+
+<pre>
+SIGILL: illegal instruction
+PC=0x499ebe m=0 sigcode=2
+instruction bytes: 0x62 0xf1 0xfe 0x48 0x6f 0x84 0x24 0x68 0x0 0x0 0x0 0x62 0xf1 0x7c 0x48 0x58
+&nbsp;
+goroutine 1 gp=0x1970112861e0 m=0 mp=0x572260 [running]:
+main.main()
+        /tmp/ramdisk/go/bin/vector_add_4.go:17 +0x7e fp=0x197011322eb8 sp=0x197011322db0 pc=0x499ebe
+runtime.main()
+        /tmp/ramdisk/go/src/runtime/proc.go:302 +0x427 fp=0x197011322fe0 sp=0x197011322eb8 pc=0x447987
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x197011322fe8 sp=0x197011322fe0 pc=0x47e421
+&nbsp;
+goroutine 2 gp=0x197011286780 m=nil [force gc (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+        /tmp/ramdisk/go/src/runtime/proc.go:474 +0xca fp=0x1970112fafa8 sp=0x1970112faf88 pc=0x478fca
+runtime.goparkunlock(...)
+        /tmp/ramdisk/go/src/runtime/proc.go:480
+runtime.forcegchelper()
+        /tmp/ramdisk/go/src/runtime/proc.go:387 +0xb3 fp=0x1970112fafe0 sp=0x1970112fafa8 pc=0x447c53
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x1970112fafe8 sp=0x1970112fafe0 pc=0x47e421
+created by runtime.init.7 in goroutine 1
+        /tmp/ramdisk/go/src/runtime/proc.go:375 +0x1a
+&nbsp;
+goroutine 3 gp=0x197011286d20 m=nil [GC sweep wait]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+        /tmp/ramdisk/go/src/runtime/proc.go:474 +0xca fp=0x1970112fb788 sp=0x1970112fb768 pc=0x478fca
+runtime.goparkunlock(...)
+        /tmp/ramdisk/go/src/runtime/proc.go:480
+runtime.bgsweep(0x1970112a8080)
+        /tmp/ramdisk/go/src/runtime/mgcsweep.go:279 +0x94 fp=0x1970112fb7c8 sp=0x1970112fb788 pc=0x4339f4
+runtime.gcenable.gowrap1()
+        /tmp/ramdisk/go/src/runtime/mgc.go:214 +0x17 fp=0x1970112fb7e0 sp=0x1970112fb7c8 pc=0x472177
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x1970112fb7e8 sp=0x1970112fb7e0 pc=0x47e421
+created by runtime.gcenable in goroutine 1
+        /tmp/ramdisk/go/src/runtime/mgc.go:214 +0x66
+&nbsp;
+goroutine 4 gp=0x197011286f00 m=nil [GC scavenge wait]:
+runtime.gopark(0x1970112a8080?, 0x4a3428?, 0x1?, 0x0?, 0x197011286f00?)
+        /tmp/ramdisk/go/src/runtime/proc.go:474 +0xca fp=0x1970112fbf78 sp=0x1970112fbf58 pc=0x478fca
+runtime.goparkunlock(...)
+        /tmp/ramdisk/go/src/runtime/proc.go:480
+runtime.(*scavengerState).park(0x571260)
+        /tmp/ramdisk/go/src/runtime/mgcscavenge.go:425 +0x49 fp=0x1970112fbfa8 sp=0x1970112fbf78 pc=0x4315c9
+runtime.bgscavenge(0x1970112a8080)
+        /tmp/ramdisk/go/src/runtime/mgcscavenge.go:653 +0x3c fp=0x1970112fbfc8 sp=0x1970112fbfa8 pc=0x431b1c
+runtime.gcenable.gowrap2()
+        /tmp/ramdisk/go/src/runtime/mgc.go:215 +0x17 fp=0x1970112fbfe0 sp=0x1970112fbfc8 pc=0x472137
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x1970112fbfe8 sp=0x1970112fbfe0 pc=0x47e421
+created by runtime.gcenable in goroutine 1
+        /tmp/ramdisk/go/src/runtime/mgc.go:215 +0xa5
+&nbsp;
+goroutine 5 gp=0x1970112874a0 m=nil [GOMAXPROCS updater (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+        /tmp/ramdisk/go/src/runtime/proc.go:474 +0xca fp=0x1970112fa788 sp=0x1970112fa768 pc=0x478fca
+runtime.goparkunlock(...)
+        /tmp/ramdisk/go/src/runtime/proc.go:480
+runtime.updateMaxProcsGoroutine()
+        /tmp/ramdisk/go/src/runtime/proc.go:7146 +0xe7 fp=0x1970112fa7e0 sp=0x1970112fa788 pc=0x454fc7
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x1970112fa7e8 sp=0x1970112fa7e0 pc=0x47e421
+created by runtime.defaultGOMAXPROCSUpdateEnable in goroutine 1
+        /tmp/ramdisk/go/src/runtime/proc.go:7134 +0x37
+&nbsp;
+goroutine 6 gp=0x197011287680 m=nil [finalizer wait]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+        /tmp/ramdisk/go/src/runtime/proc.go:474 +0xca fp=0x1970112fc620 sp=0x1970112fc600 pc=0x478fca
+runtime.runFinalizers()
+        /tmp/ramdisk/go/src/runtime/mfinal.go:210 +0x107 fp=0x1970112fc7e0 sp=0x1970112fc620 pc=0x424dc7
+runtime.goexit({})
+        /tmp/ramdisk/go/src/runtime/asm_amd64.s:1264 +0x1 fp=0x1970112fc7e8 sp=0x1970112fc7e0 pc=0x47e421
+created by runtime.createfing in goroutine 1
+        /tmp/ramdisk/go/src/runtime/mfinal.go:172 +0x3d
+&nbsp;
+rax    0x499e40
+rbx    0x0
+rcx    0x1970112861e0
+rdx    0x197011322dd8
+rdi    0x0
+rsi    0x4a6460
+rbp    0x197011322ea8
+rsp    0x197011322db0
+r8     0x2
+r9     0x38
+r10    0x7f53ff011620
+r11    0xd0
+r12    0x197011322e30
+r13    0x1970113360d0
+r14    0x1970112861e0
+r15    0xffffffffffffffff
+rip    0x499ebe
+rflags 0x10202
+cs     0x33
+fs     0x0
+gs     0x0
+exit status 2
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: z&nbsp;tohoto pádu je patrné, že pokud
+použijeme přímo balíček <strong>simd/archsimd</strong>, je nutné explicitně
+testovat, která rozšíření instrukční sady jsou podporována a která
+nikoli.</div></p>
+
+
+
+<h2 id="k13">Základní unární operace s&nbsp;prvky vektorů</h2>
+
+<p>S&nbsp;vektory lze provádět i různé unární operace, přičemž každá taková
+operace se volá jako metoda vektoru a výsledkem je nový vektor. Některé
+z&nbsp;těchto operací jsou ukázány v&nbsp;následujícím demonstračním
+příkladu:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>Abs</td><td>absolutní hodnoty všech prvků vektoru</td></tr>
+<tr><td>Neg</td><td>změna znaménka všech prvků vektoru</td></tr>
+<tr><td>Reciprocal</td><td>převrácená hodnota všech prvků vektoru</td></tr>
+<tr><td>Sqrt</td><td>druhá odmocnina všech prvků vektoru</td></tr>
+<tr><td>ReciprocalSqrt</td><td>převrácená hodnota druhé odmocniny (používá se například při normalizacích atd.)</td></tr>
+</table>
+
+<p>V&nbsp;dalším demonstračním příkladu jsou tyto operace ukázány:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{-1.0, -2.0, -3.0, -4.0}
+        a2 := [...]float32{1.0, 2.0, 3.0, 4.0}
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x4Array(&amp;a2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+&nbsp;
+        <i>// SIMD operace výpočtu absolutní hodnoty</i>
+        v3 := v1.Abs()
+        v2.Store(result)
+        fmt.Println("abs", result)
+&nbsp;
+        <i>// SIMD operace změny znaménka</i>
+        v3 = v1.Neg()
+        v3.Store(result)
+        fmt.Println("neg", result)
+&nbsp;
+        <i>// SIMD operace výpočtu převrácené hodnoty</i>
+        v3 = v1.Reciprocal()
+        v3.Store(result)
+        fmt.Println("reciprocal", result)
+&nbsp;
+        <i>// SIMD operace výpočtu druhé odmocniny</i>
+        v3 = v2.Sqrt()
+        v3.Store(result)
+        fmt.Println("sqrt", result)
+&nbsp;
+        <i>// SIMD operace výpočtu převrácené hodnoty druhé odmocniny</i>
+        v3 = v2.ReciprocalSqrt()
+        v3.Store(result)
+        fmt.Println("reciprocal sqrt", result)
+}
+</pre>
+
+<p>Vypočtené výsledky:</p>
+
+<pre>
+$ <strong>./go run vector_unary.go</strong>
+&nbsp;
+abs [1 2 3 4]
+neg [1 2 3 4]
+reciprocal [-0.99975586 -0.49987793 -0.33325195 -0.24993896]
+sqrt [1 1.4142135 1.7320508 2]
+reciprocal sqrt [0.99975586 0.7069092 0.5772705 0.49987793]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: přesnost výpočtů i výsledků pochopitelně
+stále odpovídá formátu <i>single</i> a tudíž i datovému typu
+<strong>float32</strong>.</div></p>
+
+
+
+<h2 id="k14">Další binární operace s&nbsp;prvky vektorů</h2>
+
+<p>Ve stručnosti si taktéž ukážeme další binární operace prováděné
+s&nbsp;odpovídajícími si prvky dvou vektorů. Tyto operace jsou opět dostupné
+přes metody, které mají jeden parametr (druhý vektor) a návratovou hodnotou je
+nový vektor s&nbsp;výsledky:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>Add</td><td>součet odpovídajících si prvků vektorů</td></tr>
+<tr><td>Sub</td><td>rozdíl odpovídajících si prvků vektorů</td></tr>
+<tr><td>Mul</td><td>součin odpovídajících si prvků vektorů</td></tr>
+<tr><td>Div</td><td>podíl odpovídajících si prvků vektorů</td></tr>
+<tr><td>Min</td><td>porovnání odpovídajících si prvků vektorů, uložení menšího z&nbsp;nich do výsledného vektoru</td></tr>
+<tr><td>Max</td><td>porovnání odpovídajících si prvků vektorů, uložení většího z&nbsp;nich do výsledného vektoru</td></tr>
+</table>
+
+<p>Tyto operace si pochopitelně opět otestujeme:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0}
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+&nbsp;
+        <i>// naplnění celého vektoru stejnou hodnotou</i>
+        v2 := archsimd.BroadcastFloat32x4(0.5)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+        v3.Store(result)
+        fmt.Println("add", result)
+&nbsp;
+        <i>// SIMD operace rozdílu prvků vektorů</i>
+        v3 = v1.Sub(v2)
+        v3.Store(result)
+        fmt.Println("sub", result)
+&nbsp;
+        <i>// SIMD operace součinu prvků vektorů</i>
+        v3 = v1.Mul(v2)
+        v3.Store(result)
+        fmt.Println("mul", result)
+&nbsp;
+        <i>// SIMD operace podílu prvků vektorů</i>
+        v3 = v1.Div(v2)
+        v3.Store(result)
+        fmt.Println("div", result)
+&nbsp;
+        <i>// SIMD operace výběru menších prvků vektorů</i>
+        v3 = v1.Min(v2)
+        v3.Store(result)
+        fmt.Println("min", result)
+&nbsp;
+        <i>// SIMD operace výběru větších prvků vektorů</i>
+        v3 = v1.Max(v2)
+        v3.Store(result)
+        fmt.Println("max", result)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+$ <strong>./go run vector_binary.go</strong>
+&nbsp;
+add [1.5 2.5 3.5 4.5]
+sub [0.5 1.5 2.5 3.5]
+mul [0.5 1 1.5 2]
+div [2 4 6 8]
+min [0.5 0.5 0.5 0.5]
+max [1 2 3 4]
+</pre>
+
+
+
+<h2 id="k15">Různé způsoby zaokrouhlení hodnot prvků vektorů</h2>
+
+<p>V&nbsp;nabídce operací s&nbsp;vektory nalezneme i čtyři metody
+s&nbsp;různými způsoby zaokrouhlení hodnot prvků vektorů. Zajímavé je, že
+výsledkem je vždy vektor stejného typu, jako vektor vstupní &ndash; nedochází
+zde tedy ke konverzi na typ <i>celé číslo</i>:</p>
+
+<table>
+<tr><th>Metoda</th><th>Provedená operace</th></tr>
+<tr><td>Floor</td><td>zaokrouhlení na nejbližší nižší celočíselnou hodnotu</td></tr>
+<tr><td>Ceil</td><td>zaokrouhlení na nejbližší vyšší celočíselnou hodnotu</td></tr>
+<tr><td>Trunc</td><td>odříznutí desetinné části</td></tr>
+<tr><td>Round</td><td>klasické zaokrouhlování</td></tr>
+</table>
+
+<p>Vše si opět ověříme na čtyřprvkovém vektoru s&nbsp;vhodně zvolenými
+hodnotami (0,5 vs 0,5+epsilon):</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{0.4, 0.5, 0.50001, 0.6}
+&nbsp;
+        fmt.Println("a1", a1)
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+&nbsp;
+        v2 := v1.Floor()
+        v2.Store(result)
+        fmt.Println("floor", result)
+&nbsp;
+        v2 = v1.Ceil()
+        v2.Store(result)
+        fmt.Println("ceil ", result)
+&nbsp;
+        v2 = v1.Trunc()
+        v2.Store(result)
+        fmt.Println("trunc", result)
+&nbsp;
+        v2 = v1.Round()
+        v2.Store(result)
+        fmt.Println("round", result)
+}
+</pre>
+
+<p>Výsledky by měly vypadat takto:</p>
+
+<pre>
+$ <strong>./go run vector_round.go</strong>
+&nbsp;
+a1 [0.4 0.5 0.50001 0.6]
+floor [0 0 0 0]
+ceil  [1 1 1 1]
+trunc [0 0 0 0]
+round [0 0 1 1]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: za povšimnutí stojí především to, že
+hodnota 0,5 (ta je reprezentována přesně) může být zaokrouhlena směrem
+dolů.</div></p>
+
+
+
+<h2 id="k16">Operace typu <i>broadcast</i></h2>
+
+<p>Vyzkoušejme si ještě operaci, která se nazývá <i>broadcast</i>, tedy
+všesměrové vysílání. Tato operace umožňuje naplnění všech prvků vektorů stejnou
+hodnotou. Použití je snadné, protože přímo z&nbsp;názvu funkce je zřejmé, jaký
+bude typ výsledného vektoru. Například naplníme vektor se čtyřmi prvky typu
+<strong>float32</strong> hodnotou 0.5:</p>
+
+<pre>
+<i>// naplnění celého vektoru stejnou hodnotou</i>
+v2 := archsimd.BroadcastFloat32x4(0.5)
+</pre>
+
+<p>Použití této funkce/konstruktoru v&nbsp;příkladu je snadné:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func AddTwoVectors(v1, v2 archsimd.Float32x4, result []float32) {
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0}
+&nbsp;
+        <i>// převod pole na vektor se čtyřmi prvky</i>
+        v1 := archsimd.LoadFloat32x4Array(&amp;a1)
+&nbsp;
+        <i>// naplnění celého vektoru stejnou hodnotou</i>
+        v2 := archsimd.BroadcastFloat32x4(0.5)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 4)
+&nbsp;
+        <i>// provedení vybrané operace s vektory</i>
+        AddTwoVectors(v1, v2, result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println(result)
+}
+</pre>
+
+<p>Výsledky resp.&nbsp;výsledek ukazuje, že se původní vektor skutečně sečetl
+s&nbsp;vektorem, jehož všechny prvky mají hodnotu 0.5:</p>
+
+<pre>
+$ <strong>go run vector_broadcast.go </strong>
+&nbsp;
+[1.5 2.5 3.5 4.5]
+</pre>
+
+<p>Ve výsledném strojovém kódu se pro implementaci broadcastu používají
+instrukce <strong>VMOVSS</strong> a <strong>VBROADCASTSS</strong> (S na konci
+znamená označení typu <i>single</i>, tedy v&nbsp;Go <i>float32</i>):</p>
+
+<pre>
+main.main STEXT size=185 align=0x0 args=0x0 locals=0x60 funcid=0x0
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       TEXT    main.main(SB), ABIInternal, $96-0
+        0x0000 00000 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       CMPQ    SP, 16(R14)
+        0x0004 00004 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       PCDATA  $0, $-2
+        0x0004 00004 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       JLS     175
+        0x000a 00010 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       PCDATA  $0, $-1
+        0x000a 00010 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       PUSHQ   BP
+        0x000b 00011 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       MOVQ    SP, BP
+        0x000e 00014 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       SUBQ    $88, SP
+        0x0012 00018 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       FUNCDATA        $0, gclocals·J26BEvPExEQhJvjp9E8Whg==(SB)
+        0x0012 00018 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       FUNCDATA        $1, gclocals·5VlIHulmjZXLybuW+4WJgQ==(SB)
+        0x0012 00018 (/tmp/ramdisk/go/bin/vector_broadcast.go:20)       FUNCDATA        $2, main.main.stkobj(SB)
+        0x0012 00018 (/tmp/ramdisk/go/bin/vector_broadcast.go:22)       MOVQ    $4611686019492741120, DX
+        0x001c 00028 (/tmp/ramdisk/go/bin/vector_broadcast.go:22)       MOVQ    DX, main.a1+40(SP)
+        0x0021 00033 (/tmp/ramdisk/go/bin/vector_broadcast.go:22)       MOVQ    $4647714816524288000, DX
+        0x002b 00043 (/tmp/ramdisk/go/bin/vector_broadcast.go:22)       MOVQ    DX, main.a1+48(SP)
+        0x0030 00048 (/tmp/ramdisk/go/src/simd/archsimd/other_gen_amd64.go:85)  VMOVSS  $f32.3f000000(SB), X0
+        0x0038 00056 (/tmp/ramdisk/go/src/simd/archsimd/other_gen_amd64.go:85)  VBROADCASTSS    X0, X0
+</pre>
+
+
+
+<h2 id="k17">Vytvoření masky, základní práce s&nbsp;maskami</h2>
+
+<p>Některé operace s&nbsp;vektory využívají takzvané <i>masky</i>, což jsou
+taktéž vektory (s&nbsp;pevným počtem prvků), které ovšem obsahují pouze
+pravdivostní hodnoty. Příkladem jsou operace určené pro porovnání
+odpovídajících si prvků vektorů na nějakou relaci (&bdquo;menší než&ldquo;
+atd.). Výsledkem je maska s&nbsp;pravdivostní hodnotou nastavenou pro každou
+dvojici porovnávaných prvků. Použití je snadné:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        a2 := [...]float32{5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor s osmi prvky</i>
+        v1 := archsimd.LoadFloat32x8Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x8Array(&amp;a2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektoru</i>
+        mask := v1.Less(v2)
+        fmt.Println("&lt; ", mask.String())
+&nbsp;
+        mask = v1.LessEqual(v2)
+        fmt.Println("&lt;=", mask.String())
+&nbsp;
+        mask = v1.Equal(v2)
+        fmt.Println("==", mask.String())
+&nbsp;
+        mask = v1.GreaterEqual(v2)
+        fmt.Println(&gt;=", mask.String())
+&nbsp;
+        mask = v1.Greater(v2)
+        fmt.Println("&gt; ", mask.String())
+&nbsp;
+        mask = v1.NotEqual(v2)
+        fmt.Println("!=", mask.String())
+}
+</pre>
+
+<p>Výsledky porovnání prvků dvou vektorů na zvolenou relaci dopadne
+následovně:</p>
+
+<pre>
+$ <strong>./go run vector_comparison.go</strong>
+&nbsp;
+a1 [1 2 3 4 5 6 7 8]
+a2 [5 5 5 5 5 5 5 5]
+&lt;  {1,1,1,1,0,0,0,0}
+&lt;= {1,1,1,1,1,0,0,0}
+== {0,0,0,0,1,0,0,0}
+&gt;= {0,0,0,0,1,1,1,1}
+&gt;  {0,0,0,0,0,1,1,1}
+!= {1,1,1,1,0,1,1,1}
+</pre>
+
+<p>Představme si, že z&nbsp;nějakého vektoru potřebujeme získat pouze ty prvky,
+jejichž hodnoty jsou menší než zadaná limitní hodnota. Jednu z&nbsp;možností
+představuje právě použití masky. Maska se inicializuje porovnáním prvků vektoru
+s&nbsp;mezní hodnotou (uloženou v&nbsp;dalším vektoru &ndash; použít lze
+<i>broadcast</i>). A následně se s&nbsp;využitím metody <strong>Masked</strong>
+z&nbsp;původního vektoru vrátí jen ty prvky, jejichž odpovídající příznak
+v&nbsp;masce je roven jedné. Ostatní prvky budou vynulovány:</p>
+
+<pre>
+<i>// ----------------------------------------------------------------------</i>
+<i>// Podpora nativních SIMD operací v experimentálním balíčku simd/archsimd</i>
+<i>// ----------------------------------------------------------------------</i>
+&nbsp;
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        a2 := [...]float32{5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1    ", a1)
+        fmt.Println("a2    ", a2)
+&nbsp;
+        <i>// převod pole na vektor s osmi prvky</i>
+        v1 := archsimd.LoadFloat32x8Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x8Array(&amp;a2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektoru</i>
+        mask := v1.Less(v2)
+        fmt.Println("&lt;     ", mask.String())
+&nbsp;
+        v3 := v1.Masked(mask)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 8)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("masked", v3)
+}
+</pre>
+
+<p>Ověřme si funkcionalitu:</p>
+
+<pre>
+$ <strong>./go run vector_masked.go</strong>
+&nbsp;
+a1     [1 2 3 4 5 6 7 8]
+a2     [5 5 5 5 5 5 5 5]
+&lt;      {1,1,1,1,0,0,0,0}
+masked {1,2,3,4,0,0,0,0}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: sofistikovanější příklady použití masky
+si ukážeme v&nbsp;navazujícím článku.</div></p>
+
+
+
+<h2 id="k18">Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+Všechny příklady vyžadují Go verze 1.26 nebo 1.27.  V&nbsp;případě, že nebudete
+chtít klonovat celý repositář (ten je ovšem &ndash; alespoň prozatím &ndash;
+relativně malý, dnes má přibližně šest až sedm megabajtů), můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>test_avx.go</td><td>runtime test, zda procesor podporuje instrukční sadu AVX</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/test_avx.go">https://github.com/tisnik/go-root/blob/master/article_B2/test_avx.go</a></td></tr>
+<tr><td> 2</td><td>test_other_variants.go</td><td>runtime test, zda procesor podporuje další rozšíření instrukční sady o SIMD operace</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/test_other_variants.go">https://github.com/tisnik/go-root/blob/master/article_B2/test_other_variants.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>vector_add_1.go</td><td>součet dvou vektorů typu Float32x4</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_1.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_1.go</a></td></tr>
+<tr><td> 4</td><td>vector_add_2.go</td><td>součet dvou vektorů typu Float32x4 (upraveno do samostatné funkce)</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_2.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_2.go</a></td></tr>
+<tr><td> 5</td><td>vector_add_3.go</td><td>součet dvou vektorů typu Float32x8</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_3.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_3.go</a></td></tr>
+<tr><td> 6</td><td>vector_add_4.go</td><td>součet dvou vektorů typu Float32x16</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_4.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_add_4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>vector_unary.go</td><td>základní unární operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_unary.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_unary.go</a></td></tr>
+<tr><td> 8</td><td>vector_binary.go</td><td>základní binární operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_binary.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_binary.go</a></td></tr>
+<tr><td> 9</td><td>vector_round.go</td><td>zaokrouhlení a podobné operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_round.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_round.go</a></td></tr>
+<tr><td>10</td><td>vector_broadcast.go</td><td>naplnění všech prvků vektoru stejnou hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_broadcast.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_broadcast.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>vector_comparison.go</td><td>porovnání prvků dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_comparison.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_comparison.go</a></td></tr>
+<tr><td>12</td><td>vector_masked.go</td><td>základní operace s&nbsp;maskou</td><td><a href="https://github.com/tisnik/go-root/blob/master/article_B2/vector_masked.go">https://github.com/tisnik/go-root/blob/master/article_B2/vector_masked.go</a></td></tr>
+</table>
+
+
+
+<h2 id="k19">Seznam všech předchozích částí seriálu a článků o SIMD instrukcích</h2>
+
+<p>Podporou SIMD instrukcí na úrovni <i>intrinsic</i> (v&nbsp;céčku, nikoli
+v&nbsp;jazyku Go) jsme se už na Rootu zabývali, stejně jako samotnými SIMD
+instrukcemi na úrovni assembleru. Pro úplnost jsou v&nbsp;této příloze uvedeny
+odkazy na příslušné články:</p>
+
+<ol>
+
+<li>Užitečné rozšíření GCC: podpora SIMD (vektorových) instrukcí<br />
+<a href="https://www.root.cz/clanky/uzitecne-rozsireni-gcc-podpora-simd-vektorovych-instrukci/">https://www.root.cz/clanky/uzitecne-rozsireni-gcc-podpora-simd-vektorovych-instrukci/</a>
+</li>
+
+<li>Užitečné rozšíření GCC – podpora SIMD (vektorových) instrukcí: nedostatky technologie<br />
+<a href="https://www.root.cz/clanky/uzitecne-rozsireni-gcc-podpora-simd-vektorovych-instrukci-nedostatky-technologie/">https://www.root.cz/clanky/uzitecne-rozsireni-gcc-podpora-simd-vektorovych-instrukci-nedostatky-technologie/</a>
+</li>
+
+<li>Podpora SIMD (vektorových) instrukcí na RISCových procesorech<br />
+<a href="https://www.root.cz/clanky/podpora-simd-vektorovych-instrukci-na-riscovych-procesorech/">https://www.root.cz/clanky/podpora-simd-vektorovych-instrukci-na-riscovych-procesorech/</a>
+</li>
+
+<li>Podpora SIMD operací v&nbsp;GCC s&nbsp;využitím intrinsic pro nízkoúrovňové optimalizace<br />
+<a href="https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-pro-nizkourovnove-optimalizace/">https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-pro-nizkourovnove-optimalizace/</a>
+</li>
+
+<li>Podpora SIMD operací v&nbsp;GCC s&nbsp;využitím intrinsic: technologie SSE<br />
+<a href="https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-technologie-sse/">https://www.root.cz/clanky/podpora-simd-operaci-v-gcc-s-vyuzitim-intrinsic-technologie-sse/</a>
+</li>
+
+<li>Rozšíření instrukční sady „Advanced Vector Extensions“ na platformě x86–64<br />
+<a href="https://www.root.cz/clanky/rozsireni-instrukcni-sady-advanced-vector-extensions-na-platforme-x86-64/">https://www.root.cz/clanky/rozsireni-instrukcni-sady-advanced-vector-extensions-na-platforme-x86-64/</a>
+</li>
+
+<li>Rozšíření instrukční sady F16C, FMA a AVX-512 na platformě x86–64<br />
+<a href="https://www.root.cz/clanky/rozsireni-instrukcni-sady-f16c-fma-a-avx-512-na-platforme-x86-64/">https://www.root.cz/clanky/rozsireni-instrukcni-sady-f16c-fma-a-avx-512-na-platforme-x86-64/</a>
+</li>
+
+<li>Rozšíření instrukční sady AVX-512 na platformě x86–64 (dokončení)<br />
+<a href="https://www.root.cz/clanky/rozsireni-instrukcni-sady-avx-512-na-platforme-x86-64-dokonceni/">https://www.root.cz/clanky/rozsireni-instrukcni-sady-avx-512-na-platforme-x86-64-dokonceni/</a>
+</li>
+
+<li>SIMD instrukce na platformě 80×86: instrukční sada MMX<br />
+<a href="https://www.root.cz/clanky/simd-instrukce-na-platforme-80x86-instrukcni-sada-mmx/">https://www.root.cz/clanky/simd-instrukce-na-platforme-80x86-instrukcni-sada-mmx/</a>
+</li>
+
+<li>SIMD instrukce na 80×86: dokončení popisu MMX, instrukce 3DNow! <br />
+<a href="https://www.root.cz/clanky/simd-instrukce-na-80-86-dokonceni-popisu-mmx-instrukce-3dnow/">https://www.root.cz/clanky/simd-instrukce-na-80-86-dokonceni-popisu-mmx-instrukce-3dnow/</a>
+</li>
+
+<li>SIMD instrukce v rozšíření SSE<br />
+<a href="https://www.root.cz/clanky/simd-instrukce-v-rozsireni-sse/">https://www.root.cz/clanky/simd-instrukce-v-rozsireni-sse/</a>
+</li>
+
+<li>SIMD instrukce v rozšíření SSE (2. část)<br />
+<a href="https://www.root.cz/clanky/simd-instrukce-v-rozsireni-sse-2-cast/">https://www.root.cz/clanky/simd-instrukce-v-rozsireni-sse-2-cast/</a>
+</li>
+
+<li>Pokročilejší SSE operace: přeskupení, promíchání a rozbalování prvků vektorů<br />
+<a href="https://www.root.cz/clanky/pokrocilejsi-sse-operace-preskupeni-promichani-a-rozbalovani-prvku-vektoru/">https://www.root.cz/clanky/pokrocilejsi-sse-operace-preskupeni-promichani-a-rozbalovani-prvku-vektoru/</a>
+</li>
+
+<li>Od instrukční sady SSE k sadě SSE2<br />
+<a href="https://www.root.cz/clanky/od-instrukcni-sady-sse-k-sade-sse2/">https://www.root.cz/clanky/od-instrukcni-sady-sse-k-sade-sse2/</a>
+</li>
+
+<li>Instrukční sady SIMD a automatické vektorizace prováděné překladačem GCC<br />
+<a href="https://www.root.cz/clanky/instrukcni-sady-simd-a-automaticke-vektorizace-provadene-prekladacem-gcc/">https://www.root.cz/clanky/instrukcni-sady-simd-a-automaticke-vektorizace-provadene-prekladacem-gcc/</a>
+</li>
+
+<li>Instrukční sady SIMD a automatické vektorizace prováděné překladačem GCC (2)<br />
+<a href="https://www.root.cz/clanky/instrukcni-sady-simd-a-automaticke-vektorizace-provadene-prekladacem-gcc-2/">https://www.root.cz/clanky/instrukcni-sady-simd-a-automaticke-vektorizace-provadene-prekladacem-gcc-2/</a>
+</li>
+
+</ol>
+
+
+
+<h2 id="k20">Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go 1.27 Release Notes<br />
+<a href="https://go.dev/doc/go1.27">https://go.dev/doc/go1.27</a>
+</li>
+
+<li>New experimental simd package<br />
+<a href="https://go.dev/doc/go1.27#simd">https://go.dev/doc/go1.27#simd</a>
+</li>
+
+<li>Balíček simd<br />
+<a href="https://pkg.go.dev/simd">https://pkg.go.dev/simd</a>
+</li>
+
+<li>Balíček archsimd<br />
+<a href="https://pkg.go.dev/simd/archsimd">https://pkg.go.dev/simd/archsimd</a>
+</li>
+
+<li>Experimental SIMD with simd/archsimd<br />
+<a href="https://go-cookbook.com/snippets/performance/experimental-simd-archsimd">https://go-cookbook.com/snippets/performance/experimental-simd-archsimd</a>
+</li>
+
+<li>Go Generic Methods: A Hands-On Go 1.27 Tutorial<br />
+<a href="https://www.danilchenko.dev/posts/go-generic-methods/">https://www.danilchenko.dev/posts/go-generic-methods/</a>
+</li>
+
+<li>Auto-vectorization in GCC<br />
+<a href="https://gcc.gnu.org/projects/tree-ssa/vectorization.html">https://gcc.gnu.org/projects/tree-ssa/vectorization.html</a>
+</li>
+
+<li>GCC documentation: Extensions to the C Language Family<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/C-Extensions.html#C-Extensions">https://gcc.gnu.org/onlinedocs/gcc/C-Extensions.html#C-Extensions</a>
+</li>
+
+<li>GCC documentation: Using Vector Instructions through Built-in Functions<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Vector-Extensions.html">https://gcc.gnu.org/onlinedocs/gcc/Vector-Extensions.html</a>
+</li>
+
+<li>SSE (Streaming SIMD Extentions)<br />
+<a href="http://www.songho.ca/misc/sse/sse.html">http://www.songho.ca/misc/sse/sse.html</a>
+</li>
+
+<li>Timothy A. Chagnon: SSE and SSE2<br />
+<a href="http://www.cs.drexel.edu/~tc365/mpi-wht/sse.pdf">http://www.cs.drexel.edu/~tc365/mpi-wht/sse.pdf</a>
+</li>
+
+<li>Intel corporation: Extending the Worldr's Most Popular Processor Architecture<br />
+<a href="http://download.intel.com/technology/architecture/new-instructions-paper.pdf">http://download.intel.com/technology/architecture/new-instructions-paper.pdf</a>
+</li>
+
+<li>SIMD architectures:<br />
+<a href="http://arstechnica.com/old/content/2000/03/simd.ars/">http://arstechnica.com/old/content/2000/03/simd.ars/</a>
+</li>
+
+<li>Tour of the Black Holes of Computing!: Floating Point<br />
+<a href="http://www.cs.hmc.edu/~geoff/classes/hmc.cs105.../slides/class02_floats.ppt">http://www.cs.hmc.edu/~geoff/classes/hmc.cs105.../slides/class02_floats.ppt</a>
+</li>
+
+<li>3Dnow! Technology Manual<br />
+AMD Inc., 2000</li>
+
+<li>Intel MMX<sup>TM</sup> Technology Overview<br />
+Intel corporation, 1996</li>
+
+<li>MultiMedia eXtensions<br />
+<a href="http://softpixel.com/~cwright/programming/simd/mmx.php">http://softpixel.com/~cwright/programming/simd/mmx.php</a>i
+</li>
+
+<li>AMD K5 ("K5" / "5k86")<br />
+<a href="http://www.pcguide.com/ref/cpu/fam/g5K5-c.html">http://www.pcguide.com/ref/cpu/fam/g5K5-c.html</a>
+</li>
+
+<li>Sixth Generation Processors<br />
+<a href="http://www.pcguide.com/ref/cpu/fam/g6.htm">http://www.pcguide.com/ref/cpu/fam/g6.htm</a>
+</li>
+
+<li>Great Microprocessors of the Past and Present<br />
+<a href="http://www.cpushack.com/CPU/cpu1.html">http://www.cpushack.com/CPU/cpu1.html</a>
+</li>
+
+<li>Very long instruction word (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/Very_long_instruction_word">http://en.wikipedia.org/wiki/Very_long_instruction_word</a>
+</li>
+
+<li>CPU design (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/CPU_design">http://en.wikipedia.org/wiki/CPU_design</a>
+</li>
+
+<li>Bulldozer (microarchitecture)<br />
+<a href="https://en.wikipedia.org/wiki/Bulldozer_(microarchitecture)">https://en.wikipedia.org/wiki/Bulldozer_(microarchitecture)</a>
+</li>
+
+<li>SIMD Instructions Considered Harmful<br />
+<a href="https://www.sigarch.org/simd-instructions-considered-harmful/">https://www.sigarch.org/simd-instructions-considered-harmful/</a>
+</li>
+
+<li>GCC Compiler Intrinsics<br />
+<a href="https://iq.opengenus.org/gcc-compiler-intrinsics/">https://iq.opengenus.org/gcc-compiler-intrinsics/</a>
+</li>
+
+<li>Scalable_Vector_Extension_(SVE)<br />
+<a href="https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)">https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)</a>
+</li>
+
+<li>Improve the Multimedia User Experience<br />
+<a href="https://www.arm.com/technologies/neon">https://www.arm.com/technologies/neon</a>
+</li>
+
+<li>NEON Technology (stránky ARM)<br />
+<a href="https://developer.arm.com/technologies/neon">https://developer.arm.com/technologies/neon</a>
+</li>
+
+<li>SIMD Assembly Tutorial: ARM NEON - Xiph.org<br />
+<a href="https://people.xiph.org/~tterribe/daala/neon_tutorial.pdf">https://people.xiph.org/~tterribe/daala/neon_tutorial.pdf</a>
+</li>
+
+<li>Ne10<br />
+<a href="http://projectne10.github.io/Ne10/">http://projectne10.github.io/Ne10/</a>
+</li>
+
+<li>NEON and Floating-Point architecture<br />
+<a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABIGHEB.html">http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABIGHEB.html</a>
+</li>
+
+<li>An Introduction to ARM NEON<br />
+<a href="http://peterdn.com/post/an-introduction-to-ARM-NEON.aspx">http://peterdn.com/post/an-introduction-to-ARM-NEON.aspx</a>
+</li>
+
+<li>ARM NEON Intrinsics Reference<br />
+<a href="http://infocenter.arm.com/help/topic/com.arm.doc.ihi0073a/IHI0073A_arm_neon_intrinsics_ref.pdf">http://infocenter.arm.com/help/topic/com.arm.doc.ihi0073a/IHI0073A_arm_neon_intrinsics_ref.pdf</a>
+</li>
+
+<li>Arm Neon Intrinsics vs hand assembly<br />
+<a href="https://stackoverflow.com/questions/9828567/arm-neon-intrinsics-vs-hand-assembly">https://stackoverflow.com/questions/9828567/arm-neon-intrinsics-vs-hand-assembly</a>
+</li>
+
+<li>ARM NEON Optimization. An Example<br />
+<a href="http://hilbert-space.de/?p=22">http://hilbert-space.de/?p=22</a>
+</li>
+
+<li>AArch64 NEON instruction format<br />
+<a href="https://developer.arm.com/docs/den0024/latest/7-aarch64-floating-point-and-neon/73-aarch64-neon-instruction-format">https://developer.arm.com/docs/den0024/latest/7-aarch64-floating-point-and-neon/73-aarch64-neon-instruction-format</a>
+</li>
+
+<li>ARM SIMD instructions<br />
+<a href="https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions">https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions</a>
+</li>
+
+<li>Learn the architecture - Migrate Neon to SVE Version 1.0<br />
+<a href="https://developer.arm.com/documentation/102131/0100/?lang=en">https://developer.arm.com/documentation/102131/0100/?lang=en</a>
+</li>
+
+<li>1.2.2. Comparison between NEON technology and other SIMD solutions<br />
+<a href="https://developer.arm.com/documentation/den0018/a/Introduction/Comparison-between-ARM-NEON-technology-and-other-implementations/Comparison-between-NEON-technology-and-other-SIMD-solutions?lang=en">https://developer.arm.com/documentation/den0018/a/Introduction/Comparison-between-ARM-NEON-technology-and-other-implementations/Comparison-between-NEON-technology-and-other-SIMD-solutions?lang=en</a>
+</li>
+
+<li>NEON Programmer’s Guide<br />
+<a href="https://documentation-service.arm.com/static/63299276e68c6809a6b41308">https://documentation-service.arm.com/static/63299276e68c6809a6b41308</a>
+</li>
+
+<li>Brain Floating Point – nový formát uložení čísel pro strojové učení a chytrá čidla<br />
+<a href="https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/">https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/</a>
+</li>
+
+<li>Other Built-in Functions Provided by GCC<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html">https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html</a>
+</li>
+
+<li>GCC: 6.60 Built-in Functions Specific to Particular Target Machines<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Target-Builtins.html#Target-Builtins">https://gcc.gnu.org/onlinedocs/gcc/Target-Builtins.html#Target-Builtins</a>
+</li>
+
+<li>Advanced Vector Extensions<br />
+<a href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">https://en.wikipedia.org/wiki/Advanced_Vector_Extensions</a>
+</li>
+
+<li>Top 10 Craziest Assembly Language Instructions<br />
+<a href="https://www.youtube.com/watch?v=Wz_xJPN7lAY">https://www.youtube.com/watch?v=Wz_xJPN7lAY</a>
+</li>
+
+<li>Intel x86: let's take a look at one of the most complex instruction set!<br />
+<a href="https://www.youtube.com/watch?v=KBLy23B38-c">https://www.youtube.com/watch?v=KBLy23B38-c</a>
+</li>
+
+<li>x64 Assembly Tutorial 58: Intro to AVX<br />
+<a href="https://www.youtube.com/watch?v=yAvuHd8cBJY">https://www.youtube.com/watch?v=yAvuHd8cBJY</a>
+</li>
+
+<li>AVX512 (1 of 3): Introduction and Overview<br />
+<a href="https://www.youtube.com/watch?v=D-mM6X5xnTY">https://www.youtube.com/watch?v=D-mM6X5xnTY</a>
+</li>
+
+<li>AVX512 (2 of 3): Programming AVX512 in 3 Different Ways<br />
+<a href="https://www.youtube.com/watch?v=I3efQKLgsjM">https://www.youtube.com/watch?v=I3efQKLgsjM</a>
+</li>
+
+<li>AVX512 (3 of 3): Deep Dive into AVX512 Mechanisms<br />
+<a href="https://www.youtube.com/watch?v=543a1b-cPmU">https://www.youtube.com/watch?v=543a1b-cPmU</a>
+</li>
+
+<li>AVX-512<br />
+<a href="https://en.wikipedia.org/wiki/AVX-512">https://en.wikipedia.org/wiki/AVX-512</a>
+</li>
+
+<li>AVX-512<br />
+<a href="https://iq.opengenus.org/avx512/">https://iq.opengenus.org/avx512/</a>
+</li>
+
+<li>SIMD Algorithms Youtube course<br />
+<a href="https://denisyaroshevskiy.github.io/presentations/">https://denisyaroshevskiy.github.io/presentations/</a>
+</li>
+
+<li>Compiler explorer<br />
+<a href="https://godbolt.org/">https://godbolt.org/</a>
+</li>
+
+<li>Restricting pointers<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Restricted-Pointers.html">https://gcc.gnu.org/onlinedocs/gcc/Restricted-Pointers.html</a>
+</li>
+
+<li>Does the restrict keyword provide significant benefits in gcc/g++<br />
+<a href="https://stackoverflow.com/questions/1965487/does-the-restrict-keyword-provide-significant-benefits-in-gcc-g">https://stackoverflow.com/questions/1965487/does-the-restrict-keyword-provide-significant-benefits-in-gcc-g</a>
+</li>
+
+<li>Demystifying The Restrict Keyword<br />
+<a href="https://cellperformance.beyond3d.com/articles/2006/05/demystifying-the-restrict-keyword.html">https://cellperformance.beyond3d.com/articles/2006/05/demystifying-the-restrict-keyword.html</a>
+</li>
+
+<li>Basics of Vectorization for Fortran Applications<br />
+<a href="https://inria.hal.science/hal-01688488/document">https://inria.hal.science/hal-01688488/document</a>
+</li>
+
+<li>What does the restrict keyword mean in C++?<br />
+<a href="https://stackoverflow.com/questions/776283/what-does-the-restrict-keyword-mean-in-c">https://stackoverflow.com/questions/776283/what-does-the-restrict-keyword-mean-in-c</a>
+</li>
+
+<li>restrict keyword (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Restrict">https://en.wikipedia.org/wiki/Restrict</a>
+</li>
+
+<li>Reduction operator<br />
+<a href="https://en.wikipedia.org/wiki/Reduction_operator">https://en.wikipedia.org/wiki/Reduction_operator</a>
+</li>
+
+<li>The Power of the Dot Product in Artificial Intelligence<br />
+<a href="https://medium.com/data-science/the-power-of-the-dot-product-in-artificial-intelligence-c002331e1829">https://medium.com/data-science/the-power-of-the-dot-product-in-artificial-intelligence-c002331e1829</a>
+</li>
+
+<li>Can any one explain why dot product is used in neural network and what is the intitutive thought of dot product<br />
+<a href="https://stats.stackexchange.com/questions/291680/can-any-one-explain-why-dot-product-is-used-in-neural-network-and-what-is-the-in">https://stats.stackexchange.com/questions/291680/can-any-one-explain-why-dot-product-is-used-in-neural-network-and-what-is-the-in</a>
+</li>
+
+<li>Aligned and unaligned memory accesses?<br />
+<a href="https://stackoverflow.com/questions/1063809/aligned-and-unaligned-memory-accesses">https://stackoverflow.com/questions/1063809/aligned-and-unaligned-memory-accesses</a>
+</li>
+
+<li>Go finally gets SIMD in 1.26<br />
+<a href="https://hexfusion.io/posts/go-simd-art/">https://hexfusion.io/posts/go-simd-art/</a>
+</li>
+
+<li>simd/archsimd: architecture-specific SIMD intrinsics under a GOEXPERIMENT #73787<br />
+<a href="https://github.com/golang/go/issues/73787">https://github.com/golang/go/issues/73787</a>
+</li>
+
+</ol>
+
