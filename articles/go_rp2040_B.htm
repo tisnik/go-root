@@ -1,0 +1,1709 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Využití TinyGo při programování Raspberry Pi Pico (2. část)</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Využití TinyGo při programování Raspberry Pi Pico (2. část)</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Na předchozí článek o překladači TinyGo použitém pro tvorbu aplikací pro Raspberry Pi Pico dnes navážeme. Ukážeme si přečtení teploty změřené interním senzorem připojeným na pátý kanál ADC. Dále se budeme zabývat SW ovládáním maticového displeje přes posuvné registry.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Využití TinyGo při programování Raspberry Pi Pico (2. část)</a></p>
+<p><a href="#k02">2. Využití dalších kanálů analogově-digitálního převodníku</a></p>
+<p><a href="#k03">3. Přečtení a zobrazení teploty změřené senzorem na čipu</a></p>
+<p><a href="#k04">4. Zabránění častému &bdquo;přeskakování&ldquo; teploty</a></p>
+<p><a href="#k05">5. Korektní zobrazení desetinné tečky</a></p>
+<p><a href="#k06">6. Řízení maticového displeje</a></p>
+<p><a href="#k07">7. Zapojení maticového displeje</a></p>
+<p><a href="#k08">8. Softwarové řízení posuvných registrů přes GPIO</a></p>
+<p><a href="#k09">9. Základní tvar SW smyčky pro obnovu informací na maticovém displeji</a></p>
+<p><a href="#k10">10. Demonstrační příklad: vyplnění celé plochy rozsvícenými pixely</a></p>
+<p><a href="#k11">11. Vykreslení šachovnicového vzorku</a></p>
+<p><a href="#k12">12. Otestování, zda je časování sloupců při ovládání displeje korektní</a></p>
+<p><a href="#k13">13. Otestování časování řádků</a></p>
+<p><a href="#k14">14. Vykreslení celé bitmapy 32&times;8 pixelů</a></p>
+<p><a href="#k15">15. Scrolling obrazu s&nbsp;využitím potenciometru</a></p>
+<p><a href="#k16">16. Raspberry Pi Pico připojené ve funkci terminálu</a></p>
+<p><a href="#k17">17. Sériové rozhraní SPI</a></p>
+<p><a href="#k18">18. Sériová sběrnice I<sup>2</sup>C</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Využití TinyGo při programování Raspberry Pi Pico (2. část)</h2>
+
+<p>Na <a
+href="https://www.root.cz/clanky/vyuziti-tinygo-pri-programovani-raspberry-pi-pico-od-gpio-az-k-pwm/">předchozí
+článek</a> o překladači TinyGo použitém pro tvorbu aplikací pro Raspberry Pi
+Pico dnes navážeme. Ukážeme si, jakým způsobem je možné přečíst teplotu
+změřenou interním senzorem připojeným na pátý kanál analogově-digitálního
+převodníku. Dále se budeme zabývat tím, jak lze čistě softwarově ovládat
+maticový displej s&nbsp;rozlišením 32&times;8 pixelů, přičemž každý pixel je
+tvořen LED. Dále se zmíníme o připojení Raspberry Pi Pico k&nbsp;počítači
+v&nbsp;režimu terminálu, což mj.&nbsp;umožňuje spouštět programy, které
+používají standardní vstupní a výstupní proudy (<i>input stream</i> a <i>output
+stream</i>). A v&nbsp;závěrečné části článku si popíšeme způsob práce se
+sériovými sběrnicemi a rozhraními. Raspberry Pi Pico totiž podporuje jak
+rozhraní SPI, tak i sběrnici I<sup>2</sup>C. Sériový způsob přenosu dat je
+podporován mnoha periferními zařízeními, například řadiči LCD atd.</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 534px"><a href="https://www.root.cz/obrazek/1266327/"><img src="https://i.iinfo.cz/images/274/picopixel2-1-large.jpg" class="image-1266327" width="534" height="525" data-prev-filename="https://i.iinfo.cz/images/274/picopixel2-1-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/274/picopixel2-1-prev.webp" data-prev-width="274" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/274/picopixel2-1-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/274/picopixel2-1-large.webp" data-large-width="534" data-large-height="525" alt="Obrázek XX:" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 534px" /></a><p>Obrázek 1: Přední strana desky, kterou použijeme v dnešním článku. Vlevo dole je běžné Raspberry Pi Pico W.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 538px"><a href="https://www.root.cz/obrazek/1266330/"><img src="https://i.iinfo.cz/images/274/picopixel2-2-large.jpg" class="image-1266330" width="538" height="525" data-prev-filename="https://i.iinfo.cz/images/274/picopixel2-2-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/274/picopixel2-2-prev.webp" data-prev-width="277" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/274/picopixel2-2-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/274/picopixel2-2-large.webp" data-large-width="538" data-large-height="525" alt="Obrázek XX:" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 538px" /></a><p>Obrázek 2: Zadní strana desky, která naznačuje, že Pico lze provozovat i s napájením 4,5V&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Využití dalších kanálů analogově-digitálního převodníku</h2>
+
+<p>Již v&nbsp;úvodním článku jsme si řekli, že mikrořadiče RP2040 i RP2350 jsou
+mj.&nbsp;vybaveny i analogově-digitálním převodníkem. Typicky se jedná o čtyři
+(vstupní) kanály s&nbsp;rozlišením dvanácti bitů, ovšem RP2350 v&nbsp;pouzdře
+QFN-80EP nabízí celých osm kanálů (a současně i osmnáct GPIO). I když má
+analogově-digitální převodník rozlišení dvanácti bitů, prakticky všechna
+programová rozhraní vrací šestnáctibitové hodnoty, což znamená, že spodní čtyři
+bity přečtených výsledků je možné ignorovat. Navíc je možné u každého ze vstupů
+do analogově-digitálního převodníku zvolit, zda budou použity nebo zda se má
+příslušný pin použít pro jiné účely (tedy například jako GPIO, SCL apod.).</p>
+
+<p>To se ovšem týká pouze prvních tří kanálů ADC0, ADC1 a ADC2, protože čtvrtý
+kanál se používá pro čtení úrovně referenčního napětí (není vyveden na piny
+RPi). Pátý kanál čte hodnoty získané teplotním senzorem (a není tedy vyveden na
+piny RPi). Popis pinů naleznete na adrese <a
+href="https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico-2-family">https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico-2-family</a>.</p>
+
+<p>A právě pátý kanál ADC nás bude zajímat, protože nám umožní zjistit aktuální
+teplotu čipu. V&nbsp;případě, že používáme TinyGo a knihovny, které jsou jeho
+součástí, není nutné provádět ruční převod přečtené hodnoty na teplotu, protože
+je k&nbsp;dispozici pro tento účel určená funkce, která přečte hodnotu
+z&nbsp;ADC a provede konverzi automaticky:</p>
+
+<pre>
+<i>// ReadTemperature does a one-shot sample of the internal temperature sensor and returns a milli-celsius reading.</i>
+func <strong>ReadTemperature</strong>() (millicelsius int32) {
+    if rp.ADC.CS.Get()&amp;rp.ADC_CS_EN == 0 {
+        InitADC()
+    }
+    thermChan, _ := ADC{Pin: thermADC}.GetADCChannel()
+    <i>// Enable temperature sensor bias source</i>
+    rp.ADC.CS.SetBits(rp.ADC_CS_TS_EN)
+
+    <i>// T = 27 - (ADC_voltage - 0.706)/0.001721</i>
+    <i>// 1/0.001721 ≈ 581</i>
+    return int32(((int64(27000) &lt;&lt; 16) - ((int64(thermChan.getVoltage()) - (int64(706) &lt;&lt; 16)) * 581)) &gt;&gt; 16)
+}
+</pre>
+
+<p>Jak je z&nbsp;dokumentačního řetězce patrné, je výsledek reprezentován
+v&nbsp;tisícinách stupně Celsia.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě se nejedná o metodu
+ke struktuře <strong>machine.Pin</strong>, ale skutečně o jednoduchou funkci,
+která neakceptuje žádné parametry.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Přečtení a zobrazení teploty změřené senzorem na čipu</h2>
+
+<p>Přečtení teploty změřené senzorem a převedené do číslicové podoby
+analogově-digitálním převodníkem je velmi jednoduché, takže snadno můžeme
+realizovat programovou smyčku, která teplotu přečte a zobrazí ji na displeji.
+K&nbsp;zobrazení lze použít funkci pojmenovanou <strong>displayNumber</strong>,
+kterou jsme si popsali v&nbsp;předchozím článku. Ovšem vzhledem k&nbsp;tomu, že
+se (teoreticky) vrací teplota v rozsahu od 0&deg;C až 65,536&deg;C, ale displej
+má pouze čtyři cifry, nejprve vrácenou teplotu podělíme deseti. Ostatně to je
+více než dostačující; není zapotřebí zobrazovat setiny a tisíciny stupně
+Celsia:</p>
+
+<pre>
+for {
+    temperature := machine.ReadTemperature()
+    temperature /= 10
+    displayNumber(int(temperature))
+}
+</pre>
+
+<p>Výsledek bude vypadat následovně:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 367px"><a href="https://www.root.cz/obrazek/1267851/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-1.jpg" class="image-1267851" width="367" height="130" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-1.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-1.webp" data-prev-width="367" data-prev-height="130" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-1.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-1.webp" data-large-width="367" data-large-height="130" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 367px" /></a><p>Obrázek 3: Zobrazení změřené teploty na displeji.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Ukažme si ještě úplný zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+const SleepAmount = time.Millisecond * 1
+&nbsp;
+var controls [4]machine.Pin
+var pins [8]machine.Pin
+&nbsp;
+var digits [][]bool = [][]bool{
+    {true, true, true, true, true, true, false, false},
+    {false, true, true, false, false, false, false, false},
+    {true, true, false, true, true, false, true, false},
+    {true, true, true, true, false, false, true, false},
+    {false, true, true, false, false, true, true, false},
+    {true, false, true, true, false, true, true, false},
+    {true, false, true, true, true, true, true, false},
+    {true, true, true, false, false, false, false, false},
+    {true, true, true, true, true, true, true, false},
+    {true, true, true, true, false, true, true, false},
+}
+&nbsp;
+func <strong>init</strong>() {
+    controls[0] = machine.GP5
+    controls[1] = machine.GP6
+    controls[2] = machine.GP7
+    controls[3] = machine.GP8
+    for _, control := range controls {
+        control.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+&nbsp;
+    pins[0] = machine.GP11
+    pins[1] = machine.GP9
+    pins[2] = machine.GP13
+    pins[3] = machine.GP15
+    pins[4] = machine.GP16
+    pins[5] = machine.GP10
+    pins[6] = machine.GP12
+    pins[7] = machine.GP14
+&nbsp;
+    for _, pin := range pins {
+        pin.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+}
+&nbsp;
+func <strong>displaySegments</strong>(bits []bool) {
+    for i := range bits {
+        bit := bits[i]
+        pin := pins[i]
+        if bit {
+            pin.High()
+        } else {
+            pin.Low()
+        }
+    }
+}
+&nbsp;
+func <strong>displayNumber</strong>(number int) {
+    x := number
+    for i := range 4 {
+        digit := x % 10
+        x /= 10
+        bits := digits[digit]
+        control := controls[3-i]
+        control.High()
+        displaySegments(bits)
+        time.Sleep(SleepAmount)
+        control.Low()
+    }
+}
+&nbsp;
+func <strong>main</strong>() {
+    for {
+        temperature := machine.ReadTemperature()
+        temperature /= 10
+        displayNumber(int(temperature))
+    }
+}
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Zabránění častému &bdquo;přeskakování&ldquo; teploty</h2>
+
+<p><a href="#k03">V&nbsp;předchozím</a> demonstračním příkladu se teplota
+z&nbsp;analogově-digitálního převodníku četla velmi často a ihned poté byla
+zobrazena na displeji. Ovšem kvůli různým vlivům se minimálně poslední dvě
+číslice (desetiny a setiny stupně Celsia) velmi často měnily, takže vlastně
+nebylo možné teplotu z&nbsp;displeje ani přečíst. Řešení tohoto problému je
+snadné &ndash; měření teploty se provede s&nbsp;relativně malou frekvencí
+(postačuje i jednou za několik sekund) a poté se stejné číslice opakovaně
+zobrazí na displeji (obnovu jeho obsahu provádíme programově). Nejjednodušší
+forma řešení může vypadat:</p>
+
+<pre>
+for {
+    temperature := machine.ReadTemperature()
+    temperature /= 10
+    for range 1000 {
+        displayNumber(int(temperature))
+    }
+}
+</pre>
+
+<p>Nyní je výsledkem zobrazení teploty, které se ovšem mění s&nbsp;mnohem menší
+frekvencí a číslice lze tedy snadno přečíst:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 382px"><a href="https://www.root.cz/obrazek/1267854/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-2.jpg" class="image-1267854" width="382" height="160" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-2-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-2-prev.webp" data-prev-width="370" data-prev-height="155" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-2.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-2.webp" data-large-width="382" data-large-height="160" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 382px" /></a><p>Obrázek 4: Vylepšený způsob zobrazení teploty na displeji.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Následuje výpis upraveného zdrojového kódu demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+const SleepAmount = time.Millisecond * 1
+&nbsp;
+var controls [4]machine.Pin
+var pins [8]machine.Pin
+&nbsp;
+var digits [][]bool = [][]bool{
+    {true, true, true, true, true, true, false, false},
+    {false, true, true, false, false, false, false, false},
+    {true, true, false, true, true, false, true, false},
+    {true, true, true, true, false, false, true, false},
+    {false, true, true, false, false, true, true, false},
+    {true, false, true, true, false, true, true, false},
+    {true, false, true, true, true, true, true, false},
+    {true, true, true, false, false, false, false, false},
+    {true, true, true, true, true, true, true, false},
+    {true, true, true, true, false, true, true, false},
+}
+&nbsp;
+func <strong>init</strong>() {
+    controls[0] = machine.GP5
+    controls[1] = machine.GP6
+    controls[2] = machine.GP7
+    controls[3] = machine.GP8
+    for _, control := range controls {
+        control.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+&nbsp;
+    pins[0] = machine.GP11
+    pins[1] = machine.GP9
+    pins[2] = machine.GP13
+    pins[3] = machine.GP15
+    pins[4] = machine.GP16
+    pins[5] = machine.GP10
+    pins[6] = machine.GP12
+    pins[7] = machine.GP14
+&nbsp;
+    for _, pin := range pins {
+        pin.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+}
+&nbsp;
+func <strong>displaySegments</strong>(bits []bool) {
+    for i := range bits {
+        bit := bits[i]
+        pin := pins[i]
+        if bit {
+            pin.High()
+        } else {
+            pin.Low()
+        }
+    }
+}
+&nbsp;
+func <strong>displayNumber</strong>(number int) {
+    x := number
+    for i := range 4 {
+        digit := x % 10
+        x /= 10
+        bits := digits[digit]
+        control := controls[3-i]
+        control.High()
+        displaySegments(bits)
+        time.Sleep(SleepAmount)
+        control.Low()
+    }
+}
+&nbsp;
+func <strong>main</strong>() {
+    for {
+        temperature := machine.ReadTemperature()
+        temperature /= 10
+        for range 1000 {
+            displayNumber(int(temperature))
+        }
+    }
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Korektní zobrazení desetinné tečky</h2>
+
+<p>Každá cifra na sedmisegmentovém displeji ve skutečnosti ještě obsahuje jednu
+LED určenou pro zobrazení desetinné tečky. Toho pochopitelně můžeme využít,
+protože například hodnota 2050 zobrazená na displeji je poněkud zavádějící.
+Ovšem když zobrazíme 20.50, bude již zřejmé, že se jedná o skutečnou teplotu.
+Existuje mnoho možností úpravy existující funkce pro zobrazení celočíselné
+hodnoty na displeji; nejjednodušší je však předat do této funkce index
+desetinné tečky, tj.&nbsp;vlastně index číslice, za kterou bude tečka
+zobrazena. Pokud tento index bude ležet mimo rozsah 0..3, tečka zobrazena
+nebude. Jedno z&nbsp;možných řešení může vypadat následovně. Nevýhodou tohoto
+řešení je nutnost kopie všech osmi příznaků segmentů (nebo naopak modifikace
+původního globálního pole, což je možná ještě horší):</p>
+
+<pre>
+func <strong>displayNumber</strong>(number int, dp int) {
+    x := number
+    for i := range 4 {
+        digit := x % 10
+        x /= 10
+        bits := make([]bool, 8)
+        copy(bits, digits[digit])
+&nbsp;
+        if i == dp {
+            bits[7] = true
+        }
+&nbsp;
+        control := controls[3-i]
+        control.High()
+        displaySegments(bits)
+        time.Sleep(SleepAmount)
+        control.Low()
+    }
+}
+</pre>
+
+<p>Volání funkce <strong>displayNumber</strong> bude v&nbsp;našem případě
+vypadat následovně. Zobrazujeme tisíciny stupně Celsia vydělené deseti, takže
+vlastně setiny. Tudíž musí být tečka zobrazena před posledními dvěma
+číslicemi:</p>
+
+<pre>
+    for {
+        temperature := machine.ReadTemperature()
+        temperature /= 10
+        for range 1000 {
+            displayNumber(int(temperature), 2)
+        }
+    }
+</pre>
+
+<p>Výsledek získaný po spuštění tohoto příkladu na reálné vývojové desce:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 427px"><a href="https://www.root.cz/obrazek/1267857/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-3.jpg" class="image-1267857" width="427" height="188" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-3-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-3-prev.webp" data-prev-width="370" data-prev-height="163" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-3.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-3.webp" data-large-width="427" data-large-height="188" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 427px" /></a><p>Obrázek 5: Zobrazení teploty i s desetinnou tečkou.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Opět si pro úplnost ukážeme zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+const SleepAmount = time.Millisecond * 1
+&nbsp;
+var controls [4]machine.Pin
+var pins [8]machine.Pin
+&nbsp;
+var digits [][]bool = [][]bool{
+    {true, true, true, true, true, true, false, false},
+    {false, true, true, false, false, false, false, false},
+    {true, true, false, true, true, false, true, false},
+    {true, true, true, true, false, false, true, false},
+    {false, true, true, false, false, true, true, false},
+    {true, false, true, true, false, true, true, false},
+    {true, false, true, true, true, true, true, false},
+    {true, true, true, false, false, false, false, false},
+    {true, true, true, true, true, true, true, false},
+    {true, true, true, true, false, true, true, false},
+}
+&nbsp;
+func <strong>init</strong>() {
+    controls[0] = machine.GP5
+    controls[1] = machine.GP6
+    controls[2] = machine.GP7
+    controls[3] = machine.GP8
+    for _, control := range controls {
+        control.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+&nbsp;
+    pins[0] = machine.GP11
+    pins[1] = machine.GP9
+    pins[2] = machine.GP13
+    pins[3] = machine.GP15
+    pins[4] = machine.GP16
+    pins[5] = machine.GP10
+    pins[6] = machine.GP12
+    pins[7] = machine.GP14
+&nbsp;
+    for _, pin := range pins {
+        pin.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    }
+}
+&nbsp;
+func <strong>displaySegments</strong>(bits []bool) {
+    for i := range bits {
+        bit := bits[i]
+        pin := pins[i]
+        if bit {
+            pin.High()
+        } else {
+            pin.Low()
+        }
+    }
+}
+&nbsp;
+func <strong>displayNumber</strong>(number int, dp int) {
+    x := number
+    for i := range 4 {
+        digit := x % 10
+        x /= 10
+        bits := make([]bool, 8)
+        copy(bits, digits[digit])
+&nbsp;
+        if i == dp {
+            bits[7] = true
+        }
+&nbsp;
+        control := controls[3-i]
+        control.High()
+        displaySegments(bits)
+        time.Sleep(SleepAmount)
+        control.Low()
+    }
+}
+&nbsp;
+func <strong>main</strong>() {
+    for {
+        temperature := machine.ReadTemperature()
+        temperature /= 10
+        for range 1000 {
+            displayNumber(int(temperature), 2)
+        }
+    }
+}
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Řízení maticového displeje</h2>
+
+<p>Prozatím jsme si ukázali tři možnosti zobrazení informací na vývojové
+desce:</p>
+
+<ol>
+
+<li>Přímé řízení LED připojené na GPIO. Lze tak vizuálně zobrazit binární
+hodnotu ano/ne, ok/chyba atd.</li>
+
+<li>Řízení LED přes PWM (pulsní šířkovou modulaci). Již se nejedná o binární
+hodnotu, ale o rozsah intenzity od &bdquo;nesvítí&ldquo; po &bdquo;plný
+svit&ldquo;.</li>
+
+<li>Řízení čtyřmístného sedmisegmentového displeje, což nám umožní zobrazit
+například dekadickou hodnotu 0 až 9999, hexadecimální hodnotu 0000 až FFFF, ale
+i některá <a
+href="https://en.wikipedia.org/wiki/Seven-segment_display_character_representations">další
+písmena či znaky</a>.</li>
+
+</ol>
+
+<p>To ovšem stále nemusí být pro mnoho účelů dostačující a proto je vývojová
+deska vybavena i maticovým displejem, resp.&nbsp;přesněji řečeno čtveřicí
+maticových displejů, které dohromady tvoří rastr 32&times;8 pixelů. Každý pixel
+je realizován jednou LED a podle způsobu řízení je možné zajistit jak zobrazení
+čistě <a href="https://en.wikipedia.org/wiki/Binary_image">binárních
+obrázků</a>, tak i obrázků ve stupních ... zelené.</p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Zapojení maticového displeje</h2>
+
+<p>Podívejme se na způsob zapojení maticového displeje na vývojové desce:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1267884/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-12-large.png" class="image-1267884" width="720" height="384" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-12-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-12-prev.webp" data-prev-width="370" data-prev-height="197" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-12-large.png" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-12-large.webp" data-large-width="720" data-large-height="384" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 6: Zapojení maticového displeje.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Ze schématu je patrné, že celá matice 32&times;8 pixelů je ve skutečnosti
+složena ze čtyř matic 8&times;8 pixelů. Ke každé z&nbsp;těchto matic je
+připojen osmibitový posuvný registr vybírající sloupce (každý posuvný registr
+má i svůj záchytný registr &ndash; <i>latch</i>). A LED z&nbsp;vybraného
+sloupce jsou řízeny přes posuvný registr umístěný do levého horního rohu
+schématu.</p>
+
+<p>Z&nbsp;pohledu programátora tedy musíme ovládat dva posuvné registry:</p>
+
+<ol>
+
+<li>Výběr sloupců, což je de facto 32bitový posuvný registr (povšimněte si, že
+je čtveřice obvodů 4094N zapojena za sebou &ndash; výstup jednoho z&nbsp;nich
+je připojen na <strong>D</strong> dalšího registru atd.).</li>
+
+<li>Výběr osmi LED ve sloupci osmibitovým posuvným registrem. Nejprve se do
+tohoto registru nasune osm bitů a poté se přenesou ze záchytného registru na
+výstup.</li>
+
+</ol>
+
+<p>Řízení je čistě věcí software, takže můžeme provádět různé optimalizace.
+Ovšem nejjednodušší je skutečně vždy vybrat pouze jediný sloupec, nasunout do
+osmice bitů pro sloupec hodnoty odpovídající LED ve sloupci, přenést tyto
+hodnoty ze záchytného registru na výstup a chvíli počkat. Takto se tedy provede
+vykreslování po sloupcích. Ovšem stejně tak je dobré vykreslovat po řádcích
+popř.&nbsp;například vykreslit stejný vzorek do více sloupců.</p>
+
+<p><div class="rs-tip-major">Poznámka: pochopitelně se jedná o dosti krkolomný
+způsob řízení maticového displeje. Existují totiž obvody, které přesně tento
+typ displeje dokážou řídit automaticky a s&nbsp;RPi se propojují přes
+standardní sériové rozhraní. Ovšem díky tomu, že máme k&nbsp;dispozici pouze
+dvojici posuvných registrů, donutí nás to se při programování důkladně
+zamyslet, jak vlastně musí celý systém fungovat &ndash; jakákoli chyba se ihned
+vizuálně projeví.</div></p>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Softwarové řízení posuvných registrů přes GPIO</h2>
+
+<p>Aby bylo možné maticový displej ovládat, musíme mít možnost komunikovat se
+dvěma posuvnými registry. První z&nbsp;těchto registrů budeme řídit přes
+GPIO17, GPIO18 a GPIO19. Na první pin je připojen signál, který oznamuje, že se
+má obsah interního posuvného registru poslat na osmici výstupních pinů. Dalším
+pinem se do registru nasunuje bit a posledním pinem se provádí posun všech bitů
+v&nbsp;registru o jednu pozici:</p>
+
+<pre>
+rowsLatch := machine.GP19
+rowsData := machine.GP18
+rowsClock := machine.GP17
+</pre>
+
+<p>Druhý posuvný registr je 32bitový a fyzicky je vytvořen ze čtveřice
+osmibitových registrů. Řídit ho budeme přes GPIO20, GPIO21 a GPIO22:</p>
+
+<pre>
+colsLatch := machine.GP22
+colsData := machine.GP21
+colsClock := machine.GP20
+</pre>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 293px"><a href="https://www.root.cz/obrazek/1267887/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-13-large.png" class="image-1267887" width="293" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-13-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-13-prev.webp" data-prev-width="151" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-13-large.png" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-13-large.webp" data-large-width="293" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 293px" /></a><p>Obrázek 7: Piny ROWSx a COLSx jsou použity pro ovládání maticového displeje.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Všechny tyto piny jsou výstupní, proto musíme provést jejich korektní
+konfiguraci:</p>
+
+<pre>
+rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Základní tvar SW smyčky pro obnovu informací na maticovém displeji</h2>
+
+<p>Jak jsme si již řekli v&nbsp;předchozím textu, budeme maticový displej
+ovládat čistě softwarově, tj.&nbsp;bez pomoci specializovaných obvodů.
+Zobrazení údajů na displeji spočívá v&nbsp;neustálém opakování tohoto kódu:</p>
+
+<pre>
+for {
+    for x := range 32 {
+        for y := range 8 {
+            <i>// výpočet hodnoty pro LED ve sloupci x na řádku y</i>
+&nbsp;
+            <i>// nasunutí hodnoty do sloupce</i>
+        }
+        <i>// přenos obsahu sloupcového záchytného registru na displej</i>
+&nbsp;
+        <i>// posun bitového vzorku v řádkovém záchytném registru</i>
+        <i>// přenos obsahu řádkového záchytného registru na displej</i>
+    }
+}
+</pre>
+
+<p>Ve vnějším cyklu se v&nbsp;posuvném 32bitovém registru <strong>COL</strong>
+posunuje nulový bit (výběr sloupce) postupně následovaný jedničkovými bity.
+Programová smyčka, která postupně povolí vysvícení LED v&nbsp;jednom sloupci,
+tedy může vypadat následovně:</p>
+
+<pre>
+for {
+    colsData.Low()
+    colsClock.High()
+    colsData.High()
+&nbsp;
+    for x := range 32 {
+        <i>// zde se bude řešit nasouvání pixelů ve sloupci</i>
+        <i>// zde se bude řešit nasouvání pixelů ve sloupci</i>
+        <i>// zde se bude řešit nasouvání pixelů ve sloupci</i>
+&nbsp;
+        colsClock.High()
+        time.Sleep(1 * time.Millisecond)
+        colsClock.Low()
+&nbsp;
+        colsLatch.High()
+        time.Sleep(1 * time.Millisecond)
+        colsLatch.Low()
+    }
+    time.Sleep(10 * time.Millisecond)
+}
+</pre>
+
+<p>Samozřejmě musíme ještě dopsat logiku pro nasunutí osmi bitů do registru
+<strong>ROW</strong> s&nbsp;následným posláním obsahu tohoto posuvného registru
+na piny připojené k&nbsp;maticovému displeji. Musíme tedy osmkrát provést zápis
+bitu do registru+nastavení signálu hodin. Po osmici těchto operací se pošle
+jednotkový puls na pin LATCH:</p>
+
+<pre>
+for {
+    colsData.Low()
+    colsClock.High()
+    colsData.High()
+&nbsp;
+    for x := range 32 {
+        for y := range 8 {
+            rowsData.Set(true)
+            rowsClock.Low()
+            time.Sleep(1 * time.Millisecond)
+            rowsClock.High()
+        }
+        rowsLatch.High()
+        time.Sleep(1 * time.Millisecond)
+        rowsLatch.Low()
+&nbsp;
+        colsClock.High()
+        time.Sleep(1 * time.Millisecond)
+        colsClock.Low()
+&nbsp;
+        colsLatch.High()
+        time.Sleep(1 * time.Millisecond)
+        colsLatch.Low()
+    }
+    time.Sleep(10 * time.Millisecond)
+}
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Demonstrační příklad: vyplnění celé plochy rozsvícenými pixely</h2>
+
+<p>Vnořené programové smyčky, které byly popsány <a href="#k09">v&nbsp;deváté
+kapitole</a>, nyní použijeme v&nbsp;demonstračním příkladu, který by po svém
+spuštění měl zapnout (a postupně obnovovat) všechny LED tvořící maticový
+displej:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        for range 32 {
+            for range 8 {
+                rowsData.Set(true)
+                rowsClock.Low()
+                time.Sleep(1 * time.Millisecond)
+                rowsClock.High()
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Millisecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Millisecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Millisecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Millisecond)
+    }
+}
+</pre>
+
+<p>Jak budou vypadat výsledky? Obnovování je provedeno relativně pomalu, takže
+vždy uvidíme pouze část rozsvícených LED (navíc lidské oko vnímá jinak, než
+CCD). Konkrétně uvidíme pruh několika sloupců LED, přičemž se tento pruh
+posunuje po displeji:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 522px"><a href="https://www.root.cz/obrazek/1267863/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-5-large.jpg" class="image-1267863" width="522" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-5-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-5-prev.webp" data-prev-width="268" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-5-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-5-large.webp" data-large-width="522" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 522px" /></a><p>Obrázek 9: Namísto všech diod vidíme pouze několik sloupců.&#160;Ty se neustále posouvají.</p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 520px"><a href="https://www.root.cz/obrazek/1267860/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-4-large.jpg" class="image-1267860" width="520" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-4-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-4-prev.webp" data-prev-width="268" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-4-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-4-large.webp" data-large-width="520" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 520px" /></a><p>Obrázek 8: Namísto všech diod vidíme pouze několik sloupců.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Vykreslení šachovnicového vzorku</h2>
+
+<p>Z&nbsp;předchozího pokusu je patrné, že musíme zkrátit doby trvání
+jednotlivých signálů (překlopení hodin a signálu pro ovládání záchytného
+registru), protože se displej neobnovuje dostatečně rychle. Namísto čekání
+jednu milisekundu budeme čekat minimálně jednu mikrosekundu (v&nbsp;praxi to
+však bude déle). To ovšem není vše. Namísto rozsvícení všech LED si necháme
+vykreslit šachovnicový vzorek. To vyžaduje zásah do smyčky, ve které se do
+posuvného registru (pro sloupec) nasunují jednotlivé bity.</p>
+
+<p>Namísto předchozí varianty smyčky ve tvaru:</p>
+
+<pre>
+for range 32 {
+    for range 8 {
+        rowsData.Set(true)
+</pre>
+
+<p>použijeme počitadla smyček a rozhodnutí, které LED se mají zapnout a které
+nikoli:</p>
+
+<pre>
+for x := range 32 {
+    for y := range 8 {
+        value := (x+y)%2 == 0
+        rowsData.Set(value)
+</pre>
+
+<p>Výsledek bude vypadat takto:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 394px"><a href="https://www.root.cz/obrazek/1267866/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-6-large.jpg" class="image-1267866" width="394" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-6-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-6-prev.webp" data-prev-width="203" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-6-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-6-large.webp" data-large-width="394" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 394px" /></a><p>Obrázek 9: Vykreslený šachovnicový vzorek.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Opět si ukažme úplný zdrojový kód tohoto demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        for x := range 32 {
+            for y := range 8 {
+                value := (x+y)%2 == 0
+                rowsData.Set(value)
+&nbsp;
+                rowsClock.Low()
+                time.Sleep(1 * time.Microsecond)
+                rowsClock.High()
+&nbsp;
+                time.Sleep(10 * time.Microsecond)
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Microsecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Microsecond)
+    }
+}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Otestování, zda je časování sloupců při ovládání displeje korektní</h2>
+
+<p>V&nbsp;dalším demonstračním příkladu si ověříme, jestli je vůbec časování a
+synchronizace obsluhy obou sad posuvných registrů korektní. Začneme tím, že
+necháme rozsvícený pouze první sloupec diod, zatímco ostatních 31 sloupců bude
+zhasnutých:</p>
+
+<pre>
+for x := range 32 {
+    for range 8 {
+        value := x == 0
+        rowsData.Set(value)
+&nbsp;
+        <i>// nasunutí hodnoty do sloupce</i>
+    }
+    <i>// přenos obsahu sloupcového záchytného registru na displej</i>
+&nbsp;
+    <i>// posun bitového vzorku v řádkovém záchytném registru</i>
+    <i>// přenos obsahu řádkového záchytného registru na displej</i>
+}
+</pre>
+
+<p>V&nbsp;případě, že je náš ovládací program napsán nekorektně, například
+pokud provádí posuny &bdquo;off-by-one&ldquo; (což byl největší problém při
+ladění kódu), bude zobrazen odlišný sloupec, nebude rozsvícený žádný sloupec
+nebo bude docházet k&nbsp;různému posunu.</p>
+
+<p>V&nbsp;praxi, tj.&nbsp;po překladu programu a jeho přenosu do Raspberry Pi
+Pico, bychom měli uvidět tento vzorek:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 623px"><a href="https://www.root.cz/obrazek/1267869/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-7-large.jpg" class="image-1267869" width="623" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-7-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-7-prev.webp" data-prev-width="321" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-7-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-7-large.webp" data-large-width="623" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 623px" /></a><p>Obrázek 10: Nyní svítí pouze první sloupec LED.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Následuje výpis celého zdrojového kódu takto upraveného demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        for x := range 32 {
+            for range 8 {
+                value := x == 0
+                rowsData.Set(value)
+&nbsp;
+                rowsClock.Low()
+                time.Sleep(1 * time.Microsecond)
+                rowsClock.High()
+&nbsp;
+                time.Sleep(10 * time.Microsecond)
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Microsecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Microsecond)
+    }
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Otestování časování řádků</h2>
+
+<p>Ještě nám zbývá ověření časování řádků (což není zcela přesné, spíše bychom
+mohli říci, že se jedná o časování nasunování pixelů do aktivního sloupce). Pro
+tento účel si necháme rozsvítit celou plochu displeje, s&nbsp;výjimkou
+trojúhelníku v&nbsp;jeho levé horní části:</p>
+
+<pre>
+for x := range 32 {
+    for range 8 {
+        value := y &lt; x
+        rowsData.Set(value)
+&nbsp;
+        <i>// nasunutí hodnoty do sloupce</i>
+    }
+    <i>// přenos obsahu sloupcového záchytného registru na displej</i>
+&nbsp;
+    <i>// posun bitového vzorku v řádkovém záchytném registru</i>
+    <i>// přenos obsahu řádkového záchytného registru na displej</i>
+}
+</pre>
+
+<p>Vzorek zobrazený na maticovém displeji by měl vypadat takto:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 532px"><a href="https://www.root.cz/obrazek/1267872/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-8-large.jpg" class="image-1267872" width="532" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-8-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-8-prev.webp" data-prev-width="274" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-8-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-8-large.webp" data-large-width="532" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 532px" /></a><p>Obrázek 11: Trojúhelníkový vzorek.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Opět si ukážeme celý zdrojový kód takto upraveného demonstračního
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+func <strong>main</strong>() {
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        for x := range 32 {
+            for y := range 8 {
+                value := y &lt; x
+                rowsData.Set(value)
+&nbsp;
+                rowsClock.Low()
+                time.Sleep(1 * time.Microsecond)
+                rowsClock.High()
+&nbsp;
+                time.Sleep(10 * time.Microsecond)
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Microsecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Microsecond)
+    }
+}
+</pre>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Vykreslení celé bitmapy 32&times;8 pixelů</h2>
+
+<p>Prozatím jsme na maticovém displeji zobrazovali pouze jednoduché vzory.
+V&nbsp;praxi však budeme chtít zobrazit libovolnou bitmapu. Pro jednoduchost
+můžeme takovou bitmapu uložit do řezu řetězců. Tento řez bude obsahovat osm
+prvků, přičemž každý prvek bude řetězec se třiceti dvěma znaky. Mezera znamená
+&bdquo;dioda nesvítí&ldquo;, jakýkoli jiný znak &bdquo;dioda svítí&ldquo;:</p>
+
+<pre>
+var raster []string = []string{
+    //
+    "***** * *   * *   *             ",
+    "  *   * **  *  * *              ",
+    "  *   * * * *   *   ****   **** ",
+    "  *   * *  **   *  *    * *    *",
+    "  *   * *   *   *  *      *    *",
+    "                   *   ** *    *",
+    "                   *    * *    *",
+    "                    ****   **** ",
+}
+</pre>
+
+<p>Ve skutečnosti je úprava vykreslovací smyčky triviální. Získáme hodnotu
+&bdquo;pixelu&ldquo; (v&nbsp;tomto případě pixel=znak) a pokud se nejedná o
+mezeru, nastaví se bit nasunovaný do posuvného registru <strong>ROW</strong> na
+logickou jedničku:</p>
+
+<pre>
+for x := range 32 {
+    for y := range 8 {
+        pixel := raster[7-y][x]
+        value := pixel != ' '
+        rowsData.Set(value)
+                ...
+                ...
+                ...
+    }
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Výsledek by měl vypadat takto:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 614px"><a href="https://www.root.cz/obrazek/1267875/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-9.jpg" class="image-1267875" width="614" height="185" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-9-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-9-prev.webp" data-prev-width="370" data-prev-height="111" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-9.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-9.webp" data-large-width="614" data-large-height="185" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 614px" /></a><p>Obrázek 12: Vykreslená bitmapa. Povšimněte si "duchů" (ghostingu), což je chyba, kterou lze opravit změnou časování signálů posuvných registrů. Ve skutečnosti je ghosting patrný jen na snímku a nikoli při pohledu na reálný displej.</p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Celý zdrojový kód takto upraveného demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+var raster []string = []string{
+    //
+    "***** * *   * *   *             ",
+    "  *   * **  *  * *              ",
+    "  *   * * * *   *   ****   **** ",
+    "  *   * *  **   *  *    * *    *",
+    "  *   * *   *   *  *      *    *",
+    "                   *   ** *    *",
+    "                   *    * *    *",
+    "                    ****   **** ",
+}
+&nbsp;
+func <strong>main</strong>() {
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        for x := range 32 {
+            for y := range 8 {
+                pixel := raster[7-y][x]
+                value := pixel != ' '
+                rowsData.Set(value)
+&nbsp;
+                rowsClock.Low()
+                time.Sleep(1 * time.Microsecond)
+                rowsClock.High()
+&nbsp;
+                time.Sleep(10 * time.Microsecond)
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Microsecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Microsecond)
+    }
+}
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Scrolling obrazu s&nbsp;využitím potenciometru</h2>
+
+<p>Nyní, když dokážeme vykreslit prakticky jakýkoli rastrový obraz na maticovém
+displeji, můžeme spojit tuto schopnost s&nbsp;ovládáním posunu (scrollingu)
+přes potenciometr. Jak se čte hodnota potenciometru s&nbsp;využitím
+analogově-digitálního převodníku jsme si již ukázali minule. Můžeme se tedy
+pokusit o posun vykreslovaného rastrového obrázku o hodnotu 0-31 (pixelů),
+kterou nějakým způsobem získáme z&nbsp;aktuální orientace potenciometru.</p>
+
+<p>Původně vypadala smyčka pro obnovení obsahu displeje takto:</p>
+
+<pre>
+for x := range 32 {
+    for y := range 8 {
+        pixel := raster[7-y][x]
+        value := pixel != ' '
+        rowsData.Set(value)
+                ...
+                ...
+                ...
+    }
+        ...
+        ...
+        ...
+}
+</pre>
+
+<p>Úprava spočívá v&nbsp;tom, že přečteme hodnotu potenciometru (16 bitů),
+kterou posuneme doprava o 11 bitů. Výsledkem je pětibitová hodnota 0..31, o
+kterou se posuneme při čtení obsahu rastrového obrázku, který se má zobrazit
+(pochopitelně včetně řešení přetečení):</p>
+
+<pre>
+var scroll = int(adc2.Get()) &gt;&gt; 11
+&nbsp;
+for x := range 32 {
+    for y := range 8 {
+        pixel := raster[7-y][(x+scroll)%32]
+        value := pixel != ' '
+        rowsData.Set(value)
+</pre>
+
+<p>Výsledky:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 619px"><a href="https://www.root.cz/obrazek/1267878/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-10-large.jpg" class="image-1267878" width="619" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-10-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-10-prev.webp" data-prev-width="318" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-10-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-10-large.webp" data-large-width="619" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 619px" /></a><p>Obrázek 13: Plynulý scrolling řízený potenciometrem.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 642px"><a href="https://www.root.cz/obrazek/1267881/"><img src="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-11-large.jpg" class="image-1267881" width="642" height="525" data-prev-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-11-prev.jpg" data-prev-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-11-prev.webp" data-prev-width="330" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-11-large.jpg" data-large-filename-webp="https://i.iinfo.cz/images/564/tinygo-a-raspberry-pi-pico-11-large.webp" data-large-width="642" data-large-height="525" alt="Obrázek :" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 642px" /></a><p>Obrázek 14: Plynulý scrolling řízený potenciometrem.&#160;&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Opět si ukažme úplný zdrojový kód takto upraveného demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+var raster []string = []string{
+    //
+    "***** * *   * *   *             ",
+    "  *   * **  *  * *              ",
+    "  *   * * * *   *   ****   **** ",
+    "  *   * *  **   *  *    * *    *",
+    "  *   * *   *   *  *      *    *",
+    "                   *   ** *    *",
+    "                   *    * *    *",
+    "                    ****   **** ",
+}
+&nbsp;
+func <strong>main</strong>() {
+    machine.InitADC()
+    adc0 := machine.ADC{Pin: machine.ADC0}
+    adc1 := machine.ADC{Pin: machine.ADC1}
+    adc2 := machine.ADC{Pin: machine.ADC2}
+&nbsp;
+    adc0.Configure(machine.ADCConfig{})
+    adc1.Configure(machine.ADCConfig{})
+    adc2.Configure(machine.ADCConfig{})
+&nbsp;
+    rowsLatch := machine.GP19
+    rowsData := machine.GP18
+    rowsClock := machine.GP17
+&nbsp;
+    colsLatch := machine.GP22
+    colsData := machine.GP21
+    colsClock := machine.GP20
+&nbsp;
+    rowsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    rowsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    colsLatch.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsData.Configure(machine.PinConfig{Mode: machine.PinOutput})
+    colsClock.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    for {
+        colsData.Low()
+        colsClock.High()
+        colsData.High()
+&nbsp;
+        var scroll = int(adc2.Get()) &gt;&gt; 11
+&nbsp;
+        for x := range 32 {
+            for y := range 8 {
+                pixel := raster[7-y][(x+scroll)%32]
+                value := pixel != ' '
+                rowsData.Set(value)
+&nbsp;
+                rowsClock.Low()
+                time.Sleep(1 * time.Microsecond)
+                rowsClock.High()
+&nbsp;
+                time.Sleep(10 * time.Microsecond)
+            }
+            rowsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            rowsLatch.Low()
+&nbsp;
+            colsClock.High()
+            time.Sleep(1 * time.Microsecond)
+            colsClock.Low()
+&nbsp;
+            colsLatch.High()
+            time.Sleep(1 * time.Microsecond)
+            colsLatch.Low()
+        }
+        time.Sleep(10 * time.Microsecond)
+    }
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Raspberry Pi Pico připojené ve funkci terminálu</h2>
+
+<p>Ve chvíli, kdy se do Raspberry Pi Pico přes USB přesune soubor
+s&nbsp;binárním spustitelným kódem, dojde k&nbsp;automatickému odpojení
+Raspberry (v&nbsp;režimu mass storage) a k&nbsp;opětovnému připojení
+v&nbsp;režimu terminálu (resp.&nbsp;přesněji řečeno v&nbsp;režimu sériového
+přenosu). To například znamená, že je možné v&nbsp;programech používat klasické
+vstupně-výstupní operace.</p>
+
+<pre>
+[2399478.090936] usb 3-1: new full-speed USB device number 106 using xhci_hcd
+[2399478.216206] usb 3-1: New USB device found, idVendor=2e8a, idProduct=000a, bcdDevice= 1.00
+[2399478.216224] usb 3-1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[2399478.216230] usb 3-1: Product: Pico
+[2399478.216235] usb 3-1: Manufacturer: Raspberry Pi
+[2399478.220389] cdc_acm 3-1:1.0: ttyACM0: USB ACM device
+</pre>
+
+<p>Způsob připojení (jméno zařízení se získá z&nbsp;dmesg):</p>
+
+<pre>
+$ <strong>minicom -D /dev/ttyACM0</strong>
+</pre>
+
+<p>Pokud se k&nbsp;Raspberry Pi Pico připojíme například přes výše zmíněný
+Minocom, lze sledovat zprávy tištěné aplikací. Příkladem je detekci stisku
+tlačítka na vývojové desce:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+    "machine"
+    "time"
+)
+&nbsp;
+const InputPin = machine.GP0
+const OutputPin = machine.GP2
+&nbsp;
+func <strong>main</strong>() {
+    led := OutputPin
+    led.Configure(machine.PinConfig{Mode: machine.PinOutput})
+&nbsp;
+    button := InputPin
+    button.Configure(machine.PinConfig{Mode: machine.PinInput})
+&nbsp;
+    for {
+        pressed := button.Get()
+        led.Set(pressed)
+        if pressed {
+            println("Button press detected")
+            const SleepAmount = time.Second * 1
+            time.Sleep(SleepAmount)
+        }
+    }
+}
+</pre>
+
+<p>Taktéž je možné, aby aplikace čekala na data zadaná z&nbsp;klávesnice a
+poslaná přes Minicom do Raspberry Pi Pico:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+    var name string
+&nbsp;
+    fmt.Print("Name: ")
+    fmt.Scanln(&amp;name)
+&nbsp;
+    fmt.Printf("Hello, %s!\n", name)
+}
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Sériové rozhraní SPI</h2>
+
+<p>Sběrnice resp.&nbsp;přesněji řečeno rozhraní <i>SPI</i> (<i>Serial
+Peripheral Interface</i>) představuje jednu z&nbsp;forem sériových externích
+sběrnic sloužících pro vzájemné propojení dvou či více komunikujících uzlů,
+přičemž jeden uzel obvykle vystupuje v&nbsp;roli takzvaného řadiče sběrnice
+(<i>master</i>), ostatní uzly pracují v&nbsp;režimu <i>slave</i>. Uzel, který
+pracuje jako <i>master</i>, obsahuje generátor hodinového signálu, který je
+rozveden do všech ostatních uzlů, čímž je umožněn zcela synchronní (navíc ještě
+obousměrný) přenos dat. Hodinový signál je rozváděn vodičem označovaným
+symbolem <i>SCK</i>.</p>
+
+<p>Kromě vodiče s&nbsp;hodinovým signálem jsou uzly propojeny dvojicí vodičů
+označovaných většinou symboly <i>MISO</i> (<i>Master In, Slave Out</i>) a
+<i>MOSI</i> (<i>Master Out, Slave In</i>), pomocí nichž se obousměrně (full
+duplex) přenáší data.  Posledním signálem, který se u této sběrnice používá, je
+signál <i>SSEL</i> (<i>Slave Select</i>), jenž slouží &ndash; jak již jeho
+název napovídá &ndash; k&nbsp;výběru některého uzlu pracujícího v&nbsp;režimu
+<i>slave</i>. Všechny čtyři signály &ndash; <i>SCK</i>, <i>MISO</i>,
+<i>MOSI</i> i <i>SSEL</i>, pro svoji funkci vyžadují pouze jednosměrné porty,
+což přispívá k&nbsp;jednoduché a především levné implementaci této
+sběrnice.</p>
+
+<p>Raspberry Pi Pico nabízí dvojici na sobě nezávislých SPI rozhraní, přičemž
+pro každé SPI může být rezervováno několik pinů: <strong>MOSI</strong>,
+<strong>MISO</strong>, <strong>SCLK</strong> (nebo <strong>SCK</strong>) a
+výstupní piny pro výběr obvodu <strong>CSn</strong> (jeden z&nbsp;těchto pinů
+je propojen na druhé straně s&nbsp;výběrovým pinem SSEL). Konkrétně se jedná o
+následující piny:</p>
+
+<table>
+<tr><th>Rozhraní</th><th>MISO</th><th>MOSI</th><th>SCLK</th><th>CSn</th></tr>
+<tr><td>SPI0</td><td>GP0/GP4/GP16</td><td>GP3/GP7/GP19</td><td>GP2/GP6/GP18</td><td>GP1/GP5/GP17</td></tr>
+<tr><td>SPI1</td><td>GP8/GP12</td><td>GP11/GP15</td><td>GP10/GP14</td><td>GP9/GP13</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: s&nbsp;praktickým příkladem použití SPI
+z&nbsp;TinyGo se seznámíme v&nbsp;navazujícím článku.</div></p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Sériová sběrnice I<sup>2</sup>C</h2>
+
+<p>Další sériovou sběrnicí, kterou si dnes a především v&nbsp;navazující části
+tohoto seriálu popíšeme, je sběrnice označovaná poněkud neobvykle symbolem
+<i>I<sup>2</sup>C</i>, což je zkratka z&nbsp;celého názvu <i>Inter-Integrated
+Circuit</i>. V&nbsp;určitých ohledech se jedná o sběrnici podobnou rozhraní
+<i>SPI</i> (existence hodinového signálu, jediný uzel typu <i>master</i>),
+ovšem některé vlastnosti těchto sběrnic jsou odlišné. Zatímco u sběrnice
+<i>SPI</i> byl umožněn obousměrný přenos dat díky použití dvojice vodičů
+<i>MISO</i> a <i>MOSI</i>, je sběrnice <i>I<sup>2</sup>C</i> vybavena
+&bdquo;pouze&ldquo; jedním datovým vodičem <i>SDA</i>, z&nbsp;čehož vyplývá, že
+se data přenáší poloduplexně (a ušetří se jak piny, tak i vodiče). Také to
+znamená poněkud složitější interní strukturu všech připojených zařízení,
+protože příslušné piny musí být možné přepínat ze vstupního režimu na režim
+výstupní.</p>
+
+<p>Navíc zde není použit výběr zařízení typu <i>slave</i> pomocí zvláštních
+signálů, protože každému uzlu je přiřazena jednoznačná adresa &ndash; kromě
+elektrických charakteristik je totiž přesně stanoven i komunikační protokol,
+což je další rozdíl oproti výše popsanému rozhraní <i>SPI</i>. Obecně je možné
+říci, že <i>I<sup>2</sup>C</i> je sice poněkud složitější, ale zato
+flexibilnější sběrnice, která se velmi často používá i pro komunikaci na delší
+vzdálenosti (řádově metry, viz například <i>DDC</i> u monitorů), než tomu je u
+sběrnice <i>SPI</i>. V&nbsp;navazující části seriálu si řekneme, jakým způsobem
+komunikace probíhá a jak se vlastně jednotlivá zařízení adresují.</p>
+
+<p>Pro I<sup>2</sup>C se na Raspberry Pi Pico mohou použít dvojice pinů
+<strong>SDA</strong> a <strong>SCL</strong>. Současně mohou být nakonfigurovány
+dvě sběrnice I<sup>2</sup>C0 a I<sup>2</sup>C1, což znamená čtveřici obsazených
+GPIO:</p>
+
+<table>
+<tr><th>Sběrnice</th><th>SDA</th><th>SCL</th></tr>
+<tr><td>I<sup>2</sup>C0</td><td>GP0/GP4/GP8/GP12/GP16/GP20</td><td>GP1/GP5/GP9/GP13/GP17/GP21</td></tr>
+<tr><td>I<sup>2</sup>C1</td><td>GP2/GP6/GP10/GP14/GP18/GP26</td><td>GP3/GP7/GP11/GP15/GP19/GP27</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: s&nbsp;praktickým příkladem použití
+I<sup>2</sup>C z&nbsp;TinyGo se opět seznámíme v&nbsp;navazujícím
+článku.</div></p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech <a
+href="https://www.root.cz/clanky/vyuziti-tinygo-pri-programovani-raspberry-pi-pico-od-gpio-az-k-pwm/">minule</a>
+i dnes použitých demonstračních příkladů byly uloženy do Git repositáře, který
+je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář, můžete namísto toho použít odkazy na jednotlivé demonstrační
+příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>blink.go</td><td>blikání LED připojenou ke zvolenému GPIO</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/blink.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/blink.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 2</td><td>button1.go</td><td>čtení tlačítka připojeného ke zvolenému GPIO, základní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button1.go</a></td></tr>
+<tr><td> 3</td><td>button2.go</td><td>čtení tlačítka připojeného ke zvolenému GPIO, pojmenované konstanty s&nbsp;GPIO</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button2.go</a></td></tr>
+<tr><td> 4</td><td>button3.go</td><td>čtení tlačítka připojeného ke zvolenému GPIO, vylepšení vizualizace stisku tlačítka</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button3.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/button3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 5</td><td>7segments1.go</td><td>ovládání sedmisegmentového displeje, základní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments1.go</a></td></tr>
+<tr><td> 6</td><td>7segments2.go</td><td>ovládání sedmisegmentového displeje s&nbsp;více číslicemi</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments2.go</a></td></tr>
+<tr><td> 7</td><td>7segments3.go</td><td>rozsvícení libovolné kombinace segmentů</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments3.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments3.go</a></td></tr>
+<tr><td> 8</td><td>7segments4.go</td><td>tisk hodnoty 0 až 9999  na čtyřmístném sedmisegmentovém displeji</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments4.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/7segments4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 9</td><td>adc1.go</td><td>analogově digitální převodník: čtení stavu potenciometru s&nbsp;tiskem hodnoty odpovídající jeho natočení, základní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/adc1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/adc1.go</a></td></tr>
+<tr><td>10</td><td>adc2.go</td><td>čtení stavu potenciometru, varianta méně závislá na šumu ADC</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/adc2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/adc2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>pwm1.go</td><td>pulsně šířková modulace: příklad bez detekce chyb</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/pwm1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/pwm1.go</a></td></tr>
+<tr><td>12</td><td>pwm2.go</td><td>pulsně šířková modulace: příklad s&nbsp;detekcí chyb (vizualizováno přes LED)</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/pwm2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/pwm2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>temperature1.go</td><td>změření teploty senzorem na čipu</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature1.go</a></td></tr>
+<tr><td>14</td><td>temperature2.go</td><td>menší frekvence měření teploty</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature2.go</a></td></tr>
+<tr><td>15</td><td>temperature3.go</td><td>úprava pro zobrazení desetinné tečky</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature3.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/temperature3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>matrix1.go</td><td>ovládání maticového LED displeje: pomalé časování signálů</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix1.go</a></td></tr>
+<tr><td>17</td><td>matrix2.go</td><td>zobrazení šachovnicového vzorku</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix2.go</a></td></tr>
+<tr><td>18</td><td>matrix3.go</td><td>test korektního načasování pro zobrazení prvního sloupce</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix3.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix3.go</a></td></tr>
+<tr><td>19</td><td>matrix4.go</td><td>test korektního načasování pro zobrazení řádků</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix4.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix4.go</a></td></tr>
+<tr><td>20</td><td>matrix5.go</td><td>zobrazení rastrového obrázku na maticovém LED displeji</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix5.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix5.go</a></td></tr>
+<tr><td>21</td><td>matrix6.go</td><td>skrolování informace na maticovém LED displeji pomocí potenciometru</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix6.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/matrix6.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>22</td><td>terminal1.go</td><td>výpis informací na terminál</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/terminal1.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/terminal1.go</a></td></tr>
+<tr><td>23</td><td>terminal2.go</td><td>přečtení informací z&nbsp;terminálu</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/terminal2.go">https://github.com/tisnik/go-root/blob/master/tinygo-rp2040/terminal2.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>TinyGo - A Go Compiler For Small Places<br />
+<a href="https://tinygo.org/">https://tinygo.org/</a>
+</li>
+
+<li>Getting started<br />
+<a href="https://tinygo.org/getting-started/">https://tinygo.org/getting-started/</a>
+</li>
+
+<li>Go.dev (klasická varianta překladače jazyka Go)<br />
+<a href="https://go.dev/">https://go.dev/</a>
+</li>
+
+<li>gccgo<br />
+<a href="https://gcc.gnu.org/onlinedocs/gccgo/">https://gcc.gnu.org/onlinedocs/gccgo/</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://go.dev/doc/install/gccgo">https://go.dev/doc/install/gccgo</a>
+</li>
+
+<li>Awesome Go<br />
+<a href="https://github.com/avelino/awesome-go">https://github.com/avelino/awesome-go</a>
+</li>
+
+<li>TinyGo: Inline assembly<br />
+<a href="https://tinygo.org/docs/concepts/compiler-internals/inline-assembly/">https://tinygo.org/docs/concepts/compiler-internals/inline-assembly/</a>
+</li>
+
+<li>Getting Started with TinyGo: Bringing Go to Microcontrollers and WebAssembly<br />
+<a href="https://dev.to/ekwoster/getting-started-with-tinygo-bringing-go-to-microcontrollers-and-webassembly-2pp0">https://dev.to/ekwoster/getting-started-with-tinygo-bringing-go-to-microcontrollers-and-webassembly-2pp0</a>
+</li>
+
+<li>Optimizing Go code with GCCGO for improved performance<br />
+<a href="https://dev.to/parmcoder/optimizing-go-code-with-gccgo-for-improved-performance-2d3d">https://dev.to/parmcoder/optimizing-go-code-with-gccgo-for-improved-performance-2d3d</a>
+</li>
+
+<li>The Untold Power of TinyGo: How to Run Go on Microcontrollers and Supercharge Embedded Development<br />
+<a href="https://dev.to/ekwoster/the-untold-power-of-tinygo-how-to-run-go-on-microcontrollers-and-supercharge-embedded-development-2g7d">https://dev.to/ekwoster/the-untold-power-of-tinygo-how-to-run-go-on-microcontrollers-and-supercharge-embedded-development-2g7d</a>
+</li>
+
+<li>From Arduino to Mars: Why You Should Be Using TinyGo for Embedded Web Development<br />
+<a href="https://dev.to/ekwoster/from-arduino-to-mars-why-you-should-be-using-tinygo-for-embedded-web-development-54od">https://dev.to/ekwoster/from-arduino-to-mars-why-you-should-be-using-tinygo-for-embedded-web-development-54od</a>
+</li>
+
+<li>Optimizing binaries<br />
+<a href="https://tinygo.org/docs/guides/optimizing-binaries/">https://tinygo.org/docs/guides/optimizing-binaries/</a>
+</li>
+
+<li>Why TinyGo Might Be the Future of Embedded WebAssembly &amp; How To Get Started Today<br />
+<a href="https://ekwoster.dev/post/-why-tinygo-might-be-the-future-of-embedded-webassembly-how-to-get-started-today/">https://ekwoster.dev/post/-why-tinygo-might-be-the-future-of-embedded-webassembly-how-to-get-started-today/</a>
+</li>
+
+<li>TinyGo na GitHubu<br />
+<a href="https://github.com/tinygo-org/tinygo">https://github.com/tinygo-org/tinygo</a>
+</li>
+
+<li>Compile Go directly to WebAssembly components with TinyGo and WASI P2<br />
+<a href="https://wasmcloud.com/blog/compile-go-directly-to-webassembly-components-with-tinygo-and-wasi-p2/">https://wasmcloud.com/blog/compile-go-directly-to-webassembly-components-with-tinygo-and-wasi-p2/</a>
+</li>
+
+<li>Do you use gccgo?<br />
+<a href="https://www.reddit.com/r/golang/comments/j1g1z6/do_you_use_gccgo/">https://www.reddit.com/r/golang/comments/j1g1z6/do_you_use_gccgo/</a>
+</li>
+
+<li>Go v/s TinyGo: Which one is the best for you?<br />
+<a href="https://blog.nonstopio.com/go-v-s-tinygo-which-one-is-the-best-for-you-73cac3c7849e">https://blog.nonstopio.com/go-v-s-tinygo-which-one-is-the-best-for-you-73cac3c7849e</a>
+</li>
+
+<li>Go Wiki: GccgoCrossCompilation<br />
+<a href="https://go.dev/wiki/GccgoCrossCompilation">https://go.dev/wiki/GccgoCrossCompilation</a>
+</li>
+
+<li>Oficiální stránky Gccgo<br />
+<a href="https://gcc.gnu.org/onlinedocs/gccgo/index.html">https://gcc.gnu.org/onlinedocs/gccgo/index.html</a>
+</li>
+
+<li>What are the primary differences between 'gc' and 'gccgo'?<br />
+<a href="https://stackoverflow.com/questions/25811445/what-are-the-primary-differences-between-gc-and-gccgo">https://stackoverflow.com/questions/25811445/what-are-the-primary-differences-between-gc-and-gccgo</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://go.dev/doc/install/gccgo">https://go.dev/doc/install/gccgo</a>
+</li>
+
+<li>Go (Arch Linux)<br />
+<a href="https://wiki.archlinux.org/title/Talk:Go">https://wiki.archlinux.org/title/Talk:Go</a>
+</li>
+
+<li>Why are binaries built with gccgo smaller (among other differences?)<br />
+<a href="https://stackoverflow.com/questions/27067112/why-are-binaries-built-with-gccgo-smaller-among-other-differences">https://stackoverflow.com/questions/27067112/why-are-binaries-built-with-gccgo-smaller-among-other-differences</a>
+</li>
+
+<li>Why Everyone Is Sleeping On TinyGo: Run Go on Microcontrollers and the Web (WASM) Today!<br />
+<a href="https://ekwoster.dev/post/-why-everyone-is-sleeping-on-tinygo-run-go-on-microcontrollers-and-the-web-wasm-today/">https://ekwoster.dev/post/-why-everyone-is-sleeping-on-tinygo-run-go-on-microcontrollers-and-the-web-wasm-today/</a>
+</li>
+
+<li>Go (Golang) GOOS and GOARCH<br />
+<a href="https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63">https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63</a>
+</li>
+
+<li>Externí sériové sběrnice SPI a I²C<br />
+<a href="https://www.root.cz/clanky/externi-seriove-sbernice-spi-a-i2c/">https://www.root.cz/clanky/externi-seriove-sbernice-spi-a-i2c/</a>
+</li>
+
+<li>Sedmisegmentový displej (Wikipedie)<br />
+<a href="https://cs.wikipedia.org/wiki/Sedmisegmentov%C3%BD_displej">https://cs.wikipedia.org/wiki/Sedmisegmentov%C3%BD_displej</a>
+</li>
+
+<li>A/D převodník (Wikipedie)<br />
+<a href="https://cs.wikipedia.org/wiki/A/D_p%C5%99evodn%C3%ADk">https://cs.wikipedia.org/wiki/A/D_p%C5%99evodn%C3%ADk</a>
+</li>
+
+<li>D/A převodník (Wikipedie)<br />
+<a href="https://cs.wikipedia.org/wiki/D/A_p%C5%99evodn%C3%ADk">https://cs.wikipedia.org/wiki/D/A_p%C5%99evodn%C3%ADk</a>
+</li>
+
+<li>Pulzně šířková modulace<br />
+<a href="https://cs.wikipedia.org/wiki/Pulzn%C4%9B_%C5%A1%C3%AD%C5%99kov%C3%A1_modulace">https://cs.wikipedia.org/wiki/Pulzn%C4%9B_%C5%A1%C3%AD%C5%99kov%C3%A1_modulace</a>
+</li>
+
+<li>TinyGo: Using PWM<br />
+<a href="https://tinygo.org/docs/tutorials/pwm/">https://tinygo.org/docs/tutorials/pwm/</a>
+</li>
+
+<li>General-purpose input/output<br />
+<a href="https://en.wikipedia.org/wiki/General-purpose_input/output">https://en.wikipedia.org/wiki/General-purpose_input/output</a>
+</li>
+
+<li>KWM-20881AGBLUCKYLIGHT-Display LED<br />
+<a href="https://www.tme.eu/en/details/kwm-20881agb/led-displays-matrix/luckylight/">https://www.tme.eu/en/details/kwm-20881agb/led-displays-matrix/luckylight/</a>
+</li>
+
+<li>ESP-32 - LED Matrix<br />
+<a href="https://esp32io.com/tutorials/esp32-led-matrix">https://esp32io.com/tutorials/esp32-led-matrix</a>
+</li>
+
+<li>Seven-segment display character representations<br />
+<a href="https://en.wikipedia.org/wiki/Seven-segment_display_character_representations">https://en.wikipedia.org/wiki/Seven-segment_display_character_representations</a>
+</li>
+
+<li>Binary image<br />
+<a href="https://en.wikipedia.org/wiki/Binary_image">https://en.wikipedia.org/wiki/Binary_image</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="https://github.com/tisnik/">Pavel Tišnovský</a> &nbsp; 2026</small></p>
+</body>
+</html>
+
