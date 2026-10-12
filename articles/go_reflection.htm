@@ -1,0 +1,2081 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>Reflexe v programovacím jazyce Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>Reflexe v programovacím jazyce Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Typový systém programovacího jazyka Go je pro většinu menších aplikací velmi jednoduše použitelný a obvykle nevyžaduje žádné &bdquo;ohýbání&ldquo;. Ovšem existují situace, v nichž je nutné pracovat s hodnotami, jejichž typy nemusí být známé v době překladu. A právě zde se uplatní reflexe.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. Reflexe v&nbsp;programovacím jazyce Go</a></p>
+<p><a href="#k02">2. Koncept rozhraní v&nbsp;jazyce Go</a></p>
+<p><a href="#k03">3. Rozhraní je plnohodnotný datový typ</a></p>
+<p><a href="#k04">4. Struktura vyhovující rozhraní</a></p>
+<p><a href="#k05">5. Rozlišení konkrétních typů v&nbsp;čase běhu programu</a></p>
+<p><a href="#k06">6. Explicitní typové konverze (přetypování)</a></p>
+<p><a href="#k07">7. Typové aserce</a></p>
+<p><a href="#k08">8. Kontroly prováděné překladačem</a></p>
+<p><a href="#k09">9. Test v&nbsp;runtime, zda bylo možné přetypování provést</a></p>
+<p><a href="#k10">10. Ukázka typových asercí</a></p>
+<p><a href="#k11">11. Rozeskok na základě běhové typové informace</a></p>
+<p><a href="#k12">12. Ukázka rozeskoku provedeného na základě běhových typových informací</a></p>
+<p><a href="#k13">13. Standardní balíček <strong>reflect</strong></a></p>
+<p><a href="#k14">14. Funkce <strong>reflect.ValueOf</strong> a datový typ <strong>Value</strong></a></p>
+<p><a href="#k15">15. Příklady použití funkce <strong>reflect.ValueOf</strong></a></p>
+<p><a href="#k16">16. Složitější příklady</a></p>
+<p><a href="#k17">17. Reflexe a hodnoty <strong>nil</strong></a></p>
+<p><a href="#k18">18. Přečtení informace o typu</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. Reflexe v&nbsp;programovacím jazyce Go</h2>
+
+<p>Jak již bylo napsáno v&nbsp;perexu dnešního článku, je možné aplikace
+v&nbsp;jazyce Go programovat takovým způsobem, že jak programátor, tak i
+překladač bude pro každou proměnnou a pro každý parametr přesně znát datový typ
+hodnot. Ovšem v&nbsp;případě, že se tvoří obecnější algoritmy, se situace
+komplikuje, protože v&nbsp;takových případech se většinou namísto konkrétních
+datových typů používají rozhraní (<i>interface</i>), která mohou být obecně
+splňována (<i>satisfy</i>) mnoha různými typy. A někdy se dokonce používají i
+prázdná rozhraní, která splňují všechny datové typy. V&nbsp;takových případech
+musíme mít možnost získání informace o tom, jaký je typ konkrétní hodnoty,
+s&nbsp;níž se pracuje &ndash; a zde již možnosti statického typového systému
+rozpoznávaného překladačem nemusí postačovat. Jedno z&nbsp;řešení tohoto
+problému spočívá ve využití reflexe (<i>reflection</i>).</p>
+
+<p>V&nbsp;rukou programátora se jedná o mocnou zbraň, která však může být dosti
+nebezpečná, takže se obecně doporučuje se reflexi vyhnout. To je ovšem dosti
+obecné doporučení a bude dobré si ověřit, jestli je nebo není pravdivé
+(popř.&nbsp;kdy je pravdivé). Ovšem jazyk Go programátorům nabízí i dva další
+koncepty, které se mohou použít namísto poněkud nízkoúrovňové reflexe. Jedná se
+o typové aserce a konverze+rozeskoky na základě konkrétního typu hodnoty,
+s&nbsp;níž se pracuje. I s&nbsp;těmito koncepty se dnes ve stručnosti
+seznámíme.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Koncept rozhraní v&nbsp;jazyce Go</h2>
+
+<p>Již v&nbsp;úvodní části dnešního článku je nutné se alespoň ve stručnosti
+seznámit s&nbsp;konceptem takzvaných <i>rozhraní</i> (<i>interface</i>), která
+tvoří nedílnou součást jazyka Go a společně s&nbsp;gorutinami jsou tím
+konceptem, které Go odlišují od konkurence. Rozhraní v&nbsp;jazyku Go byla
+inspirována <i>protokoly</i>, s&nbsp;nimiž jsme se mohli setkat například
+v&nbsp;programovacím jazyku Smalltalk: ve stručnosti jde o specifikaci metod
+(jmen, parametrů, návratových typů), které jsou společné pro entity
+s&nbsp;nějakou sdílenou vlastností nebo vlastnostmi. V&nbsp;rozhraní se však
+nijak nespecifikuje vlastní chování, tj.&nbsp;těla metod. V&nbsp;jazyce Go
+navíc není nutné explicitně určovat, které záznamy (nebo obecně které datové
+typy) implementují dané rozhraní &ndash; tuto informaci si totiž dokáže
+automaticky odvodit překladač (poněkud nepřesně se toto chování nazývá <i>duck
+typing</i>).</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;jazyce Java se taktéž
+s&nbsp;rozhraními pracuje, ovšem zde je vždy nutné explicitně určit, které
+třídy rozhraní implementují (přes klíčové slovo <strong>implements</strong>).
+V&nbsp;Go se tento princip neuplatňuje, už jen z&nbsp;toho důvodu, že se zde
+vůbec s&nbsp;pojmem <i>třída</i> nepracuje a rozhraní mohou být vztažena
+k&nbsp;jakémukoli datovému typu.</div></p>
+
+<p>Při deklaraci nového rozhraní (tj.&nbsp;při vytváření nového datového typu
+&ndash; samotné rozhraní je totiž taktéž datovým typem) je nutné specifikovat
+jak jméno rozhraní, tak i seznam hlaviček metod, které jsou součástí rozhraní
+(tento seznam ovšem může být prázdný, nicméně je nutné ho zapsat pomocí
+prázdného bloku {}). Příkladem rozhraní s&nbsp;jedinou metodou může být datový
+typ pojmenovaný <strong>OpenShape</strong>, v&nbsp;němž je předepsána jediná
+metoda <strong>length</strong> bez parametrů a s&nbsp;návratovou hodnotou
+<strong>float64</strong> (u metody předepsané v&nbsp;rozhraní se ovšem neuvádí
+příjemce &ndash; ten si Go odvodí automaticky na základě dalšího kódu):</p>
+
+<pre>
+type <strong>OpenShape</strong> interface {
+    <strong>length</strong>() float64
+}
+</pre>
+
+<p>V&nbsp;rozhraní může být pochopitelně předepsáno větší množství metod:</p>
+
+<pre>
+type <strong>ClosedShape</strong> interface {
+    <strong>area</strong>() float64
+    <strong>perimeter</strong>() float64
+}
+</pre>
+
+<p>Nebo naopak nemusí být předepsána žádná metoda a tím získáme prázdné
+rozhraní:</p>
+
+<pre>
+type <strong>Shape</strong> interface {
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;seriálu o programovacím jazyku
+Rust jsme se setkali s&nbsp;termínem <i>trait</i> (rys). Traity lze (poněkud
+zjednodušeně řečeno) pokládat za rozšířená rozhraní, která kromě hlaviček
+funkcí a metod obsahují (resp.&nbsp;mohou obsahovat) i jejich těla, ale už
+nikoli stavové informace. Právě tím, že se v&nbsp;traitu mohou objevit
+implementace metod, se tento koncept odlišuje od běžných rozhraní (je jejich
+zobecněním).</div></p>
+
+<p>Následuje velmi jednoduchý demonstrační <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/05_interface.go">příklad</a>,
+v&nbsp;němž je pouze deklarována trojice rozhraní, přičemž každé z&nbsp;nich má
+odlišný počet metod (0 až dvě):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+type <strong>Shape</strong> interface {
+}
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        <strong>length</strong>() float64
+}
+&nbsp;
+type <strong>ClosedShape</strong> interface {
+        <strong>area</strong>() float64
+        <strong>perimeter</strong>() float64
+}
+&nbsp;
+func <strong>main</strong>() {
+}
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Rozhraní je plnohodnotný datový typ</h2>
+
+<p>Rozhraní jakožto plnohodnotný datový typ je možné použít například pro
+specifikaci typu parametru (parametrů) ve funkcích, popř.&nbsp;u specifikace
+návratových hodnot. Opět si to vyzkoušejme na našem jednoduchém příkladu
+s&nbsp;rozhraním nazvaným <strong>OpenShape</strong>, v&nbsp;němž je předepsána
+jediná metoda <strong>length()</strong>:</p>
+
+<pre>
+type <strong>OpenShape</strong> interface {
+        <strong>length</strong>() float64
+}
+</pre>
+
+<p>Nyní můžeme napsat funkci (běžnou funkci), které se předá libovolná
+struktura implementující rozhraní <strong>OpenShape</strong> a tato funkce
+vrátí hodnotu získanou zavoláním metody
+<strong>OpenShape.length()</strong>:</p>
+
+<pre>
+func <strong>length</strong>(shape OpenShape) float64 {
+        return shape.length()
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: nenechte se zmást tím, že můžeme mít
+funkci <strong>length</strong> a metodu (či více metod)
+<strong>length</strong>. Víme již, že se jedná o odlišné prvky programu, takže
+funkci <strong>length</strong> klidně můžeme přejmenovat:</div></p>
+
+<pre>
+func <strong>compute_open_shape_length</strong>(shape OpenShape) float64 {
+        return shape.length()
+}
+</pre>
+
+<p><a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/06_interface_implementation.go">V&nbsp;dalším
+demonstračním příkladu</a> se pokusíme funkci <strong>length()</strong> zavolat
+a předat jí strukturu/záznam <strong>Line</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func <strong>length</strong>(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func <strong>main</strong>() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Ovšem vzhledem k&nbsp;tomu, že struktura <strong>Line</strong> prozatím
+rozhraní <strong>OpenShape</strong> neimplementuje (v&nbsp;Go se mluví o tom,
+že struktura <i>nevyhovuje</i> rozhraní), nebude možné tento program přeložit a
+pochopitelně ani spustit:</p>
+
+<pre>
+./06_interface_implementation.go:12:2: imported and not used: "math"
+./06_interface_implementation.go:33:23: cannot use line1 (type Line) as type OpenShape in argument to length:
+        Line does not implement OpenShape (missing length method)
+</pre>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Struktura vyhovující rozhraní</h2>
+
+<p>Co přesně tedy musíme udělat pro to, aby datová struktura
+<strong>Line</strong> vyhovovala (<i>satisfy</i>) rozhraní
+<strong>OpenShape</strong> a v&nbsp;něm předepsané metodě
+<strong>length()</strong>? Je toho překvapivě málo, protože jediné, co musíme
+udělat, je implementace metody <strong>length()</strong> s&nbsp;příjemcem
+<strong>Line</strong>, která je bez parametrů a vrací <strong>float64</strong>.
+Tato implementace bude jednoduchá, protože metoda bude vracet délku úsečky,
+tj.&nbsp;vzdálenost mezi body [x1, y1] a [x2, y2]:</p>
+
+<pre>
+func (line Line) <strong>length</strong>() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+</pre>
+
+<p>Již vytvořením této metody jsme dosáhli toho, že <strong>Line</strong> bude
+vyhovovat rozhraní <strong>OpenShape</strong>! Tuto skutečnost si jazyk Go
+ověří jak při překladu, tak i po spuštění aplikace.</p>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že skutečně nemusíme
+explicitně specifikovat (například klíčovým slovem <strong>implements</strong>
+apod.), že je rozhraní implementováno. To je poměrně velký sémantický rozdíl
+oproti programovacímu jazyku Java.</div></p>
+
+<p>Korektní chování si otestujeme na <a
+href="https://github.com/tisnik/go-fedora/blob/master/article_04/08_more_implementations.go">tomto
+demonstračním příkladu</a>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func <strong>length</strong>(shape OpenShape) float64 {
+        return shape.length()
+}
+&nbsp;
+func (line Line) <strong>length</strong>() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Po spuštění tohoto příkladu dostaneme žádoucí výsledek:</p>
+
+<pre>
+{0 0 100 100}
+141.4213562373095
+</pre>
+
+<p>Metody předepsané v&nbsp;rozhraní musí být implementovány zcela přesně, a to
+včetně návratového typu. V&nbsp;případě, že typ návratové hodnoty nepatrně
+změníme (<strong>float32</strong> &rarr; <strong>float64</strong>), nebude
+<strong>Line</strong> rozhraní <strong>OpenShape</strong> vyhovovat:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float32
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func <strong>length</strong>(shape OpenShape) float32 {
+        return shape.length()
+}
+&nbsp;
+func (line Line) <strong>length</strong>() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        line1 := Line{x1: 0, y1: 0, x2: 100, y2: 100}
+&nbsp;
+        fmt.Println(line1)
+&nbsp;
+        line_length := length(line1)
+        fmt.Println(line_length)
+}
+</pre>
+
+<p>Pokus o překlad nyní skončí s&nbsp;chybou:</p>
+
+<pre>
+./07_B_wrong_return_type.go:37:23: cannot use line1 (type Line) as type OpenShape in argument to length:
+        Line does not implement OpenShape (wrong type for length method)
+                have length() float64
+                want length() float32
+</pre>
+
+<p>A pochopitelně nám nic nebrání v&nbsp;tom, aby i jiné datové struktury
+implementovaly to samé rozhraní:</p>
+
+<pre>
+type <strong>Polyline</strong> struct {
+        x, y []float64
+}
+&nbsp;
+func (pline Polyline) <strong>length</strong>() float64 {
+        <i>// výpočet délky na základě všech vrcholů polyčáry</i>
+        <i>// (není relevantní)</i>
+        ...
+        return ...
+}
+</pre>
+
+<p>Nebo triviální případ:</p>
+
+<pre>
+type <strong>Point</strong> struct {
+        x, y float64
+}
+&nbsp;
+func (point Point) <strong>length</strong>() float64 {
+        return 0.0
+}
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Rozlišení konkrétních typů v&nbsp;čase běhu programu</h2>
+
+<p>Rozhraní, která jsou použitá pro deklaraci parametrů funkcí a/nebo jejich
+návratových hodnot, umožňují psaní obecných algoritmů a knihovních funkcí.
+Například prakticky celý vstupně-výstupní systém programovacího jazyka Go (kam
+spadá práce se soubory, práce s&nbsp;paměťovými buffery, síťovými sockety atd.)
+je postavena nad dvojicí rozhraní nazvaných <strong>Reader</strong> a
+<strong>Writer</strong>, které může implementovat i libovolná uživatelem
+definovaná datová struktura. Programové kódy lze skutečně koncipovat tak, že
+parametry funkcí a návratové hodnoty budou typu <strong>rozhraní_xyz</strong>,
+což je poměrně elegantní řešení. Mohou však nastat situace, které vyžadují
+&bdquo;konverzi&ldquo; předávané hodnoty na konkrétní typ. Příkladem může být
+funkce, která akceptuje parametr typu <strong>OpenShape</strong> (tedy 2D
+geometrický tvar se začátkem a koncem), ale v&nbsp;níž budeme chtít například
+přistoupit k&nbsp;vrcholům úsečky, pokud je předána úsečka či k&nbsp;souřadnici
+bodu, pokud je předán bod.</p>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Explicitní typové konverze (přetypování)</h2>
+
+<p>Ovšem v&nbsp;takovém případě není možné provést klasickou typovou konverzi
+&ndash; to nám překladač jazyka Go nedovolí. Opět si to vyzkoušejme na
+příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+type <strong>Point</strong> struct {
+        x, y float64
+}
+&nbsp;
+func (point Point) length() float64 {
+        return 0
+}
+&nbsp;
+func <strong>do_something</strong>(shape OpenShape) {
+        s := Point(shape)
+        fmt.Println(s.x1, s.y1)
+}
+&nbsp;
+func <strong>main</strong>() {
+}
+</pre>
+
+<p>Ve funkci <strong>do_something</strong> se pokoušíme o typovou konverzi, což
+však není dovoleno. Na tuto skutečnost nás přitom upozorní již překladač a
+nebude tedy docházet k&nbsp;&bdquo;náhodným&ldquo; výjimkám v&nbsp;runtime:</p>
+
+<pre>
+./shapes_1.go:30:13: cannot convert shape (variable of type OpenShape) to type Point: need type assertion
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Typové aserce</h2>
+
+<p>Namísto přímé typové konverze je v&nbsp;takových případech nutné
+v&nbsp;jazyku Go použít typové aserce (<i>type assertion</i>). Ty se zapisují
+následovně:</p>
+
+<pre>
+s := shape.(Point)
+</pre>
+
+<p>kde <strong>shape</strong> je jméno proměnné nebo parametru a
+<strong>Point</strong> je typ, na který se má hodnota převést (pokud je to
+možné). Můžeme tedy například psát:</p>
+
+<pre>
+func <strong>do_something</strong>(shape OpenShape) {
+        s := shape.(Point)
+        fmt.Println(s.x, s.y)
+}
+</pre>
+
+<p>kde <strong>x</strong> a <strong>y</strong> jsou prvky datové struktury
+<strong>Point</strong>. To ovšem znamená, že <strong>s</strong> je taktéž typu
+<strong>Point</strong>. Zápis typové aserce je rozpoznán překladačem, který
+dokáže určit typ proměnné <strong>s</strong>. Ovšem vlastní konverze se provádí
+až v&nbsp;čase běhu. Máme zde tedy dvě časově oddělené operace: <i>compile
+time</i> a <i>runtime</i>. V&nbsp;případě, že konverzi nelze provést,
+tj.&nbsp;pokud předávaná hodnota je jiného konkrétního typu, vyhodí se běhová
+výjimka (překladač to &ndash; logicky &ndash; nedokáže rozpoznat).</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+type <strong>Point</strong> struct {
+        x, y float64
+}
+&nbsp;
+func (point Point) length() float64 {
+        return 0
+}
+&nbsp;
+func <strong>do_something</strong>(shape OpenShape) {
+        s := shape.(Point)
+        fmt.Println(s.x, s.y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := Point{x: 10, y: 20}
+        do_something(p)
+}
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Kontroly prováděné překladačem</h2>
+
+<p>Mohlo by se zdát, že do zdrojového kódu je možné zapsat jakoukoli typovou
+aserci, ovšem ve skutečnosti překladač provádí kontroly, zda má zápis
+z&nbsp;pohledu statické typové analýzy smysl. Ostatně zkusme upravit funkci
+<strong>do_something</strong> tak, aby její parametr <strong>shape</strong> byl
+typu <strong>io.Writer</strong>, což je jedno z&nbsp;rozhraní definovaných ve
+standardní knihovně. A dopředu si prozraďme, že typ <strong>Point</strong>
+tomuto rozhraní nevyhovuje:</p>
+
+<pre>
+func <strong>do_something</strong>(shape io.Writer) {
+        s := <u>shape.(Point)</u>
+}
+</pre>
+
+<p>Překladač v&nbsp;tomto případě korektně nahlásí chybu (ale už nám
+neprozradí, kterým všem rozhraním struktura <strong>Point</strong>
+vyhovuje):</p>
+
+<pre>
+./shapes_4.go:31:11: impossible type assertion: shape.(Point)
+        Point does not implement io.Writer (missing method Write)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ovšem to neznamená, že překladač zajistí
+běh aplikace bez chyb souvisejících s&nbsp;typovým subsystémem &ndash; viz
+další kapitolu.</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Test v&nbsp;runtime, zda bylo možné přetypování provést</h2>
+
+<p>Ve skutečnosti může řešení <a href="#k07">z&nbsp;předchozí kapitoly</a> vést
+k&nbsp;běhovým výjimkám. Stane se tak v&nbsp;případě, kdy není možné
+přetypování předepsané typovou asercí provést. V&nbsp;našem konkrétním
+ukázkovém příkladu to znamená situaci, kdy do funkce
+<strong>do_something</strong> sice předáme hodnotu typu, která splňuje rozhraní
+<strong>OpenShape</strong>, ale nebude se jednat o bod (ale například o
+úsečku):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+type <strong>Point</strong> struct {
+        x, y float64
+}
+&nbsp;
+func (point Point) length() float64 {
+        return 0
+}
+&nbsp;
+func <strong>do_something</strong>(shape OpenShape) {
+        s := shape.(Point)
+        fmt.Println(s.x, s.y)
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := Point{x: 10, y: 20}
+        do_something(p)
+&nbsp;
+        l := Line{x1: 0, y1: 0, x2: 10, y2: 20}
+        do_something(l)
+}
+</pre>
+
+<p>První zavolání funkce proběhne v&nbsp;pořádku, druhé pak skončí s&nbsp;výjimkou:</p>
+
+<pre>
+10 20
+panic: interface conversion: main.OpenShape is main.Line, not main.Point
+&nbsp;
+goroutine 1 [running]:
+main.do_something({0x4bc958?, 0xc00009cf10?})
+        /home/ptisnovs/xy/shapes_2.go:30 +0xb8
+main.main()
+        /home/ptisnovs/xy/shapes_2.go:39 +0x77
+exit status 2
+</pre>
+
+<p>Úprava (resp.&nbsp;oprava) spočívá v&nbsp;tom, že budeme explicitně
+zjišťovat, zda k&nbsp;přetypování skutečně mohlo dojít. K&nbsp;tomuto účelu se
+použije druhá návratová hodnota typové aserce:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "math"
+)
+&nbsp;
+type <strong>OpenShape</strong> interface {
+        length() float64
+}
+&nbsp;
+type <strong>Line</strong> struct {
+        x1, y1 float64
+        x2, y2 float64
+}
+&nbsp;
+func (line Line) length() float64 {
+        return math.Hypot(line.x1-line.x2, line.y1-line.y2)
+}
+&nbsp;
+type <strong>Point</strong> struct {
+        x, y float64
+}
+&nbsp;
+func (point Point) length() float64 {
+        return 0
+}
+&nbsp;
+func <strong>do_something</strong>(shape OpenShape) {
+        s, ok := shape.(Point)
+        if ok {
+                fmt.Println(s.x, s.y)
+        } else {
+                fmt.Println("can not convert")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        p := Point{x: 10, y: 20}
+        do_something(p)
+
+        l := Line{x1: 0, y1: 0, x2: 10, y2: 20}
+        do_something(l)
+}
+</pre>
+
+<p>Nyní program v&nbsp;případě neúspěšné typové konverze neskončí běhovou
+výjimkou:</p>
+
+<pre>
+10 20
+can not convert
+</pre>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Ukázka typových asercí</h2>
+
+<p>Podívejme se nyní na způsob použití typových asercí v&nbsp;programovacím
+jazyku Go. V&nbsp;prvním příkladu budeme ve funkci <strong>test_type</strong>,
+které lze předat libovolnou hodnotu, rozlišovat, zda je konkrétní předaná
+hodnota typu <strong>int</strong>, <strong>bool</strong> či
+<strong>string</strong>. Na základě zjištění typu se vypíšou odlišné zprávy a
+zejména skutečně získáme hodnoty konkrétního typu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>test_type</strong>(value any) {
+        int_val, ok := value.(int)
+        if ok {
+                fmt.Println("Integer value:", int_val)
+                return
+        }
+&nbsp;
+        bool_val, ok := value.(bool)
+        if ok {
+                fmt.Println("Boolean value:", bool_val)
+                return
+        }
+&nbsp;
+        string_val, ok := value.(string)
+        if ok {
+                fmt.Println("String value:", string_val)
+                return
+        }
+&nbsp;
+        fmt.Println("Unsupported value")
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        test_type(x)
+&nbsp;
+        y := true
+        test_type(y)
+&nbsp;
+        z := "foobar"
+        test_type(z)
+&nbsp;
+        w := 1 + 2i
+        test_type(w)
+}
+</pre>
+
+<p>Zprávy, které by se měly zobrazit po překladu a spuštění:</p>
+
+<pre>
+Integer value: 42
+Boolean value: true
+String value: foobar
+Unsupported value
+</pre>
+
+<p>Ve druhém demonstračním příkladu jsme si situaci ještě více zkomplikovali,
+protože v&nbsp;něm je definována dvojice rozhraní <strong>Interface1</strong>,
+<strong>Interface2</strong> a trojice datových typů, které jedno či obě tato
+rozhraní splňují (tím, že implementují předepsané metody). Ve funkci
+<strong>test_type</strong> potom rozlišujeme, zda konkrétní hodnota splňuje
+jedno či obě rozhraní (obecněji řečeno &ndash; zda je typu daného rozhraní).
+Hodnoty získané přes typovou aserci budou vždy typu <strong>Interface1</strong>
+nebo <strong>Interface2</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Interface1</strong> interface {
+        foo()
+}
+&nbsp;
+type <strong>Interface2</strong> interface {
+        bar()
+}
+&nbsp;
+type <strong>Type1</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type1) foo() {
+}
+&nbsp;
+type <strong>Type2</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type2) bar() {
+}
+&nbsp;
+type <strong>Type3</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type3) foo() {
+}
+&nbsp;
+func (t Type3) bar() {
+}
+&nbsp;
+func <strong>test_type</strong>(value any) {
+        interface1_val, ok := value.(Interface1)
+        if ok {
+                fmt.Println("Interface1 value:", interface1_val)
+        }
+&nbsp;
+        interface2_val, ok := value.(Interface2)
+        if ok {
+                fmt.Println("Interface2 value:", interface2_val)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := Type1{"x"}
+        test_type(x)
+&nbsp;
+        y := Type2{"y"}
+        test_type(y)
+&nbsp;
+        z := Type3{"z"}
+        test_type(z)
+}
+</pre>
+
+<p>Výsledky nyní budou zajímavější, protože ukazují, že hodnota
+<strong>z</strong> typu <strong>Type3</strong> splňuje obě rozhraní:</p>
+
+<pre>
+Interface1 value: {x}
+Interface2 value: {y}
+Interface1 value: {z}
+Interface2 value: {z}
+</pre>
+
+<p>Předchozí příklad je samozřejmě možné ještě více rozšířit, a to konkrétně
+tak, že ve funkci <strong>test_type</strong> se budeme z&nbsp;předané hodnoty
+libovolného typu pokoušet získat hodnoty typu <strong>Interface1</strong>,
+<strong>Interface2</strong>, <strong>Type1</strong>, <strong>Type2</strong>
+nebo <strong>Type3</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Interface1</strong> interface {
+        foo()
+}
+&nbsp;
+type <strong>Interface2</strong> interface {
+        bar()
+}
+&nbsp;
+type <strong>Type1</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type1) foo() {
+}
+&nbsp;
+type <strong>Type2</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type2) bar() {
+}
+&nbsp;
+type <strong>Type3</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type3) foo() {
+}
+&nbsp;
+func (t Type3) bar() {
+}
+&nbsp;
+func <strong>test_type</strong>(value any) {
+        interface1_val, ok := value.(Interface1)
+        if ok {
+                fmt.Println("Interface1 value:", interface1_val)
+        }
+&nbsp;
+        interface2_val, ok := value.(Interface2)
+        if ok {
+                fmt.Println("Interface2 value:", interface2_val)
+        }
+&nbsp;
+        type1_val, ok := value.(Type1)
+        if ok {
+                fmt.Println("Type1 value:", type1_val)
+        }
+&nbsp;
+        type2_val, ok := value.(Type2)
+        if ok {
+                fmt.Println("Type2 value:", type2_val)
+        }
+&nbsp;
+        type3_val, ok := value.(Type3)
+        if ok {
+                fmt.Println("Type3 value:", type3_val)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := Type1{"x"}
+        test_type(x)
+&nbsp;
+        y := Type2{"y"}
+        test_type(y)
+&nbsp;
+        z := Type3{"z"}
+        test_type(z)
+}
+</pre>
+
+<p>Opět se podívejme na výsledky pro hodnoty tři různých typů (struktur):</p>
+
+<pre>
+Interface1 value: {x}
+Type1 value: {x}
+Interface2 value: {y}
+Type2 value: {y}
+Interface1 value: {z}
+Interface2 value: {z}
+Type3 value: {z}
+</pre>
+
+<p>Z&nbsp;tohoto výpisu je patrné, že každou strukturu lze převést i na
+příslušná rozhraní.</p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Rozeskok na základě běhové typové informace</h2>
+
+<p>V&nbsp;jazyce Go mají vývojáři k&nbsp;dispozici ještě jednu zajímavou řídicí
+strukturu, která doplňuje typovou aserci. Jedná se o rozeskok, který je
+proveden na základě informace o typu výrazu. Datový typ tohoto výrazu je
+zjištěn za běhu aplikace. Pro tento rozeskok (nebo, chcete-li, rozvětvení) se
+používá konstrukce <strong>switch-case</strong>, ovšem výraz uvedený za
+klíčovým slovem <strong>switch</strong> připomíná právě typovou aserci. A
+v&nbsp;jednotlivých větvích jsou uvedena jména datových typů (ať již typů
+standardních, tak i uživatelem definovaných). Navíc v&nbsp;jednotlivých větvích
+bude mít proměnná, do které se výraz za <strong>switch</strong> uložil,
+korektní typ &ndash; obecně v&nbsp;každé větvi jiný!</p>
+
+<p>Podívejme se na jednoduchý příklad, z&nbsp;něhož bude celá konstrukce snadno
+pochopitelná:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>test_type</strong>(value any) {
+        switch v := value.(type) {
+        case int:
+                fmt.Println("Integer value:", v)
+        case bool:
+                fmt.Println("Boolean value:", v)
+        case string:
+                fmt.Println("String value:", v)
+        default:
+                fmt.Println("Unsupported value")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        test_type(x)
+&nbsp;
+        y := true
+        test_type(y)
+&nbsp;
+        z := "foobar"
+        test_type(z)
+&nbsp;
+        w := 1 + 2i
+        test_type(w)
+}
+</pre>
+
+<p>Výsledky</p>
+
+<pre>
+Integer value: 42
+Boolean value: true
+String value: foobar
+Unsupported value
+</pre>
+
+<p>Povšimněte si, že proměnná <strong>v</strong> bude mít v&nbsp;každé větvi
+odlišný typ. Nejedná se tedy o jedinou proměnnou. To znamená, že můžeme program
+upravit do této (stále zcela korektní) podoby:</p>
+
+<pre>
+        switch v := value.(type) {
+        case int:
+                fmt.Println("Integer value:", v*10)
+        case bool:
+                fmt.Println("Boolean value:", !v)
+        case string:
+                fmt.Println("String value:", v+"foooooooo")
+        default:
+                fmt.Println("Unsupported value")
+        }
+</pre>
+
+<p>Výsledky</p>
+
+<pre>
+Integer value: 420
+Boolean value: false
+String value: foobarfooooooo
+Unsupported value
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Ukázka rozeskoku provedeného na základě běhových typových informací</h2>
+
+<p>Naprosto stejným způsobem můžeme v&nbsp;rozeskoku použít i typ rozhraní a
+nikoli pouze konkrétní datové typy. Vyzkoušejme si chování v&nbsp;situaci se
+dvěma rozhraními a trojicí konkrétních datových typů, které splňují jedno či
+obě rozhraní:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+type <strong>Interface1</strong> interface {
+        foo()
+}
+&nbsp;
+type <strong>Interface2</strong> interface {
+        bar()
+}
+&nbsp;
+type <strong>Type1</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type1) foo() {
+}
+&nbsp;
+type <strong>Type2</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type2) bar() {
+}
+&nbsp;
+type <strong>Type3</strong> struct {
+        name string
+}
+&nbsp;
+func (t Type3) foo() {
+}
+&nbsp;
+func (t Type3) bar() {
+}
+&nbsp;
+func <strong>test_type</strong>(value any) {
+        switch v := value.(type) {
+        case Interface1:
+                fmt.Println("Interface1 value:", v)
+        case Interface2:
+                fmt.Println("Interface2 value:", v)
+        default:
+                fmt.Println("Unsupported value")
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := Type1{"x"}
+        test_type(x)
+&nbsp;
+        y := Type2{"y"}
+        test_type(y)
+&nbsp;
+        z := Type3{"z"}
+        test_type(z)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+Interface1 value: {x}
+Interface2 value: {y}
+Interface1 value: {z}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve třetím případě se vybrala první
+vyhovující větev a nikoli obě větve!</div></p>
+
+<p>Jen krátké připomenutí, jak se tato programová konstrukce používá společně
+s&nbsp;dalšími knihovnami. Příkladem je zpracování událostí, které vznikají při
+běhu aplikace založené na knihovně SDL2. Jednotlivé události jsou
+reprezentovány ukazateli na hodnoty konkrétních typů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "log"
+&nbsp;
+        "github.com/veandco/go-sdl2/sdl"
+)
+&nbsp;
+func <strong>eventLoop</strong>() {
+        var event sdl.Event
+        done := false
+&nbsp;
+        for !done {
+                event = sdl.PollEvent()
+                switch t := event.(type) {
+                case *sdl.QuitEvent:
+                        done = true
+                case *sdl.KeyboardEvent:
+                        keyCode := t.Keysym.Sym
+                        switch t.State {
+                        case sdl.PRESSED:
+                                switch keyCode {
+                                case sdl.K_ESCAPE:
+                                        done = true
+                                case sdl.K_q:
+                                        done = true
+                                }
+                        }
+                }
+                state.moveNPC()
+                state.redraw()
+                sdl.Delay(10)
+        }
+        log.Println("Quitting")
+}
+</pre>
+
+<p>A další příklad &ndash; průchod (traverzace) AST stromem. Při průchodu tímto
+stromem vzniklým zparsováním zdrojového kódu, je pro každý uzel volána metoda
+<strong>Visit</strong>, přičemž její parametr je sice typu
+<strong>ast.Node</strong> (obecné rozhraní), ovšem v&nbsp;runtime se jedná o
+jeden z&nbsp;mnoha datových typů, které toto rozhraní splňují:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "log"
+        "strings"
+&nbsp;
+        "go/ast"
+        "go/parser"
+)
+&nbsp;
+<i>// výraz, který se má naparsovat</i>
+const source = `
+1 + 2 * 3 + x + y * z - 1
+`
+&nbsp;
+<i>// nový datový typ implementující rozhraní ast.Visitor</i>
+type <strong>visitor</strong> int
+&nbsp;
+<i>// implementace (jediné) funkce předepsané v rozhraní ast.Visitor</i>
+func (v visitor) <strong>Visit</strong>(n ast.Node) ast.Visitor {
+        <i>// dosáhli jsme koncového uzlu?</i>
+        if n == nil {
+                return nil
+        }
+&nbsp;
+        <i>// tisk pozice a typu uzlu</i>
+        fmt.Printf("%3d\t", v)
+        var s string
+&nbsp;
+        <i>// převod uzlu do tisknutelné podoby</i>
+        switch x := n.(type) {
+        case *ast.BasicLit:
+                s = x.Value
+        case *ast.Ident:
+                s = x.Name
+        case *ast.UnaryExpr:
+                s = x.Op.String()
+        case *ast.BinaryExpr:
+                s = x.Op.String()
+        }
+&nbsp;
+        <i>// tisk obsahu uzlu</i>
+        indent := strings.Repeat("  ", int(v))
+        if s != "" {
+                fmt.Printf("%s%s\n", indent, s)
+        } else {
+                fmt.Printf("%s%T\n", indent, n)
+        }
+        return v + 1
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce parseru a parsing zdrojového kódu</i>
+        f, err := parser.ParseExpr(source)
+        if err != nil {
+                log.Fatal(err)
+        }
+&nbsp;
+        <i>// hodnota typu visitor</i>
+        var v visitor
+&nbsp;
+        <i>// zahájení průchodu abstraktním syntaktickým stromem</i>
+        ast.Walk(v, f)
+}
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Standardní balíček <strong>reflect</strong></h2>
+
+<p>V&nbsp;mnoha případech si v&nbsp;praxi vystačíte s&nbsp;typovými asercemi a
+rozeskoky prováděnými na základě typové informace, což jsou koncepty popsané
+výše. Ovšem existují situace, v&nbsp;nichž je nutné s&nbsp;typovými informacemi
+(v&nbsp;čase běhu) pracovat sofistikovaněji. A právě v&nbsp;takových případech
+se používá <i>reflexe</i>. Většina funkcionality, která se týká reflexe
+v&nbsp;jazyku Go, je dostupná přes standardní balíček <strong>reflect</strong>.
+Veřejné funkce a další symboly tohoto balíčku jsou pochopitelně zdokumentovány
+a některé nejdůležitější vlastnosti budou popsány a ukázány v&nbsp;navazujících
+kapitolách. Mimochodem &ndash; celou dokumentaci si můžete přečíst <a
+href="https://pkg.go.dev/reflect">na stránkách s&nbsp;dokumentací</a>, nebo si
+je můžete zobrazit příkazem <strong>go doc reflect</strong>:</p>
+
+<pre>
+$ <strong>go doc reflect</strong>
+&nbsp;
+package reflect // import "reflect"
+&nbsp;
+Package reflect implements run-time reflection, allowing a program to manipulate
+objects with arbitrary types. The typical use is to take a value with static
+type interface{} and extract its dynamic type information by calling TypeOf,
+which returns a Type.
+&nbsp;
+A call to ValueOf returns a Value representing the run-time data. Zero takes a
+Type and returns a Value representing a zero value for that type.
+&nbsp;
+See "The Laws of Reflection" for an introduction to reflection in Go:
+https://golang.org/doc/articles/laws_of_reflection.html
+&nbsp;
+...
+...
+...
+</pre>
+
+<p>V&nbsp;navazujících kapitolách se s&nbsp;možnostmi nabízenými tímto balíčkem
+seznámíme.</p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Funkce <strong>reflect.ValueOf</strong> a datový typ <strong>Value</strong></h2>
+
+<p>Jednou ze základních operací implementovaných ve standardním balíčku
+<strong>reflect</strong> je získání konkrétní hodnoty předané v&nbsp;parametru
+typu <strong>any</strong> neboli <strong>interface{}</strong> (prázdné
+rozhraní). Co to znamená? Existují situace, zejména v&nbsp;případě, že píšeme
+obecný kód, v&nbsp;nichž víme, že do nějaké funkce nebo metody se může předat
+libovolná hodnota (tedy ono <strong>any</strong>), popř.&nbsp;libovolná hodnota
+typu, který implementuje nějaké (obecnější) rozhraní. Překladač tedy bude
+pracovat právě s&nbsp;těmito zmíněnými typy &ndash; <strong>any</strong>
+popř.&nbsp;<strong>interface X</strong>. Ovšem v&nbsp;čase běhu
+(<i>runtime</i>) se samozřejmě do oné funkce nebo metody předává nějaká
+konkrétní hodnota: většinou datová struktura (resp.&nbsp;datový typ), která
+vyhovuje (<i>satisfy</i>) zvolenému rozhraní. A jen pro připomenutí &ndash;
+prázdnému rozhraní, tj.&nbsp;typu <strong>any</strong>, vyhovuje hodnota
+libovolného typu, protože implementuje všechny předepsané metody (což je u
+prázdného rozhraní prázdná množina).</p>
+
+<p>Vraťme se nyní k&nbsp;funkci <strong>reflect.ValueOf</strong>. Ta jako svůj
+argument akceptuje hodnotu libovolného typu a vrací strukturu (datový typ)
+nazvaný <strong>Value</strong>. Přes tuto strukturu budeme moci hodnotu zkoumat
+&ndash; získat její typ, modifikovat ji atd.:</p>
+
+<pre>
+$ <strong>go doc reflect.ValueOf</strong>
+&nbsp;
+package reflect <i>// import "reflect"</i>
+&nbsp;
+func ValueOf(i any) Value
+    ValueOf returns a new Value initialized to the concrete value stored in the
+    interface i. ValueOf(nil) returns the zero Value.
+</pre>
+
+<p>Vidíme, že funkce <strong>reflect.ValueOf</strong> skutečně akceptuje
+argument typu <strong>any</strong> (naprosto libovolná hodnota) a vrací jinou
+hodnotu, která je typu <strong>reflect.Value</strong>. Interně se jedná o
+datovou strukturu, ovšem nemáme přístup k&nbsp;prvkům této struktury (jejich
+jména jsou zapsána malými písmeny):</p>
+
+<pre>
+type <strong>Value</strong> struct {
+        <i>// Has unexported fields.</i>
+}
+</pre>
+
+<p>Důležité jsou však metody, které jsou pro tuto datovou strukturu definovány.
+Je jich celá řada a postupně se s&nbsp;nimi seznámíme:</p>
+
+<pre>
+func (v Value) <strong>Addr</strong>() Value
+func (v Value) <strong>Bool</strong>() bool
+func (v Value) <strong>Bytes</strong>() []byte
+func (v Value) <strong>Call</strong>(in []Value) []Value
+func (v Value) <strong>CallSlice</strong>(in []Value) []Value
+func (v Value) <strong>CanAddr</strong>() bool
+func (v Value) <strong>CanComplex</strong>() bool
+func (v Value) <strong>CanConvert</strong>(t Type) bool
+func (v Value) <strong>CanFloat</strong>() bool
+func (v Value) <strong>CanInt</strong>() bool
+func (v Value) <strong>CanInterface</strong>() bool
+func (v Value) <strong>CanSet</strong>() bool
+func (v Value) <strong>CanUint</strong>() bool
+func (v Value) <strong>Cap</strong>() int
+func (v Value) <strong>Clear</strong>()
+func (v Value) <strong>Close</strong>()
+func (v Value) <strong>Comparable</strong>() bool
+func (v Value) <strong>Complex</strong>() complex128
+func (v Value) <strong>Convert</strong>(t Type) Value
+func (v Value) <strong>Elem</strong>() Value
+func (v Value) <strong>Equal</strong>(u Value) bool
+func (v Value) <strong>Field</strong>(i int) Value
+func (v Value) <strong>FieldByIndex</strong>(index []int) Value
+func (v Value) <strong>FieldByIndexErr</strong>(index []int) (Value, error)
+func (v Value) <strong>FieldByName</strong>(name string) Value
+func (v Value) <strong>FieldByNameFunc</strong>(match func(string) bool) Value
+func (v Value) <strong>Float</strong>() float64
+func (v Value) <strong>Grow</strong>(n int)
+func (v Value) <strong>Index</strong>(i int) Value
+func (v Value) <strong>Int</strong>() int64
+func (v Value) <strong>Interface</strong>() (i any)
+func (v Value) <strong>InterfaceData</strong>() [2]uintptr
+func (v Value) <strong>IsNil</strong>() bool
+func (v Value) <strong>IsValid</strong>() bool
+func (v Value) <strong>IsZero</strong>() bool
+func (v Value) <strong>Kind</strong>() Kind
+func (v Value) <strong>Len</strong>() int
+func (v Value) <strong>MapIndex</strong>(key Value) Value
+func (v Value) <strong>MapKeys</strong>() []Value
+func (v Value) <strong>MapRange</strong>() *MapIter
+func (v Value) <strong>Method</strong>(i int) Value
+func (v Value) <strong>MethodByName</strong>(name string) Value
+func (v Value) <strong>NumField</strong>() int
+func (v Value) <strong>NumMethod</strong>() int
+func (v Value) <strong>OverflowComplex</strong>(x complex128) bool
+func (v Value) <strong>OverflowFloat</strong>(x float64) bool
+func (v Value) <strong>OverflowInt</strong>(x int64) bool
+func (v Value) <strong>OverflowUint</strong>(x uint64) bool
+func (v Value) <strong>Pointer</strong>() uintptr
+func (v Value) <strong>Recv</strong>() (x Value, ok bool)
+func (v Value) <strong>Send</strong>(x Value)
+func (v Value) <strong>Set</strong>(x Value)
+func (v Value) <strong>SetBool</strong>(x bool)
+func (v Value) <strong>SetBytes</strong>(x []byte)
+func (v Value) <strong>SetCap</strong>(n int)
+func (v Value) <strong>SetComplex</strong>(x complex128)
+func (v Value) <strong>SetFloat</strong>(x float64)
+func (v Value) <strong>SetInt</strong>(x int64)
+func (v Value) <strong>SetIterKey</strong>(iter *MapIter)
+func (v Value) <strong>SetIterValue</strong>(iter *MapIter)
+func (v Value) <strong>SetLen</strong>(n int)
+func (v Value) <strong>SetMapIndex</strong>(key, elem Value)
+func (v Value) <strong>SetPointer</strong>(x unsafe.Pointer)
+func (v Value) <strong>SetString</strong>(x string)
+func (v Value) <strong>SetUint</strong>(x uint64)
+func (v Value) <strong>SetZero</strong>()
+func (v Value) <strong>Slice</strong>(i, j int) Value
+func (v Value) <strong>Slice3</strong>(i, j, k int) Value
+func (v Value) <strong>String</strong>() string
+func (v Value) <strong>TryRecv</strong>() (x Value, ok bool)
+func (v Value) <strong>TrySend</strong>(x Value) bool
+func (v Value) <strong>Type</strong>() Type
+func (v Value) <strong>Uint</strong>() uint64
+func (v Value) <strong>UnsafeAddr</strong>() uintptr
+func (v Value) <strong>UnsafePointer</strong>() unsafe.Pointer
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Příklady použití funkce <strong>reflect.ValueOf</strong></h2>
+
+<p>Opět si ukažme základní způsoby použití funkce
+<strong>reflect.ValueOf</strong>, která byla popsána <a
+href="#k14">v&nbsp;předchozí kapitole</a>. V&nbsp;prvním příkladu převedeme
+hodnotu proměnné <strong>x</strong> typu <strong>int</strong> na hodnotu
+<strong>reflect.Value</strong> a následně si necháme vypsat jak
+<strong>x</strong> tak i takto získanou hodnotu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        v := reflect.ValueOf(x)
+        fmt.Println(x)
+        fmt.Println(v)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto příkladu se zobrazí dvě zdánlivě stejné
+hodnoty:</p>
+
+<pre>
+42
+42
+</pre>
+
+<p>Ve skutečnosti jsou však obě hodnoty zcela odlišného typu, což nám prozradí
+následující demonstrační příklad. Připomeňme si, že formátovacím znakem "%T" si
+vynutíme výpis typu hodnoty:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        v := reflect.ValueOf(x)
+        fmt.Printf("value %v of type %T\n", x, x)
+        fmt.Printf("value %v of type %T\n", v, v)
+}
+</pre>
+
+<p>Nyní budou zobrazené zprávy odlišné (zcela podle očekávání):</p>
+
+<pre>
+value 42 of type int
+value 42 of type reflect.Value
+</pre>
+
+<p>Zajímavé bude zjistit, jak se bude program chovat v&nbsp;případě, že
+<strong>x</strong> bude proměnná typu prázdné rozhraní (tedy vlastně
+<strong>any</strong>), ovšem bude obsahovat celé číslo:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x interface{} = 42
+        v := reflect.ValueOf(x)
+        fmt.Printf("value %v of type %T\n", x, x)
+        fmt.Printf("value %v of type %T\n", v, v)
+}
+</pre>
+
+<p>Výsledky prozradí, že typ je zde zjištěn na základě hodnoty a nikoli typu
+proměnné:</p>
+
+<pre>
+value 42 of type int
+value 42 of type reflect.Value
+</pre>
+
+<p>Ovšem pozor si musíme dát (jako obvykle) na použití speciální hodnoty
+<strong>nil</strong>. Zde je patrné, že jak typ, tak i hodnota jsou rovny
+<strong>nil</strong>, což je matoucí, ovšem druhé <strong>nil</strong> je
+v&nbsp;tomto případě jméno typu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        var x interface{} = nil
+        v := reflect.ValueOf(x)
+        fmt.Printf("value %v of type %T\n", x, x)
+        fmt.Printf("value %v of type %T\n", v, v)
+}
+</pre>
+
+<p>Z&nbsp;výsledných zpráv je patrné, že slovo <strong>nil</strong> má
+v&nbsp;Go dvojí význam:</p>
+
+<pre>
+value &lt;nil&gt; of type &lt;nil&gt;
+value &lt;invalid reflect.Value&gt; of type reflect.Value
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Složitější příklady</h2>
+
+<p>Z&nbsp;příkladů uvedených <a href="#k15">v&nbsp;předchozí kapitole</a> by se
+mohlo zdát, že překladač dokáže už v&nbsp;čase překladu zjistit konkrétní typ
+hodnoty uložené do proměnné <strong>x</strong> a podle toho provede překlad. Ve
+skutečnosti tomu tak není, o čemž se ostatně můžeme poměrně snadno přesvědčit
+v&nbsp;následujícím příkladu. V&nbsp;něm je definována funkce
+<strong>test_get_type</strong>, které je skutečně možné předat hodnotu
+libovolného typu a následně realizovat její převod (přes reflexi) na hodnotu
+typu <strong>reflect.Value</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        fmt.Println(x)
+        fmt.Println(value)
+        fmt.Println()
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        test_get_type(x)
+&nbsp;
+        y := true
+        test_get_type(y)
+&nbsp;
+        z := "foobar"
+        test_get_type(z)
+&nbsp;
+        w := 1 + 2i
+        test_get_type(w)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+42
+42
+&nbsp;
+true
+true
+&nbsp;
+foobar
+foobar
+&nbsp;
+(1+2i)
+(1+2i)
+</pre>
+
+<p>Popř.&nbsp;si ještě vypíšeme jak hodnoty <strong>x</strong> a
+<strong>value</strong>, tak i jejich typy, což je mnohem názornější:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        fmt.Printf("value %v of type %T\n", x, x)
+        fmt.Printf("value %v of type %T\n", value, value)
+        fmt.Println()
+}
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        test_get_type(x)
+&nbsp;
+        y := true
+        test_get_type(y)
+&nbsp;
+        z := "foobar"
+        test_get_type(z)
+&nbsp;
+        w := 1 + 2i
+        test_get_type(w)
+}
+</pre>
+
+<p>Výsledky:</p>
+
+<pre>
+value 42 of type int
+value 42 of type reflect.Value
+&nbsp;
+value true of type bool
+value true of type reflect.Value
+&nbsp;
+value foobar of type string
+value foobar of type reflect.Value
+&nbsp;
+value (1+2i) of type complex128
+value (1+2i) of type reflect.Value
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že nezávisle na konkrétní
+předávané hodnotě bude výsledkem volání <strong>reflect.ValueOf</strong> vždy
+struktura typu <strong>reflect.Value</strong>.</div></p>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Reflexe a hodnoty <strong>nil</strong></h2>
+
+<p>Jak již bylo naznačeno v&nbsp;předchozím textu, ale i v&nbsp;článku <a
+href="https://www.root.cz/clanky/problematika-nulovych-hodnot-v-go-aneb-proc-nil-nil/">Problematika
+nulových hodnot v Go, aneb proč nil != nil</a>, je práce s&nbsp;hodnotami
+<strong>nil</strong> obecně problematická, protože jazyk Go při porovnávání
+bere v&nbsp;úvahu jak tuto hodnotu, tak i jí přiřazený typ (který však běžně
+není viditelný). A proto se může stát, že výraz <strong>x == y</strong> vrací
+<strong>false</strong> i v&nbsp;případě, kdy <strong>x=nil</strong> a
+<strong>y=nil</strong>, což celkem spolehlivě zmate každého, kdo s&nbsp;jazykem
+Go začíná. V&nbsp;kontextu dnešního článku nás bude zajímat, jak
+s&nbsp;hodnotami <strong>nil</strong> pracuje knihovna
+<strong>reflect</strong>; nyní konkrétně funkce
+<strong>reflect.ValueOf</strong>. Pokusíme se o převod několika hodnot
+<strong>nil</strong> různých typů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        fmt.Println(x)
+        fmt.Println(value)
+        fmt.Println()
+}
+&nbsp;
+type <strong>user</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        var nil1 *int = nil
+        test_get_type(nil1)
+&nbsp;
+        var nil2 *bool = nil
+        test_get_type(nil2)
+&nbsp;
+        var nil3 *string = nil
+        test_get_type(nil3)
+&nbsp;
+        var nil4 *user = nil
+        test_get_type(nil4)
+&nbsp;
+        var nil5 interface{} = nil
+        test_get_type(nil5)
+&nbsp;
+        var nil6 []int = nil
+        test_get_type(nil6)
+}
+</pre>
+
+<p>V&nbsp;tomto konkrétním případě se nejprve vytisknou samé hodnoty
+<strong>nil</strong>, což nám příliš neprozradí o konkrétních &bdquo;typech
+nil&ldquo;. Ovšem povšimněte si zejména posledních dvou typů (prázdné rozhraní
+a takzvaná nulová mapa):</p>
+
+<pre>
+&lt;nil&gt;
+&lt;nil&gt;
+&nbsp;
+&lt;nil&gt;
+&lt;nil&gt;
+&nbsp;
+&lt;nil&gt;
+&lt;nil&gt;
+&nbsp;
+&lt;nil&gt;
+&lt;nil&gt;
+&nbsp;
+&lt;nil&gt;
+&lt;invalid reflect.Value&gt;
+&nbsp;
+[]
+[]
+</pre>
+
+<p>Užitečnější bude nechat si vypsat nejenom předávanou hodnotu a její typ, ale
+i hodnotu+typ získanou pomocí funkce <strong>reflect.ValueOf</strong>():</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        fmt.Printf("value %v of type %T\n", x, x)
+        fmt.Printf("value %v of type %T\n", value, value)
+        fmt.Println()
+}
+&nbsp;
+type <strong>user</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        var nil1 *int = nil
+        test_get_type(nil1)
+&nbsp;
+        var nil2 *bool = nil
+        test_get_type(nil2)
+&nbsp;
+        var nil3 *string = nil
+        test_get_type(nil3)
+&nbsp;
+        var nil4 *user = nil
+        test_get_type(nil4)
+&nbsp;
+        var nil5 interface{} = nil
+        test_get_type(nil5)
+&nbsp;
+        var nil6 []int = nil
+        test_get_type(nil6)
+}
+</pre>
+
+<p>Z&nbsp;výsledků je patrné, že typ předávané hodnoty je stále dostupný, i
+když se zdánlivě jedná o stejnou hodnotu <strong>nil</strong>. Pátý výsledek
+říká &bdquo;hodnota <strong>nil</strong> typu <strong>nil</strong>&ldquo;, což
+platí jen pro prázdné rozhraní:</p>
+
+<pre>
+value &lt;nil&gt; of type *int
+value &lt;nil&gt; of type reflect.Value
+&nbsp;
+value &lt;nil&gt; of type *bool
+value &lt;nil&gt; of type reflect.Value
+&nbsp;
+value &lt;nil&gt; of type *string
+value &lt;nil&gt; of type reflect.Value
+&nbsp;
+value &lt;nil&gt; of type *main.user
+value &lt;nil&gt; of type reflect.Value
+&nbsp;
+value &lt;nil&gt; of type &lt;nil&gt;
+value &lt;invalid reflect.Value&gt; of type reflect.Value
+&nbsp;
+value [] of type []int
+value [] of type reflect.Value
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Přečtení informace o typu</h2>
+
+<p>Prozatím jsme pro tisk typu nějaké hodnoty používali funkci
+<strong>fmt.Printf</strong>, přičemž ve formátovacím řetězci byl použit
+formátovací znak &bdquo;%T&ldquo;. Tímto způsobem se skutečně tiskne typ
+hodnoty, ovšem jak se má postupovat v&nbsp;případě, že s&nbsp;typovou informací
+(což je mimochodem taktéž hodnota) musíme nějak pracovat přímo ve vyvíjeném
+programu? Opět nám pomůže reflexe, protože typ <strong>reflect.Value</strong>
+poskytuje i metodu <strong>Type</strong>, která informaci o typu vrací. Tato
+metoda vrací hodnotu typu <strong>Type</strong> (sic), kterou si podrobněji
+popíšeme příště. Ovšem užitečné je, že tuto hodnotu je možné převést na
+řetězec. To si ukážeme v&nbsp;dalším demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>main</strong>() {
+        x := 42
+        v := reflect.ValueOf(x)
+        t := v.Type()
+        fmt.Println("type is: ", t)
+}
+</pre>
+
+<p>Výsledkem by mělo být:</p>
+
+<pre>
+type is:  int
+</pre>
+
+<p>Dtto pro uživatelský datový typ:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        typ := value.Type()
+        fmt.Println("type is: ", typ)
+}
+&nbsp;
+type <strong>user</strong> struct {
+        name    string
+        surname string
+}
+&nbsp;
+func <strong>main</strong>() {
+        var nil1 interface{} = user{name: "foo", surname: "bar"}
+        test_get_type(nil1)
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+type is:  main.user
+</pre>
+
+<p>Použití ukazatelů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        typ := value.Type()
+        fmt.Println("type is: ", typ)
+}
+&nbsp;
+func <strong>main</strong>() {
+        var nil1 *int = nil
+        test_get_type(nil1)
+}
+</pre>
+
+<p>Výsledek:</p>
+
+<pre>
+type is:  *int
+</pre>
+
+<p>Pozor si ovšem musíme dát u hodnoty typu prázdné rozhraní a hodnotu
+<strong>nil</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "reflect"
+)
+&nbsp;
+func <strong>test_get_type</strong>(x any) {
+        value := reflect.ValueOf(x)
+        typ := value.Type()
+        fmt.Println("type is: ", typ)
+}
+&nbsp;
+func <strong>main</strong>() {
+        var nil1 interface{} = nil
+        test_get_type(nil1)
+}
+</pre>
+
+<p>Zde dojde k&nbsp;běhové výjimce!</p>
+
+<pre>
+reflect.Value.typeSlow({0x0?, 0x0?, 0x10052d540?})
+        /usr/local/go/src/reflect/value.go:2699 +0x113
+reflect.Value.Type(...)
+        /usr/local/go/src/reflect/value.go:2694
+main.test_get_type({0x0?, 0x0?})
+        /home/ptisnovs/src/GoCourse/lesson14/get_type_empty_interface.go:10 +0x97
+main.main()
+        /home/ptisnovs/src/GoCourse/lesson14/get_type_empty_interface.go:16 +0x17
+</pre>
+
+<p>Proč tomu tak je, si řekneme příště.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Demonstrační příklady napsané v&nbsp;jazyce Go, které jsou určené pro
+překlad s&nbsp;využitím standardního překladače jazyka Go, byly uloženy do Git
+repositáře, jenž je dostupný na adrese <a
+href="https://github.com/RedHatOfficial/GoCourse">https://github.com/RedHatOfficial/GoCourse</a>.
+Jednotlivé demonstrační příklady si můžete v&nbsp;případě potřeby stáhnout i
+jednotlivě bez nutnosti klonovat celý (dnes již poměrně rozsáhlý)
+repositář:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td> 1</td><td>type_assertion_1.go</td><td>typové aserce (bez použití rozhraní)</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_1.go</a></td></tr>
+<tr><td> 2</td><td>type_assertion_2.go</td><td>typové aserce a rozhraní</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_2.go</a></td></tr>
+<tr><td> 3</td><td>type_assertion_3.go</td><td>typové aserce a rozhraní i konkrétní datové struktury</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_assertion_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 4</td><td>shapes_1.go</td><td>základní typová aserce s&nbsp;vynucením konverze bez testu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_1.go</a></td></tr>
+<tr><td> 5</td><td>shapes_2.go</td><td>běhová výjimka při předání hodnoty s&nbsp;odlišným typem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_2.go</a></td></tr>
+<tr><td> 6</td><td>shapes_3.go</td><td>test prováděný přímo v&nbsp;běhové aserci</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_3.go</a></td></tr>
+<tr><td> 7</td><td>shapes_4.go</td><td>pokus o typovou aserci s&nbsp;nekompatibilními typy</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_4.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/shapes_4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 8</td><td>type_switch_1.go</td><td>rozeskok s&nbsp;typovou konverzí</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_1.go</a></td></tr>
+<tr><td> 9</td><td>type_switch_2.go</td><td>rozeskok s&nbsp;typovou konverzí</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_2.go</a></td></tr>
+<tr><td>10</td><td>type_switch_3.go</td><td>rozeskok s&nbsp;typovou konverzí</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_3.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_3.go</a></td></tr>
+<tr><td>11</td><td>type_switch_4.go</td><td>rozeskok s&nbsp;typovou konverzí</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_4.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/type_switch_4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>12</td><td>value_of.go</td><td>základní způsob použití funkce <strong>reflect.ValueOf</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of.go</a></td></tr>
+<tr><td>13</td><td>value_of_type.go</td><td>typ získaný funkcí <strong>reflect.ValueOf</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_type.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_type.go</a></td></tr>
+<tr><td>14</td><td>value_of_interface.go</td><td>odvození typu hodnoty uložené v&nbsp;proměnné typu prázdné rozhraní</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_interface.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_interface.go</a></td></tr>
+<tr><td>15</td><td>value_of_empty_interface.go</td><td>typ <strong>nil</strong> a prázdné rozhraní</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_empty_interface.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/value_of_empty_interface.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>values_of.go</td><td>reflexe pro libovolný primitivní datový typ</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of.go</a></td></tr>
+<tr><td>17</td><td>values_of_type.go</td><td>reflexe s&nbsp;výpisem typu libovolné hodnoty</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_type.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_type.go</a></td></tr>
+<tr><td>18</td><td>values_of_nil.go</td><td>reflexe pro různé hodnoty <strong>nil</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_nil.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_nil.go</a></td></tr>
+<tr><td>19</td><td>values_of_type_nil.go</td><td>reflexe s&nbsp;výpisem typu pro různé hodnoty <strong>nil</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_type_nil.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/values_of_type_nil.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>20</td><td>get_type.go</td><td>získání informace o typu z&nbsp;<strong>reflect.ValueOf</strong> pro konkrétní hodnoty</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type.go</a></td></tr>
+<tr><td>21</td><td>get_type_interface.go</td><td>získání informace o typu z&nbsp;<strong>reflect.ValueOf</strong> pro rozhraní</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type_interface.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type_interface.go</a></td></tr>
+<tr><td>22</td><td>get_type_empty_interface.go</td><td>získání informace o typu z&nbsp;<strong>reflect.ValueOf</strong> pro prázdná rozhraní</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type_empty_interface.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_type_empty_interface.go</a></td></tr>
+<tr><td>23</td><td>get_types.go</td><td>získání informace o typech</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_types.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_types.go</a></td></tr>
+<tr><td>24</td><td>get_types_nil.go</td><td>získání informace o typu hodnot <strong>nil</strong></td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_types_nil.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson14/get_types_nil.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>The Go Programming Language Specification<br />
+<a href="https://golang.org/ref/spec">https://golang.org/ref/spec</a>
+</li>
+
+<li>Go: the Good, the Bad and the Ugly<br />
+<a href="https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/">https://bluxte.net/musings/2018/04/10/go-good-bad-ugly/</a>
+</li>
+
+<li>Go Data Structures: Interfaces <br />
+<a href="https://research.swtch.com/interfaces">https://research.swtch.com/interfaces</a>
+</li>
+
+<li>How to use interfaces in Go<br />
+<a href="http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go">http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go</a>
+</li>
+
+<li>Interfaces in Go (part I)<br />
+<a href="https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c">https://medium.com/golangspec/interfaces-in-go-part-i-4ae53a97479c</a>
+</li>
+
+<li>The Laws of Reflection<br />
+<a href="https://go.dev/blog/laws-of-reflection">https://go.dev/blog/laws-of-reflection</a>
+</li>
+
+<li>Standardní balíček <strong>reflect</strong><br />
+<a href="https://pkg.go.dev/reflect">https://pkg.go.dev/reflect</a>
+</li>
+
+<li>Reflection in Go: Use cases and tutorial<br />
+<a href="https://blog.logrocket.com/reflection-go-use-cases-tutorial/">https://blog.logrocket.com/reflection-go-use-cases-tutorial/</a>
+</li>
+
+<li>Reflection in Golang<br />
+<a href="https://www.geeksforgeeks.org/reflection-in-golang/">https://www.geeksforgeeks.org/reflection-in-golang/</a>
+</li>
+
+<li>Reflexe (programování)<br />
+<a href="https://cs.wikipedia.org/wiki/Reflexe_(programov%C3%A1n%C3%AD)">https://cs.wikipedia.org/wiki/Reflexe_(programov%C3%A1n%C3%AD)</a>
+</li>
+
+<li>Reflective programming<br />
+<a href="https://en.wikipedia.org/wiki/Reflective_programming">https://en.wikipedia.org/wiki/Reflective_programming</a>
+</li>
+
+<li>go2js<br />
+<a href="https://github.com/tredoe/go2js">https://github.com/tredoe/go2js</a>
+</li>
+
+<li>GitHub repositář projektu GopherJS<br />
+<a href="https://github.com/gopherjs/gopherjs">https://github.com/gopherjs/gopherjs</a>
+</li>
+
+<li>How to use GopherJS to turn Go code into a JavaScript library<br />
+<a href="https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a">https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a</a>
+</li>
+
+<li>Source to source compiler<br />
+<a href="https://en.wikipedia.org/wiki/Source-to-source_compiler">https://en.wikipedia.org/wiki/Source-to-source_compiler</a>
+</li>
+
+<li>Binary recompiler<br />
+<a href="https://en.wikipedia.org/wiki/Binary_recompiler">https://en.wikipedia.org/wiki/Binary_recompiler</a>
+</li>
+
+<li>py2many na GitHubu<br />
+<a href="https://github.com/py2many/py2many">https://github.com/py2many/py2many</a>
+</li>
+
+<li>py2many na PyPi<br />
+<a href="https://pypi.org/project/py2many/">https://pypi.org/project/py2many/</a>
+</li>
+
+<li>Awesome Transpilers<br />
+<a href="https://github.com/milahu/awesome-transpilers">https://github.com/milahu/awesome-transpilers</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="https://github.com/tisnik/">Pavel Tišnovský</a> &nbsp; 2024</small></p>
+</body>
+</html>
