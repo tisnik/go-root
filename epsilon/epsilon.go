@@ -261,12 +261,8 @@ type WorkSheet struct {
 
 // HTML pages, templates, and part of pages
 //
-//go:embed html/page_header.htm
-var PageHeader string
-
-//
-//go:embed html/page_footer.htm
-var PageFooter string
+//go:embed html/epsilon.htm
+var MainPage string
 
 // Static images in PNG format
 //
@@ -286,9 +282,9 @@ var Favicon []byte
 //go:embed css/*.css
 var StaticStylesheets embed.FS
 
-// Scripts
+// Scripts and JavaScript libraries
 //
-//go:embed *.js
+//go:embed scripts/*.js
 var Scripts embed.FS
 
 // ---------------------------------------------------------------------------
@@ -428,17 +424,24 @@ func (s ServerImpl) renderTable(writer http.ResponseWriter) {
 
 // mainEndpoint serves the main HTML page at the root path.
 //
-// It returns 404 for any non-root request, writes the page header and footer,
-// and renders the main table content in between.
+// It returns 404 for any non-root request, writes the page header and footer
 func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Request) {
 	if request.URL.Path != "/" {
 		http.NotFound(writer, request)
 		return
 	}
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	io.WriteString(writer, PageHeader)
+	io.WriteString(writer, MainPage)
+}
+
+// gridEndpoint renders the empty grid
+func (s ServerImpl) gridEndpoint(writer http.ResponseWriter, request *http.Request) {
+	if request.URL.Path != "/grid" {
+		http.NotFound(writer, request)
+		return
+	}
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.renderTable(writer)
-	io.WriteString(writer, PageFooter)
 }
 
 func (s ServerImpl) returnCell(writer http.ResponseWriter, r *http.Request) {
@@ -468,6 +471,7 @@ func (s ServerImpl) Serve() {
 	log.Printf("Starting server on port %d", port)
 
 	http.HandleFunc("/", s.mainEndpoint)
+	http.HandleFunc("/grid", s.gridEndpoint)
 
 	// static content
 	http.HandleFunc("/favicon.ico", s.serveFavicon)
