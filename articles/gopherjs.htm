@@ -1,0 +1,1412 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>GopherJS: transpřekladač z jazyka Go do JavaScriptu</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>GopherJS: transpřekladač z jazyka Go do JavaScriptu</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>V dnešním článku si popíšeme transpřekladač GopherJS. Jak již jeho název naznačuje, jedná se o transpřekladač z jazyka Go do JavaScriptu. Do výsledného kódu v JavaScriptu jsou přidány i použité knihovny (balíčky) a taktéž základní funkce z runtime Go (práce s řezy, mapami, runami atd.).</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. GopherJS: transpřekladač z&nbsp;jazyka Go do JavaScriptu</a></p>
+<p><a href="#k02">2. Svět transpřekladačů do JavaScriptu</a></p>
+<p><a href="#k03">3. Transpřekladač GopherJS</a></p>
+<p><a href="#k04">4. Instalace Go 1.19.13 před samotnou instalací GopherJS</a></p>
+<p><a href="#k05">5. Jak vlastně vypadá instalace Go 1.19.13?</a></p>
+<p><a href="#k06">6. Instalace transpřekladače GopherJS</a></p>
+<p><a href="#k07">7. Program typu &bdquo;Hello, world!&ldquo;, který se bude spouštět ve webovém prohlížeči</a></p>
+<p><a href="#k08">8. Pomocný HTTP server pro poskytování HTML stránek i JavaScriptových souborů</a></p>
+<p><a href="#k09">9. Spuštění programu typu &bdquo;Hello, world!&ldquo; ve webovém prohlížeči</a></p>
+<p><a href="#k10">10. Proč je výsledný soubor <strong>hello_world.go</strong> tak obrovský?</a></p>
+<p><a href="#k11">11. Manipulace s&nbsp;DOMem webové stránky</a></p>
+<p><a href="#k12">12. Demonstrační příklad: změna obsahu vybraného elementu na webové stránce</a></p>
+<p><a href="#k13">13. Přidání nových značek do HTML stránky přes DOM</a></p>
+<p><a href="#k14">14. Kreslení do 2D canvasu z&nbsp;jazyka Go</a></p>
+<p><a href="#k15">15. Demonstrační příklad: kreslení do 2D canvasu</a></p>
+<p><a href="#k16">16. Komunikace mezi kódem psaným v&nbsp;jazyce Go a JavaScriptem</a></p>
+<p><a href="#k17">17. Zavolání funkce naprogramované v&nbsp;Go z&nbsp;JavaScriptu</a></p>
+<p><a href="#k18">18. Modifikace obsahu HTML stránky po stisku tlačítka</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. GopherJS: transpřekladač z&nbsp;jazyka Go do JavaScriptu</h2>
+
+<p>Pravděpodobně nejjednodušší a nejpřímější cestou podpory nového
+programovacího jazyka ve webových prohlížečích je integrace jeho interpretru
+přímo do prohlížeče popř.&nbsp;použití pluginu s&nbsp;tímto interpretrem. Ovšem
+i přes snahy některých vývojářů a softwarových společností o začlenění dalších
+skriptovacích jazyků do webových prohlížečů (z&nbsp;historického pohledu se
+jednalo minimálně o Tcl, VBScript, Dart v&nbsp;Dartiu apod.) je patrné, že
+v&nbsp;současnosti je jediným široce akceptovaným <i>skriptovacím jazykem</i>
+na straně webového prohlížeče pouze JavaScript se všemi přednostmi a zápory,
+které tato monokultura přináší. To však v&nbsp;žádném případě neznamená, že by
+se ty části aplikace, které mají být spouštěny na straně klienta, musely psát
+pouze v&nbsp;JavaScriptu, jenž nemusí zdaleka všem vývojářům vyhovovat, ať již
+z&nbsp;objektivních (<i>hoisting</i>) či ze subjektivních příčin (například
+kvůli dosti <a href="https://www.youtube.com/watch?v=et8xNAc2ic8">zvláštně
+navrženému typovému systému</a>, který ovšem umožnil realizovat například <a
+href="http://www.jsfuck.com/">JSF*ck</a>).</p>
+
+<p>V&nbsp;relativně nedávné minulosti proto vzniklo a pořád ještě vzniká mnoho
+projektů, jejichž cílem je umožnit tvorbu webových aplikací pro prohlížeč
+v&nbsp;jiných programovacích jazycích. Zdrojové kódy je pak nutné nějakým
+způsobem zpracovat (transpřeložit, přeložit, ...) takovým způsobem, aby je bylo
+možné ve webovém prohlížeči spustit stejně, jako kód psaný přímo
+v&nbsp;JavaScriptu. Možností je hned několik &ndash; lze použít plugin (velmi
+problematické a dnes značně nepopulární řešení, pravděpodobně již mrtvá cesta
+vývoje), <i>transpřekladač</i> do JavaScriptu či virtuální stroj
+popř.&nbsp;interpret daného jazyka implementovaný opět v&nbsp;JavaScriptu..</p>
+
+<p>Jednu z&nbsp;dnes velmi populárních technik umožňujících použití prakticky
+libovolného programovacího jazyka pro tvorbu aplikací běžících na straně
+webového prohlížeče, představuje použití takzvaných <i>transcompilerů
+(source-to-source compiler)</i> zajišťujících překlad programu napsaného ve
+zdrojovém programovacím jazyce do funkčně identického programu napsaného
+v&nbsp;JavaScriptu (někdy se setkáme i s&nbsp;označením <a
+href="https://scotch.io/tutorials/javascript-transpilers-what-they-are-why-we-need-them">transpiler</a>).
+Transpřekladač se většinou spouští jen jednou na vývojářském počítači, samotní
+klienti již mají k&nbsp;dispozici JavaScriptový kód.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti není technologie
+transpřekladačů žádným způsobem svázána právě s&nbsp;JavaScriptem, protože se
+používala (a používá) i pro další manipulace se zdrojovými kódy.</div></p>
+
+<p>Existuje však i druhá možnost, kdy je samotný transpřekladač naprogramován
+v&nbsp;JavaScriptu a spouštěn přímo ve webovém prohlížeči klientů. Oba přístupy
+mají své přednosti, ale pochopitelně i nějaké zápory (například tvůrci
+uzavřených aplikací pravděpodobně budou upřednostňovat první možnost, protože
+výstupy transcompilerů jsou většinou dosti nečitelné; dokonce by mohla snaha o
+prozkoumání kódu spadat pod reverse engineering). Druhá možnost je relativně
+elegantní v&nbsp;tom ohledu, že se z&nbsp;pohledu programátora webové aplikace
+skutečně jedná o nový programovací jazyk, který je jakoby přímo zpracováván
+prohlížečem na stejné úrovni jako JavaScript. Příkladem může být kombinace
+JavaScriptu a jazyka <a
+href="https://www.root.cz/clanky/propojeni-sveta-lispu-se-svetem-javascriptu-s-vyuzitim-transprekladace-wisp/">WISP</a>.</p>
+
+<p>Zapomenout nesmíme ani na technologii WebAssembly, která je určitou
+alternativou k&nbsp;JavaScriptu. Jazyk Go překlad do WebAssembly podporuje
+(není přitom nutné instalovat žádné další nástroje ani knihovny) a dokonce
+většina demonstračních příkladů, které si dnes ukážeme, lze po malých úpravách
+přeložit do WebAssembly a teprve poté spustit v&nbsp;prohlížeči.</p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Svět transpřekladačů do JavaScriptu</h2>
+
+<p>Z&nbsp;praxe můžeme uvést například následující projekty založené na
+technologii transpřekladače. Některé z&nbsp;těchto projektů je možné použít
+přímo v&nbsp;prohlížeči, jiné provádí překlad do JavaScriptu na příkazovém
+řádku. A pochopitelně existují i kombinace obou způsobů (opět viz například
+projekt <i>WISP</i> podporující oba režimy):</p>:
+
+<table>
+<tr><th>#</th><th>Jazyk</th><th>Poznámka</th></tr>
+<tr><td>1</td><td>CoffeeScript</td><td>přidání syntaktického cukru do JavaScriptu</td></tr>
+<tr><td>2</td><td>JSweet</td><td>překlad programů z&nbsp;Javy do JavaScriptu popř.&nbsp;do TypeScriptu</td></tr>
+<tr><td>3</td><td>Transcrypt</td><td>překlad Pythonu do JavaScriptu (tomuto nástroji se budeme věnovat v&nbsp;dalším článku)</td></tr>
+<tr><td>4</td><td>ClojureScript</td><td>překlad aplikací psaných v&nbsp;Clojure do JavaScriptu</td></tr>
+<tr><td>5</td><td>Kaffeine</td><td>rozšíření JavaScriptu o nové vlastnosti</td></tr>
+<tr><td>6</td><td>RedScript</td><td>jazyk inspirovaný Ruby</td></tr>
+<tr><td>7</td><td>GorillaScript</td><td>další rozšíření JavaScriptu</td></tr>
+<tr><td>8</td><td>ghcjs</td><td>transpřekladač pro fanoušky programovacího jazyka Haskell</td></tr>
+<tr><td>9</td><td>wisp</td><td>zjednodušená a dnes již nevyvíjená varianta ClojureScriptu</td></tr>
+<tr><td>10</td><td>Babel</td><td>překlad novějších variant JavaScript (ES2015) a TypeScriptu do zvolené (starší) verze JavaScriptu, stále populární, i přesto, že nové prohlížeče ES2015 podporují</td></tr>
+<tr><td>11</td><td>GopherJS</td><td>překladač programů naprogramovaných v&nbsp;jazyce Go do JavaScriptu &ndash; tímto projektem se zabýváme dnes</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: seznam všech (či alespoň většiny)
+známých transpřekladačů do JavaScriptu naleznete například na stránce <a
+href="https://github.com/jashkenas/coffeescript/wiki/List-of-languages-that-compile-to-JS">https://github.com/jashkenas/coffeescript/wiki/List-of-languages-that-compile-to-JS</a>,
+i když je nutné varovat, že některé projekty (kromě výše zmíněných) jsou
+v&nbsp;dosti špatném stavu nebo již nejsou dále vyvíjeny. To se do jisté míry
+týká i druhého transpřekladače z&nbsp;jazyka Go do JavaScriptu &ndash; projektu
+<a href="https://github.com/tredoe/go2js">go2js</a>.</div></p>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. Transpřekladač GopherJS</h2>
+
+<p>V&nbsp;dnešním článku si ukážeme práci s&nbsp;transpřekladačem pojmenovaným
+<i>GopherJS</i>. Jak již název tohoto projektu naznačuje, jedná se o
+transpřekladač z&nbsp;programovacího jazyka Go do JavaScriptu. Přitom je však
+nutné dodat, že do výsledného kódu v&nbsp;JavaScriptu jsou přidány i použité
+knihovny (balíčky), pochopitelně v&nbsp;&bdquo;transcriptované&ldquo; podobě a
+taktéž základní funkce z&nbsp;runtime, které umožňují například práci
+s&nbsp;řezy, mapami atd. Výsledný kód v&nbsp;JavaScriptu tedy může být poměrně
+velký (začíná se na přibližně 100kB, jak ostatně uvidíme dále), na druhou
+stranu však obsahuje všechny funkce potřebné pro spuštění výsledku, například
+ve webovém prohlížeči (samozřejmě je ale možné výsledek použít například i
+v&nbsp;node.js atd.). Navíc je pochopitelně možné výsledný kód
+<i>minifikovat</i> a ještě více tak zmenšit jeho velikost.</p>
+
+<p>Velmi důležité je taktéž to, že je plně podporována standardní knihovna
+<strong>syscall/js</strong>, která umožňuje z&nbsp;Go kódu například
+manipulovat s&nbsp;DOMem HTML stránky, kreslit do canvasu, volat JavaScriptové
+funkce atd. Jazyk Go, resp.&nbsp;programy v&nbsp;něm psané, tak mohou být téměř
+dokonale integrovány do frontendu (tedy až na fázi překladu, která u původního
+JavaScriptu může odpadnout).</p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Instalace Go 1.19.13 před samotnou instalací GopherJS</h2>
+
+<p>GopherJS je sice nabízen stejným způsobem, jako jakýkoli jiný balíček pro
+Go, ovšem jeho instalace má jeden háček &ndash; je totiž nutné použít Go
+1.19.13 a nikoli novější verze Go (nejnovější stabilní verze přitom nese číslo
+1.23). Musíme tedy k&nbsp;již existující nainstalované verzi Go paralelně
+nainstalovat i verzi Go 1.19.13. Dále popsaný postup se může hodit i
+v&nbsp;jiných situacích, protože vám umožňuje mít na jednom počítači větší
+množství verzí Go.</p>
+
+<p>Nejprve nainstalujeme balíček nazvaný <strong>go1.19.13@latest</strong>,
+který obsahuje samotný instalátor Go 1.19.13 (takže tento balíček je velmi malý
+&ndash; několik kilobajtů):</p>
+
+<pre>
+$ <strong>go install golang.org/dl/</strong>
+&nbsp;
+go: downloading golang.org/dl v0.0.0-20241213165225-4b9e3f9eb6e1
+</pre>
+
+<p>Po instalaci si ověříme, že je sice možné spustit program
+<strong>go1.19.13</strong>, ovšem nejedná se o plnohodnotný překladač jazyka
+Go, což nám napoví vypsaná zpráva:</p>
+
+<pre>
+$ <strong>go1.19.13</strong>
+&nbsp;
+go1.19.13: not downloaded. Run 'go1.19.13 download' to install to /home/ptisnovs/sdk/go1.19.13
+</pre>
+
+<p>Instalace celého Go 1.19.13 (překladače, dalších nástrojů, knihoven,
+zdrojových kódů) se realizuje následujícím příkazem:</p>
+
+<pre>
+$ <strong>go1.19.13 download</strong>
+&nbsp;
+Downloaded   0.0% (     3119 / 149141790 bytes) ...
+Downloaded   0.4% (   524288 / 149141790 bytes) ...
+&nbsp;
+Downloaded  98.3% (146618736 / 149141790 bytes) ...
+Downloaded 100.0% (149141790 / 149141790 bytes)
+Unpacking /home/ptisnovs/sdk/go1.19.13/go1.19.13.linux-amd64.tar.gz ...
+Success. You may now run 'go1.19.13'
+</pre>
+
+<p>Nyní je již možné použít příkaz <strong>go1.19.13</strong> namísto pouhého
+<strong>go</strong> pro spuštění jakéhokoli standardního nástroje jazyka
+Go:</p>
+
+<pre>
+$ <strong>go1.19.13 version</strong>
+&nbsp;
+go version go1.19.13 linux/amd64
+</pre>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Jak vlastně vypadá instalace Go 1.19.13?</h2>
+
+<p>Nástroje i knihovny starší verze jazyka Go, v&nbsp;našem případě konkrétně
+Go 1.19.13, jsou nainstalovány do adresáře <strong>sdk</strong> umístěného
+v&nbsp;domovském adresáři uživatele. Interní struktura odpovídá běžné instalaci
+Go (navíc zde zůstal i tarball, který je samozřejmě možné smazat):</p>
+
+<pre>
+$ <strong>tree ~/sdk -L 2</strong>
+&nbsp;
+/home/ptisnovs/sdk
+└── go1.19.13
+    ├── api
+    ├── bin
+    ├── codereview.cfg
+    ├── CONTRIBUTING.md
+    ├── doc
+    ├── go1.19.13.linux-amd64.tar.gz
+    ├── lib
+    ├── LICENSE
+    ├── misc
+    ├── PATENTS
+    ├── pkg
+    ├── README.md
+    ├── SECURITY.md
+    ├── src
+    ├── test
+    └── VERSION
+</pre>
+
+<p>Samotný příkaz <strong>go1.19.13</strong> je uložen na standardním místě,
+tj.&nbsp;v&nbsp;<strong>~/go/bin</strong>:</p>
+
+<pre>
+$ <strong>whereis go1.19.13</strong>
+&nbsp;
+go1.19.13: /home/ptisnovs/go/bin/go1.19.13
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Instalace transpřekladače GopherJS</h2>
+
+<p>Ve chvíli, kdy je nainstalován Go verze 1.19.13, si můžeme nainstalovat i
+transpřekladač GopherJS. Použijeme přitom příkaz <strong>go install</strong>.
+Je přitom vlastně jedno, jaká konkrétní verze Go bude pro spuštění tohoto
+příkazu použita:</p>
+
+<pre>
+$ <strong>go install github.com/gopherjs/gopherjs@v1.19.0-beta1</strong>
+</pre>
+
+<p>GopherJS závisí na několika dalších balíčcích, které jsou pochopitelně
+taktéž doinstalovány:</p>
+
+<pre>
+go: downloading github.com/gopherjs/gopherjs v1.19.0-beta1
+go: downloading github.com/sirupsen/logrus v1.8.1
+go: downloading golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
+go: downloading github.com/spf13/cobra v1.2.1
+go: downloading github.com/spf13/pflag v1.0.5
+go: downloading golang.org/x/sync v0.3.0
+go: downloading github.com/neelance/sourcemap v0.0.0-20200213170602-2833bce08e4c
+go: downloading golang.org/x/sys v0.10.0
+go: downloading github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86
+go: downloading golang.org/x/tools v0.11.0
+go: downloading github.com/fsnotify/fsnotify v1.5.1
+go: downloading github.com/visualfc/goembed v0.3.3
+go: downloading github.com/evanw/esbuild v0.18.0
+</pre>
+
+<p>Dále nastavíme proměnnou prostředí nazvanou <strong>GOPHERJS_GOROOT</strong>
+tak, aby obsahovala cestu k&nbsp;adresáři, ve kterém je nainstalován Go verze
+1.19.13. Tento adresář získáme příkazem <strong>go1.19.13 env GOROOT</strong>,
+takže zmíněnou proměnnou prostředí nastavíme například takto:</p>
+
+<pre>
+$ export GOPHERJS_GOROOT="$(go1.19.13 env GOROOT)"
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: tento příkaz je možné přidat do
+<strong>.bash_profile</strong> atd.</div></p>
+
+<p>Nyní již můžeme transpřekladač GopherJS spustit:</p>
+
+<pre>
+$ <strong>gopherjs</strong>
+</pre>
+
+<p>Měly by se vypsat následující informace:</p>
+
+<pre>
+GopherJS is a tool for compiling Go source code to JavaScript.
+&nbsp;
+Usage:
+  gopherjs [command]
+&nbsp;
+Available Commands:
+  build       compile packages and dependencies
+  clean       clean GopherJS build cache
+  completion  generate the autocompletion script for the specified shell
+  doc         display documentation for the requested, package, method or symbol
+  help        Help about any command
+  install     compile and install packages and dependencies
+  run         compile and run Go program
+  serve       compile on-the-fly and serve
+  test        test packages
+  version     print GopherJS compiler version
+&nbsp;
+Flags:
+      --alloc_profile string   Save GopherJS compiler allocation profile at the given path. If unset, profiling is disabled.
+      --cpu_profile string     Save GopherJS compiler CPU profile at the given path. If unset, profiling is disabled.
+  -h, --help                   help for gopherjs
+      --log_level string       Compiler log level (debug, info, warn, error, fatal, panic). (default "error")
+&nbsp;
+Additional help topics:
+  gopherjs get        download and install packages and dependencies
+&nbsp;
+Use "gopherjs [command] --help" for more information about a command.
+</pre>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Program typu &bdquo;Hello, world!&ldquo;, který se bude spouštět ve webovém prohlížeči</h2>
+
+<p>Nyní si ukažme, jakým způsobem se vlastně překládá projekt naprogramovaný
+v&nbsp;jazyce Go do JavaScriptu a jak se výsledný JavaScriptový zdrojový kód
+stane součástí webové aplikace. Samotný projekt je tak triviální, že si možná
+ani nezaslouží označení &bdquo;projekt&ldquo;. Jeho část napsaná v&nbsp;jazyce
+Go vypadá následovně:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<i>//</i>
+<i>// Program typu "Hello, world!"</i>
+&nbsp;
+package main
+&nbsp;
+import (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+func main() {
+        fmt.Println("Hello, world!")
+        js.Global().Call("alert", "Hello, world!")
+}
+</pre>
+
+<p>Běžný překlad &bdquo;projektu&ldquo; by se provedl známým způsobem:</p>
+
+<pre>
+$ <strong>go build</strong>
+</pre>
+
+<p>Přičemž výsledkem by byl nativní spustitelný soubor pro použitou
+architekturu mikroprocesoru a operační systém.</p>
+
+<p>My ovšem potřebujeme provést transpřeklad do JavaScriptu. Ten zajistíme
+následujícím příkazem:</p>
+
+<pre>
+$ <strong>gopherjs build hello_world.go</strong>
+</pre>
+
+<p>Výsledkem překladu tímto způsobem budou dva soubory:</p>
+
+<pre>
+-rw-r--r--. 1 ptisnovs ptisnovs 1297978 Jan  6 21:12 hello_world.js
+-rw-r--r--. 1 ptisnovs ptisnovs   60380 Jan  6 21:12 hello_world.js.map
+</pre>
+
+<p>První z&nbsp;těchto souborů obsahuje celý projekt i se všemi potřebnými
+knihovnami (<strong>fmt</strong>), druhý soubor slouží například pro ladění
+&ndash; obsahuje mapování mezi řádky původního zdrojového kódu a kódu vzniklého
+transpřekladem.</p>
+
+<p>Webová stránka, která po svém otevření v&nbsp;prohlížeči načte i soubor
+<strong>hello_world.js</strong>, je prozatím velmi jednoduchá:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Hello, world! from GopherJS&lt;/title&gt;
+        &lt;script src="hello_world.js" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        Hello, world! from GopherJS
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Pomocný HTTP server pro poskytování HTML stránek i JavaScriptových souborů</h2>
+
+<p>Zbývá nám vyřešit ještě jeden problém &ndash; jak vlastně otevřít HTML
+stránku, v&nbsp;níž je umístěn odkaz na zdrojový kód s&nbsp;JavaScriptem?.
+Mohlo by se zdát, že se jedná o triviální úkol &ndash; prostě stránku otevřeme
+ve webovém prohlížeči přímo ze souboru a prohlížeč si po jejím zparsování
+ostatní potřebné soubory načte automaticky sám přímo z&nbsp;disku. Toto řešení
+je sice funkční v&nbsp;případě obrázků či dalšího multimediálního obsahu, ovšem
+už v&nbsp;případě JavaScriptu nemusí vždy fungovat (tato funkcionalita může být
+zakázána) a nebude funkční například ani v&nbsp;případě WebAssembly. Prohlížeč
+totiž v&nbsp;tomto případě může striktně vyžadovat, aby mu byl předán obsah
+s&nbsp;korektním MIME typem a taktéž může být načítání a spouštění skriptů
+přímo z&nbsp;disku zakázáno ve webovém prohlížeči.</p>
+
+<p>Bude tedy praktičtější nasimulovat chování naší &bdquo;aplikace&ldquo;
+(jediného HTML souboru a jediného JavaScriptového zdrojového kódu) tak, aby to
+odpovídalo jejímu reálnému použití &ndash; tj.&nbsp;spuštění na vzdáleném
+klientovi. To zajistíme spuštěním vlastního HTTP serveru, který je
+v&nbsp;případě použití programovacího jazyka Go implementován téměř triviálním
+způsobem:</p>
+
+<pre>
+<strong>package</strong> main
+&nbsp;
+import (
+        "fmt"
+        "net/http"
+)
+&nbsp;
+<strong>func</strong> main() {
+        <strong>const</strong> address = ":8080"
+&nbsp;
+        <strong>const</strong> directory = http.Dir(".")
+&nbsp;
+        fmt.Println("Starting HTTP server on address", address)
+        err := http.ListenAndServe(address, http.FileServer(directory))
+&nbsp;
+        <strong>if</strong> err != nil {
+                fmt.Println("Failed to start server", err)
+                return
+        }
+}
+</pre>
+
+<p>HTTP server spustíme ve vlastním terminálu, a to z&nbsp;adresáře, kde se
+nachází i naše aplikace &bdquo;Hello, world!&ldquo;:</p>
+
+<pre>
+$ <strong>go run http_server.go</strong>
+&nbsp;
+Starting HTTP server on address :8080
+</pre>
+
+<p>Nyní si můžeme ověřit, zda jsou všechny soubory naší aplikace dostupné i
+z&nbsp;klienta:</p>
+
+<pre>
+$ <strong>curl localhost:8080/</strong>
+</pre>
+
+<p>Náš HTTP server zobrazí (resp.&nbsp;vrátí) seznam souborů:</p>
+
+<pre>
+&lt;pre&gt;
+&lt;a href="hello_world.go"&gt;hello_world.go&lt;/a&gt;
+&lt;a href="hello_world.html"&gt;hello_world.html&lt;/a&gt;
+&lt;a href="hello_world.js"&gt;hello_world.js&lt;/a&gt;
+&lt;a href="hello_world.js.map"&gt;hello_world.js.map&lt;/a&gt;
+&lt;a href="http_server.go"&gt;http_server.go&lt;/a&gt;
+&lt;/pre&gt;
+</pre>
+
+<p>Pro jistotu se podíváme i na kód HTML stránky:</p>
+
+<pre>
+$ <strong>curl localhost:8080/hello_world.html</strong>
+&nbsp;
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Hello, world! from GopherJS&lt;/title&gt;
+        &lt;script src="hello_world.js" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        Hello, world! from GopherJS
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>A ověříme si, že i JavaScriptový kód je dostupný a navíc i to, že se vrací
+korektní Content-Type (podtrženo):</p>
+
+<pre>
+$ <strong>curl -v localhost:8080/hello_world.js &gt; /dev/null</strong>
+&nbsp;
+* Host localhost:8080 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:8080...
+* Connected to localhost (::1) port 8080
+&gt; GET /hello_world.js HTTP/1.1
+&gt; Host: localhost:8080
+&gt; User-Agent: curl/8.6.0
+&gt; Accept: */*
+&gt; 
+&lt; HTTP/1.1 200 OK
+&lt; Accept-Ranges: bytes
+&lt; Content-Length: 1297978
+&lt; <u>Content-Type: text/javascript; charset=utf-8</u>
+&lt; Last-Modified: Fri, 03 Jan 2025 20:17:02 GMT
+&lt; Date: Fri, 03 Jan 2025 20:18:19 GMT
+&lt; 
+{ [33280 bytes data]
+100 1267k  100 1267k    0     0   125M      0 --:--:-- --:--:-- --:--:--  137M
+* Connection #0 to host localhost left intact
+</pre>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Spuštění programu typu &bdquo;Hello, world!&ldquo; ve webovém prohlížeči</h2>
+
+<p>Ve chvíli, kdy <a href="#k08">výše popsaný</a> HTTP server běží, si můžeme
+ve webovém prohlížeči otevřít stránku z&nbsp;adresy
+<strong>localhost:8080</strong>. Měl by se zobrazit seznam dostupných souborů,
+který je generován přímo HTTP serverem:</p>
+
+<a href="https://www.root.cz/obrazek/1164246/"><img src="https://i.iinfo.cz/images/284/gopherjs-1-prev.webp" class="image-1164246" width="255" height="270" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-1-prev.webp" data-prev-width="255" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-1-large.webp" data-large-width="496" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 1: Seznam dostupných souborů generovaný přímo HTTP serverem
+naprogramovaným v&nbsp;Go.</i></p>
+
+<p>Vybereme si stránku <strong>hello_world.html</strong>. Ta by se měla
+zobrazit na ploše prohlížeče a navíc by se měl zobrazit dialog s&nbsp;hlášením
+&bdquo;Hello, world&ldquo;:</p>
+
+<a href="https://www.root.cz/obrazek/1164249/"><img src="https://i.iinfo.cz/images/284/gopherjs-2-prev.webp" class="image-1164249" width="370" height="160" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-2-prev.webp" data-prev-width="370" data-prev-height="160" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-2-large.webp" data-large-width="720" data-large-height="312" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 2: Stránka s&nbsp;dialogem s&nbsp;hlášením &bdquo;Hello,
+world&ldquo;.</i></p>
+
+<p>Nakonec se podíváme do konzole webové stránky (Ctrl+Shift+K ve Firefoxu),
+v&nbsp;níž by taktéž mělo být viditelné hlášení &bdquo;Hello, world&ldquo;,
+které bylo vypsáno funkcí <strong>fmt.Println</strong>:</p>
+
+<a href="https://www.root.cz/obrazek/1164252/"><img src="https://i.iinfo.cz/images/284/gopherjs-3-prev.webp" class="image-1164252" width="370" height="129" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-3-prev.webp" data-prev-width="370" data-prev-height="129" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-3.webp" data-large-width="565" data-large-height="197" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 3: Zpráva &bdquo;Hello, world&ldquo; v&nbsp;konzoli webové stránky.</i></p>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Proč je výsledný soubor <strong>hello_world.go</strong> tak obrovský?</h2>
+
+<p>Připomeňme si, že výsledkem transpřekladu prvního demonstračního příkladu je
+soubor (v&nbsp;JavaScriptu), jehož velikost přesahuje jeden megabajt:</p>
+
+<pre>
+-rw-r--r--. 1 ptisnovs ptisnovs 1297978 Jan  6 21:12 hello_world.js
+-rw-r--r--. 1 ptisnovs ptisnovs   60380 Jan  6 21:12 hello_world.js.map
+</pre>
+
+<p>Je to je poměrně hodně (a to i na poměry, které ve světě JavaScriptu
+vládnou), ovšem musíme si uvědomit, že ve výsledném souboru není obsažen pouze
+výsledek transpřekladu našeho zdrojového kódu, ale i všech potřebných knihoven.
+V&nbsp;tomto případě konkrétně standardní knihovny <strong>fmt</strong>, která
+je poměrně rozsáhlá.</p>
+
+<p>Pokusme se tedy náš demonstrační příklad upravit takovým způsobem, aby se
+balíček <strong>fmt</strong> nepoužíval. To je snadné &ndash; zavoláme
+standardní funkci <strong>println</strong>, kterou není zapotřebí
+importovat:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<i>//</i>
+<i>// Program typu "Hello, world!"</i>
+<i>// Použití funkce println</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "syscall/js"
+)
+&nbsp;
+<strong>func</strong> main() {
+        println("Hello, world!")
+        js.Global().Call("alert", "Hello, world!")
+}
+</pre>
+
+<p>Nyní bude výsledek transpřekladu již mnohem menší &ndash; jen cca 100
+kB:</p>
+
+<pre>
+-rw-r--r--. 1 ptisnovs ptisnovs 108971 Jan  6 21:15 hello_world_2.js
+-rw-r--r--. 1 ptisnovs ptisnovs   4018 Jan  6 21:15 hello_world_2.js.map
+</pre>
+
+<p>Pokud vynecháme i poslední importovaný balíček
+<strong>syscall/js</strong>:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<i>//</i>
+<i>// Program typu "Hello, world!"</i>
+<i>// Použití funkce println</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>func</strong> main() {
+        println("Hello, world!")
+}
+</pre>
+
+<p>nepřesáhne výsledek transpřekladu hranici 90kB.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;oněch necelých 90kB je vlastně
+naprogramována funkcionalita runtime jazyka Go, dále podpora pro jeho typový
+systém, základní datové typy, strukturované datové typy, ale například i
+dekódování znaků atd.</div></p>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Manipulace s&nbsp;DOMem webové stránky</h2>
+
+<p>V&nbsp;praxi, tj.&nbsp;při programování webového front-endu, se prakticky
+vždy setkáme s&nbsp;nutností manipulace s&nbsp;DOMem celé HTML stránky
+popř.&nbsp;s&nbsp;DOMem souboru typu SVG (méně často). I tato možnost je
+pochopitelně na straně jazyka Go podporována, a to díky tomu, že balíček
+<strong>syscall/js</strong> zpřístupňuje programátorům objekt
+<strong>Global</strong>, který v&nbsp;JavaScriptu odpovídá objektu
+<strong>window</strong> (minimálně pokud se bavíme o HTML stránkách, nikoli o
+node.js):</p>
+
+<pre>
+<i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+window := js.Global()
+</pre>
+
+<p>Přes tento objekt můžeme přistoupit k&nbsp;dalšímu známému objektu
+<strong>document</strong> s&nbsp;obsahem HTML stránky:</p>
+
+<pre>
+<i>// přečtení instance objektu "document"</i>
+document := window.Get("document")
+</pre>
+
+<p>Následně již můžeme volat metody objektu <strong>document</strong>, ovšem
+nepřímo přes:</p>
+
+<pre>
+proměnná = document.Call("jméno_JS_metody", parametry)
+</pre>
+
+<p>Například pro získání elementu &nbsp;identifikátorem <strong>header</strong>
+zavoláme:</p>
+
+<pre>
+<i>// získání reference na element s ID="header" umístěného</i>
+<i>// na HTML stránce</i>
+element := document.Call("getElementById", "header")
+</pre>
+
+<p>Popř.&nbsp;můžeme měnit atributy s&nbsp;využitím:</p>
+
+<pre>
+document.Set("jméno_atributu", hodnota)
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Demonstrační příklad: změna obsahu vybraného elementu na webové stránce</h2>
+
+<p>Podívejme se nyní, jakým způsobem můžeme změnit obsah značky
+s&nbsp;identifikátorem &bdquo;header&ldquo;. V&nbsp;plain JavaScriptu by se
+jednalo o tento kód:</p>
+
+<pre>
+element = document.getElementById("header");
+element.innerHTML = "foobar";
+</pre>
+
+<p>V&nbsp;programovacím jazyce Go by se s&nbsp;využitím balíčku
+<strong>syscall/js</strong> dosáhlo podobné funkcionality tímto způsobem:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<i>//</i>
+<i>// - manipulace s DOMem přímo z jazyka Go</i>
+<i>// - změna atributu vybraného elementu</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+&nbsp;
+        <i>// získání reference na element s ID="header" umístěného</i>
+        <i>// na HTML stránce</i>
+        element := document.Call("getElementById", "header")
+&nbsp;
+        <i>// změna atributu elementu</i>
+        <i>// (text uvnitř značky)</i>
+        element.Set("innerHTML", "foobar")
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Ve zdrojovém kódu HTML stránky si povšimněte přítomnosti elementu (značky)
+<strong>h1</strong> s&nbsp;ID nastaveným na &bdquo;header&ldquo;. Právě tento
+nadpis bude modifikován. Ovšem v&nbsp;tomto případě musíme zajistit, že se
+JavaScriptový kód vzniklý transpilací zavolá až poté, co se element na stránku
+umístí. Toho lze dosáhnout mnoha více či méně sofistikovanými způsoby. Ten
+nejjednodušší způsob je naznačen v&nbsp;HTML kódu:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"/&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;nothing&lt;/h2&gt;
+        &lt;script src="dom_manipulation.js" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Výsledná HTML stránka by měla (po modifikaci našim kódem) vypadat
+následovně:</p>
+
+<a href="https://www.root.cz/obrazek/1164255/"><img src="https://i.iinfo.cz/images/284/gopherjs-4-prev.webp" class="image-1164255" width="370" height="130" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-4-prev.webp" data-prev-width="370" data-prev-height="130" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-4.webp" data-large-width="540" data-large-height="189" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 4: Změna elementu na HTML stránce.</i></p>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Přidání nových značek do HTML stránky přes DOM</h2>
+
+<p>Podobným způsobem můžeme do HTML stránky přidat další značky, což je ukázáno
+na dalším demonstračním příkladu, po jehož inicializaci by se do stránky měla
+přidat tabulka s&nbsp;hodnotami faktoriálů čísel od nuly do deseti. Povšimněte
+si, že nyní voláme metodu <strong>document.createElement()</strong> a taktéž
+<strong>document.body.appendChild()</strong>:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<i>//</i>
+<i>// - manipulace s DOMem přímo z jazyka Go</i>
+<i>// - přidání nových elementů do HTML stránky</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// rekurzivní výpočet faktoriálu</i>
+func <strong>Factorial</strong>(n int64) int64 {
+        <strong>switch</strong> {
+        <strong>case</strong> n &lt; 0:
+                <strong>return</strong> 1
+        <strong>case</strong> n == 0:
+                <strong>return</strong> 1
+        <strong>default</strong>:
+                <strong>return</strong> n * Factorial(n-1)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("started")
+&nbsp;
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+&nbsp;
+        <i>// získání reference na element s ID="header" umístěného</i>
+        <i>// na HTML stránce</i>
+        element := document.Call("getElementById", "header")
+&nbsp;
+        <i>// změna atributu elementu</i>
+        <i>// (text uvnitř značky)</i>
+        <i>element.Set("innerHTML", "Factorial table")</i>
+&nbsp;
+        <i>// konstrukce tabulky faktoriálů</i>
+        for n := int64(0); n &lt;= 10; n++ {
+                <i>// výpočet faktoriálu</i>
+                f := Factorial(n)
+                message := fmt.Sprintf("%2d! = %d", n, f)
+&nbsp;
+                <i>// vytvoření nového elementu</i>
+                pre := document.Call("createElement", "pre")
+                pre.Set("innerHTML", message)
+&nbsp;
+                <i>// přidání elementu do HTML stránky</i>
+                document.Get("body").Call("appendChild", pre)
+        }
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Příslušná HTML stránka, do které se bude přidávat nový element:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"/&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;nothing&lt;/h2&gt;
+        &lt;script src="dom_add_element.js" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: opět si povšimněte, že JavaScriptový kód
+importujeme až po přidání příslušného elementu na HTML stránku.</div></p>
+
+<p>Ukázka výsledku zobrazeného ve webovém prohlížeči:</p>
+
+<a href="https://www.root.cz/obrazek/1164258/"><img src="https://i.iinfo.cz/images/284/gopherjs-5-prev.webp" class="image-1164258" width="235" height="270" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-5-prev.webp" data-prev-width="235" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-5-large.webp" data-large-width="457" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 5: Tabulka s&nbsp;vypočtenými hodnotami faktoriálu vypsaná do
+DOMu HTML stránky.</i></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Kreslení do 2D canvasu z&nbsp;jazyka Go</h2>
+
+<p>Poměrně často se aplikace překládané do JavaScriptu používají pro kreslení
+2D či 3D grafiky, typicky s&nbsp;přímým či nepřímým využitím <a
+href="https://www.khronos.org/webgl/">WebGL</a>. Tomuto zajisté zajímavému
+tématu se však dnes věnovat nebudeme. Namísto toho si ukážeme, jak může
+aplikace naprogramovaná v&nbsp;jazyce Go vytvořit 2D canvas (HTML 5) a kreslit
+do něj.  Nejdříve si zpřístupníme objekt <strong>document</strong>, což již
+známe:</p>
+
+<pre>
+window := js.Global()
+document := window.Get("document")
+</pre>
+
+<p>Následně do dokumentu (HTML stránky) vložíme nový canvas se zadanou
+velikostí:</p>
+
+<pre>
+canvas := document.Call("createElement", "canvas")
+canvas.Set("height", CanvasWidth)
+canvas.Set("width", CanvasHeight)
+document.Get("body").Call("appendChild", canvas)
+</pre>
+
+<p>Získáme kontext pro kreslení:</p>
+
+<pre>
+context2d := canvas.Call("getContext", "2d")
+</pre>
+
+<p>A následně například vybarvíme celou plochu canvasu světle šedou barvou a
+navíc nakreslíme žlutý obdélník:</p>
+
+<pre>
+<i>// obdélník</i>
+context2d.Set("fillStyle", "#c0c0c0")
+context2d.Call("fillRect", 0, 0, CanvasWidth, CanvasHeight)
+&nbsp;
+<i>// obdélník zobrazený uvnitř prvního obdélníku</i>
+context2d.Set("fillStyle", "yellow")
+context2d.Call("fillRect", 10, 10, CanvasWidth-20, CanvasHeight-20)
+</pre>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Demonstrační příklad: kreslení do 2D canvasu</h2>
+
+<p>Celý demonstrační příklad, který postupně vytvoří 2D canvas a poté do něj
+vykreslí dvojici obdélníků, může být v&nbsp;jazyce Go naprogramován
+následujícím způsobem:</p>
+
+<pre>
+<i>// Technologie GopherJS</i>
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<strong>func</strong> main() {
+        <i>// rozměry canvasu</i>
+        const CanvasWidth = 256
+        const CanvasHeight = 256
+&nbsp;
+        fmt.Println("started")
+&nbsp;
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+        fmt.Println("window", window)
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+        fmt.Println("document", document)
+&nbsp;
+        <i>// změna nadpisu</i>
+        element := document.Call("getElementById", "header")
+        fmt.Println("element", element)
+        element.Set("innerHTML", "2D canvas")
+&nbsp;
+        <i>// vytvoření elementu typu "canvas"</i>
+        canvas := document.Call("createElement", "canvas")
+        canvas.Set("height", CanvasWidth)
+        canvas.Set("width", CanvasHeight)
+&nbsp;
+        <i>// vložení canvasu na HTML stránku</i>
+        document.Get("body").Call("appendChild", canvas)
+&nbsp;
+        <i>// vykreslení grafických objektů na canvas</i>
+        context2d := canvas.Call("getContext", "2d")
+&nbsp;
+        <i>// obdélník</i>
+        context2d.Set("fillStyle", "#c0c0c0")
+        context2d.Call("fillRect", 0, 0, CanvasWidth, CanvasHeight)
+&nbsp;
+        <i>// obdélník zobrazený uvnitř prvního obdélníku</i>
+        context2d.Set("fillStyle", "yellow")
+        context2d.Call("fillRect", 10, 10, CanvasWidth-20, CanvasHeight-20)
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>HTML stránka, v&nbsp;níž se 2D canvas vytvoří:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Canvas manipulation from Go&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        Hello, world! from GopherJS
+        &lt;h1 id="header"&gt;canvas should be displayed here...&lt;/h1&gt;
+        &lt;script src="draw_into_canvas.js" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>A konečně se podívejme na výsledek, tedy jak bude HTML stránka vypadat po
+spuštění skriptu vzniklého transpilací našeho Go kódu do JavaScriptu:</p>
+
+<a href="https://www.root.cz/obrazek/1164261/"><img src="https://i.iinfo.cz/images/284/gopherjs-6-prev.webp" class="image-1164261" width="230" height="270" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-6-prev.webp" data-prev-width="230" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-6-large.webp" data-large-width="446" data-large-height="525" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 6: HTML stránka, v&nbsp;níž byl vytvořen canvas, do něhož se
+vykreslila dvojice obdélníků.</i></p>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Komunikace mezi kódem psaným v&nbsp;jazyce Go a JavaScriptem</h2>
+
+<p>V&nbsp;závěrečné části dnešního článku si ukážeme dvojici nejsložitějších
+příkladů, v&nbsp;nichž bude ukázána komunikace mezi kódem psaným v&nbsp;jazyce
+Go na straně jedné a JavaScriptem na straně druhé. To je důležitá a vlastně i
+téměř nezbytná vlastnost, protože je například nutné reagovat na činnost
+uživatele na webové stránce (stisk tlačítka atd.) a volat příslušné
+<i>callback</i> funkce. V&nbsp;obou dále uvedených příkladech nejprve vytvoříme
+pomocnou funkci naprogramovanou v&nbsp;Go, která bude volatelná
+z&nbsp;JavaScriptu. Povšimněte si, že se této funkci předává řez libovolných
+JavaScriptových hodnot a funkce může taktéž vracet libovolnou hodnotu:</p>
+
+<pre>
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintHello(this js.Value, args []js.Value) any {
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+&nbsp;
+        <i>// získání reference na element s ID="header" umístěného</i>
+        <i>// na HTML stránce</i>
+        element := document.Call("getElementById", "header")
+&nbsp;
+        <i>// změna atributu elementu</i>
+        <i>// (text uvnitř značky)</i>
+        element.Set("innerHTML", "Hello from Go")
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+</pre>
+
+<p>Tuto funkci je ovšem nutné zaregistrovat, aby ji viděl i JavaScriptový
+engine, a to pod jménem &bdquo;printHello&ldquo;:</p>
+
+<pre>
+<i>// export funkce PrintHello tak, aby byla volatelná</i>
+<i>// z JavaScriptu</i>
+js.Global().Set("printHello", js.FuncOf(PrintHello))
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: pozor na to, že dříve se používal
+nepatrně odlišný postup:</div></p>
+
+<pre>
+<i>// export funkce PrintHello tak, aby byla volatelná</i>
+<i>// z JavaScriptu</i>
+js.Global().Set("printHello", js.NewCallback(PrintHello))
+</pre>
+
+<p>To však není vše &ndash; dále totiž musíme zajistit, aby se hlavní funkce Go
+(<strong>main</strong>) automaticky neukončila, protože by JavaScriptová část
+nemohla přistupovat k&nbsp;objektu <strong>Go</strong> (byl by odstraněn GC).
+To se provede s&nbsp;využitím kanálu s&nbsp;nulovou kapacitou, z&nbsp;něhož se
+pokusíme přečíst hodnotu. Tato operace je blokující a tudíž nikdy neskončí:</p>
+
+<pre>
+func <strong>main</strong>() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintHello tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printHello", js.FuncOf(PrintHello))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Volání zaregistrované funkce <strong>printHello()</strong>
+z&nbsp;JavaScriptu bude vypadat následovně:</p>
+
+<pre>
+&lt;script type="text/javascript"&gt;
+    printHello();
+&lt;/script&gt;
+</pre>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Zavolání funkce naprogramované v&nbsp;Go z&nbsp;JavaScriptu</h2>
+
+<p>Podívejme se nyní na konkrétní implementaci postupu popsaného <a
+href="#k16">v&nbsp;předchozí kapitole</a>. Výsledkem by přitom měla být tato
+stránka, jejíž statický obsah je sice odlišný od obsahu vykresleného, ovšem po
+inicializaci se spustí kód původně psaný v&nbsp;jazyce Go, který obsah stránky
+příslušným způsobem modifikuje:</p>
+
+<a href="https://www.root.cz/obrazek/1164264/"><img src="https://i.iinfo.cz/images/284/gopherjs-7-prev.webp" class="image-1164264" width="370" height="173" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-7-prev.webp" data-prev-width="370" data-prev-height="173" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-7.webp" data-large-width="495" data-large-height="231" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 7: Stránka, která byla modifikována kódem naprogramovaným
+v&nbsp;Go, který byl zavolán z&nbsp;JavaScriptu.</i></p>
+
+<p>Úplný zdrojový kód tohoto demonstračního příkladu (přesněji řečeno jeho část
+psaná v&nbsp;jazyce Go) vypadá následovně:</p>
+
+<pre>
+<i>// Technologie WebAssembly</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintHello(this js.Value, args []js.Value) any {
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+&nbsp;
+        <i>// získání reference na element s ID="header" umístěného</i>
+        <i>// na HTML stránce</i>
+        element := document.Call("getElementById", "header")
+&nbsp;
+        <i>// změna atributu elementu</i>
+        <i>// (text uvnitř značky)</i>
+        element.Set("innerHTML", "Hello from Go")
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintHello tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printHello", js.FuncOf(PrintHello))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>A takto vypadá zdrojový kód HTML stránky, v&nbsp;níž se zavolá funkce
+<strong>printHello</strong> (takto je funkce známá z&nbsp;pohledu jazyka
+JavaScript, v&nbsp;Go má či může mít odlišný název):</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Hello, world! from GopherJS&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;nothing&lt;/h2&gt;
+        Hello, world! from GopherJS
+        &lt;script src="js_interop_1.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript"&gt;
+            printHello();
+        &lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Modifikace obsahu HTML stránky po stisku tlačítka</h2>
+
+<p>Díky tomu, že je možné z&nbsp;JavaScriptu volat funkci naprogramovanou
+v&nbsp;jazyce Go (a taktéž patřičně zaregistrovanou), lze snadno realizovat
+například reakci na stisk tlačítka umístěného na HTML stránce:</p>
+
+<pre>
+&lt;button type="button" onclick="printHello()"&gt;Say "Hello"&lt;/button&gt;
+</pre>
+
+<p>Stránka s&nbsp;takovým tlačítkem například může po renderingu ve webovém
+prohlížeči vypadat následovně:</p>
+
+<a href="https://www.root.cz/obrazek/1164267/"><img src="https://i.iinfo.cz/images/284/gopherjs-8-prev.webp" class="image-1164267" width="370" height="173" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-8-prev.webp" data-prev-width="370" data-prev-height="173" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-8.webp" data-large-width="495" data-large-height="231" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 8: Původní obsah HTML stránky.</i></p>
+
+<p>Po stisku tlačítka uživatelem se obsah HTML stránky pozmění, a to takto:</p>
+
+<a href="https://www.root.cz/obrazek/1164270/"><img src="https://i.iinfo.cz/images/284/gopherjs-9-prev.webp" class="image-1164270" width="370" height="173" data-prev-filename="https://i.iinfo.cz/images/284/gopherjs-9-prev.webp" data-prev-width="370" data-prev-height="173" data-large-filename="https://i.iinfo.cz/images/284/gopherjs-9.webp" data-large-width="495" data-large-height="231" alt="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" /></a>
+<p><i>Obrázek 9: Modifikovaný obsah HTML stránky po stisku tlačítka.</i></p>
+
+<p>Nejprve si opět ukažme implementaci funkce nazvané
+<strong>PrintHello</strong> v&nbsp;jazyce Go. Tato funkce je následně
+zaregistrována pod jménem <strong>printHello</strong>, takže bude dostupná
+z&nbsp;JavaScriptu. A nezapomeneme ani na &bdquo;nekonečné čekání&ldquo; při
+čtení z&nbsp;kanálu, do kterého nikdo nezapisuje:</p>
+
+<pre>
+<i>// Technologie WebAssembly</i>
+<i>//</i>
+<i>// - rozhraní mezi jazyky Go a JavaScript</i>
+&nbsp;
+<strong>package</strong> main
+&nbsp;
+<strong>import</strong> (
+        "fmt"
+        "syscall/js"
+)
+&nbsp;
+<i>// funkce, která se bude volat z HTML stránky, jakoby</i>
+<i>// se jednalo o JavaScriptovou funkci</i>
+<strong>func</strong> PrintHello(this js.Value, args []js.Value) any {
+        <i>// získání objektu typu "window" (z pohledu JavaScriptu)</i>
+        window := js.Global()
+&nbsp;
+        <i>// přečtení instance objektu "document"</i>
+        document := window.Get("document")
+&nbsp;
+        <i>// získání reference na element s ID="header" umístěného</i>
+        <i>// na HTML stránce</i>
+        element := document.Call("getElementById", "header")
+&nbsp;
+        <i>// změna atributu elementu</i>
+        <i>// (text uvnitř značky)</i>
+        element.Set("innerHTML", "Hello from Go")
+&nbsp;
+        <i>// je nutné vrátit nějakou hodnotu</i>
+        <strong>return</strong> nil
+}
+&nbsp;
+<strong>func</strong> main() {
+        fmt.Println("started")
+&nbsp;
+        c := make(chan bool)
+&nbsp;
+        <i>// export funkce PrintHello tak, aby byla volatelná</i>
+        <i>// z JavaScriptu</i>
+        js.Global().Set("printHello", js.FuncOf(PrintHello))
+&nbsp;
+        <i>// realizace nekonečného čekání</i>
+        &lt;-c
+&nbsp;
+        fmt.Println("finished")
+}
+</pre>
+
+<p>Posledním zdrojovým kódem, který si v&nbsp;dnešním článku ukážeme, je kód
+HTML stránky, v&nbsp;němž nalezneme jak značku s&nbsp;ID=header, tak i
+tlačítko, po jehož stisku se zavolá (JavaScriptová) funkce nazvaná
+<strong>printHello</strong>:</p>
+
+<pre>
+&lt;!doctype html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Hello, world! from GopherJS&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 id="header"&gt;nothing&lt;/h2&gt;
+        &lt;script src="js_interop_1.js" type="text/javascript"&gt;&lt;/script&gt;
+        &lt;button type="button" onclick="printHello()"&gt;Say "Hello"&lt;/button&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Demonstrační příklady napsané v&nbsp;jazyce Go, které jsou určené pro
+transpřeklad do JavaScriptu s&nbsp;využitím nástroje <strong>GopherJS</strong>,
+byly uloženy do Git repositáře, jenž je dostupný na adrese <a
+href="https://github.com/RedHatOfficial/GoCourse">https://github.com/RedHatOfficial/GoCourse</a>.
+Jednotlivé demonstrační příklady si můžete v&nbsp;případě potřeby stáhnout i
+jednotlivě bez nutnosti klonovat celý (dnes již poměrně rozsáhlý)
+repositář:</p>
+
+<table>
+<tr><th>#</th><th>Příklad</th><th>Stručný popis</th><th>Adresa</th></tr>
+<tr><td>1</td><td>hello_world.go</td><td>zdrojový kód prvního demonstračního příkladu: výpis zprávy na konzoli webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.go</a></td></tr>
+<tr><td>1</td><td>hello_world.html</td><td>HTML stránka s&nbsp;kódem pro načtení prvního demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/hello_world.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>2</td><td>dom_manipulation.go</td><td>zdrojový kód druhého demonstračního příkladu: manipulace s&nbsp;DOMem webové stránky</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.go</a></td></tr>
+<tr><td>2</td><td>dom_manipulation.html</td><td>HTML stránka s&nbsp;kódem pro načtení druhého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_manipulation.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>3</td><td>dom_add_element.go</td><td>zdrojový kód třetího demonstračního příkladu: přidání elementů do DOMu webové stránky</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.go</a></td></tr>
+<tr><td>3</td><td>dom_add_element.html</td><td>HTML stránka s&nbsp;kódem pro načtení třetího demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/dom_add_element.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>4</td><td>draw_into_canvas.go</td><td>zdrojový kód čtvrtého demonstračního příkladu: kreslení do canvasu</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.go</a></td></tr>
+<tr><td>4</td><td>draw_into_canvas.html</td><td>HTML stránka s&nbsp;kódem pro načtení čtvrtého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/draw_into_canvas.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>5</td><td>js_interop_1.go</td><td>zdrojový kód pátého demonstračního příkladu: komunikace s&nbsp;JavaScriptem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.go</a></td></tr>
+<tr><td>5</td><td>js_interop_1.html</td><td>HTML stránka s&nbsp;kódem pro načtení pátého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_1.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>6</td><td>js_interop_2.go</td><td>zdrojový kód šestého demonstračního příkladu: komunikace s&nbsp;JavaScriptem</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.go</a></td></tr>
+<tr><td>6</td><td>js_interop_2.html</td><td>HTML stránka s&nbsp;kódem pro načtení šestého demonstračního příkladu do webového prohlížeče</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.html">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/js_interop_2.html</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>7</td><td>http_server.go</td><td>implementace HTTP serveru, který dokáže webovému prohlížeči předávat obsah požadovaných souborů</td><td><a href="https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/http_server.go">https://github.com/RedHatOfficial/GoCourse/blob/master/lesson12/http_server.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>go2js<br />
+<a href="https://github.com/tredoe/go2js">https://github.com/tredoe/go2js</a>
+</li>
+
+<li>GitHub repositář projektu GopherJS<br />
+<a href="https://github.com/gopherjs/gopherjs">https://github.com/gopherjs/gopherjs</a>
+</li>
+
+<li>How to use GopherJS to turn Go code into a JavaScript library<br />
+<a href="https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a">https://medium.com/@kentquirk/how-to-use-gopherjs-to-turn-go-code-into-a-javascript-library-1e947703db7a</a>
+</li>
+
+<li>Source to source compiler<br />
+<a href="https://en.wikipedia.org/wiki/Source-to-source_compiler">https://en.wikipedia.org/wiki/Source-to-source_compiler</a>
+</li>
+
+<li>Binary recompiler<br />
+<a href="https://en.wikipedia.org/wiki/Binary_recompiler">https://en.wikipedia.org/wiki/Binary_recompiler</a>
+</li>
+
+<li>py2many na GitHubu<br />
+<a href="https://github.com/py2many/py2many">https://github.com/py2many/py2many</a>
+</li>
+
+<li>py2many na PyPi<br />
+<a href="https://pypi.org/project/py2many/">https://pypi.org/project/py2many/</a>
+</li>
+
+<li>Awesome Transpilers<br />
+<a href="https://github.com/milahu/awesome-transpilers">https://github.com/milahu/awesome-transpilers</a>
+</li>
+
+<li>WebAssembly<br />
+<a href="https://webassembly.org/">https://webassembly.org/</a>
+</li>
+
+<li>WebAssembly na Wiki Golangu<br />
+<a href="https://github.com/golang/go/wiki/WebAssembly">https://github.com/golang/go/wiki/WebAssembly</a>
+</li>
+
+<li>The future of WebAssembly - A look at upcoming features and proposals<br />
+<a href="https://blog.scottlogic.com/2018/07/20/wasm-future.html">https://blog.scottlogic.com/2018/07/20/wasm-future.html</a>
+</li>
+
+<li>Writing WebAssembly By Hand<br />
+<a href="https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html">https://blog.scottlogic.com/2018/04/26/webassembly-by-hand.html</a>
+</li>
+
+<li>WebAssembly Specification<br />
+<a href="https://webassembly.github.io/spec/core/index.html">https://webassembly.github.io/spec/core/index.html</a>
+</li>
+
+<li>Index of Instructions<br />
+<a href="https://webassembly.github.io/spec/core/appendix/index-instructions.html">https://webassembly.github.io/spec/core/appendix/index-instructions.html</a>
+</li>
+
+<li>The WebAssembly Binary Toolkit<br />
+<a href="https://github.com/WebAssembly/wabt">https://github.com/WebAssembly/wabt</a>
+</li>
+
+<li>Will WebAssembly replace JavaScript? Or Will WASM Make JavaScript More Valuable in Future?<br />
+<a href="https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e">https://dev.to/vaibhavshah/will-webassembly-replace-javascript-or-will-wasm-make-javascript-more-valuable-in-future-5c6e</a>
+</li>
+
+<li>Roadmap (pro WebAssemly)<br />
+<a href="https://webassembly.org/roadmap/">https://webassembly.org/roadmap/</a>
+</li>
+
+<li>Transcrypt<br />
+<a href="https://transcrypt.org/">https://transcrypt.org/</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="http://www.fit.vutbr.cz/~tisnovpa">Pavel Tišnovský</a> &nbsp; 2024</small></p>
+</body>
+</html>
+
