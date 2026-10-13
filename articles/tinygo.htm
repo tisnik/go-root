@@ -1,0 +1,1691 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<title>TinyGo: alternativní překladač a runtime systém programovacího jazyka Go</title>
+<meta name="Author" content="Pavel Tisnovsky" />
+<meta name="Generator" content="vim" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<style type="text/css">
+         body {color:#000000; background:#ffffff;}
+         h1  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#c00000; text-align:center; padding-left:1em}
+         h2  {font-family: arial, helvetica, sans-serif; color:#ffffff; background-color:#0000c0; padding-left:1em; text-align:left}
+         h3  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#c0c0c0; padding-left:1em; text-align:left}
+         h4  {font-family: arial, helvetica, sans-serif; color:#000000; background-color:#e0e0e0; padding-left:1em; text-align:left}
+         a   {font-family: arial, helvetica, sans-serif;}
+         li  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ol  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         ul  {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify; width:450px;}
+         p   {font-family: arial, helvetica, sans-serif; color:#000000; text-align:justify;}
+         pre {background:#e0e0e0}
+</style>
+</head>
+
+<body>
+
+<h1>TinyGo: alternativní překladač a runtime systém programovacího jazyka Go</h1>
+
+<h3>Pavel Tišnovský</h3>
+
+<p></p>
+
+<h1>Úvodník</h1>
+
+<p>Většina programátorů vytvářejících aplikace v programovacím jazyku Go používá překladač tohoto jazyka, který je součástí standardní instalace Go. Ovšem existují i alternativní překladače, mezi než patří gccgo a TinyGo. Dnes se seznámíme se základními vlastnostmi TinyGo.</p>
+
+
+
+<h2>Obsah</h2>
+
+<p><a href="#k01">1. TinyGo: alternativní překladač a runtime systém programovacího jazyka Go</a></p>
+<p><a href="#k02">2. Základní vlastnosti standardního překladače Go</a></p>
+<p><a href="#k03">3. TinyGo v&nbsp;porovnání se standardním překladačem Go</a></p>
+<p><a href="#k04">4. Instalace TinyGo z&nbsp;dostupných balíčků</a></p>
+<p><a href="#k05">5. Instalace TinyGo ze zdrojových kódů</a></p>
+<p><a href="#k06">6. Podporované cílové platformy</a></p>
+<p><a href="#k07">7. Čas překladu a velikost výsledného souboru pro nejjednodušší variantu programu typu &bdquo;Hello world&ldquo;</a></p>
+<p><a href="#k08">8. Program typu &bdquo;Hello world&ldquo; volající funkci <strong>fmt.Println</strong></a></p>
+<p><a href="#k09">9. Ovlivnění velikosti výsledného spustitelného souboru přepínači TinyGo</a></p>
+<p><a href="#k10">10. Porovnání velikosti výsledných souborů při použití různých přepínačů</a></p>
+<p><a href="#k11">11. Benchmark pro zjištění rychlosti programů přeložených standardním překladačem Go a TinyGo</a></p>
+<p><a href="#k12">12. Výsledky změřené pro standardní překladač Go</a></p>
+<p><a href="#k13">13. Optimalizace na rychlost v&nbsp;TinyGo?</a></p>
+<p><a href="#k14">14. Porovnání změřených výsledků</a></p>
+<p><a href="#k15">15. Druhá varianta benchmarku: výpočet jednotlivých řádků v&nbsp;samostatných gorutinách</a></p>
+<p><a href="#k16">16. Porovnání změřených výsledků benchmarků</a></p>
+<p><a href="#k17">17. Překlad do WebAssembly</a></p>
+<p><a href="#k18">18. Závěr</a></p>
+<p><a href="#k19">19. Repositář s&nbsp;demonstračními příklady</a></p>
+<p><a href="#k20">20. Odkazy na Internetu</a></p>
+
+
+
+<p><a name="k01"></a></p>
+<h2 id="k01">1. TinyGo: alternativní překladač a runtime systém programovacího jazyka Go</h2>
+
+<p>Programovací jazyky je možné rozdělovat do kategorií na základě různých
+kritérií. Typicky mezi tato kritéria patří rozdělení mezi interpretry a
+překladače (s&nbsp;tímto rozdělením se dříve či později setká prakticky každý
+vývojář), ovšem jazyky můžeme taktéž rozdělovat podle jejich typového systému,
+podporovaného paradigmatu (imperativní, funkcionální, objektově orientované,
+logické atd.). Ovšem existuje ještě jedno poměrně důležité kritérium, které
+rozlišuje mezi programovacími jazyky, které jsou specifikovány či možná lépe
+řečeno definovány přímo svojí implementací (typickým zástupcem těchto jazyků je
+Perl) a jazyky s&nbsp;vlastní více či méně formální specifikací. Pro jazyky,
+které patří do druhé zmíněné kategorie, pak většinou existuje hned několik
+jejich implementací. Příkladů je celá řada: C, C++, Java, Python, stovky
+implementací LISPu a Scheme atd. atd.</p>
+
+<p>Mezi programovací jazyky, které mají vlastní specifikaci (a nejsou tedy
+definovány implementací) patří i <a
+href="https://www.root.cz/serialy/programovaci-jazyk-go/">programovací jazyk
+Go</a>. Většina vývojářů, kteří tento jazyk používají pro tvorbu aplikací,
+většinou pracuje se standardním překladačem tohoto jazyka (někdy se tento
+překladač nazývá <strong>gc</strong>, i když to může být poměrně matoucí
+zkratka), ovšem ve skutečnosti existují i další (alternativní) překladače
+jazyka Go. Mezi tyto překladače patří především <strong>gccgo</strong> a
+<strong>TinyGo</strong>. V&nbsp;dnešním článku se zaměříme právě na popis
+překladače <strong>TinyGo</strong> a pokusíme se porovnat jeho základní
+vlastnosti se standardním překladačem jazyka Go dostupným na stránkách <a
+href="https://go.dev/dl/">https://go.dev/dl/</a>.</p>
+
+<p><div class="rs-tip-major">Poznámka: ve skutečnosti nebudeme porovnávat pouze
+dva překladače programovacího jazyka Go, ale současně i jejich <i>runtime</i>,
+protože ten je v&nbsp;Go poměrně důležitý (už jen kvůli existenci automatické
+správy paměti, gorutin a kanálů). Runtime totiž ovlivňuje velikosti a částečně
+i rychlosti výsledných kódů.</div></p>
+
+
+
+<p><a name="k02"></a></p>
+<h2 id="k02">2. Základní vlastnosti standardního překladače Go</h2>
+
+<p>Na tomto místě je možná dobré si položit otázku, z&nbsp;jakého důvodu
+vlastně vůbec vznikl překladač TinyGo? Pokusme se nejdříve shrnout základní
+vlastnosti standardního překladače (a runtime systému) jazyka Go. Standardní
+překladač je znám především vysokou, v&nbsp;některých případech až skoro
+neuvěřitelnou, rychlostí překladu, což tvůrcům Go umožnilo oprostit se od
+konceptu odděleného překladu částí kódu do objektových souborů s&nbsp;jejich
+pozdějším slinkováním (což jsou vlastně pouze triky, které byly kdysi vymyšleny
+pro pomalé překladače resp.&nbsp;pro platformy s&nbsp;malým množstvím operační
+paměti, které si rozdělení překladu vynutily). Nicméně standardní překladač Go
+je velmi rychlý a byl vlastně vytvořen na &bdquo;zelené louce&ldquo; (není
+založen na LLVM ani na žádném jiném podobném univerzálním nástroji). Rychlost
+překladu ovšem současně znamená, že překladač neprovádí žádné sofistikovanější
+optimalizace, které by vyžadovaly poměrně mnoho strojového času (ovšem jak
+uvidíme dále, je standardní překladač Go až překvapivě dobrý).</p>
+
+<p>Současně standardní překladač jazyka Go oficiálně podporuje relativně malé
+množství cílových platforem. Typicky se jedná o 32bitové a 64bitové platformy
+(viz též <a
+href="https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63">https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63</a>,
+přičemž přidání podpory pro další cílové platformy je složité (vše se musí
+implementovat, nelze se spolehnout například na již výše zmíněný LLVM atd.).
+Výsledné binární soubory jsou staticky slinkované a jsou poměrně velké, což
+sice pro typické způsoby nasazení nepředstavuje velký problém (aplikace běžící
+na serveru), ovšem znamená to, že Go v&nbsp;této podobě není dobře využitelné
+na mikrořadičích s&nbsp;menší paměťovou kapacitou pro uložení výsledného
+spustitelného binárního obsahu.</p>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;benchmarcích použijeme tuto verzi
+Go:</div></p>
+
+<pre>
+$ <strong>go version</strong>
+&nbsp;
+go version go1.24.10 linux/amd64
+</pre>
+
+
+
+<p><a name="k03"></a></p>
+<h2 id="k03">3. TinyGo v&nbsp;porovnání se standardním překladačem Go</h2>
+
+<p>Zatímco je standardní překladač jazyka Go optimalizován s&nbsp;ohledem na
+rychlost překladu, má TinyGo odlišné cíle. Jedná se především o snahu o
+zmenšení velikosti výsledných binárních souborů (to souvisí se změnami
+v&nbsp;runtime systému TinyGo a s&nbsp;konfigurovatelností tohoto runtime) a
+taktéž o podporu mnohem většího množství cílových platforem, pro které je možné
+aplikace přeložit. Mezi podporované platformy pochopitelně patří mainstreamové
+x86 (a samozřejmě x86-64) a ARM (AArch64), ale i mnoho různých méně výkonných
+mikrořadičů (viz též <a href="#k06">šestou kapitolu</a>). A zapomenout nesmíme
+ještě na jednu platformu &ndash; WebAssembly (o které právě paralelně vychází
+samostatný seriál). Kombinace WebAssembly + malé velikosti výsledných binárních
+souborů je pro spouštění aplikací v&nbsp;rámci webových prohlížečů velmi
+užitečná, takže se TinyGo v&nbsp;této oblasti vývoje stává velmi oblíbenou
+alternativou.</p>
+
+<p><div class="rs-tip-major">Poznámka: standardní překladač Go sice WebAssembly
+podporuje také, ale výsledné WASM soubory jsou dosti velké. To si ostatně
+taktéž ověříme.</div></p>
+
+<p>TinyGo je navíc postaveno nad LLVM, což znamená, že je umožněno provádění i
+poměrně komplikovaných optimalizací (jak na výslednou velikost, tak i na
+rychlost). Ovšem za tuto možnost platíme delší dobou překladu (mnohdy i
+několikanásobnou). Runtime systém TinyGo je, na rozdíl od standardního Go, do
+značné míry konfigurovatelný. Například je možné pro krátkodobě běžící skripty
+nebo naopak pro aplikace, které mají běžet na mikrořadičích, z&nbsp;runtime
+zcela odstranit automatického správce paměti atd. Se všemi těmito koncepty se
+seznámíme v&nbsp;praktické části dnešního článku.</p>
+
+<p><div class="rs-tip-major">Poznámka: ovšem tvrzení, že TinyGo postavené nad
+LLVM provádí lepší optimalizace, než standardní Go, je nutné dokázat, takže si
+toto tvrzení ověříme na benchmarcích.</div></p>
+
+
+
+<p><a name="k04"></a></p>
+<h2 id="k04">4. Instalace TinyGo z&nbsp;dostupných balíčků</h2>
+
+<p>Instalace TinyGo může (minimálně v&nbsp;Linuxu) probíhat několika možnými
+způsoby. Některé distribuce Linuxu obsahují balíčky s&nbsp;TinyGo, takže
+v&nbsp;tomto případě může být instalace snadná. Příkladem mohou být distribuce
+postavené na DNF/YUM, z&nbsp;nichž některé dokážou chybějící balíček
+(resp.&nbsp;přesněji řečeno chybějící příkaz) doinstalovat:</p>
+
+<pre>
+$ <strong>tinygo</strong>
+&nbsp;
+bash: tinygo: command not found...
+Install package 'tinygo' to provide command 'tinygo'? [N/y] y
+</pre>
+
+<p>Pokud na předchozí otázku odpovíme &bdquo;y&ldquo;, TinyGo se začne
+instalovat:</p>
+
+<pre>
+ * Waiting in queue...
+ * Loading list of packages....
+The following packages have to be installed:
+ clang17-libs-17.0.6-9.fc40.x86_64      Runtime library for clang
+ clang17-resource-filesystem-17.0.6-9.fc40.x86_64       Filesystem package that owns the clang resource directory
+ llvm17-libs-17.0.6-7.fc40.x86_64       LLVM shared libraries
+ qemu-system-arm-core-2:8.2.9-1.fc40.x86_64     QEMU system emulator for ARM
+ qemu-system-riscv-core-2:8.2.9-1.fc40.x86_64   QEMU system emulator for RISC-V
+ qemu-user-2:8.2.9-1.fc40.x86_64        QEMU user mode emulation of qemu targets
+ tinygo-0.30.0-4.fc40.x86_64    Go compiler for small places
+Proceed with changes? [N/y] y
+</pre>
+
+<p>Potvrzení, že skutečně chceme doinstalovat i závislé balíčky (popravdě
+řečeno jsou závislosti na QEMU poněkud podezřelé, ale budiž):</p>
+
+<pre>
+ * Waiting in queue...
+ * Waiting for authentication...
+ * Waiting in queue...
+ * Downloading packages...
+ * Requesting data...
+ * Testing changes...
+ * Installing packages...
+</pre>
+
+<p>Po provedení předchozích kroků by mělo být možné spustit příkaz
+<strong>tinygo</strong>:</p>
+
+<pre>
+$ <strong>tinygo</strong>
+</pre>
+
+<p>Ovšem důležité je zkontrolovat nainstalovanou verzi. V&nbsp;tomto případě
+byla doinstalována starší verze 0.30.0, která je sice plně funkční, ale
+hodnoty, které získáme v&nbsp;dalších kapitolách, zde mohou být horší:</p>
+
+<pre>
+No command-line arguments supplied.
+TinyGo is a Go compiler for small places.
+version: 0.30.0
+usage: tinygo &lt;command&gt; [arguments]
+&nbsp;
+commands:
+  build:   compile packages and dependencies
+  run:     compile and run immediately
+  test:    test packages
+  flash:   compile and flash to the device
+  gdb:     run/flash and immediately enter GDB
+  lldb:    run/flash and immediately enter LLDB
+  monitor: open communication port
+  env:     list environment variables used during build
+  list:    run go list using the TinyGo root
+  clean:   empty cache directory (/home/ptisnovs/.cache/tinygo)
+  targets: list targets
+  info:    show info for specified target
+  version: show version
+  help:    print this help text
+&nbsp;
+for more details, see https://tinygo.org/docs/reference/usage/
+</pre>
+
+<p>Na novějších systémech dojde k&nbsp;instalaci verze 0.39.0, což je poslední
+stabilní verze TinyGo:</p>
+
+<pre>
+$ <strong>tinygo</strong>
+&nbsp;
+No command-line arguments supplied.
+TinyGo is a Go compiler for small places.
+version: 0.39.0
+usage: tinygo &lt;command&gt; [arguments]
+commands:
+                build:          compile packages and dependencies
+                run:            compile and run immediately
+                test:           test packages
+                flash:          compile and flash to the device
+                gdb:            run/flash and immediately enter GDB
+                lldb:           run/flash and immediately enter LLDB
+                monitor:        open communication port
+                ports:          list available serial ports
+                env:            list environment variables used during build
+                list:           run go list using the TinyGo root
+                clean:          empty cache directory (/home/ptisnovs/.cache/tinygo)
+                targets:        list targets
+                info:           show info for specified target
+                version:        show version
+                help:           print this help text
+for more details, see https://tinygo.org/docs/reference/usage/
+</pre>
+
+<p>Poslední (již přeloženou) verzi TinyGo určenou pro vývojáře TinyGo, ale
+využitelnou i pro jiné účely, je možné získat z&nbsp;adresy <a
+href="https://github.com/tinygo-org/tinygo/actions/workflows/linux.yml?query=branch%3Adev">https://github.com/tinygo-org/tinygo/actions/workflows/linux.yml?query=branch%3Adev</a>.
+Klikněte na jméno posledního sestavení (buildu) a stáhněte si artefakt pro vaši
+platformu.</p>
+
+
+
+<p><a name="k05"></a></p>
+<h2 id="k05">5. Instalace TinyGo ze zdrojových kódů</h2>
+
+<p>Alternativně je pochopitelně možné si TinyGo nainstalovat přímo ze
+zdrojových kódů, což je snadné, ovšem musíte mít nainstalovány všechny potřebné
+nástroje. Kromě běžných nástrojů typu Make a Git je nutné doinstalovat i
+nástroj <strong>ninja</strong> (ninja-build) a vyžadováno je i původní Go.</p>
+
+<p>Naklonování repositáře se zdrojovými kódy TinyGo:</p>
+
+<pre>
+$ <strong>git clone https://github.com/tinygo-org/tinygo.git</strong>
+&nbsp;
+Cloning into 'tinygo'...
+remote: Enumerating objects: 36613, done.
+remote: Counting objects: 100% (1255/1255), done.
+remote: Compressing objects: 100% (702/702), done.
+remote: Total 36613 (delta 915), reused 565 (delta 553), pack-reused 35358 (from 4)
+Receiving objects: 100% (36613/36613), 12.70 MiB | 8.92 MiB/s, done.
+Resolving deltas: 100% (26501/26501), done.
+</pre>
+
+<p>Po spuštění překladu příkazem <strong>make</strong> se může vypsat, že je
+nejdříve nutné přeložit samotné LLVM. To se provede dvěma kroky:</p>
+
+<pre>
+$ <strong>make llvm-source</strong>
+&nbsp;
+git clone -b xtensa_release_19.1.2 --depth=1 https://github.com/espressif/llvm-project llvm-project
+Cloning into 'llvm-project'...
+remote: Enumerating objects: 153857, done.
+remote: Counting objects: 100% (153857/153857), done.
+remote: Compressing objects: 100% (124651/124651), done.
+...
+...
+...
+</pre>
+
+<p>Následovaným krokem:</p>
+
+<pre>
+$ <strong>make llvm-build</strong>
+&nbsp;
+(tento krok pochopitelně trvá poměrně dlouhou dobu, konkrétně se překládá více
+než 3000 zdrojových kódů)
+</pre>
+
+<p>A konečně spustíme závěrečnou fázi překladu, která je již rychlá:</p>
+
+<pre>
+$ <strong>make</strong>
+&nbsp;
+go: downloading go.bug.st/serial v1.6.0
+go: downloading github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
+go: downloading golang.org/x/tools v0.30.0
+go: downloading github.com/mattn/go-colorable v0.1.13
+go: downloading github.com/mattn/go-tty v0.0.4
+go: downloading github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
+go: downloading tinygo.org/x/go-llvm v0.0.0-20250422114502-b8f170971e74
+go: downloading github.com/aykevl/go-wasm v0.0.2-0.20250317121156-42b86c494139
+go: downloading github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
+go: downloading github.com/gofrs/flock v0.8.1
+go: downloading github.com/marcinbor85/gohex v0.0.0-20200531091804-343a4b548892
+go: downloading github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3
+go: downloading github.com/mattn/go-isatty v0.0.20
+go: downloading golang.org/x/sys v0.30.0
+go: downloading github.com/creack/goselect v0.1.2
+</pre>
+
+<p>Výsledek je uložen v&nbsp;podadresáři <strong>build</strong>:</p>
+
+<pre>
+$ <strong>ls -l build</strong>
+&nbsp;
+total 173972
+-rwxr-xr-x. 1 ptisnovs ptisnovs 178143696 Dec  7 15:19 tinygo
+</pre>
+
+<p>Ověříme si verzi TinyGo, kterou jsme získali překladem:</p>
+
+<pre>
+$ <strong>./tinygo version</strong>
+&nbsp;
+tinygo version 0.39.0 linux/amd64 (using go version go1.24.10 and LLVM version 19.1.2)
+</pre>
+
+
+
+<p><a name="k06"></a></p>
+<h2 id="k06">6. Podporované cílové platformy</h2>
+
+<p>Jak jsme si již napsali v&nbsp;úvodních kapitolách, patří mezi jednu
+z&nbsp;klíčových vlastností překladače TinyGo podpora pro překlad aplikací na
+mnoho cílových platforem (architektur CPU či MCU), a to včetně mnoha typů
+populárních mikrořadičů. Všechny aktuálně podporované cílové platformy je možné
+zjistit po zadání příkazu:</p>
+
+<pre>
+$ <strong>tinygo targets</strong>
+</pre>
+
+<p>TinyGo verze 0.39.0 vypíše tyto platformy (povšimněte si použitých jmenných
+konvencí):</p>
+
+<pre>
+adafruit-esp32-feather-v2
+ae-rp2040
+arduino
+arduino-leonardo
+arduino-mega1280
+arduino-mega2560
+arduino-mkr1000
+arduino-mkrwifi1010
+arduino-nano
+arduino-nano-new
+arduino-nano33
+arduino-zero
+atmega1284p
+atsame54-xpro
+attiny1616
+badger2040
+badger2040-w
+bluemicro840
+bluepill
+bluepill-clone
+btt-skr-pico
+challenger-rp2040
+circuitplay-bluefruit
+circuitplay-express
+clue
+clue-alpha
+cortex-m-qemu
+d1mini
+digispark
+elecrow-rp2040
+elecrow-rp2350
+esp-c3-32s-kit
+esp32
+esp32-c3-devkit-rust-1
+esp32-coreboard-v2
+esp32-mini32
+esp32c3
+esp32c3-12f
+esp32c3-supermini
+esp8266
+feather-m0
+feather-m0-express
+feather-m4
+feather-m4-can
+feather-nrf52840
+feather-nrf52840-sense
+feather-rp2040
+feather-stm32f405
+gameboy-advance
+gemma-m0
+gnse
+gobadge
+gopher-badge
+gopherbot
+gopherbot2
+grandcentral-m4
+hifive1b
+hw-651
+hw-651-s110v8
+itsybitsy-m0
+itsybitsy-m4
+itsybitsy-nrf52840
+kb2040
+lgt92
+lorae5
+m5paper
+m5stack
+m5stack-core2
+m5stamp-c3
+m5stick-c
+macropad-rp2040
+maixbit
+makerfabs-esp32c3spi35
+matrixportal-m4
+mch2022
+mdbt50qrx-uf2
+metro-m4-airlift
+metro-rp2350
+microbit
+microbit-s110v8
+microbit-v2
+microbit-v2-s113v7
+microbit-v2-s140v7
+mksnanov3
+nano-33-ble
+nano-33-ble-s140v6-uf2
+nano-33-ble-s140v7
+nano-33-ble-s140v7-uf2
+nano-rp2040
+nicenano
+nodemcu
+nrf52840-mdk
+nrf52840-mdk-usb-dongle
+nrf52840-s140v6-uf2
+nrf52840-s140v6-uf2-generic
+nrf52840-s140v7-uf2
+nucleo-f103rb
+nucleo-f722ze
+nucleo-l031k6
+nucleo-l432kc
+nucleo-l476rg
+nucleo-l552ze
+nucleo-wl55jc
+p1am-100
+particle-3rd-gen
+particle-argon
+particle-boron
+particle-xenon
+pca10031
+pca10040
+pca10040-s132v6
+pca10056
+pca10056-s140v6-uf2
+pca10056-s140v7
+pca10059
+pca10059-s140v7
+pga2350
+pico
+pico-plus2
+pico-w
+pico2
+pico2-w
+pinetime
+pybadge
+pygamer
+pyportal
+qtpy
+qtpy-esp32c3
+qtpy-rp2040
+rak4631
+reelboard
+reelboard-s140v7
+riscv-qemu
+rp2040
+rp2350
+rp2350b
+simavr
+stm32f469disco
+stm32f4disco
+stm32f4disco-1
+stm32l0x1
+swan
+teensy36
+teensy40
+teensy41
+thingplus-rp2040
+thumby
+tiny2350
+tkey
+trinket-m0
+trinkey-qt2040
+tufty2040
+wasi
+wasip1
+wasip2
+wasm
+wasm-unknown
+waveshare-rp2040-tiny
+waveshare-rp2040-zero
+wioterminal
+x9pro
+xiao
+xiao-ble
+xiao-esp32c3
+xiao-rp2040
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: mezi podporované platformy patří i
+WebAssembly (WASM), což je další důvod, proč je TinyGo v&nbsp;současnosti
+populární.</div></p>
+
+
+
+<p><a name="k07"></a></p>
+<h2 id="k07">7. Čas překladu a velikost výsledného souboru pro nejjednodušší variantu programu typu &bdquo;Hello world&ldquo;</h2>
+
+<p>V&nbsp;praktické části článku se pokusíme o porovnání TinyGo se standardním
+překladačem jazyka Go (a s&nbsp;jeho runtime systémem). Začneme, jak je po
+vydání původní knihy o jazyku C dobrým zvykem, programem typu &bdquo;Hello,
+world!&ldquo;. Tento program lze v&nbsp;Go implementovat tak, že není nutné
+volat žádnou knihovní funkci; namísto toho můžeme zavolat standardní (ovšem
+v&nbsp;praxi spíše obcházenou) funkci <strong>println</strong>:</p>
+
+<pre>
+$ <strong>go doc builtin.println</strong>
+&nbsp;
+package builtin // import "builtin"
+&nbsp;
+func println(args ...Type)
+    The println built-in function formats its arguments in an
+    implementation-specific way and writes the result to standard error.
+    Spaces are always added between arguments and a newline is appended. Println
+    is useful for bootstrapping and debugging; it is not guaranteed to stay in
+    the language.
+</pre>
+
+<p>Implementace programu bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+func <strong>main</strong>() {
+        println("Go!")
+}
+</pre>
+
+<p>Porovnejme nyní velikosti spustitelných souborů, které vzniknou
+překladem.</p>
+
+<p>Standardní Go:</p>
+
+<pre>
+$ <strong>stat hello</strong>
+  File: hello
+  Size: <strong>1519795</strong>         Blocks: 2976       IO Block: 4096   regular file
+Device: 0,44    Inode: 657113      Links: 1
+Access: (0755/-rwxr-xr-x)  Uid: (14282/ptisnovs)   Gid: (14282/ptisnovs)
+Context: unconfined_u:object_r:user_tmp_t:s0
+Access: 2025-11-28 16:32:51.751457255 +0100
+Modify: 2025-11-28 16:32:51.695457298 +0100
+Change: 2025-11-28 16:32:51.695457298 +0100
+ Birth: 2025-11-28 16:32:51.694626885 +0100
+</pre>
+
+<p>TinyGo:</p>
+
+<pre>
+$ <strong>stat hello</strong>
+  File: hello
+  Size: <strong>542536</strong>          Blocks: 1064       IO Block: 4096   regular file
+Device: 0,44    Inode: 657114      Links: 1
+Access: (0755/-rwxr-xr-x)  Uid: (14282/ptisnovs)   Gid: (14282/ptisnovs)
+Context: unconfined_u:object_r:user_tmp_t:s0
+Access: 2025-11-28 16:35:03.068357976 +0100
+Modify: 2025-11-28 16:35:02.877358121 +0100
+Change: 2025-11-28 16:35:02.877358121 +0100
+ Birth: 2025-11-28 16:35:02.877358121 +0100
+</pre>
+
+<p>V&nbsp;tomto případě tedy TinyGo vytvořilo soubor o zhruba třetinové
+velikosti.</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250550/"><img src="https://i.iinfo.cz/images/96/tinygo-1-large.png" class="image-1250550" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-1-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-1-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-1-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-1-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 1: Porovnání velikosti výsledných binárních spustitelných souborů.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Odlišné budou i časy překladu:</p>
+
+<pre>
+$ <strong>time go build hello.go</strong>
+&nbsp;
+real    0m0.161s
+user    0m0.232s
+sys     0m0.131s
+</pre>
+
+<pre>
+$ <strong>time tinygo build hello.go</strong>
+&nbsp;
+real    0m0.441s
+user    0m0.489s
+sys     0m0.190s
+</pre>
+
+<p>Ovšem toto měření nebude zcela přesné, takže zkusme překlad několikrát
+opakovat a porovnat průměrné časy:</p>
+
+<pre>
+for i in `seq 10`
+do
+    /usr/bin/time -f %E -o hello_go.txt -a go build hello.go
+done
+&nbsp;
+for i in `seq 10`
+do
+    /usr/bin/time -f %E -o hello_tinygo.txt -a ./tinygo build hello.go
+done
+</pre>
+
+<p>Změřené výsledky pro standardní Go:</p>
+
+<pre>
+0:00.14
+0:00.06
+0:00.06
+0:00.05
+0:00.06
+0:00.05
+0:00.05
+0:00.06
+0:00.05
+0:00.06
+</pre>
+
+<p>Změřené výsledky pro TinyGo:</p>
+
+<pre>
+0:00.45
+0:00.45
+0:00.45
+0:00.44
+0:00.44
+0:00.50
+0:00.45
+0:00.54
+0:00.44
+0:00.47
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: v&nbsp;tomto případě je tedy překlad
+pomocí TinyGo zhruba sedmkrát pomalejší!</div></p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250553/"><img src="https://i.iinfo.cz/images/96/tinygo-2-large.png" class="image-1250553" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-2-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-2-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-2-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-2-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 2: Porovnání rychlostí překladu.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k08"></a></p>
+<h2 id="k08">8. Program typu &bdquo;Hello world&ldquo; volající funkci <strong>fmt.Println</strong></h2>
+
+<p>Nyní zdrojové kódy programu typu &bdquo;Hello world&ldquo; upravíme, a to
+konkrétně takovým způsobem, že se namísto standardní funkce
+<strong>println</strong> bude volat funkce <strong>Println</strong>
+z&nbsp;balíčku <strong>fmt</strong>:</p>
+
+<pre>
+$ <strong>go doc fmt.Println</strong>
+&nbsp;
+package fmt // import "fmt"
+&nbsp;
+func Println(a ...any) (n int, err error)
+    Println formats using the default formats for its operands and writes to
+    standard output. Spaces are always added between operands and a newline
+    is appended. It returns the number of bytes written and any write error
+    encountered.
+</pre>
+
+<p>Tato relativně malá úprava povede k&nbsp;tomu, že se do výsledného binárního
+souboru přidá i část knihovny <strong>fmt</strong> a současně i její
+závislosti:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        fmt.Println("Go!")
+}
+</pre>
+
+<p>Opět si nejdříve porovnejme velikosti výsledných souborů, které vzniknou
+překladem tohoto demonstračního příkladu:</p>
+
+<table>
+<tr><th>Překladač</th><th>Velikost</th></tr>
+<tr><td>std. Go</td><td>2130697</td></tr>
+<tr><td>TinyGo </td><td>1074968</td></tr>
+</table>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250556/"><img src="https://i.iinfo.cz/images/96/tinygo-3-large.png" class="image-1250556" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-3-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-3-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-3-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-3-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 3: Porovnání velikosti výsledných binárních spustitelných souborů.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p><div class="rs-tip-major">Poznámka: TinyGo stále generuje mnohem menší
+soubory, a to i v&nbsp;případě, že bylo nutné do runtime přidat i celou další
+knihovnu.</div></p>
+
+<p>Časy překladu výsledné binární spustitelné aplikace.</p>
+
+<p>Standardní překladač jazyka Go:</p>
+
+<pre>
+0:00.20
+0:00.08
+0:00.09
+0:00.09
+0:00.08
+0:00.07
+0:00.08
+0:00.07
+0:00.08
+0:00.07
+</pre>
+
+<p>TinyGo:</p>
+
+<pre>
+0:03.14
+0:03.18
+0:03.06
+0:03.06
+0:03.18
+0:03.06
+0:03.03
+0:03.21
+0:03.01
+0:03.12
+</pre>
+
+<p>Grafické porovnání rychlostí překladu:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250559/"><img src="https://i.iinfo.cz/images/96/tinygo-4-large.png" class="image-1250559" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-4-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-4-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-4-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-4-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 4: Porovnání rychlostí překladu.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p><div class="rs-tip-major">Poznámka: nyní je standardní Go opět rychlejší,
+ovšem více než tricetkrát!</div></p>
+
+
+
+<p><a name="k09"></a></p>
+<h2 id="k09">9. Ovlivnění velikosti výsledného spustitelného souboru přepínači TinyGo</h2>
+
+<p>Způsob překladu prováděný překladačem TinyGo je možné (na rozdíl od
+standardního Go) ovlivnit mnoha přepínači. Těmi lze řídit jak to, jestli má být
+kód optimalizován na rychlost nebo na velikost, ale například je možné
+odstranit ladicí symboly, změnit plánovač (<i>scheduler</i>) použitý pro řízení
+a přepínání gorutin, ale například i zvolit to, jaký se má použít automatický
+správce paměti. Zajímavé je, že automatický správce paměti může být
+z&nbsp;výsledného runtime zcela odstraněn. Na první pohled se sice může jednat
+o nelogické rozhodnutí, protože jazyk Go je na správci paměti postaven (paměť
+nelze uvolňovat explicitně), ovšem pro krátkodobě běžící nástroje nebo
+například pro programy, které mají běžet na MCU (v&nbsp;nichž se žádná další
+paměť mnohdy nealokuje), může být tato volba užitečná, neboť dokáže poměrně
+razantním způsobem snížit velikost runtime subsystému, který je součástí
+každého přeloženého programu.</p>
+
+<p>Volby překladače, které ovlivňují rychlost výsledného programu a velikost
+vygenerovaného souboru, jsou vypsány v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th>Přepínač</th><th>Stručný popis</th></tr>
+<tr><td>-no-debug</td><td>odstranění ladicích informací</td></tr>
+<tr><td>-nobounds</td><td>odstranění kódu pro kontrolu překročení mezí</td></tr>
+<tr><td>-gc</td><td>volba, která implementace správce paměti se má použít (lze zvolit i <strong>none</strong> nebo <strong>leaking</strong>)</td></tr>
+<tr><td>-scheduler</td><td>volba, který plánovač se má použít (lze zvolit i <strong>none</strong>)</td></tr>
+<tr><td>-opt 0-2</td><td>optimalizace na rychlost</td></tr>
+<tr><td>-opt s</td><td>optimalizace na velikost</td></tr>
+</table>
+
+
+
+<p><a name="k10"></a></p>
+<h2 id="k10">10. Porovnání velikosti výsledných souborů při použití různých přepínačů</h2>
+
+<p>Vyzkoušejme si, jak se použití přepínačů zmíněných <a
+href="#k09">v&nbsp;předchozí kapitole</a> projeví na velikosti výsledných
+spustitelných binárních souborů získaných překladem. Začneme první variantou
+programu typu &bdquo;Hello world&ldquo;, tedy variantou volající standardní
+funkci <strong>println</strong>:</p>
+
+<table>
+<tr><th>Způsob překladu</th><th>Velikost</th></tr>
+<tr><td>std.Go         </td><td>1519795</td></tr>
+<tr><td>std.TinyGo     </td><td>542536</td></tr>
+<tr><td>-no-debug      </td><td>79584</td></tr>
+<tr><td>-scheduler=none</td><td>73616</td></tr>
+<tr><td>-gc=leaking    </td><td>14464</td></tr>
+</table>
+
+<p><div class="rs-tip-major">Poznámka: odstraněním automatické správy paměti se
+velikost souboru zmenšila na pouhých 14kB, což je srovnatelné s&nbsp;C či
+C++!</div></p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250562/"><img src="https://i.iinfo.cz/images/96/tinygo-5-large.png" class="image-1250562" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-5-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-5-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-5-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-5-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 5: Grafické porovnání výsledných velikostí spustitelných souborů.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p>Pro variantu &bdquo;Hello world&ldquo; volající funkci
+<strong>fmt.Println</strong> dostaneme pochopitelně (značně) odlišné hodnoty,
+z&nbsp;nichž je ovšem stále patrné, že vliv přepínačů překladače je
+v&nbsp;případě TinyGo značný:</p>
+
+<table>
+<tr><th>Způsob překladu</th><th>Velikost</th></tr>
+<tr><td>std.Go         </td><td>2130697</td></tr>
+<tr><td>std.TinyGo     </td><td>1074968</td></tr>
+<tr><td>-no-debug      </td><td>243344</td></tr>
+<tr><td>-shecduler=none</td><td>238448</td></tr>
+<tr><td>-gc=leaking    </td><td>169872</td></tr>
+</table>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250565/"><img src="https://i.iinfo.cz/images/96/tinygo-6-large.png" class="image-1250565" width="720" height="436" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-6-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-6-prev.webp" data-prev-width="370" data-prev-height="224" data-large-filename="https://i.iinfo.cz/images/96/tinygo-6-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-6-large.webp" data-large-width="720" data-large-height="436" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 6: Grafické porovnání výsledných velikostí spustitelných souborů.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k11"></a></p>
+<h2 id="k11">11. Benchmark pro zjištění rychlosti programů přeložených standardním překladačem Go a TinyGo</h2>
+
+<p>Prozatím jsme porovnávali velikosti výsledných spustitelných souborů
+popř.&nbsp;rychlosti překladu. Ovšem taktéž je důležité zjistit, jak rychlé
+jsou výsledné aplikace, tj.&nbsp;zda se nějak odlišují strojové kódy
+produkované standardním překladačem jazyka Go v&nbsp;porovnání s&nbsp;výsledky,
+které získáme v&nbsp;TinyGo (které je postaveno na LLVM). Abychom mohli toto
+porovnání provést, vrátíme se znovu k&nbsp;benchmarku, který jsme
+v&nbsp;seriálu o jazyku Go použili. Jedná se o benchmark, ve kterém je počítána
+Mandelbrotova množina. Příklad je naprogramován takovým způsobem, aby ho
+později bylo možné upravit do paralelní podoby.</p>
+
+<p>Následuje stručný popis struktury benchmarku.</p>
+
+<p>Zápis (či lépe řečeno export) výsledné bitmapy je realizován
+v&nbsp;samostatné funkci pojmenované <strong>writeImage</strong>, které se
+předají rozměry bitmapy a hodnoty jednotlivých pixelů v&nbsp;poli typu
+<strong>[]byte</strong>:</p>
+
+<pre>
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ve druhé variantě benchmarku nebudeme
+tuto funkci vůbec volat, protože se ukazuje, že i samotné I/O operace jsou
+poměrně náročné a současně jsme neimplementovali žádnou formu
+bufferingu.</div></p>
+
+<p>Funkce pro výpočet jediného obrazového řádku rastrového obrázku
+Mandelbrotovy množiny bude mít hlavičku:</p>
+
+<pre>
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64) {
+}
+</pre>
+
+<p>Povšimněte si, že v&nbsp;posledním parametru předáváme hodnotu
+<strong>cy</strong>, která určuje imaginární složku komplexního čísla
+<strong>C</strong>, které vstupuje do iterativního výpočtu Mandelbrotovy
+množiny.</p>
+
+<p>Volání této funkce a postupné skládání bitmapy tedy může vypadat například
+takto:</p>
+
+<pre>
+image := make([]byte, width*height*3)
+offset := 0
+delta := width * 3
+&nbsp;
+var cy float64 = -1.5
+for y := 0; y &lt; height; y++ {
+        calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy)
+        offset += delta
+        cy += 3.0 / float64(height)
+}
+</pre>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 673px"><a href="https://www.root.cz/obrazek/1250568/"><img src="https://i.iinfo.cz/images/96/tinygo-7-large.png" class="image-1250568" width="673" height="525" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-7-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-7-prev.webp" data-prev-width="346" data-prev-height="270" data-large-filename="https://i.iinfo.cz/images/96/tinygo-7-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-7-large.webp" data-large-width="673" data-large-height="525" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 673px" /></a><p>Obrázek 7: Sekvenční diagram (jediná část článku vytvořená&#160;s podporou umělé inteligence ;-/).&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+<p><a
+href="https://github.com/tisnik/go-root/tree/master/benchmarks/mandelbrot/go-linewise">Úplný
+zdrojový kód dnešního prvního benchmarku</a> tedy bude vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+        w := bufio.NewWriter(os.Stdout)
+        defer w.Flush()
+&nbsp;
+        fmt.Fprintln(w, "P3")
+        fmt.Fprintf(w, "%d %d\n", width, height)
+        fmt.Fprintln(w, "255")
+&nbsp;
+        for i := 0; i &lt; len(image); {
+                r := image[i]
+                i++
+                g := image[i]
+                i++
+                b := image[i]
+                i++
+                fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+        }
+}
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64) {
+        var cx float64 = -2.0
+        for x := uint(0); x &lt; width; x++ {
+                var zx float64 = 0.0
+                var zy float64 = 0.0
+                var i uint = 0
+                for i &lt; maxiter {
+                        zx2 := zx * zx
+                        zy2 := zy * zy
+                        if zx2+zy2 &gt; 4.0 {
+                                break
+                        }
+                        zy = 2.0*zx*zy + cy
+                        zx = zx2 - zy2 + cx
+                        i++
+                }
+                color := palette[i]
+                image[3*x] = color[0]
+                image[3*x+1] = color[1]
+                image[3*x+2] = color[2]
+                cx += 3.0 / float64(width)
+        }
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        image := make([]byte, width*height*3)
+        offset := 0
+        delta := width * 3
+&nbsp;
+        var cy float64 = -1.5
+        for y := 0; y &lt; height; y++ {
+                calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy)
+                offset += delta
+                cy += 3.0 / float64(height)
+        }
+        writeImage(uint(width), uint(height), image)
+}
+</pre>
+
+<p>Benchmark je ještě doplněn pomocným souborem s&nbsp;barvovou paletou:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+<i>/* taken from Fractint */</i>
+&nbsp;
+var <strong>mandmap</strong> = [...][3]byte{
+        {255, 255, 255}, {224, 224, 224}, {216, 216, 216}, {208, 208, 208},
+        {200, 200, 200}, {192, 192, 192}, {184, 184, 184}, {176, 176, 176},
+        {168, 168, 168}, {160, 160, 160}, {152, 152, 152}, {144, 144, 144},
+        {136, 136, 136}, {128, 128, 128}, {120, 120, 120}, {112, 112, 112},
+        {104, 104, 104}, {96, 96, 96}, {88, 88, 88}, {80, 80, 80},
+        {72, 72, 72}, {64, 64, 64}, {56, 56, 56}, {48, 48, 56},
+        {40, 40, 56}, {32, 32, 56}, {24, 24, 56}, {16, 16, 56},
+        {8, 8, 56}, {000, 000, 60}, {000, 000, 64}, {000, 000, 72},
+        {000, 000, 80}, {000, 000, 88}, {000, 000, 96}, {000, 000, 104},
+        {000, 000, 108}, {000, 000, 116}, {000, 000, 124}, {000, 000, 132},
+        {000, 000, 140}, {000, 000, 148}, {000, 000, 156}, {000, 000, 160},
+        {000, 000, 168}, {000, 000, 176}, {000, 000, 184}, {000, 000, 192},
+        {000, 000, 200}, {000, 000, 204}, {000, 000, 212}, {000, 000, 220},
+        {000, 000, 228}, {000, 000, 236}, {000, 000, 244}, {000, 000, 252},
+        {000, 4, 252}, {4, 12, 252}, {8, 20, 252}, {12, 28, 252},
+        {16, 36, 252}, {20, 44, 252}, {20, 52, 252}, {24, 60, 252},
+        {28, 68, 252}, {32, 76, 252}, {36, 84, 252}, {40, 92, 252},
+        {40, 100, 252}, {44, 108, 252}, {48, 116, 252}, {52, 120, 252},
+        {56, 128, 252}, {60, 136, 252}, {60, 144, 252}, {64, 152, 252},
+        {68, 160, 252}, {72, 168, 252}, {76, 176, 252}, {80, 184, 252},
+        {80, 192, 252}, {84, 200, 252}, {88, 208, 252}, {92, 216, 252},
+        {96, 224, 252}, {100, 232, 252}, {100, 228, 248}, {96, 224, 244},
+        {92, 216, 240}, {88, 212, 236}, {88, 204, 232}, {84, 200, 228},
+        {80, 192, 220}, {76, 188, 216}, {76, 180, 212}, {72, 176, 208},
+        {68, 168, 204}, {64, 164, 200}, {64, 156, 196}, {60, 152, 188},
+        {56, 144, 184}, {52, 140, 180}, {52, 132, 176}, {48, 128, 172},
+        {44, 120, 168}, {40, 116, 160}, {40, 108, 156}, {36, 104, 152},
+        {32, 96, 148}, {28, 92, 144}, {28, 84, 140}, {24, 80, 136},
+        {20, 72, 128}, {16, 68, 124}, {16, 60, 120}, {12, 56, 116},
+        {8, 48, 112}, {4, 44, 108}, {000, 36, 100}, {4, 36, 104},
+        {12, 40, 108}, {16, 44, 116}, {24, 48, 120}, {28, 52, 128},
+        {36, 56, 132}, {40, 60, 140}, {48, 64, 144}, {52, 64, 148},
+        {60, 68, 156}, {64, 72, 160}, {72, 76, 168}, {76, 80, 172},
+        {84, 84, 180}, {88, 88, 184}, {96, 92, 192}, {104, 100, 192},
+        {112, 112, 196}, {124, 120, 200}, {132, 132, 204}, {144, 140, 208},
+        {152, 152, 212}, {164, 160, 216}, {172, 172, 220}, {180, 180, 224},
+        {192, 192, 228}, {200, 200, 232}, {212, 212, 236}, {220, 220, 240},
+        {232, 232, 244}, {240, 240, 248}, {252, 252, 252}, {252, 240, 244},
+        {252, 224, 232}, {252, 208, 224}, {252, 192, 212}, {252, 176, 204},
+        {252, 160, 192}, {252, 144, 184}, {252, 128, 172}, {252, 112, 164},
+        {252, 96, 152}, {252, 80, 144}, {252, 64, 132}, {252, 48, 124},
+        {252, 32, 112}, {252, 16, 104}, {252, 000, 92}, {236, 000, 88},
+        {228, 000, 88}, {216, 4, 84}, {204, 4, 80}, {192, 8, 76},
+        {180, 8, 76}, {168, 12, 72}, {156, 16, 68}, {144, 16, 64},
+        {132, 20, 60}, {124, 20, 60}, {112, 24, 56}, {100, 24, 52},
+        {88, 28, 48}, {76, 32, 44}, {64, 32, 44}, {52, 36, 40},
+        {40, 36, 36}, {28, 40, 32}, {16, 44, 28}, {20, 52, 32},
+        {24, 60, 36}, {28, 68, 44}, {32, 76, 48}, {36, 88, 56},
+        {40, 96, 60}, {44, 104, 64}, {48, 112, 72}, {52, 120, 76},
+        {56, 132, 84}, {48, 136, 84}, {40, 144, 80}, {52, 148, 88},
+        {68, 156, 100}, {80, 164, 112}, {96, 168, 124}, {108, 176, 136},
+        {124, 184, 144}, {136, 192, 156}, {152, 196, 168}, {164, 204, 180},
+        {180, 212, 192}, {192, 220, 200}, {208, 224, 212}, {220, 232, 224},
+        {236, 240, 236}, {252, 248, 248}, {252, 252, 252}, {252, 252, 240},
+        {252, 252, 228}, {252, 252, 216}, {248, 248, 204}, {248, 248, 192},
+        {248, 248, 180}, {248, 248, 164}, {244, 244, 152}, {244, 244, 140},
+        {244, 244, 128}, {244, 244, 116}, {240, 240, 104}, {240, 240, 92},
+        {240, 240, 76}, {240, 240, 64}, {236, 236, 52}, {236, 236, 40},
+        {236, 236, 28}, {236, 236, 16}, {232, 232, 0}, {232, 232, 12},
+        {232, 232, 28}, {232, 232, 40}, {236, 236, 56}, {236, 236, 68},
+        {236, 236, 84}, {236, 236, 96}, {240, 240, 112}, {240, 240, 124},
+        {240, 240, 140}, {244, 244, 152}, {244, 244, 168}, {244, 244, 180},
+        {244, 244, 196}, {248, 248, 208}, {248, 248, 224}, {248, 248, 236},
+        {252, 252, 252}, {248, 248, 248}, {240, 240, 240}, {232, 232, 232}}
+</pre>
+
+
+
+<p><a name="k12"></a></p>
+<h2 id="k12">12. Výsledky změřené pro standardní překladač Go</h2>
+
+<p>Benchmark bude spuštěn několikrát za sebou. Při každém spuštění se vypočítá
+Mandelbrotova množina v&nbsp;rozlišení 4096&times;4096 pixelů s&nbsp;maximálním
+počtem iterací nastaveným na 255, což je dostatečně velký obrázek a taktéž
+komplikovaný výpočet na to, aby výpočet trval několik sekund nebo i desítek
+sekund:</p>
+
+<pre>
+OUTFILE="go.times"
+PREFIX="mandelbrot"
+RESOLUTION="4096"
+MAXITER="255"
+&nbsp;
+rm $OUTFILE
+&nbsp;
+for i in `seq 10`
+do
+    echo $i
+    /usr/bin/time --output $OUTFILE --append --format "%e %M" ./mandelbrot $RESOLUTION $RESOLUTION $MAXITER &gt; "${PREFIX}_${i}.ppm"
+done
+</pre>
+
+<p>Výsledné časy pro variantu benchmarku s&nbsp;exportem obrázků:</p>
+
+<pre>
+6.20 51176
+6.18 51304
+6.14 51244
+6.23 51432
+6.24 51048
+6.20 51304
+6.18 51176
+6.19 51176
+6.22 51176
+6.18 51176
+</pre>
+
+<p>Výsledné časy pro variantu benchmarku bez exportu obrázků:</p>
+
+<pre>
+3.50 51204
+3.50 51076
+3.49 50820
+3.55 50948
+3.53 51076
+3.50 51204
+3.50 51332
+3.49 51332
+3.49 51204
+3.49 51076
+</pre>
+
+
+
+<p><a name="k13"></a></p>
+<h2 id="k13">13. Optimalizace na rychlost v&nbsp;TinyGo?</h2>
+
+<p>Vzhledem k&nbsp;tomu, že TinyGo podporuje optimalizace, které mohou být
+(ovšem jen pokud jsou povoleny) prováděny překladačem, bude zajímavé zjistit,
+jak se tyto optimalizace projeví na výsledcích benchmarku a zda bude vůbec
+benchmark přeložený TinyGo rychlejší, než jeho protějšek, který vznikl
+překladem pomocí standardního překladače jazyka Go.</p>
+
+<p>Benchmark přeložený TinyGo bez povolení optimalizací (bude se optimalizovat
+na velikost kódu) bude ve skutečnosti pomalejší, než u standardního Go:</p>
+
+<pre>
+6.78 49408
+6.77 49408
+6.79 49408
+6.76 49408
+6.78 49408
+6.77 49536
+6.84 49408
+6.76 49408
+6.77 49408
+6.77 49536
+</pre>
+
+<p>Pokud povolíme optimalizace přepínačem <strong>-opt=2</strong>, bude sice
+benchmark rychlejší, ale pouze nepatrně (což je, popravdě řečeno, poměrně velké
+zklamání):</p>
+
+<pre>
+6.13 49408
+6.12 49536
+6.12 49536
+6.12 49536
+6.13 49408
+6.20 49536
+6.11 49408
+6.07 49408
+6.13 49536
+6.13 49408
+</pre>
+
+<p>Vypnutí automatického správce paměti nemá na rychlost benchmarku výrazný
+vliv:</p>
+
+<pre>
+6.25 49188
+6.40 49188
+6.26 49316
+6.25 49060
+6.29 49060
+6.24 49060
+6.63 49060
+6.39 49316
+6.33 49188
+6.24 49060
+</pre>
+
+<p>Ještě se podívejme na časy běhu se zákazem I/O operací (rastrový obrázek se
+nebude exportovat), čímž omezíme vliv knihovních funkcí. Překlad pomocí TinyGo
+bez povolení optimalizací:</p>
+
+<pre>
+3.58 648
+3.54 648
+3.69 580
+3.60 520
+3.60 520
+3.56 520
+3.59 700
+3.60 520
+3.63 648
+3.59 648
+</pre>
+
+<p>Výsledek s&nbsp;povolením optimalizací:</p>
+
+<pre>
+3.62 580
+3.58 648
+3.55 648
+3.61 648
+3.58 648
+3.70 576
+3.60 520
+3.54 648
+3.57 648
+3.57 576
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: zajímavé je, že optimalizace
+v&nbsp;tomto případě nemají žádný vliv na rychlost prováděných
+výpočtů.</div></p>
+
+
+
+<p><a name="k14"></a></p>
+<h2 id="k14">14. Porovnání změřených výsledků</h2>
+
+<p>Z&nbsp;výsledků, které jsme získali měřením, plyne, že TinyGo nemá, i
+přesto, že jsou povolené optimalizace, výrazně lepší výsledky v&nbsp;porovnání
+se standardním překladačem jazyka Go. To je zajímavé, protože z&nbsp;časů
+překladu plyne, že překladač TinyGo zde tráví minimálně řádově více času:</p>
+
+<table>
+<tr><th>Překlad</th><th>I/O</th><th>Volby při překladu</th><th>Výsledný čas</th></tr>
+<tr><td>std.Go</td><td>povoleno</td><td>N/A</td><td>6.2</td></tr>
+<tr><td>std.Go</td><td>zakázáno</td><td>N/A</td><td>3.5</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>-Oz</td><td>6.8</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>-O2</td><td>6.1</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>noGC</td><td>6.3</td></tr>
+<tr><td>TinyGo</td><td>zakázáno</td><td>-Oz</td><td>3.6</td></tr>
+<tr><td>TinyGo</td><td>zakázáno</td><td>-O2</td><td>3.6</td></tr>
+</table>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250571/"><img src="https://i.iinfo.cz/images/96/tinygo-8-large.png" class="image-1250571" width="720" height="392" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-8-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-8-prev.webp" data-prev-width="370" data-prev-height="202" data-large-filename="https://i.iinfo.cz/images/96/tinygo-8-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-8-large.webp" data-large-width="720" data-large-height="392" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 8: Porovnání výsledků benchmarků.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k15"></a></p>
+<h2 id="k15">15. Druhá varianta benchmarku: výpočet jednotlivých řádků v&nbsp;samostatných gorutinách</h2>
+
+<p>Mnoho aplikací naprogramovaných v&nbsp;jazyku Go využívá koncept kanálů a
+gorutin, tj.&nbsp;rozdělení celého výpočtu do menších celků, které mohou být
+spuštěny souběžně a v&nbsp;mnoha případech i paralelně. Bude tedy užitečné si
+ověřit, jak bude řízen výpočet s&nbsp;mnoha stovkami nebo jednotkami tisíc
+gorutin, a to jak runtime systémem původního Go, tak i v&nbsp;TinyGo (kde lze
+navíc runtime do jisté míry ovlivnit). Původní benchmark změníme tak, aby
+využíval velké množství gorutin. Celý výpočet prováděný benchmarkem proto
+upravíme do takové podoby, aby byly výpočty prováděny souběžně (a do určité
+míry i paralelně). Barvy pixelů na každém obrazovém řádku budou vypočteny
+v&nbsp;samostatné gorutině. Vzhledem k&nbsp;tomu, že gorutiny jsou interně
+reprezentovány úsporným způsobem, je možné tuto optimalizaci bez problémů
+provést a vytvořit jich tak i několik tisíc (v&nbsp;závislosti na rozlišení
+bitmapy, resp.&nbsp;přesněji řečeno na počtu obrazových řádků bitmapy).</p>
+
+<p>O to, aby se počkalo na dokončení všech gorutin, se postará kanál
+pojmenovaný <strong>done</strong>, jehož kapacita přesně odpovídá počtu
+gorutin. Nejprve se kanál vytvoří, následně se všechny gorutiny spustí a na
+konci čtením z&nbsp;kanálu počkáme na dokončení všech <strong>height</strong>
+gorutin:</p>
+
+<pre>
+done := make(chan bool, height)
+&nbsp;
+<i>// na tomto místě bude umístěn vlastní výpočet</i>
+&nbsp;
+for i := 0; i &lt; height; i++ {
+        &lt;-done
+}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: ovšem synchronizaci lze provádět i
+odlišnými prostředky, například atomickým čítačem atd.</div></p>
+
+<p>Jedinou další úpravou bude modifikace funkce
+<strong>calcMandelbrot</strong>, které se musí předat reference na kanál, do
+kterého se na konci výpočtu zapíše hodnota <strong>true</strong> (důležitý je
+zápis, nikoli vlastní hodnota, ideální by byl kanál pro prázdné struktury):</p>
+
+<pre>
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64, <strong>done chan bool</strong>) {
+        ...
+        ...
+        ...
+        <strong>done &lt;- true</strong>
+}
+</pre>
+
+<p>V&nbsp;hlavní gorutině počkáme na dokončení všech výpočtů takto:</p>
+
+<pre>
+        for i := 0; i &lt; height; i++ {
+                &lt;-done
+        }
+</pre>
+
+<p>Následuje (volitelný) zápis výsledků do externího rastrového obrázku:</p>
+
+<pre>
+        writeImage(uint(width), uint(height), image)
+</pre>
+
+<p>Celý zdrojový kód upraveného benchmarku vypadá následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strconv"
+)
+&nbsp;
+func <strong>writeImage</strong>(width uint, height uint, image []byte) {
+        w := bufio.NewWriter(os.Stdout)
+        defer w.Flush()
+&nbsp;
+        fmt.Fprintln(w, "P3")
+        fmt.Fprintf(w, "%d %d\n", width, height)
+        fmt.Fprintln(w, "255")
+&nbsp;
+        for i := 0; i &lt; len(image); {
+                r := image[i]
+                i++
+                g := image[i]
+                i++
+                b := image[i]
+                i++
+                fmt.Fprintf(w, "%d %d %d\n", r, g, b)
+        }
+}
+&nbsp;
+func <strong>calcMandelbrot</strong>(width uint, height uint, maxiter uint, palette [][3]byte, image []byte, cy float64, done chan bool) {
+        var cx float64 = -2.0
+        for x := uint(0); x &lt; width; x++ {
+                var zx float64 = 0.0
+                var zy float64 = 0.0
+                var i uint = 0
+                for i &lt; maxiter {
+                        zx2 := zx * zx
+                        zy2 := zy * zy
+                        if zx2+zy2 &gt; 4.0 {
+                                break
+                        }
+                        zy = 2.0*zx*zy + cy
+                        zx = zx2 - zy2 + cx
+                        i++
+                }
+                color := palette[i]
+                image[3*x] = color[0]
+                image[3*x+1] = color[1]
+                image[3*x+2] = color[2]
+                cx += 3.0 / float64(width)
+        }
+        done &lt;- true
+}
+&nbsp;
+func <strong>main</strong>() {
+        if len(os.Args) &lt; 4 {
+                println("usage: ./mandelbrot width height maxiter")
+                os.Exit(1)
+        }
+&nbsp;
+        width, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+                fmt.Printf("Improper width parameter: '%s'\n", os.Args[1])
+                os.Exit(1)
+        }
+&nbsp;
+        height, err := strconv.Atoi(os.Args[2])
+        if err != nil {
+                fmt.Printf("Improper height parameter: '%s'\n", os.Args[2])
+                os.Exit(1)
+        }
+&nbsp;
+        maxiter, err := strconv.Atoi(os.Args[3])
+        if err != nil {
+                fmt.Printf("Improper maxiter parameter: '%s'\n", os.Args[3])
+                os.Exit(1)
+        }
+&nbsp;
+        done := make(chan bool, height)
+&nbsp;
+        image := make([]byte, width*height*3)
+        offset := 0
+        delta := width * 3
+&nbsp;
+        var cy float64 = -1.5
+        for y := 0; y &lt; height; y++ {
+                go calcMandelbrot(uint(width), uint(height), uint(maxiter), mandmap[:], image[offset:offset+delta], cy, done)
+                offset += delta
+                cy += 3.0 / float64(height)
+        }
+        for i := 0; i &lt; height; i++ {
+                &lt;-done
+        }
+        writeImage(uint(width), uint(height), image)
+}
+</pre>
+
+
+
+<p><a name="k16"></a></p>
+<h2 id="k16">16. Porovnání změřených výsledků benchmarků</h2>
+
+<p>Opět se podívejme na výsledky získané benchmarkem pro různé překladače a
+runtime jazyka Go i pro různé parametry překladu (volitelné pouze
+v&nbsp;případě TinyGo):</p>
+
+<table>
+<tr><th>Překlad</th><th>I/O</th><th>Volby při překladu</th><th>Výsledný čas</th></tr>
+<tr><td>std.Go</td><td>povoleno</td><td>N/A</td><td>3.5</td></tr>
+<tr><td>std.Go</td><td>zakázáno</td><td>N/A</td><td>0.5</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>-Oz</td><td>4.3</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>-O2</td><td>3.4</td></tr>
+<tr><td>TinyGo</td><td>povoleno</td><td>noGC</td><td>3.6</td></tr>
+<tr><td>TinyGo</td><td>zakázáno</td><td>-Oz</td><td>0.74</td></tr>
+<tr><td>TinyGo</td><td>zakázáno</td><td>-O2</td><td>0.73</td></tr>
+</table>
+
+<p>Z&nbsp;výsledků opět plyne, že benchmark přeložený s&nbsp;využitím TinyGo
+není rychlejší. Naopak, zdá se, že práce s&nbsp;gorutinami je v&nbsp;TinyGo
+náročnější, než v&nbsp;případě standardního jazyka Go, protože při zákazu I/O
+operací trval celý benchmark v&nbsp;případě std. Go pouze 0,5 sekundy, zatímco
+v&nbsp;TinyGo 0,73 sekundy. Vše si samozřejmě můžeme zobrazit i v&nbsp;grafické
+podobě:</p>
+
+<div class="rs-img-center" style="margin-left: auto; margin-right: auto; max-width: 720px"><a href="https://www.root.cz/obrazek/1250574/"><img src="https://i.iinfo.cz/images/96/tinygo-9-large.png" class="image-1250574" width="720" height="392" data-prev-filename="https://i.iinfo.cz/images/96/tinygo-9-prev.png" data-prev-filename-webp="https://i.iinfo.cz/images/96/tinygo-9-prev.webp" data-prev-width="370" data-prev-height="202" data-large-filename="https://i.iinfo.cz/images/96/tinygo-9-large.png" data-large-filename-webp="https://i.iinfo.cz/images/96/tinygo-9-large.webp" data-large-width="720" data-large-height="392" alt="TinyGo" data-description="&#160;" title="Autor: tisnik, podle licence: &lt;a href=&quot;http://en.wikipedia.org/wiki/Rights_Managed&quot;&gt;Rights Managed&lt;/a&gt;" style="width: 100%; height: auto; max-width: 720px" /></a><p>Obrázek 9: Porovnání výsledků benchmarků.&#160;<br class="_remove" /></p><p class="author">Autor: tisnik, podle licence: <a href="http://en.wikipedia.org/wiki/Rights_Managed">Rights Managed</a><br class="_remove" /></p></div>
+
+
+
+<p><a name="k17"></a></p>
+<h2 id="k17">17. Překlad do WebAssembly</h2>
+
+<p>TinyGo se stává populární pro vývoj těch aplikací, které mají běžet ve
+webovém prohlížeči, konkrétně ve virtuálním stroji WebAssembly. Zde může být
+kritická zejména celková velikost souborů <strong>.wasm</strong> a TinyGo je
+tedy výhodné, protože dokáže tyto soubory generovat mnohem menší, než je tomu u
+standardního Go (a jeho rozsáhlého ekosystému). Ostatně si to můžeme ověřit,
+například překladem demonstračního příkladu &bdquo;Hello world&ldquo; do
+formátu WebAssembly.</p>
+
+<p>Překlad do WebAssembly pomocí standardního Go:</p>
+
+<pre>
+$ <strong>GOOS=js GOARCH=wasm go build -o hello.wasm</strong>
+</pre>
+
+<p>Výsledný soubor bude mít velikost přesahující 1,5 MB:</p>
+
+<pre>
+$ <strong>file hello.wasm</strong>
+hello.wasm: WebAssembly (wasm) binary module version 0x1 (MVP)
+&nbsp;
+$ <strong>ls -l hello.wasm</strong>
+-rwxr-xr-x. 1 ptisnovs ptisnovs 1600338 Dec  8 11:40 hello.wasm
+</pre>
+
+<p>Překlad stejného příkladu, tentokrát s&nbsp;využitím překladače TinyGo:</p>
+
+<pre>
+$ <strong>GOOS=js GOARCH=wasm tinygo build -o hello.wasm hello.go</strong>
+</pre>
+
+<p>Výsledný soubor je v&nbsp;tomto případě mnohem menší &ndash; cca 96 kB:</p>
+
+<pre>
+$ <strong>file hello.wasm</strong>
+hello.wasm: WebAssembly (wasm) binary module version 0x1 (MVP)
+&nbsp;
+$ <strong>ls -l hello.wasm</strong>
+-rwxr-xr-x. 1 ptisnovs ptisnovs 97036 Dec  8 11:43 hello.wasm
+</pre>
+
+<p>Podobné rozdíly nalezneme i při překladu benchmarku do WebAssembly. Druhý
+benchmark je v&nbsp;případě použití TinyGo přeložen do binárního souboru ve
+WebAssembly, který má velikost 297 kB, zatímco v&nbsp;případě standardního Go
+vznikne soubor o velikosti 2,5 MB!</p>
+
+
+
+<p><a name="k18"></a></p>
+<h2 id="k18">18. Závěr</h2>
+
+<p>TinyGo je zajímavou a taktéž užitečnou alternativou ke standardnímu
+překladači (a runtime systému) programovacího jazyka Go. Mezi jeho největší
+přednosti patří obecně menší velikost výsledných spustitelných souborů, což
+ocení zejména programátoři vytvářející aplikace pro WebAssembly nebo pro
+mikrořadiče (což je téma, kterému jsme se prozatím nevěnovali, ale které si
+vyžádá samostatný článek). Teoreticky by taktéž měl překladač TinyGo generovat
+výkonnější kód, což jsme ovšem v&nbsp;benchmarcích neověřili &ndash;
+v&nbsp;některých případech naopak vyhrává rychlý standardní překladač Go.
+Velkou nevýhodou TinyGo je pomalá rychlost překladu, což je zvláště bolestné
+právě v&nbsp;ekosystému programovacího jazyka Go, který je postaven na
+předpokladu, že se celá aplikace vždy přeloží jako celek, bez rozdělení na fázi
+odděleného překladu následované fází slinkování.</p>
+
+<p>TinyGo tedy není vhodné chápat jako náhradu původní sady nástrojů jazyka Go,
+ale spíše o její doplnění.</p>
+
+
+
+<p><a name="k19"></a></p>
+<h2 id="k19">19. Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech dnes použitých demonstračních příkladů byly uloženy do
+Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>
+(stále na GitHubu :-). V&nbsp;případě, že nebudete chtít klonovat celý
+repositář (ten je ovšem &ndash; alespoň prozatím &ndash; velmi malý, dnes má
+přibližně pět až šest megabajtů), můžete namísto toho použít odkazy na
+jednotlivé příklady, které naleznete v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>hello.go</td><td>program typu &bdquo;Hello world&ldquo;, který volá přímo funkci <strong>println</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/hello.go">https://github.com/tisnik/go-root/blob/master/tinygo/hello.go</a></td></tr>
+<tr><td> 2</td><td>hello_2.go</td><td>program typu &bdquo;Hello world&ldquo;, který volá knihovní funkci <strong>fmt.Println</strong></td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/hello_2.go">https://github.com/tisnik/go-root/blob/master/tinygo/hello_2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>mandelbrot-concurrent/mandelbrot.go</td><td>benchmark pro výpočet Mandelbrotovy množiny, sekvenční varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/mandelbrot.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/mandelbrot.go</a></td></tr>
+<tr><td> 4</td><td>mandelbrot-concurrent/mandelbrot_no_out.go</td><td>varianta benchmarku bez exportu výsledku</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/mandelbrot.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/mandelbrot_no_out.go</a></td></tr>
+<tr><td> 5</td><td>mandelbrot-concurrent/palettes.go</td><td>barvová paleta použitá benchmarkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/palettes.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-concurrent/palettes.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 6</td><td>mandelbrot-linewise/mandelbrot.go</td><td>benchmark pro výpočet Mandelbrotovy množiny, souběžná/paralelní varianta</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/mandelbrot.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/mandelbrot.go</a></td></tr>
+<tr><td> 7</td><td>mandelbrot-linewise/mandelbrot_no_out.go</td><td>varianta benchmarku bez exportu výsledku</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/mandelbrot.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/mandelbrot_no_out.go</a></td></tr>
+<tr><td> 8</td><td>mandelbrot-linewise/palettes.go</td><td>barvová paleta použitá benchmarkem</td><td><a href="https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/palettes.go">https://github.com/tisnik/go-root/blob/master/tinygo/mandelbrot-linewise/palettes.go</a></td></tr>
+</table>
+
+
+
+<p><a name="k20"></a></p>
+<h2 id="k20">20. Odkazy na Internetu</h2>
+
+<ol>
+
+<li>TinyGo - A Go Compiler For Small Places<br />
+<a href="https://tinygo.org/">https://tinygo.org/</a>
+</li>
+
+<li>Getting started<br />
+<a href="https://tinygo.org/getting-started/">https://tinygo.org/getting-started/</a>
+</li>
+
+<li>Go.dev (klasická varianta překladače jazyka Go)<br />
+<a href="https://go.dev/">https://go.dev/</a>
+</li>
+
+<li>gccgo<br />
+<a href="https://gcc.gnu.org/onlinedocs/gccgo/">https://gcc.gnu.org/onlinedocs/gccgo/</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://go.dev/doc/install/gccgo">https://go.dev/doc/install/gccgo</a>
+</li>
+
+<li>Awesome Go<br />
+<a href="https://github.com/avelino/awesome-go">https://github.com/avelino/awesome-go</a>
+</li>
+
+<li>TinyGo: Inline assembly<br />
+<a href="https://tinygo.org/docs/concepts/compiler-internals/inline-assembly/">https://tinygo.org/docs/concepts/compiler-internals/inline-assembly/</a>
+</li>
+
+<li>Getting Started with TinyGo: Bringing Go to Microcontrollers and WebAssembly<br />
+<a href="https://dev.to/ekwoster/getting-started-with-tinygo-bringing-go-to-microcontrollers-and-webassembly-2pp0">https://dev.to/ekwoster/getting-started-with-tinygo-bringing-go-to-microcontrollers-and-webassembly-2pp0</a>
+</li>
+
+<li>Optimizing Go code with GCCGO for improved performance<br />
+<a href="https://dev.to/parmcoder/optimizing-go-code-with-gccgo-for-improved-performance-2d3d">https://dev.to/parmcoder/optimizing-go-code-with-gccgo-for-improved-performance-2d3d</a>
+</li>
+
+<li>The Untold Power of TinyGo: How to Run Go on Microcontrollers and Supercharge Embedded Development<br />
+<a href="https://dev.to/ekwoster/the-untold-power-of-tinygo-how-to-run-go-on-microcontrollers-and-supercharge-embedded-development-2g7d">https://dev.to/ekwoster/the-untold-power-of-tinygo-how-to-run-go-on-microcontrollers-and-supercharge-embedded-development-2g7d</a>
+</li>
+
+<li>From Arduino to Mars: Why You Should Be Using TinyGo for Embedded Web Development<br />
+<a href="https://dev.to/ekwoster/from-arduino-to-mars-why-you-should-be-using-tinygo-for-embedded-web-development-54od">https://dev.to/ekwoster/from-arduino-to-mars-why-you-should-be-using-tinygo-for-embedded-web-development-54od</a>
+</li>
+
+<li>Optimizing binaries<br />
+<a href="https://tinygo.org/docs/guides/optimizing-binaries/">https://tinygo.org/docs/guides/optimizing-binaries/</a>
+</li>
+
+<li>Why TinyGo Might Be the Future of Embedded WebAssembly &amp; How To Get Started Today<br />
+<a href="https://ekwoster.dev/post/-why-tinygo-might-be-the-future-of-embedded-webassembly-how-to-get-started-today/">https://ekwoster.dev/post/-why-tinygo-might-be-the-future-of-embedded-webassembly-how-to-get-started-today/</a>
+</li>
+
+<li>TinyGo na GitHubu<br />
+<a href="https://github.com/tinygo-org/tinygo">https://github.com/tinygo-org/tinygo</a>
+</li>
+
+<li>Compile Go directly to WebAssembly components with TinyGo and WASI P2<br />
+<a href="https://wasmcloud.com/blog/compile-go-directly-to-webassembly-components-with-tinygo-and-wasi-p2/">https://wasmcloud.com/blog/compile-go-directly-to-webassembly-components-with-tinygo-and-wasi-p2/</a>
+</li>
+
+<li>Do you use gccgo?<br />
+<a href="https://www.reddit.com/r/golang/comments/j1g1z6/do_you_use_gccgo/">https://www.reddit.com/r/golang/comments/j1g1z6/do_you_use_gccgo/</a>
+</li>
+
+<li>Go v/s TinyGo: Which one is the best for you?<br />
+<a href="https://blog.nonstopio.com/go-v-s-tinygo-which-one-is-the-best-for-you-73cac3c7849e">https://blog.nonstopio.com/go-v-s-tinygo-which-one-is-the-best-for-you-73cac3c7849e</a>
+</li>
+
+<li>Go Wiki: GccgoCrossCompilation<br />
+<a href="https://go.dev/wiki/GccgoCrossCompilation">https://go.dev/wiki/GccgoCrossCompilation</a>
+</li>
+
+<li>Oficiální stránky Gccgo<br />
+<a href="https://gcc.gnu.org/onlinedocs/gccgo/index.html">https://gcc.gnu.org/onlinedocs/gccgo/index.html</a>
+</li>
+
+<li>What are the primary differences between 'gc' and 'gccgo'?<br />
+<a href="https://stackoverflow.com/questions/25811445/what-are-the-primary-differences-between-gc-and-gccgo">https://stackoverflow.com/questions/25811445/what-are-the-primary-differences-between-gc-and-gccgo</a>
+</li>
+
+<li>Setting up and using gccgo<br />
+<a href="https://go.dev/doc/install/gccgo">https://go.dev/doc/install/gccgo</a>
+</li>
+
+<li>Go (Arch Linux)<br />
+<a href="https://wiki.archlinux.org/title/Talk:Go">https://wiki.archlinux.org/title/Talk:Go</a>
+</li>
+
+<li>Why are binaries built with gccgo smaller (among other differences?)<br />
+<a href="https://stackoverflow.com/questions/27067112/why-are-binaries-built-with-gccgo-smaller-among-other-differences">https://stackoverflow.com/questions/27067112/why-are-binaries-built-with-gccgo-smaller-among-other-differences</a>
+</li>
+
+<li>Why Everyone Is Sleeping On TinyGo: Run Go on Microcontrollers and the Web (WASM) Today!<br />
+<a href="https://ekwoster.dev/post/-why-everyone-is-sleeping-on-tinygo-run-go-on-microcontrollers-and-the-web-wasm-today/">https://ekwoster.dev/post/-why-everyone-is-sleeping-on-tinygo-run-go-on-microcontrollers-and-the-web-wasm-today/</a>
+</li>
+
+<li>Go (Golang) GOOS and GOARCH<br />
+<a href="https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63">https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63</a>
+</li>
+
+</ol>
+
+
+
+<p></p><p></p>
+<p><small>Autor: <a href="https://github.com/tisnik/">Pavel Tišnovský</a> &nbsp; 2025</small></p>
+</body>
+</html>
+
