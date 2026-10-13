@@ -1,0 +1,1980 @@
+<h2 id="k01">Dlouho očekávaná podpora SIMD operací v&nbsp;programovacím jazyku Go (dokončení)</h2>
+
+<p>Na dvojici článků <a
+href="https://www.root.cz/clanky/dlouho-ocekavana-podpora-simd-operaci-v-programovacim-jazyku-go/">Dlouho
+očekávaná podpora SIMD operací v&nbsp;programovacím jazyku Go</a> a <a
+href="https://www.root.cz/clanky/dlouho-ocekavana-podpora-simd-operaci-v-programovacim-jazyku-go-2-cast/">Dlouho
+očekávaná podpora SIMD operací v&nbsp;programovacím jazyku Go (2. část)</a>
+dnes navážeme a celé téma o podpoře SIMD operací v&nbsp;programovacím jazyku Go
+dokončíme. Zabývat se budeme popisem (stále ještě experimentálního) balíčku
+nazvaného <a href="https://pkg.go.dev/simd">simd</a>, který je dostupný
+v&nbsp;Go verze 1.26 (i když v&nbsp;tomto případě s&nbsp;omezeními) a především
+pak v&nbsp;Go 1.27. Balíček <strong>simd</strong> nabízí SIMD operace prováděné
+s&nbsp;vektory, jejichž bitová šířka (a tím i počet prvků) je odvozena
+z&nbsp;možností použité architektury mikroprocesorů. To tedy znamená, že
+například u mikroprocesorů s&nbsp;podporou AVX či AVX-2 budou podporovány
+vektory o šířce 256 bitů, zatímco v&nbsp;případě AVX-512 bude možné použít
+vektory o šířce 512 bitů. A samozřejmě je možné v&nbsp;runtime zjistit, jaká je
+skutečná šířka vektorů.</p>
+
+<p><div class="rs-tip-major">Poznámka: jak si ověříme v&nbsp;dalším textu, není
+délka vektorů libovolná (a ani není násobkem nějaké základní délky), což může
+být zpočátku matoucí.</div></p>
+
+
+
+<h2 id="k02">Datové typy definované v&nbsp;rámci balíčku <strong>simd</strong></h2>
+
+<p>V&nbsp;balíčku <strong>simd</strong> je definováno deset datových typů
+představujících vektory o určité délce (k&nbsp;tomu se ještě vrátíme)
+v&nbsp;nichž jsou uloženy prvky různých typů. Povšimněte si, že názvy těchto
+typů (na rozdíl od typů definovaných v&nbsp;balíčku
+<strong>simd/archsimd</strong>) neobsahují specifikaci počtu uložených prvků,
+ale pouze jejich typy:</p>
+
+<table>
+<tr><th>Jméno typu</th><th>Stručný popis typu</th></tr>
+<tr><td>Float32s</td><td>vektor obsahující prvky typu float32 (<i>single</i>)</td></tr>
+<tr><td>Float64s</td><td>vektor obsahující prvky typu float64 (<i>double</i>)</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Int8s</td><td>vektor obsahující prvky typu <strong>int8</strong></td></tr>
+<tr><td>Int16s</td><td>vektor obsahující prvky typu <strong>int16</strong></td></tr>
+<tr><td>Int32s</td><td>vektor obsahující prvky typu <strong>int32</strong></td></tr>
+<tr><td>Int64s</td><td>vektor obsahující prvky typu <strong>int64</strong></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>Uint8s</td><td>vektor obsahující prvky typu <strong>uint8</strong></td></tr>
+<tr><td>Uint16s</td><td>vektor obsahující prvky typu <strong>uint16</strong></td></tr>
+<tr><td>Uint32s</td><td>vektor obsahující prvky typu <strong>uint32</strong></td></tr>
+<tr><td>Uint64s</td><td>vektor obsahující prvky typu <strong>uint64</strong></td></tr>
+</table>
+
+<p>Další čtyři datové typy reprezentují takzvané <i>masky</i> s&nbsp;uloženými
+bity resp.&nbsp;z&nbsp;pohledu vývojáře s&nbsp;pravdivostními hodnotami. Masky
+jsou používány v&nbsp;některých operacích, s&nbsp;nimiž se seznámíme
+v&nbsp;navazujících kapitolách. Jednotlivé typy reprezentující masky se liší
+podle toho, s&nbsp;jakými vektory je možné je použít:</p>
+
+<table>
+<tr><th>Jméno typu</th><th>Lze použít s&nbsp;vektory</th></tr>
+<tr><td>Mask8s</td><td>Int8s, Uint8s</td></tr>
+<tr><td>Mask16s</td><td>Int16s, Uint16s</td></tr>
+<tr><td>Mask32s</td><td>Int32s, Uint32s, Float32s</td></tr>
+<tr><td>Mask64s</td><td>Int64s, Uint64s, Float64s</td></tr>
+</table>
+
+
+
+<h2 id="k03">Součet dvou vektorů: rozdíl mezi použitím balíčku <strong>simd</strong> a <strong>simd/archsimd</strong></h2>
+
+<p>Praktickou část dnešního článku začneme typickým demonstračním příkladem,
+který se velmi často používá při vysvětlování SIMD operací. Pokusíme se o
+provedení součtu dvou vektorů stejného typu. Součet vektorů je realizován
+snadno &ndash; je proveden součtem odpovídajících si prvků vektorů. Připomeňme
+si, že v&nbsp;případě přímého použití balíčku <strong>simd/archsimd</strong>
+může realizace této úlohy vypadat následovně:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd/archsimd"
+)
+&nbsp;
+func <strong>AddTwoVectors</strong>(v1, v2 archsimd.Float32x8, result []float32) {
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+}
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace pole s odvozením počtu prvků</i>
+        a1 := [...]float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        a2 := [...]float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu polí</i>
+        fmt.Println("a1", a1)
+        fmt.Println("a2", a2)
+&nbsp;
+        <i>// převod pole na vektor s osmi prvky</i>
+        v1 := archsimd.LoadFloat32x8Array(&amp;a1)
+        v2 := archsimd.LoadFloat32x8Array(&amp;a2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, 8)
+        AddTwoVectors(v1, v2, result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("a1+a2", result)
+}
+</pre>
+
+<p>Přepis výše uvedeného demonstračního příkladu do takové podoby, aby se
+používal balíček <strong>simd</strong>, je snadný. Struktura celého příkladu
+zůstane prakticky stejná, pouze se při převodu řezu (původně pole) na vektor
+namísto metody <strong>LoadFloat32x8Array</strong> použije metoda nazvaná
+<strong>LoadFloat32s</strong>. A pochopitelně se pracuje s&nbsp;odlišnými
+datovými typy, což je však ve zdrojovém kódu do značné míry skryto díky tomu,
+že se využívá typová inference:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Ověříme si výsledky výpočtu součtu vektorů:</p>
+
+<pre>
+$ <strong>./go run float32_add.go</strong>
+&nbsp;
+s1    [1 2 3 4 5 6 7 8]
+s2    [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+s1+s2 [1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5]
+</pre>
+
+
+
+<h2 id="k04">Operace prováděné se všemi prvky vektoru</h2>
+
+<p>S&nbsp;vektory lze provádět i různé unární operace (tedy operace
+s&nbsp;jediným operandem), přičemž každá taková operace se volá jako metoda
+vektoru a výsledkem je nový vektor. Připomeňme si, že v&nbsp;balíčku
+<strong>simd/archsimd</strong> je podporováno celkem pět unárních operací
+s&nbsp;prvky vektorů:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>Abs</td><td>absolutní hodnoty všech prvků vektoru</td></tr>
+<tr><td>Neg</td><td>změna znaménka všech prvků vektoru</td></tr>
+<tr><td>Reciprocal</td><td>převrácená hodnota všech prvků vektoru</td></tr>
+<tr><td>Sqrt</td><td>druhá odmocnina všech prvků vektoru</td></tr>
+<tr><td>ReciprocalSqrt</td><td>převrácená hodnota druhé odmocniny (používá se například při normalizacích atd.)</td></tr>
+</table>
+
+<p>V&nbsp;balíčku <strong>simd</strong> z&nbsp;nějakého důvodu chybí operace
+pro výpočet převrácené hodnoty a kombinace výpočtu převrácené hodnoty
+z&nbsp;odmocniny hodnoty prvku, takže nám zbývá pouze:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>Abs</td><td>absolutní hodnoty všech prvků vektoru</td></tr>
+<tr><td>Neg</td><td>změna znaménka všech prvků vektoru</td></tr>
+<tr><td>Sqrt</td><td>druhá odmocnina všech prvků vektoru</td></tr>
+</table>
+
+<p>Všechny tři výše zmíněné operace jsou použity v&nbsp;následujícím
+demonstračním příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s := []float32{-4.0, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0}
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s      ", s)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v := simd.LoadFloat32s(s)
+&nbsp;
+        <i>// konstrukce řezu pro uložení výsledků</i>
+        result := make([]float32, v.Len())
+&nbsp;
+        <i>// SIMD operace výpočtu absolutní hodnoty</i>
+        v2 := v.Abs()
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v2.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("abs(s) ", result)
+&nbsp;
+        <i>// SIMD operace výpočtu hodnoty s opačným znaménkem</i>
+        v3 := v.Neg()
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("neg(s) ", result)
+&nbsp;
+        <i>// SIMD operace výpočtu druhé odmocniny</i>
+        v4 := v.Sqrt()
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v4.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("sqrt(s)", result)
+}
+</pre>
+
+<p>Samozřejmě si zkontrolujeme i způsob výpočtu:</p>
+
+<pre>
+$ <strong>go run float32_unary.go</strong>
+&nbsp;
+s       [-4 -3 -2 -1 1 2 3 4]
+abs(s)  [4 3 2 1 1 2 3 4]
+neg(s)  [4 3 2 1 -1 -2 -3 -4]
+sqrt(s) [NaN NaN NaN NaN 1 1.4142135 1.7320508 2]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že pokus o výpočet druhé
+odmocniny ze záporného čísla nevede k&nbsp;běhové chybě, ale k&nbsp;uložení
+hodnoty <i>NaN</i> (<i>Not a Number</i>).</div></p>
+
+
+
+<h2 id="k05">Operace s&nbsp;dvojicemi vektorů stejného typu</h2>
+
+<p>Ve stručnosti si taktéž ukážeme další binární operace prováděné
+s&nbsp;odpovídajícími si prvky dvou vektorů (prozatím jsme si totiž ukázali
+pouze operaci součtu). Tyto operace jsou opět dostupné přes metody, které mají
+jeden parametr (druhý vektor) a návratovou hodnotou je nový vektor stejného
+typu i délky s&nbsp;výsledky:</p>
+
+<table>
+<tr><th>Metoda</th><th>Stručný popis</th></tr>
+<tr><td>Add</td><td>součet odpovídajících si prvků vektorů</td></tr>
+<tr><td>Sub</td><td>rozdíl odpovídajících si prvků vektorů</td></tr>
+<tr><td>Mul</td><td>součin odpovídajících si prvků vektorů</td></tr>
+<tr><td>Div</td><td>podíl odpovídajících si prvků vektorů</td></tr>
+<tr><td>Min</td><td>porovnání odpovídajících si prvků vektorů, uložení menšího z&nbsp;nich do výsledného vektoru</td></tr>
+<tr><td>Max</td><td>porovnání odpovídajících si prvků vektorů, uložení většího z&nbsp;nich do výsledného vektoru</td></tr>
+</table>
+
+<p>Realizace těchto operací je snadná, což je ostatně patrné i při pohledu na
+zdrojový kód dalšího demonstračního příkladu:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1        ", s1)
+        fmt.Println("s2        ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// konstrukce řezu pro uložení výsledků</i>
+        result := make([]float32, v1.Len())
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2     ", result)
+&nbsp;
+        <i>// SIMD operace rozdílu prvků vektorů</i>
+        v4 := v1.Sub(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v4.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1-s2     ", result)
+&nbsp;
+        <i>// SIMD operace součinu prvků vektorů</i>
+        v5 := v1.Mul(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v5.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1*s2     ", result)
+&nbsp;
+        <i>// SIMD operace podílu prvků vektorů</i>
+        v6 := v1.Div(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v6.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1/s2     ", result)
+&nbsp;
+        <i>// SIMD operace výběru větších prvků vektorů</i>
+        v7 := v1.Max(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v7.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("max(s1/s2)", result)
+&nbsp;
+        <i>// SIMD operace výběru menších prvků vektorů</i>
+        v8 := v1.Min(v2)
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v8.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("min(s1/s2)", result)
+}
+</pre>
+
+<p>Ověříme si výsledky všech implementovaných binárních operací:</p>
+
+<pre>
+$ <strong>./go run float32_binary.go</strong>
+&nbsp;
+s1         [1 2 3 4 5 6 7 8]
+s2         [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+s1+s2      [1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5]
+s1-s2      [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5]
+s1*s2      [0.5 1 1.5 2 2.5 3 3.5 4]
+s1/s2      [2 4 6 8 10 12 14 16]
+max(s1/s2) [1 2 3 4 5 6 7 8]
+min(s1/s2) [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+</pre>
+
+<p>Pro zajímavost si ještě ověřme operaci podílu nulou (včetně 0/0):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{0.0, 1.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0}
+        s2 := []float32{1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace podílu prvků vektorů</i>
+        v3 := v1.Div(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Ani v&nbsp;tomto případě nedojde k&nbsp;běhové chybě, ale příslušné prvky
+vektoru s&nbsp;výsledky budou obsahovat buď kladné či záporné nekonečno, nebo
+v&nbsp;případě podílu 0/0 hodnotu NaN:</p>
+
+<pre>
+$ <strong>go run float32_div.go</strong>
+&nbsp;
+s1    [0  1 -1  1  0    1   -1   0]
+s2    [1  1  1  1  0    0    0   0]
+s1+s2 [0  1 -1  1 NaN +Inf -Inf NaN]
+</pre>
+
+
+
+<h2 id="k06">Porovnání dvou vektorů</h2>
+
+<p>Odpovídající si prvky dvou vektorů stejného typu je možné porovnat.
+Výsledkem porovnání je sada pravdivostních hodnot, která se uloží do
+<i>masky</i> (těmi se budeme podrobněji zabývat v&nbsp;navazujících
+kapitolách). V&nbsp;dalším demonstračním příkladu jsou nejprve zkonstruovány
+dva vektory, z&nbsp;nichž každý obsahuje osm prvků typu <i>float32</i>.
+Odpovídající si prvky těchto vektorů jsou porovnány s&nbsp;využitím zvolené
+relační operace (rovno, nerovno, menší než, menší nebo rovno atd.) a výsledných
+osm hodnot typu <i>bool</i> je uloženo do masky. Obsah této masky je posléze
+vypsán (a to pochopitelně pro každou provedenou relační operaci):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1    ", s1)
+        fmt.Println("s2    ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v3 := v1.Equal(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1==s2", v3.String())
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v4 := v1.Less(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1&lt;s2 ", v4.String())
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v5 := v1.LessEqual(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1&lt;=s2", v5.String())
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v6 := v1.Greater(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1&gt;s2 ", v6.String())
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v7 := v1.GreaterEqual(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1&gt;=s2", v7.String())
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        v8 := v1.NotEqual(v2)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1&lt;&gt;s2", v8.String())
+}
+</pre>
+
+<p>Z&nbsp;vypsaných výsledků je patrné, jakým způsobem je porovnání dvou
+vektorů provedeno:</p>
+
+<pre>
+$ <strong>go run float32_comparison.go</strong>
+&nbsp;
+s1     [1 2 3 4 5 6 7 8]
+s2     [4 4 4 4 4 4 4 4]
+s1==s2 {0,0,0,1,0,0,0,0}
+s1&lt;s2  {1,1,1,0,0,0,0,0}
+s1&lt;=s2 {1,1,1,1,0,0,0,0}
+s1&gt;s2  {0,0,0,0,1,1,1,1}
+s1&gt;=s2 {0,0,0,1,1,1,1,1}
+s1&lt;&gt;s2 {1,1,1,0,1,1,1,1}
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: poměrně často je vyžadováno provedení
+porovnání všech prvků vektoru se stejnou hodnotou (například s&nbsp;nulou).
+V&nbsp;takovém případě lze využít operaci <i>broadcast</i>, která naplní vektor
+prvky stejné hodnoty. A tento vektor bude vstupovat do operace porovnání,
+typicky jako druhý operand.</div></p>
+
+
+
+<h2 id="k07">Operace MADD (<i>Multiply-Add</i>)</h2>
+
+<p>V&nbsp;předchozím článku jsme se mj.&nbsp;zmínili i o operaci multiply-add,
+kterou lze využít například při implementaci konvolučních filtrů pro zpracování
+signálů atd. I tuto operaci balíček <strong>simd</strong> podporuje, ovšem
+pouze pro vektory, které obsahují prvky typu <i>float32</i> či <i>float64</i>.
+Operace multiply-add je ternární, tj.&nbsp;vyžaduje tři operandy. Prvním
+operandem je příjemce (<i>receiver</i>), tedy struktura, jejíž metodu voláme. A
+další dva parametry jsou této metodě předány při jejím volání:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0}
+        s3 := []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1      ", s1)
+        fmt.Println("s2      ", s2)
+        fmt.Println("s3      ", s3)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+        v3 := simd.LoadFloat32s(s3)
+&nbsp;
+        <i>// SIMD operace multiply-add</i>
+        v4 := v1.MulAdd(v2, v3)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v4.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v4.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1*s2+s3", result)
+}
+</pre>
+
+<p>Samozřejmě si opět ověříme, jak je výpočet proveden:</p>
+
+<pre>
+$ <strong>go run float32_mul_add.go</strong>
+&nbsp;
+s1       [1 2 3 4 5 6 7 8]
+s2       [2 2 2 2 2 2 2 2]
+s3       [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+s1*s2+s3 [2.5 4.5 6.5 8.5 10.5 12.5 14.5 16.5]
+</pre>
+
+
+
+<h2 id="k08">Jaké délky vektorů jsou podporovány?</h2>
+
+<p>Pokusme se zjistit, jaké délky vektorů jsou podporovány. Nejdříve začneme
+vektory s&nbsp;délkou devíti prvků:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// výpis délky vektorů</i>
+        fmt.Println("len(v1)=", v1.Len())
+        fmt.Println("len(v2)=", v2.Len())
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Tento příklad bude možné přeložit a dokonce i spustit bez chyby. Ovšem ve
+skutečnosti se bude zpracovávat pouze prvních osm prvků vektorů!:</p>
+
+<pre>
+$ <strong>go run float32_length_1.go</strong>
+&nbsp;
+s1    [0 1 2 3 4 5 6 7 8]
+s2    [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+len(v1)= 8
+len(v2)= 8
+s1+s2 [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5]
+</pre>
+
+<p>Nyní vektory zkrátíme na čtyři prvky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// výpis délky vektorů</i>
+        fmt.Println("len(v1)=", v1.Len())
+        fmt.Println("len(v2)=", v2.Len())
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Tento příklad bude možné přeložit (bez chyby), ovšem po spuštění dojde
+k&nbsp;pádu, protože se očekává, že se minimální délka vektorů s&nbsp;prvky
+typu <i>float32</i> bude rovna osmi:</p>
+
+<pre>
+$ <strong>go run float32_length_2.go</strong>
+&nbsp;
+s1    [5 6 7 8]
+s2    [0.5 0.5 0.5 0.5]
+panic: runtime error: cannot convert slice with length 4 to array or pointer to array with length 8
+&nbsp;
+goroutine 1 [running]:
+simd/archsimd.LoadFloat32x8(...)
+        /tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:228
+simd/internal/bridge.LoadFloat32x8(...)
+        /tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:42
+main.main@simd256()
+        /tmp/ramdisk/go/bin/float32_length_2.go:18 +0x153
+main.main()
+        /tmp/ramdisk/go/bin/float32_length_2.go:8 +0x65
+exit status 2
+</pre>
+
+<p>Dobře, prozatím to vypadá, že lze zpracovat vektory s&nbsp;délkou osmi
+prvků. Pokusme se ještě tuto délku zdvojnásobit, což by teoreticky mohlo být
+možné (minimálně bych od vysokoúrovňové knihovny očekával):</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+        s2 := []float32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// výpis délky vektorů</i>
+        fmt.Println("len(v1)=", v1.Len())
+        fmt.Println("len(v2)=", v2.Len())
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Program sice nezhavaruje, ale bude počítat pouze s&nbsp;osmiprvkovými
+vektory:</p>
+
+<pre>
+$ <strong>go run float32_length_3.go</strong>
+&nbsp;
+s1    [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+s2    [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+len(v1)= 8
+len(v2)= 8
+s1+s2 [2 4 6 8 10 12 14 16]
+</pre>
+
+
+
+<h2 id="k09">Dobře, jaká je tedy bitová šířka vektorů?</h2>
+
+<p>Skutečnou délku vektorů lze vypočítat z&nbsp;jejich bitové šířky. Ta je
+závislá na použité architektuře a dá se zjistit (v&nbsp;čase běhu) funkcí
+<strong>simd.VectorBitSize</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// výpis bitové šířky vektorů</i>
+        fmt.Println("vector bit size=", simd.VectorBitSize())
+}
+</pre>
+
+<p>Na mém počítači s&nbsp;rozšířením instrukční sady AVX a AVX-2 dostanu
+hodnotu 256 bitů:</p>
+
+<pre>
+$ <strong>go run vector_bit_size.go</strong>
+&nbsp;
+vector bit size= 256
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: to přesně odpovídá, protože
+256/sizeof(float32)=256/32=8.</div></p>
+
+
+
+<h2 id="k10">Lze nakonfigurovat šířku vektorů?</h2>
+
+<p>Šířku vektorů, s&nbsp;nimiž se pracuje, je možné specifikovat nastavením
+proměnné prostředí <strong>GODEBUG</strong>. Zmenšení šířky na 128 bitů je
+podporováno a ovlivní všechny operace s&nbsp;vektory:</p>
+
+<pre>
+$ <strong>GODEBUG=simd=128 go run vector_bit_size.go </strong>
+&nbsp;
+vector bit size= 128
+</pre>
+
+<pre>
+$ <strong>GODEBUG=simd=128 go run float32_length_3.go</strong>
+&nbsp;
+s1    [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+s2    [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+len(v1)= 4
+len(v2)= 4
+s1+s2 [2 4 6 8]
+</pre>
+
+<p>Ovšem zvětšení šířky na architektuře, která takové vektory nepodporuje, možné není:</p>
+
+<pre>
+$ <strong>GODEBUG=simd=512 go run vector_bit_size.go</strong>
+&nbsp;
+panic: Requested GODEBUG=gosimd=512 is larger than the simd length (256) supported on this cpu 
+&nbsp;
+goroutine 1 [running]:
+simd.init.0()
+        /tmp/ramdisk/go/src/simd/midway_common.go:95 +0x3ae
+exit status 2
+</pre>
+
+<p>Teoreticky je sice možné nastavit libovolnou šířku menší než je šířka
+nativní, ovšem to je cesta do nepěkných míst, jak si můžeme snadno ověřit:</p>
+
+<pre>
+$ <strong>GODEBUG=simd=127 go run vector_bit_size.go </strong>
+&nbsp;
+vector bit size= 127
+</pre>
+
+<pre>
+$ <strong>GODEBUG=simd=127 go run float32_add.go</strong>
+&nbsp;
+panic: unsupported vector size in simd-rewritten code
+&nbsp;
+goroutine 1 [running]:
+main.main()
+        /tmp/ramdisk/go/bin/float32_add.go:8 +0x7e
+exit status 2
+</pre>
+
+
+
+<h2 id="k11">Kompatibilita různých typů vektorů</h2>
+
+<p>Vzhledem k&nbsp;tomu, jakým způsobem se pracuje s&nbsp;délkou vektorů, bude
+zajímavé zjistit, které vektory jsou vlastně kompatibilní z&nbsp;pohledu
+operací, jenž s&nbsp;nimi lze provádět. Příkladem může být pokus o součet dvou
+vektorů, přičemž první vektor má prvky typu <i>float32</i> a druhý vektor prvky
+typu <i>float64</i>. Jazyk Go neumožňuje ani součet skalárních hodnot těchto
+dvou typů, takže není divu, že taková operace není rozšiřitelná ani na
+vektory:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import "fmt"
+&nbsp;
+func <strong>main</strong>() {
+        var x float32 = 1.2
+        var y float64 = 3.4
+        z := x + y
+        fmt.Println(z)
+}
+</pre>
+
+<pre>
+t.go:8:7: invalid operation: x + y (mismatched types float32 and float64)
+</pre>
+
+<p>Pokusme se nejprve z&nbsp;řezu s&nbsp;prvky typu <i>float64</i> vytvořit
+vektor typu <i>Float32s</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu (odlišné typy)</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float64{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Překladač pochopitelně odhalí chybu, protože do funkce
+<strong>LoadFloat32s</strong> předáváme řez odlišného typu:</p>
+
+<pre>
+./vector_compatibility_1.go:19:26: cannot use s2 (variable of type []float64) as []float32 value in argument to simd.LoadFloat32s
+</pre>
+
+<p>Zkusme tedy provést korektní převod druhého řezu na vektor typu
+<i>Float64s</i> a až poté se pokusit o součet vektorů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu (odlišné typy)</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float64{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat64s(s2)
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>Ani tato operace není podporována a chyba je zjištěna již v&nbsp;době
+překladu:</p>
+
+<pre>
+./vector_compatibility_2.go:22:15: cannot use v2 (variable of struct type simd.Float64s) as simd.Float32s value in argument to v1.Add
+</pre>
+
+<p>Naproti tomu příklad, který (zdánlivě) sčítá vektory různé délky, ovšem
+s&nbsp;prvky totožného typu, bude přeložen bez problémů:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>main</strong>() {
+        <i>// konstrukce a inicializace řezu (odlišné typy)</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0}
+        s2 := []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}
+&nbsp;
+        <i>// výpis obsahu řezů</i>
+        fmt.Println("s1   ", s1)
+        fmt.Println("s2   ", s2)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// výpis délky vektorů</i>
+        fmt.Println("len(v1)=", v1.Len())
+        fmt.Println("len(v2)=", v2.Len())
+&nbsp;
+        <i>// SIMD operace součtu prvků vektorů</i>
+        v3 := v1.Add(v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("s1+s2", result)
+}
+</pre>
+
+<p>V&nbsp;runtime ovšem zjistíme, že oba vektory jsou limitovány na pouhých osm
+prvků, takže se druhá polovina prvního řezu vůbec nebere v&nbsp;úvahu:</p>
+
+<pre>
+$ <strong>go run vector_compatibility_3.go</strong>
+&nbsp;
+s1    [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+s2    [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5]
+len(v1)= 8
+len(v2)= 8
+s1+s2 [1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5]
+</pre>
+
+
+
+<h2 id="k12">Základní manipulace s&nbsp;maskami</h2>
+
+<p>Některé operace s&nbsp;vektory využívají takzvané <i>masky</i>, které taktéž
+můžeme považovat za vektory (s&nbsp;pevným počtem prvků), jenž ovšem obsahují
+pouze pravdivostní hodnoty. Interně ovšem mohou být uloženy formou bitového
+pole. Příkladem jsou operace určené pro porovnání odpovídajících si prvků
+vektorů na nějakou relaci (&bdquo;menší než&ldquo; atd.). Výsledkem je maska
+s&nbsp;pravdivostní hodnotou nastavenou pro každou dvojici porovnávaných
+prvků:</p>
+
+<pre>
+func (x Float32s) <strong>Equal</strong>(y Float32s) Mask32s
+func (x Float32s) <strong>Greater</strong>(y Float32s) Mask32s
+func (x Float32s) <strong>GreaterEqual</strong>(y Float32s) Mask32s
+func (x Float32s) <strong>Less</strong>(y Float32s) Mask32s
+func (x Float32s) <strong>LessEqual</strong>(y Float32s) Mask32s
+func (x Float32s) <strong>NotEqual</strong>(y Float32s) Mask32s
+&nbsp;
+func (x Float64s) <strong>Equal</strong>(y Float64s) Mask64s
+func (x Float64s) <strong>Greater</strong>(y Float64s) Mask64s
+func (x Float64s) <strong>GreaterEqual</strong>(y Float64s) Mask64s
+func (x Float64s) <strong>Less</strong>(y Float64s) Mask64s
+func (x Float64s) <strong>LessEqual</strong>(y Float64s) Mask64s
+func (x Float64s) <strong>NotEqual</strong>(y Float64s) Mask64s
+&nbsp;
+func (x Int16s) <strong>Equal</strong>(y Int16s) Mask16s
+func (x Int16s) <strong>Greater</strong>(y Int16s) Mask16s
+func (x Int16s) <strong>GreaterEqual</strong>(y Int16s) Mask16s
+func (x Int16s) <strong>Less</strong>(y Int16s) Mask16s
+func (x Int16s) <strong>LessEqual</strong>(y Int16s) Mask16s
+func (x Int16s) <strong>NotEqual</strong>(y Int16s) Mask16s
+&nbsp;
+func (x Int32s) <strong>Equal</strong>(y Int32s) Mask32s
+func (x Int32s) <strong>Greater</strong>(y Int32s) Mask32s
+func (x Int32s) <strong>GreaterEqual</strong>(y Int32s) Mask32s
+func (x Int32s) <strong>Less</strong>(y Int32s) Mask32s
+func (x Int32s) <strong>LessEqual</strong>(y Int32s) Mask32s
+func (x Int32s) <strong>NotEqual</strong>(y Int32s) Mask32s
+&nbsp;
+func (x Int64s) <strong>Equal</strong>(y Int64s) Mask64s
+func (x Int64s) <strong>Greater</strong>(y Int64s) Mask64s
+func (x Int64s) <strong>GreaterEqual</strong>(y Int64s) Mask64s
+func (x Int64s) <strong>Less</strong>(y Int64s) Mask64s
+func (x Int64s) <strong>LessEqual</strong>(y Int64s) Mask64s
+func (x Int64s) <strong>NotEqual</strong>(y Int64s) Mask64s
+&nbsp;
+func (x Int8s) <strong>Equal</strong>(y Int8s) Mask8s
+func (x Int8s) <strong>Greater</strong>(y Int8s) Mask8s
+func (x Int8s) <strong>GreaterEqual</strong>(y Int8s) Mask8s
+func (x Int8s) <strong>Less</strong>(y Int8s) Mask8s
+func (x Int8s) <strong>LessEqual</strong>(y Int8s) Mask8s
+func (x Int8s) <strong>NotEqual</strong>(y Int8s) Mask8s
+&nbsp;
+func (x Uint16s) <strong>Equal</strong>(y Uint16s) Mask16s
+func (x Uint16s) <strong>Greater</strong>(y Uint16s) Mask16s
+func (x Uint16s) <strong>GreaterEqual</strong>(y Uint16s) Mask16s
+func (x Uint16s) <strong>Less</strong>(y Uint16s) Mask16s
+func (x Uint16s) <strong>LessEqual</strong>(y Uint16s) Mask16s
+func (x Uint16s) <strong>NotEqual</strong>(y Uint16s) Mask16s
+&nbsp;
+func (x Uint32s) <strong>Equal</strong>(y Uint32s) Mask32s
+func (x Uint32s) <strong>Greater</strong>(y Uint32s) Mask32s
+func (x Uint32s) <strong>GreaterEqual</strong>(y Uint32s) Mask32s
+func (x Uint32s) <strong>Less</strong>(y Uint32s) Mask32s
+func (x Uint32s) <strong>LessEqual</strong>(y Uint32s) Mask32s
+func (x Uint32s) <strong>NotEqual</strong>(y Uint32s) Mask32s
+&nbsp;
+func (x Uint64s) <strong>Equal</strong>(y Uint64s) Mask64s
+func (x Uint64s) <strong>Greater</strong>(y Uint64s) Mask64s
+func (x Uint64s) <strong>GreaterEqual</strong>(y Uint64s) Mask64s
+func (x Uint64s) <strong>Less</strong>(y Uint64s) Mask64s
+func (x Uint64s) <strong>LessEqual</strong>(y Uint64s) Mask64s
+func (x Uint64s) <strong>NotEqual</strong>(y Uint64s) Mask64s
+&nbsp;
+func (x Uint8s) <strong>Equal</strong>(y Uint8s) Mask8s
+func (x Uint8s) <strong>NotEqual</strong>(y Uint8s) Mask8s
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: povšimněte si, že porovnání na nerovnost
+u vektorů s&nbsp;osmibitovými celočíselnými hodnotami bez znaménka není
+podporováno.</div></p>
+
+<p>Logické operace nad booleovskými hodnotami uloženými v&nbsp;maskách:</p>
+
+<pre>
+func (x Mask16s) <strong>And</strong>(y Mask16s) Mask16s
+func (x Mask16s) <strong>Or</strong>(y Mask16s) Mask16s
+func (x Mask16s) <strong>ToArch</strong>() any
+func (x Mask16s) <strong>ToInt16s</strong>() (to Int16s)
+func (x Mask32s) <strong>And</strong>(y Mask32s) Mask32s
+func (x Mask32s) <strong>Or</strong>(y Mask32s) Mask32s
+func (x Mask32s) <strong>ToArch</strong>() any
+func (x Mask32s) <strong>ToInt32s</strong>() (to Int32s)
+func (x Mask64s) <strong>And</strong>(y Mask64s) Mask64s
+func (x Mask64s) <strong>Or</strong>(y Mask64s) Mask64s
+func (x Mask64s) <strong>ToArch</strong>() any
+func (x Mask64s) <strong>ToInt64s</strong>() (to Int64s)
+func (x Mask8s)  <strong></strong>And(y Mask8s) Mask8s
+func (x Mask8s)  <strong></strong>Or(y Mask8s) Mask8s
+func (x Mask8s)  <strong></strong>ToArch() any
+func (x Mask8s)  <strong></strong>ToInt8s() (to Int8s)
+</pre>
+
+<p>A konečně převody masky na tisknutelný řetězec:</p>
+
+<pre>
+func (x Mask16s) <strong>String</strong>() string
+func (x Mask32s) <strong>String</strong>() string
+func (x Mask64s) <strong>String</strong>() string
+func (x Mask8s)  <strong>String</strong>() string
+</pre>
+
+<p>A naopak &ndash; pokud máme k&nbsp;dispozici masku, je jí možné využít pro
+výběr některých prvků z&nbsp;jednoho vektoru nebo dokonce pro kombinaci prvků
+ze dvou vektorů do jednoho vektoru cílového (je to vlastně jediná ternární
+operace s&nbsp;vektory, která je v&nbsp;balíčku <strong>simd</strong>
+podporována).</p>
+
+<pre>
+func (x Float32s) <strong>Masked</strong>(mask Mask32s) Float32s
+func (x Float64s) <strong>Masked</strong>(mask Mask64s) Float64s
+func (x Int16s)   <strong>Masked</strong>(mask Mask16s) Int16s
+func (x Int32s)   <strong>Masked</strong>(mask Mask32s) Int32s
+func (x Int64s)   <strong>Masked</strong>(mask Mask64s) Int64s
+func (x Int8s)    <strong>Masked</strong>(mask Mask8s) Int8s
+func (x Uint16s)  <strong>Masked</strong>(mask Mask16s) Uint16s
+func (x Uint32s)  <strong>Masked</strong>(mask Mask32s) Uint32s
+func (x Uint64s)  <strong>Masked</strong>(mask Mask64s) Uint64s
+func (x Uint8s)   <strong>Masked</strong>(mask Mask8s) Uint8s
+&nbsp;
+&nbsp;
+&nbsp;
+func (x Float64s) <strong>IfElse</strong>(mask Mask64s, y Float64s) Float64s
+func (x Float32s) <strong>IfElse</strong>(mask Mask32s, y Float32s) Float32s
+func (x Int16s)   <strong>IfElse</strong>(mask Mask16s, y Int16s) Int16s
+func (x Int32s)   <strong>IfElse</strong>(mask Mask32s, y Int32s) Int32s
+func (x Int64s)   <strong>IfElse</strong>(mask Mask64s, y Int64s) Int64s
+func (x Int8s)    <strong>IfElse</strong>(mask Mask8s, y Int8s) Int8s
+func (x Uint16s)  <strong>IfElse</strong>(mask Mask16s, y Uint16s) Uint16s
+func (x Uint32s)  <strong>IfElse</strong>(mask Mask32s, y Uint32s) Uint32s
+func (x Uint64s)  <strong>IfElse</strong>(mask Mask64s, y Uint64s) Uint64s
+func (x Uint8s)   <strong>IfElse</strong>(mask Mask8s, y Uint8s) Uint8s
+</pre>
+
+
+
+<h2 id="k13">Konstrukce masky</h2>
+
+<p>Maska je většinou vytvořena na základě výsledku nějaké relační operace
+provedené nad odpovídajícími si prvky dvou vektorů, popř.&nbsp;se maska
+zkonstruuje nějakou logickou operací nad dvojicí již existující dvojice masek.
+Podívejme se nejdříve na první způsob vytvoření masky s&nbsp;následným převodem
+masky na tisknutelný řetězec. V&nbsp;demonstračním příkladu se nejdříve
+zkonstruuje dvojice vektorů s&nbsp;prvky typu <i>float32</i>, následně se
+odpovídající si prvky vektorů porovnají na relaci &bdquo;menší než&ldquo; a
+poté je vypsána textová podoba výsledné masky:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>createMask</strong>() simd.Mask32s {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        return v1.LessEqual(v2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        mask := createMask()
+&nbsp;
+        <i>// výpis obsahu masky</i>
+        fmt.Println("mask", mask.String())
+}
+</pre>
+
+<p>Otestování je snadné a i výsledek je očekávatelný:</p>
+
+<pre>
+$ <strong>go run mask_create.go</strong>
+&nbsp;
+mask {1,1,1,1,0,0,0,0}
+</pre>
+
+
+
+<h2 id="k14">Převod masky na plnohodnotný vektor</h2>
+
+<p>Masku je možné převést na vektor metodou, která se jmenuje
+<strong>To&lt;typ_vektor&gt;</strong>. Konkrétně se jedná o tyto metody:</p>
+
+<pre>
+func (x Mask8s)  <strong>ToInt8s</strong>() (to Int8s)
+func (x Mask16s) <strong>ToInt16s</strong>() (to Int16s)
+func (x Mask32s) <strong>ToInt32s</strong>() (to Int32s)
+func (x Mask64s) <strong>ToInt64s</strong>() (to Int64s)
+</pre>
+
+<p>To si opět můžeme velmi snadno otestovat, a to konkrétně v&nbsp;případě
+masky typu <i>Mask32s</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>createMask</strong>() simd.Mask32s {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        return v1.LessEqual(v2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        mask := createMask()
+        vector := mask.ToInt32s()
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]int32, vector.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        vector.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("mask as vector", result)
+}
+</pre>
+
+<p>Po spuštění tohoto demonstračního příkladu se vytvoří maska s&nbsp;osmi
+prvky a ta je následně převedena na plnohodnotný vektor:</p>
+
+<pre>
+$ <strong>go run mask_to_vector.go</strong>
+&nbsp;
+mask as vector [-1 -1 -1 -1 0 0 0 0]
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: proč jsou vytištěny záporné hodnoty?
+Prvky výsledného vektoru mají všechny bity buď vynulovány nebo naopak nastaveny
+na samé jedničky. A samé jedničky u celočíselných typů se znaménkem znamenají
+právě -1 (ve dvojkovém doplňku).</div></p>
+
+
+
+<h2 id="k15">Logické operace prováděné s&nbsp;dvojicí masek</h2>
+
+<p>Nad dvojicí masek stejného typu (musí mít stejný počet booleovských hodnot)
+lze provádět logické operace součtu nebo součinu odpovídajících si hodnot.
+Kupodivu není podporována operace negace prvků &ndash; možná nemá tak velké
+možnosti využití v&nbsp;praxi. Ovšem podívejme se na způsob použití obou
+podporovaných operací. Ty budeme aplikovat na dva páry masek, a to z&nbsp;toho
+důvodu, že je relativně složité zkonstruovat dvě masky, jejichž odpovídající si
+prvky tvoří všechny možné kombinace hodnot <i>true</i> a <i>false</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>createFourMasks</strong>() (simd.Mask32s, simd.Mask32s, simd.Mask32s, simd.Mask32s) {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        mask1 := v1.LessEqual(v2)
+        mask2 := v1.GreaterEqual(v2)
+        mask3 := v1.Less(v2)
+        mask4 := v1.Greater(v2)
+        return mask1, mask2, mask3, mask4
+}
+&nbsp;
+func <strong>main</strong>() {
+        mask1, mask2, mask3, mask4 := createFourMasks()
+&nbsp;
+        <i>// výpis obsahu masek</i>
+        fmt.Println("mask 1        ", mask1.String())
+        fmt.Println("mask 2        ", mask2.String())
+&nbsp;
+        <i>// operace s maskami</i>
+        mask5 := mask1.Or(mask2)
+        fmt.Println("mask 1 | mask2", mask5.String())
+&nbsp;
+        mask6 := mask1.And(mask2)
+        fmt.Println("mask 1 &amp; mask2", mask6.String())
+&nbsp;
+        fmt.Println()
+&nbsp;
+        <i>// výpis obsahu masek</i>
+        fmt.Println("mask 3        ", mask3.String())
+        fmt.Println("mask 4        ", mask4.String())
+&nbsp;
+        <i>// operace s maskami</i>
+        mask7 := mask3.Or(mask4)
+        fmt.Println("mask 3 | mask4", mask7.String())
+&nbsp;
+        mask8 := mask3.And(mask4)
+        fmt.Println("mask 3 &amp; mask4", mask8.String())
+}
+</pre>
+
+<p>Po překladu a spuštění bude zřejmé, že se vlastně jedná o dva příklady,
+protože se provádí operace logického součtu a součinu nad dvojicí rozdílných
+párů masek:</p>
+
+<pre>
+$ <strong>go run mask_operations.go</strong>
+&nbsp;
+mask 1         {1,1,1,1,0,0,0,0}
+mask 2         {0,0,0,1,1,1,1,1}
+mask 1 | mask2 {1,1,1,1,1,1,1,1}
+mask 1 &amp; mask2 {0,0,0,1,0,0,0,0}
+&nbsp;
+mask 3         {1,1,1,0,0,0,0,0}
+mask 4         {0,0,0,0,1,1,1,1}
+mask 3 | mask4 {1,1,1,0,1,1,1,1}
+mask 3 &amp; mask4 {0,0,0,0,0,0,0,0}
+</pre>
+
+
+
+<h2 id="k16">Výběr prvků z&nbsp;jednoho vektoru na základě masky</h2>
+
+<p>Všechny typy reprezentující vektory v&nbsp;balíčku <i>simd</i> nabízejí
+metodu nazvanou <strong>Masked</strong>. Tato metoda slouží k&nbsp;výběru prvků
+ze zdrojového vektoru a uložení těchto prvků do vektoru cílového (návratová
+hodnota metody). Pokud má prvek v&nbsp;masce pravdivostní hodnotu nastavenou na
+<strong>true</strong>, bude odpovídající prvek zdrojového vektoru zkopírován do
+vektoru cílového. Pokud má ovšem prvek masky hodnotu <strong>false</strong>, je
+odpovídající prvek zdrojového vektoru ignorován a do vektoru cílového se na
+toto místo zapíše nula:</p>
+
+<pre>
+func (x Float32s) <strong>Masked</strong>(mask Mask32s) Float32s
+func (x Float64s) <strong>Masked</strong>(mask Mask64s) Float64s
+&nbsp;
+func (x Int16s)   <strong>Masked</strong>(mask Mask16s) Int16s
+func (x Int32s)   <strong>Masked</strong>(mask Mask32s) Int32s
+func (x Int64s)   <strong>Masked</strong>(mask Mask64s) Int64s
+func (x Int8s)    <strong>Masked</strong>(mask Mask8s) Int8s
+&nbsp;
+func (x Uint16s)  <strong>Masked</strong>(mask Mask16s) Uint16s
+func (x Uint32s)  <strong>Masked</strong>(mask Mask32s) Uint32s
+func (x Uint64s)  <strong>Masked</strong>(mask Mask64s) Uint64s
+func (x Uint8s)   <strong>Masked</strong>(mask Mask8s) Uint8s
+</pre>
+
+<p>Otestujme si nyní tuto operaci, konkrétně s&nbsp;maskou typu <i>Mask32s</i>
+(která je vhodným způsobem naplněna) a zdrojovým vektorem s&nbsp;osmi prvky
+typu <i>float32</i>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>createMask</strong>() simd.Mask32s {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        return v1.GreaterEqual(v2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        mask := createMask()
+&nbsp;
+        <i>// konstrukce a inicializace řezu</i>
+        s := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("original", s)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s)
+&nbsp;
+        <i>// výběr prvků na základě masky</i>
+        v2 := v1.Masked(mask)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v2.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v2.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("selected", result)
+}
+</pre>
+
+<p>Po překladu a spuštění tohoto demonstračního příkladu je patrné, že se do
+výsledného vektoru přepsalo posledních pět prvků vektoru zdrojového. A
+zbývající prvky v&nbsp;cílovém vektoru byly vynulovány:</p>
+
+<pre>
+$ <strong>go run mask_selection_1.go</strong>
+&nbsp;
+original [1 2 3 4 5 6 7 8]
+selected [0 0 0 4 5 6 7 8]
+</pre>
+
+
+
+<h2 id="k17">Výběr prvků z&nbsp;dvojice vektorů na základě masky</h2>
+
+<p>V&nbsp;knihovně <i>simd</i> nalezneme ještě jednu velmi užitečnou metodu,
+která se jmenuje <strong>IfElse</strong>. Jedná se vlastně o rozšíření možností
+metody <strong>Masked</strong>. Dochází zde ke kombinaci prvků dvou vektorů. Na
+základě hodnoty uložené v&nbsp;masce se vybere buď prvek z&nbsp;vektoru prvního
+(což je příjemce metody) nebo naopak prvek z&nbsp;vektoru druhého (druhý
+parametr metody). A opět platí, že tyto metody jsou definovány pro všechny typy
+vektorů:</p>
+
+<pre>
+func (x Float64s) <strong>IfElse</strong>(mask Mask64s, y Float64s) Float64s
+func (x Float32s) <strong>IfElse</strong>(mask Mask32s, y Float32s) Float32s
+func (x Int16s)   <strong>IfElse</strong>(mask Mask16s, y Int16s) Int16s
+func (x Int32s)   <strong>IfElse</strong>(mask Mask32s, y Int32s) Int32s
+func (x Int64s)   <strong>IfElse</strong>(mask Mask64s, y Int64s) Int64s
+func (x Int8s)    <strong>IfElse</strong>(mask Mask8s, y Int8s) Int8s
+func (x Uint16s)  <strong>IfElse</strong>(mask Mask16s, y Uint16s) Uint16s
+func (x Uint32s)  <strong>IfElse</strong>(mask Mask32s, y Uint32s) Uint32s
+func (x Uint64s)  <strong>IfElse</strong>(mask Mask64s, y Uint64s) Uint64s
+func (x Uint8s)   <strong>IfElse</strong>(mask Mask8s, y Uint8s) Uint8s
+</pre>
+
+<p>Vše si opět otestujeme na příkladu dvou vektorů typu <i>Float32s</i> a masky
+typu <i>Mask32s</i>. Jedná se vlastně o nepatrnou úpravu předchozího
+demonstračního příkladu tak, aby se prvky výsledného vektoru vybíraly
+z&nbsp;vektoru <strong>v1</strong> i vektoru <strong>v2</strong>:</p>
+
+<pre>
+package <strong>main</strong>
+&nbsp;
+import (
+        "fmt"
+        "simd"
+)
+&nbsp;
+func <strong>createMask</strong>() simd.Mask32s {
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1, 2, 3, 4, 5, 6, 7, 8}
+        s2 := []float32{4, 4, 4, 4, 4, 4, 4, 4}
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// SIMD operace porovnání prvků vektorů</i>
+        return v1.GreaterEqual(v2)
+}
+&nbsp;
+func <strong>main</strong>() {
+        mask := createMask()
+&nbsp;
+        <i>// konstrukce a inicializace řezu</i>
+        s1 := []float32{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}
+        s2 := []float32{99, 99, 99, 99, 99, 99, 99, 99}
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("original", s1)
+&nbsp;
+        <i>// převod řezu na vektor</i>
+        v1 := simd.LoadFloat32s(s1)
+        v2 := simd.LoadFloat32s(s2)
+&nbsp;
+        <i>// výběr prvků na základě masky</i>
+        v3 := v1.IfElse(mask, v2)
+&nbsp;
+        <i>// konstrukce řezu</i>
+        result := make([]float32, v3.Len())
+&nbsp;
+        <i>// zápis prvků vektoru do řezu</i>
+        v3.Store(result)
+&nbsp;
+        <i>// výpis obsahu řezu</i>
+        fmt.Println("selected", result)
+}
+</pre>
+
+<p>Z&nbsp;vypsaných výsledků je patrné, že první tři prvky výsledku byly
+přečteny z&nbsp;vektoru <strong>v2</strong>, zatímco dalších pět prvků
+z&nbsp;vektoru <strong>v1</strong>:</p>
+
+<pre>
+$ <strong>go run mask_selection_2.go</strong>
+&nbsp;
+original [1 2 3 4 5 6 7 8]
+selected [99 99 99 4 5 6 7 8]
+</pre>
+
+
+
+<h2 id="k18">Způsob překladu do strojového kódu</h2>
+
+<p>Interně většina funkcí a metod implementovaných v&nbsp;balíčku
+<strong>simd</strong> volá funkce či metody z&nbsp;balíčku
+<strong>simd/archsimd</strong>, který jsme si již popsali. A tyto funkce a
+metody jsou typicky transformovány na sérii SIMD instrukcí. Můžeme si to ukázat
+například na způsobu implementace operace součtu. Po překladu by měl výsledný
+strojový kód vypadat přibližně takto:</p>
+
+<pre>
+0x0170 00368 (/tmp/ramdisk/go/bin/float32_add.go:15)    CALL    runtime.convTslice(SB)
+0x0175 00373 (/tmp/ramdisk/go/bin/float32_add.go:15)    LEAQ    type:[]float32(SB), DX
+0x017c 00380 (/tmp/ramdisk/go/bin/float32_add.go:15)    MOVQ    DX, main..autotmp_50+120(SP)
+0x0181 00385 (/tmp/ramdisk/go/bin/float32_add.go:15)    MOVQ    AX, main..autotmp_50+128(SP)
+0x0189 00393 (/tmp/ramdisk/go/src/fmt/print.go:307)     MOVQ    os.Stdout(SB), BX
+0x0190 00400 (&lt;unknown line number&gt;)    NOP
+0x0190 00400 (/tmp/ramdisk/go/src/fmt/print.go:307)     LEAQ    go:itab.*os.File,io.Writer(SB), AX
+0x0197 00407 (/tmp/ramdisk/go/src/fmt/print.go:307)     LEAQ    main..autotmp_50+104(SP), CX
+0x019c 00412 (/tmp/ramdisk/go/src/fmt/print.go:307)     MOVL    $2, DI
+0x01a1 00417 (/tmp/ramdisk/go/src/fmt/print.go:307)     MOVL    DI, SI
+0x01a3 00419 (/tmp/ramdisk/go/src/fmt/print.go:307)     PCDATA  $1, $3
+0x01a3 00419 (/tmp/ramdisk/go/src/fmt/print.go:307)     CALL    fmt.Fprintln(SB)
+0x01a8 00424 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:108) MOVQ    main..autotmp_95+64(SP), DX
+0x01ad 00429 (/tmp/ramdisk/go/src/simd/archsimd/slice_gen_amd64.go:108) VMOVDQU (DX), X0
+0x01b1 00433 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     MOVQ    main..autotmp_96+56(SP), DX
+0x01b6 00438 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     <strong>VADDPS  (DX), X0, X0</strong>
+0x01ba 00442 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     MOVUPS  X0, main..autotmp_97+40(SP)
+0x01bf 00447 (/tmp/ramdisk/go/bin/float32_add.go:18)    XCHGL   AX, AX
+0x01c0 00448 (/tmp/ramdisk/go/bin/float32_add.go:22)    XCHGL   AX, AX
+</pre>
+
+<p>Povšimněte si, že ústřední částí celého kódu je volání SIMD instrukce
+<strong>VADDPS</strong>:</p>
+
+<pre>
+0x01b1 00433 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     MOVQ    main..autotmp_96+56(SP), DX
+0x01b6 00438 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     <strong>VADDPS  (DX), X0, X0</strong>
+0x01ba 00442 (/tmp/ramdisk/go/src/simd/internal/bridge/decls_amd64.go:3348)     MOVUPS  X0, main..autotmp_97+40(SP)
+</pre>
+
+<p><div class="rs-tip-major">Poznámka: na druhou stranu je nutné upozornit na
+to, že zmenšení bitové šířky vektorů přes proměnnou prostředí nemá vliv na
+přeložený kód, resp.&nbsp;přesněji řečeno na tu část, která volá vektorové
+(SIMD) operace. Pouze se změní způsob konverzí řezů na vektory a naopak (ovšem
+tato část bude možná v&nbsp;dalších verzích jazyka Go modifikována, protože
+nynější chování není příliš intuitivní).</div></p>
+
+
+
+<h2 id="k19">Repositář s&nbsp;demonstračními příklady</h2>
+
+<p>Zdrojové kódy všech minule i dnes použitých demonstračních příkladů byly
+uloženy do Git repositáře, který je dostupný na adrese <a
+href="https://github.com/tisnik/go-root">https://github.com/tisnik/go-root</a>.
+Všechny příklady vyžadují Go verze 1.26 nebo 1.27. V&nbsp;případě, že nebudete
+chtít klonovat celý repositář (ten je ovšem &ndash; alespoň prozatím &ndash;
+relativně malý, dnes má přibližně šest až sedm megabajtů), můžete namísto toho
+použít odkazy na jednotlivé demonstrační příklady, které naleznete
+v&nbsp;následující tabulce:</p>
+
+<table>
+<tr><th> #</th><th>Příklad</th><th>Stručný popis</th><th>Cesta</th></tr>
+<tr><td> 1</td><td>test_avx.go</td><td>runtime test, zda procesor podporuje instrukční sadu AVX</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/test_avx.go">https://github.com/tisnik/go-root/blob/master/simd/test_avx.go</a></td></tr>
+<tr><td> 2</td><td>test_other_variants.go</td><td>runtime test, zda procesor podporuje další rozšíření instrukční sady o SIMD operace</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/test_other_variants.go">https://github.com/tisnik/go-root/blob/master/simd/test_other_variants.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 3</td><td>vector_add_1.go</td><td>součet dvou vektorů typu Float32x4</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_add_1.go">https://github.com/tisnik/go-root/blob/master/simd/vector_add_1.go</a></td></tr>
+<tr><td> 4</td><td>vector_add_2.go</td><td>součet dvou vektorů typu Float32x4 (upraveno do samostatné funkce)</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_add_2.go">https://github.com/tisnik/go-root/blob/master/simd/vector_add_2.go</a></td></tr>
+<tr><td> 5</td><td>vector_add_3.go</td><td>součet dvou vektorů typu Float32x8</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_add_3.go">https://github.com/tisnik/go-root/blob/master/simd/vector_add_3.go</a></td></tr>
+<tr><td> 6</td><td>vector_add_4.go</td><td>součet dvou vektorů typu Float32x16</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_add_4.go">https://github.com/tisnik/go-root/blob/master/simd/vector_add_4.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td> 7</td><td>vector_unary.go</td><td>základní unární operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_unary.go">https://github.com/tisnik/go-root/blob/master/simd/vector_unary.go</a></td></tr>
+<tr><td> 8</td><td>vector_binary.go</td><td>základní binární operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_binary.go">https://github.com/tisnik/go-root/blob/master/simd/vector_binary.go</a></td></tr>
+<tr><td> 9</td><td>vector_round.go</td><td>zaokrouhlení a podobné operace s&nbsp;vektory</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_round.go">https://github.com/tisnik/go-root/blob/master/simd/vector_round.go</a></td></tr>
+<tr><td>10</td><td>vector_broadcast.go</td><td>naplnění všech prvků vektoru stejnou hodnotou</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_broadcast.go">https://github.com/tisnik/go-root/blob/master/simd/vector_broadcast.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>11</td><td>vector_comparison.go</td><td>porovnání prvků dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_comparison.go">https://github.com/tisnik/go-root/blob/master/simd/vector_comparison.go</a></td></tr>
+<tr><td>12</td><td>vector_masked.go</td><td>základní operace s&nbsp;maskou</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_masked.go">https://github.com/tisnik/go-root/blob/master/simd/vector_masked.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>13</td><td>vector_mul_add_1.go</td><td>základní varianta operace fused multiply-add</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_1.go">https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_1.go</a></td></tr>
+<tr><td>14</td><td>vector_mul_add_2.go</td><td>další varianty operace fused multiply-add</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_2.go">https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_2.go</a></td></tr>
+<tr><td>15</td><td>vector_mul_add_3.go</td><td>další varianty operace fused multiply-add</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_3.go">https://github.com/tisnik/go-root/blob/master/simd/vector_mul_add_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>16</td><td>int_vectors_add_1.go</td><td>součet vektorů s&nbsp;celočíselnými prvky (4 prvky typu <strong>int32</strong>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_1.go">https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_1.go</a></td></tr>
+<tr><td>17</td><td>int_vectors_add_2.go</td><td>součet vektorů s&nbsp;celočíselnými prvky (16 prvků typu <strong>int8</strong>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_2.go">https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_2.go</a></td></tr>
+<tr><td>18</td><td>int_vectors_add_3.go</td><td>součet vektorů s&nbsp;celočíselnými prvky (32 prvků typu <strong>int8</strong>)</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_3.go">https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>19</td><td>int_vectors_add_normal.go</td><td>součet vektorů s&nbsp;přetečením hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_normal.go">https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_normal.go</a></td></tr>
+<tr><td>20</td><td>int_vectors_add_saturated.go</td><td>součet vektorů se saturací</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_saturated.go">https://github.com/tisnik/go-root/blob/master/simd/int_vectors_add_saturated.go</a></td></tr>
+<tr><td>21</td><td>uint_vectors_add_normal.go</td><td>součet vektorů s&nbsp;prvky bez znaménka s&nbsp;přetečením hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_add_normal.go">https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_add_normal.go</a></td></tr>
+<tr><td>22</td><td>uint_vectors_add_saturated.go</td><td>součet vektorů s&nbsp;prvky bez znaménka se saturací</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_add_saturated.go">https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_add_saturated.go</a></td></tr>
+<tr><td>23</td><td>uint_vectors_sub_normal.go</td><td>rozdíl vektorů s&nbsp;prvky bez znaménka s&nbsp;přetečením hodnot</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_sub_normal.go">https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_sub_normal.go</a></td></tr>
+<tr><td>24</td><td>uint_vectors_sub_saturated.go</td><td>rozdíl vektorů s&nbsp;prvky bez znaménka se saturací</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_sub_saturated.go">https://github.com/tisnik/go-root/blob/master/simd/uint_vectors_sub_saturated.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>25</td><td>dot_product_1.go</td><td>částečný skalární součin dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/dot_product_1.go">https://github.com/tisnik/go-root/blob/master/simd/dot_product_1.go</a></td></tr>
+<tr><td>26</td><td>dot_product_2.go</td><td>částečný skalární součin dvou vektorů dvojnásobné délky</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/dot_product_2.go">https://github.com/tisnik/go-root/blob/master/simd/dot_product_2.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>27</td><td>permute_1.go</td><td>permutace vektorů s&nbsp;využitím vektorů indexů [0, 1, 2, 3, 4, 5, 6, 7]</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/permute_1.go">https://github.com/tisnik/go-root/blob/master/simd/permute_1.go</a></td></tr>
+<tr><td>28</td><td>permute_2.go</td><td>permutace vektorů s&nbsp;využitím vektorů indexů [7, 6, 5, 4, 3, 2, 1, 0]</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/permute_2.go">https://github.com/tisnik/go-root/blob/master/simd/permute_2.go</a></td></tr>
+<tr><td>29</td><td>permute_3.go</td><td>permutace vektorů s&nbsp;využitím vektorů indexů [0, 0, 7, 7, 0, 0, 7, 7]</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/permute_3.go">https://github.com/tisnik/go-root/blob/master/simd/permute_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>30</td><td>float32_add.go</td><td>součet prvků vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_add.go">https://github.com/tisnik/go-root/blob/master/simd/float32_add.go</a></td></tr>
+<tr><td>31</td><td>float32_sub.go</td><td>rozdíl prvků vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_sub.go">https://github.com/tisnik/go-root/blob/master/simd/float32_sub.go</a></td></tr>
+<tr><td>32</td><td>float32_div.go</td><td>podíl prvků vektorů (dělení nulou)</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_div.go">https://github.com/tisnik/go-root/blob/master/simd/float32_div.go</a></td></tr>
+<tr><td>33</td><td>float32_mul_add.go</td><td>operace multiply-add s&nbsp;dvojicí vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_mul_add.go">https://github.com/tisnik/go-root/blob/master/simd/float32_mul_add.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>34</td><td>float32_unary.go</td><td>unární operace nad prvky jednoho vektoru</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_unary.go">https://github.com/tisnik/go-root/blob/master/simd/float32_unary.go</a></td></tr>
+<tr><td>35</td><td>float32_binary.go</td><td>binární operace nad prvky dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_binary.go">https://github.com/tisnik/go-root/blob/master/simd/float32_binary.go</a></td></tr>
+<tr><td>36</td><td>float32_comparison.go</td><td>porovnání prvků dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_comparison.go">https://github.com/tisnik/go-root/blob/master/simd/float32_comparison.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>37</td><td>float32_length_1.go</td><td>zjištění, jaké délky vektorů jsou podporovány, první příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_length_1.go">https://github.com/tisnik/go-root/blob/master/simd/float32_length_1.go</a></td></tr>
+<tr><td>38</td><td>float32_length_2.go</td><td>zjištění, jaké délky vektorů jsou podporovány, druhý příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_length_2.go">https://github.com/tisnik/go-root/blob/master/simd/float32_length_2.go</a></td></tr>
+<tr><td>39</td><td>float32_length_3.go</td><td>zjištění, jaké délky vektorů jsou podporovány, třetí příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/float32_length_3.go">https://github.com/tisnik/go-root/blob/master/simd/float32_length_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>39</td><td>vector_bit_size.go</td><td>přečtení bitové šířky vektorů v&nbsp;runtime</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_bit_size.go">https://github.com/tisnik/go-root/blob/master/simd/vector_bit_size.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>40</td><td>vector_compatibility_1.go</td><td>test kompatibility různých typů vektorů, první příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_1.go">https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_1.go</a></td></tr>
+<tr><td>41</td><td>vector_compatibility_2.go</td><td>test kompatibility různých typů vektorů, druhý příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_2.go">https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_2.go</a></td></tr>
+<tr><td>42</td><td>vector_compatibility_3.go</td><td>test kompatibility různých typů vektorů, třetí příklad</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_3.go">https://github.com/tisnik/go-root/blob/master/simd/vector_compatibility_3.go</a></td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>43</td><td>mask_create.go</td><td>konstrukce masky</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/mask_create.go">https://github.com/tisnik/go-root/blob/master/simd/mask_create.go</a></td></tr>
+<tr><td>44</td><td>mask_operations.go</td><td>základní operace s&nbsp;dvojicí masek</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/mask_operations.go">https://github.com/tisnik/go-root/blob/master/simd/mask_operations.go</a></td></tr>
+<tr><td>45</td><td>mask_to_vector.go</td><td>převod masky na vektor</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/mask_to_vector.go">https://github.com/tisnik/go-root/blob/master/simd/mask_to_vector.go</a></td></tr>
+<tr><td>46</td><td>mask_selection_1.go</td><td>využití masky pro výběr prvků z&nbsp;jednoho vektoru</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/mask_selection_1.go">https://github.com/tisnik/go-root/blob/master/simd/mask_selection_1.go</a></td></tr>
+<tr><td>47</td><td>mask_selection_2.go</td><td>využití masky pro výběr prvků ze dvou vektorů</td><td><a href="https://github.com/tisnik/go-root/blob/master/simd/mask_selection_2.go">https://github.com/tisnik/go-root/blob/master/simd/mask_selection_2.go</a></td></tr>
+</table>
+
+
+
+<h2 id="k20">Odkazy na Internetu</h2>
+
+<ol>
+
+<li>Go 1.27 Release Notes<br />
+<a href="https://go.dev/doc/go1.27">https://go.dev/doc/go1.27</a>
+</li>
+
+<li>New experimental simd package<br />
+<a href="https://go.dev/doc/go1.27#simd">https://go.dev/doc/go1.27#simd</a>
+</li>
+
+<li>Balíček simd<br />
+<a href="https://pkg.go.dev/simd">https://pkg.go.dev/simd</a>
+</li>
+
+<li>Balíček archsimd<br />
+<a href="https://pkg.go.dev/simd/archsimd">https://pkg.go.dev/simd/archsimd</a>
+</li>
+
+<li>Experimental SIMD with simd/archsimd<br />
+<a href="https://go-cookbook.com/snippets/performance/experimental-simd-archsimd">https://go-cookbook.com/snippets/performance/experimental-simd-archsimd</a>
+</li>
+
+<li>Go Generic Methods: A Hands-On Go 1.27 Tutorial<br />
+<a href="https://www.danilchenko.dev/posts/go-generic-methods/">https://www.danilchenko.dev/posts/go-generic-methods/</a>
+</li>
+
+<li>Auto-vectorization in GCC<br />
+<a href="https://gcc.gnu.org/projects/tree-ssa/vectorization.html">https://gcc.gnu.org/projects/tree-ssa/vectorization.html</a>
+</li>
+
+<li>GCC documentation: Extensions to the C Language Family<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/C-Extensions.html#C-Extensions">https://gcc.gnu.org/onlinedocs/gcc/C-Extensions.html#C-Extensions</a>
+</li>
+
+<li>GCC documentation: Using Vector Instructions through Built-in Functions<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Vector-Extensions.html">https://gcc.gnu.org/onlinedocs/gcc/Vector-Extensions.html</a>
+</li>
+
+<li>SSE (Streaming SIMD Extentions)<br />
+<a href="http://www.songho.ca/misc/sse/sse.html">http://www.songho.ca/misc/sse/sse.html</a>
+</li>
+
+<li>Timothy A. Chagnon: SSE and SSE2<br />
+<a href="http://www.cs.drexel.edu/~tc365/mpi-wht/sse.pdf">http://www.cs.drexel.edu/~tc365/mpi-wht/sse.pdf</a>
+</li>
+
+<li>Intel corporation: Extending the Worldr's Most Popular Processor Architecture<br />
+<a href="http://download.intel.com/technology/architecture/new-instructions-paper.pdf">http://download.intel.com/technology/architecture/new-instructions-paper.pdf</a>
+</li>
+
+<li>SIMD architectures:<br />
+<a href="http://arstechnica.com/old/content/2000/03/simd.ars/">http://arstechnica.com/old/content/2000/03/simd.ars/</a>
+</li>
+
+<li>Tour of the Black Holes of Computing!: Floating Point<br />
+<a href="http://www.cs.hmc.edu/~geoff/classes/hmc.cs105.../slides/class02_floats.ppt">http://www.cs.hmc.edu/~geoff/classes/hmc.cs105.../slides/class02_floats.ppt</a>
+</li>
+
+<li>3Dnow! Technology Manual<br />
+AMD Inc., 2000</li>
+
+<li>Intel MMX<sup>TM</sup> Technology Overview<br />
+Intel corporation, 1996</li>
+
+<li>MultiMedia eXtensions<br />
+<a href="http://softpixel.com/~cwright/programming/simd/mmx.php">http://softpixel.com/~cwright/programming/simd/mmx.php</a>i
+</li>
+
+<li>AMD K5 ("K5" / "5k86")<br />
+<a href="http://www.pcguide.com/ref/cpu/fam/g5K5-c.html">http://www.pcguide.com/ref/cpu/fam/g5K5-c.html</a>
+</li>
+
+<li>Sixth Generation Processors<br />
+<a href="http://www.pcguide.com/ref/cpu/fam/g6.htm">http://www.pcguide.com/ref/cpu/fam/g6.htm</a>
+</li>
+
+<li>Great Microprocessors of the Past and Present<br />
+<a href="http://www.cpushack.com/CPU/cpu1.html">http://www.cpushack.com/CPU/cpu1.html</a>
+</li>
+
+<li>Very long instruction word (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/Very_long_instruction_word">http://en.wikipedia.org/wiki/Very_long_instruction_word</a>
+</li>
+
+<li>CPU design (Wikipedia)<br />
+<a href="http://en.wikipedia.org/wiki/CPU_design">http://en.wikipedia.org/wiki/CPU_design</a>
+</li>
+
+<li>Bulldozer (microarchitecture)<br />
+<a href="https://en.wikipedia.org/wiki/Bulldozer_(microarchitecture)">https://en.wikipedia.org/wiki/Bulldozer_(microarchitecture)</a>
+</li>
+
+<li>SIMD Instructions Considered Harmful<br />
+<a href="https://www.sigarch.org/simd-instructions-considered-harmful/">https://www.sigarch.org/simd-instructions-considered-harmful/</a>
+</li>
+
+<li>GCC Compiler Intrinsics<br />
+<a href="https://iq.opengenus.org/gcc-compiler-intrinsics/">https://iq.opengenus.org/gcc-compiler-intrinsics/</a>
+</li>
+
+<li>Scalable_Vector_Extension_(SVE)<br />
+<a href="https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)">https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)</a>
+</li>
+
+<li>Improve the Multimedia User Experience<br />
+<a href="https://www.arm.com/technologies/neon">https://www.arm.com/technologies/neon</a>
+</li>
+
+<li>NEON Technology (stránky ARM)<br />
+<a href="https://developer.arm.com/technologies/neon">https://developer.arm.com/technologies/neon</a>
+</li>
+
+<li>SIMD Assembly Tutorial: ARM NEON - Xiph.org<br />
+<a href="https://people.xiph.org/~tterribe/daala/neon_tutorial.pdf">https://people.xiph.org/~tterribe/daala/neon_tutorial.pdf</a>
+</li>
+
+<li>Ne10<br />
+<a href="http://projectne10.github.io/Ne10/">http://projectne10.github.io/Ne10/</a>
+</li>
+
+<li>NEON and Floating-Point architecture<br />
+<a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABIGHEB.html">http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABIGHEB.html</a>
+</li>
+
+<li>An Introduction to ARM NEON<br />
+<a href="http://peterdn.com/post/an-introduction-to-ARM-NEON.aspx">http://peterdn.com/post/an-introduction-to-ARM-NEON.aspx</a>
+</li>
+
+<li>ARM NEON Intrinsics Reference<br />
+<a href="http://infocenter.arm.com/help/topic/com.arm.doc.ihi0073a/IHI0073A_arm_neon_intrinsics_ref.pdf">http://infocenter.arm.com/help/topic/com.arm.doc.ihi0073a/IHI0073A_arm_neon_intrinsics_ref.pdf</a>
+</li>
+
+<li>Arm Neon Intrinsics vs hand assembly<br />
+<a href="https://stackoverflow.com/questions/9828567/arm-neon-intrinsics-vs-hand-assembly">https://stackoverflow.com/questions/9828567/arm-neon-intrinsics-vs-hand-assembly</a>
+</li>
+
+<li>ARM NEON Optimization. An Example<br />
+<a href="http://hilbert-space.de/?p=22">http://hilbert-space.de/?p=22</a>
+</li>
+
+<li>AArch64 NEON instruction format<br />
+<a href="https://developer.arm.com/docs/den0024/latest/7-aarch64-floating-point-and-neon/73-aarch64-neon-instruction-format">https://developer.arm.com/docs/den0024/latest/7-aarch64-floating-point-and-neon/73-aarch64-neon-instruction-format</a>
+</li>
+
+<li>ARM SIMD instructions<br />
+<a href="https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions">https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions</a>
+</li>
+
+<li>Learn the architecture - Migrate Neon to SVE Version 1.0<br />
+<a href="https://developer.arm.com/documentation/102131/0100/?lang=en">https://developer.arm.com/documentation/102131/0100/?lang=en</a>
+</li>
+
+<li>1.2.2. Comparison between NEON technology and other SIMD solutions<br />
+<a href="https://developer.arm.com/documentation/den0018/a/Introduction/Comparison-between-ARM-NEON-technology-and-other-implementations/Comparison-between-NEON-technology-and-other-SIMD-solutions?lang=en">https://developer.arm.com/documentation/den0018/a/Introduction/Comparison-between-ARM-NEON-technology-and-other-implementations/Comparison-between-NEON-technology-and-other-SIMD-solutions?lang=en</a>
+</li>
+
+<li>NEON Programmer’s Guide<br />
+<a href="https://documentation-service.arm.com/static/63299276e68c6809a6b41308">https://documentation-service.arm.com/static/63299276e68c6809a6b41308</a>
+</li>
+
+<li>Brain Floating Point – nový formát uložení čísel pro strojové učení a chytrá čidla<br />
+<a href="https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/">https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/</a>
+</li>
+
+<li>Other Built-in Functions Provided by GCC<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html">https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html</a>
+</li>
+
+<li>GCC: 6.60 Built-in Functions Specific to Particular Target Machines<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Target-Builtins.html#Target-Builtins">https://gcc.gnu.org/onlinedocs/gcc/Target-Builtins.html#Target-Builtins</a>
+</li>
+
+<li>Advanced Vector Extensions<br />
+<a href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">https://en.wikipedia.org/wiki/Advanced_Vector_Extensions</a>
+</li>
+
+<li>Top 10 Craziest Assembly Language Instructions<br />
+<a href="https://www.youtube.com/watch?v=Wz_xJPN7lAY">https://www.youtube.com/watch?v=Wz_xJPN7lAY</a>
+</li>
+
+<li>Intel x86: let's take a look at one of the most complex instruction set!<br />
+<a href="https://www.youtube.com/watch?v=KBLy23B38-c">https://www.youtube.com/watch?v=KBLy23B38-c</a>
+</li>
+
+<li>x64 Assembly Tutorial 58: Intro to AVX<br />
+<a href="https://www.youtube.com/watch?v=yAvuHd8cBJY">https://www.youtube.com/watch?v=yAvuHd8cBJY</a>
+</li>
+
+<li>AVX512 (1 of 3): Introduction and Overview<br />
+<a href="https://www.youtube.com/watch?v=D-mM6X5xnTY">https://www.youtube.com/watch?v=D-mM6X5xnTY</a>
+</li>
+
+<li>AVX512 (2 of 3): Programming AVX512 in 3 Different Ways<br />
+<a href="https://www.youtube.com/watch?v=I3efQKLgsjM">https://www.youtube.com/watch?v=I3efQKLgsjM</a>
+</li>
+
+<li>AVX512 (3 of 3): Deep Dive into AVX512 Mechanisms<br />
+<a href="https://www.youtube.com/watch?v=543a1b-cPmU">https://www.youtube.com/watch?v=543a1b-cPmU</a>
+</li>
+
+<li>AVX-512<br />
+<a href="https://en.wikipedia.org/wiki/AVX-512">https://en.wikipedia.org/wiki/AVX-512</a>
+</li>
+
+<li>AVX-512<br />
+<a href="https://iq.opengenus.org/avx512/">https://iq.opengenus.org/avx512/</a>
+</li>
+
+<li>SIMD Algorithms Youtube course<br />
+<a href="https://denisyaroshevskiy.github.io/presentations/">https://denisyaroshevskiy.github.io/presentations/</a>
+</li>
+
+<li>Compiler explorer<br />
+<a href="https://godbolt.org/">https://godbolt.org/</a>
+</li>
+
+<li>Restricting pointers<br />
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Restricted-Pointers.html">https://gcc.gnu.org/onlinedocs/gcc/Restricted-Pointers.html</a>
+</li>
+
+<li>Does the restrict keyword provide significant benefits in gcc/g++<br />
+<a href="https://stackoverflow.com/questions/1965487/does-the-restrict-keyword-provide-significant-benefits-in-gcc-g">https://stackoverflow.com/questions/1965487/does-the-restrict-keyword-provide-significant-benefits-in-gcc-g</a>
+</li>
+
+<li>Demystifying The Restrict Keyword<br />
+<a href="https://cellperformance.beyond3d.com/articles/2006/05/demystifying-the-restrict-keyword.html">https://cellperformance.beyond3d.com/articles/2006/05/demystifying-the-restrict-keyword.html</a>
+</li>
+
+<li>Basics of Vectorization for Fortran Applications<br />
+<a href="https://inria.hal.science/hal-01688488/document">https://inria.hal.science/hal-01688488/document</a>
+</li>
+
+<li>What does the restrict keyword mean in C++?<br />
+<a href="https://stackoverflow.com/questions/776283/what-does-the-restrict-keyword-mean-in-c">https://stackoverflow.com/questions/776283/what-does-the-restrict-keyword-mean-in-c</a>
+</li>
+
+<li>restrict keyword (Wikipedia)<br />
+<a href="https://en.wikipedia.org/wiki/Restrict">https://en.wikipedia.org/wiki/Restrict</a>
+</li>
+
+<li>Reduction operator<br />
+<a href="https://en.wikipedia.org/wiki/Reduction_operator">https://en.wikipedia.org/wiki/Reduction_operator</a>
+</li>
+
+<li>The Power of the Dot Product in Artificial Intelligence<br />
+<a href="https://medium.com/data-science/the-power-of-the-dot-product-in-artificial-intelligence-c002331e1829">https://medium.com/data-science/the-power-of-the-dot-product-in-artificial-intelligence-c002331e1829</a>
+</li>
+
+<li>Can any one explain why dot product is used in neural network and what is the intitutive thought of dot product<br />
+<a href="https://stats.stackexchange.com/questions/291680/can-any-one-explain-why-dot-product-is-used-in-neural-network-and-what-is-the-in">https://stats.stackexchange.com/questions/291680/can-any-one-explain-why-dot-product-is-used-in-neural-network-and-what-is-the-in</a>
+</li>
+
+<li>Aligned and unaligned memory accesses?<br />
+<a href="https://stackoverflow.com/questions/1063809/aligned-and-unaligned-memory-accesses">https://stackoverflow.com/questions/1063809/aligned-and-unaligned-memory-accesses</a>
+</li>
+
+<li>Go finally gets SIMD in 1.26<br />
+<a href="https://hexfusion.io/posts/go-simd-art/">https://hexfusion.io/posts/go-simd-art/</a>
+</li>
+
+<li>simd/archsimd: architecture-specific SIMD intrinsics under a GOEXPERIMENT #73787<br />
+<a href="https://github.com/golang/go/issues/73787">https://github.com/golang/go/issues/73787</a>
+</li>
+
+<li>Integer overflow<br />
+<a href="https://en.wikipedia.org/wiki/Integer_overflow">https://en.wikipedia.org/wiki/Integer_overflow</a>
+</li>
+
+<li>Saturation arithmetic<br />
+<a href="https://en.wikipedia.org/wiki/Saturation_arithmetic">https://en.wikipedia.org/wiki/Saturation_arithmetic</a>
+</li>
+
+<li>DPPS — Dot Product of Packed Single Precision Floating-Point Values<br />
+<a href="https://www.felixcloutier.com/x86/dpps">https://www.felixcloutier.com/x86/dpps</a>
+</li>
+
+<li>DPPD — Dot Product of Packed Double Precision Floating-Point Values<br />
+<a href="https://www.felixcloutier.com/x86/dppd">https://www.felixcloutier.com/x86/dppd</a>
+</li>
+
+<li>VDPBF16PS — Dot Product of BF16 Pairs Accumulated Into Packed Single Precision<br />
+<a href="https://www.felixcloutier.com/x86/vdpbf16ps">https://www.felixcloutier.com/x86/vdpbf16ps</a>
+</li>
+
+<li>Brain Floating Point – nový formát uložení čísel pro strojové učení a chytrá čidla<br />
+<a href="https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/">https://www.root.cz/clanky/brain-floating-point-ndash-novy-format-ulozeni-cisel-pro-strojove-uceni-a-chytra-cidla/</a>
+</li>
+
+</ol>
+
