@@ -187,8 +187,10 @@ END OF TERMS AND CONDITIONS
 package main
 
 import (
+	"crypto/rand"
 	"embed"
 	_ "embed"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/gob"
 	"encoding/json"
@@ -305,6 +307,14 @@ func NewServer(app *Application) Server {
 	return ServerImpl{
 		app: app,
 	}
+}
+
+func newSessionValue() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // serveStaticImage serves a PNG image from the embedded static image bundle.
@@ -430,6 +440,20 @@ func (s ServerImpl) mainEndpoint(writer http.ResponseWriter, request *http.Reque
 		http.NotFound(writer, request)
 		return
 	}
+	sessionValue, err := newSessionValue()
+	if err != nil {
+		http.Error(writer, "failed to create session", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(writer, &http.Cookie{
+		Name:     "epsilon_session",
+		Value:    sessionValue,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   3600,
+	})
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	io.WriteString(writer, MainPage)
 }
@@ -440,6 +464,13 @@ func (s ServerImpl) gridEndpoint(writer http.ResponseWriter, request *http.Reque
 		http.NotFound(writer, request)
 		return
 	}
+	cookie, err := request.Cookie("epsilon_session")
+	if err != nil {
+		http.Error(writer, "cookie not found", http.StatusUnauthorized)
+		return
+	}
+	log.Print("Cookie", cookie)
+
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.renderTable(writer)
 }
