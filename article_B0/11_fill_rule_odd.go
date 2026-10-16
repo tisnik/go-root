@@ -1,3 +1,22 @@
+// Seriál "Programovací jazyk Go"
+//    https://www.root.cz/serialy/programovaci-jazyk-go/
+//
+// Sto čtrnáctá část
+//    Tvorba 2D i 3D grafiky a animací v Go s využitím projektu GoGPU (2. část)
+//    https://www.root.cz/clanky/tvorba-2d-i-3d-grafiky-a-animaci-v-go-s-vyuzitim-projektu-gogpu-2-cast/
+//
+// Repositář:
+//    https://github.com/tisnik/go-root/
+//
+// Seznam demonstračních příkladů ze sto čtrnácté části:
+//    https://github.com/tisnik/go-root/blob/master/article_B0/README.md
+//
+// Demonstrační příklad číslo 11:
+//    pravidla "lichý počet přetnutí paprsku" pro vyplňování obrazců, jejichž hrany se překrývají
+//
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/article_B0/11_fill_rule_odd.html
+
 package main
 
 import (
