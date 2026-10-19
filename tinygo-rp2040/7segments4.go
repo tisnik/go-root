@@ -11,6 +11,8 @@
 //    Využití TinyGo při programování Raspberry Pi Pico (2. část)
 //    https://www.root.cz/clanky/vyuziti-tinygo-pri-programovani-raspberry-pi-pico-2-cast/
 //
+// Dokumentace ve stylu "literate programming":
+//    https://tisnik.github.io/go-root/tinygo-rp2040/7segments4.html
 
 package main
 
